@@ -1341,6 +1341,426 @@ function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
   )
 }
 
+
+// ============ Sentence Translator ============
+
+// Example sentences keyed by lexicon id for the placeholder hints
+const EXAMPLE_SENTENCES = {
+  medicine:     'The differential diagnosis revealed comorbidities requiring prophylactic treatment.',
+  engineering:  'The safety factor exceeded the yield strength preventing buckling under thermal expansion.',
+  law:          'The proximate cause established liability triggering indemnity under the contract.',
+  trading:      'Momentum divergence at resistance triggered a fade entry with tight stop loss.',
+  education:    'Scaffolding supports formative assessment to reach the zone of proximal development.',
+  psychology:   'Confirmation bias and anchoring distorted the self efficacy of the group.',
+  music:        'The dissonance resolved through counterpoint establishing a new harmonic cadence.',
+  agriculture:  'Crop rotation and companion planting improved soil health after the fallow period.',
+  philosophy:   'The dialectic tension between epistemology and ontology reveals a foundational axiom.',
+  military:     'Asymmetric tactics exploited the decisive point via superior operational security.',
+  cooking:      'Mise en place and deglazing built flavor layering through the Maillard reaction.',
+  sports:       'Overreaching broke the plateau, periodization and active recovery restored peak output.',
+  architecture: 'The parti drove fenestration choices along the datum respecting the genius loci.',
+  journalism:   'The lede confirmed attribution and the inverted pyramid preserved editorial independence.',
+  nyx:          'The directive restored coherence after the epoch change invalidated the audit trail.',
+  poseidon:     'Liquidity depth absorbed slippage and the oracle prevented clearing price manipulation.',
+  athena:       'The pivot exposed the tradeoff between optionality and the network effect flywheel.',
+  hephaestus:   'Refactoring addressed tech debt and CI CD enforced idempotent deployment contracts.',
+  hermes:       'Webhook latency exceeded the timeout and the circuit breaker triggered a backpressure retry.',
+  apollo:       'The TWAP filtered noise and outlier regression revealed a meaningful signal correlation.',
+}
+
+function confidenceColor(confidence) {
+  if (confidence >= 90) return '#00ff41'
+  if (confidence >= 60) return '#fbbf24'
+  return '#f97316'
+}
+
+function HighlightedText({ segments, onTermClick, activeTermIndex }) {
+  return (
+    <div className="text-sm leading-relaxed font-mono text-white/90 whitespace-pre-wrap break-words">
+      {segments.map((seg, i) => {
+        if (seg.type === 'text') {
+          return <span key={i}>{seg.text}</span>
+        }
+        const color = seg.toTerm ? confidenceColor(seg.confidence) : '#94a3b8'
+        const isActive = activeTermIndex === i
+        return (
+          <span
+            key={i}
+            onClick={() => onTermClick(i)}
+            className="relative cursor-pointer rounded px-0.5 transition-all duration-150"
+            style={{
+              backgroundColor: isActive ? color + '25' : color + '15',
+              borderBottom: '2px solid ' + color,
+              color: color,
+            }}
+            title={seg.term + ' -> ' + (seg.toTerm || '(no equivalent)') + ' [' + seg.universal + ']'}
+          >
+            {seg.text}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function TermTooltipPanel({ segment, fromMeta, toMeta }) {
+  if (!segment || segment.type !== 'term') return null
+  const fromColor = fromMeta?.color || '#94a3b8'
+  const toColor   = toMeta?.color   || '#94a3b8'
+  const hasTranslation = !!segment.toTerm
+  return (
+    <motion.div
+      key={segment.term + segment.text}
+      initial={{ opacity: 0, y: 8, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4, scale: 0.97 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className="mt-3 p-3 rounded-xl border"
+      style={{
+        background: 'rgba(8,12,8,0.85)',
+        borderColor: hasTranslation ? confidenceColor(segment.confidence) + '30' : 'rgba(37,37,37,0.8)',
+      }}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div className="flex-1 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-0.5">
+            <AgentDot color={fromColor} size={5} />
+            <span className="text-[9px] font-mono text-black-500">{fromMeta?.name}</span>
+          </div>
+          <span className="text-white text-xs font-mono font-semibold">{segment.text}</span>
+          {segment.fromDesc && (
+            <p className="text-[9px] font-mono text-black-600 mt-0.5 leading-snug">{segment.fromDesc}</p>
+          )}
+        </div>
+        <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+          <svg className="w-4 h-4 text-matrix-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+          <span className="text-[7px] font-mono text-black-700">UNIVERSAL</span>
+        </div>
+        <div className="flex-1 text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-0.5">
+            <AgentDot color={toColor} size={5} />
+            <span className="text-[9px] font-mono text-black-500">{toMeta?.name}</span>
+          </div>
+          {hasTranslation ? (
+            <>
+              <span className="text-xs font-mono font-semibold" style={{ color: confidenceColor(segment.confidence) }}>
+                {segment.toTerm?.replace(/_/g, ' ')}
+              </span>
+              {segment.toDesc && (
+                <p className="text-[9px] font-mono text-black-600 mt-0.5 leading-snug">{segment.toDesc}</p>
+              )}
+            </>
+          ) : (
+            <span className="text-[10px] font-mono text-black-600">no equivalent</span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center justify-center gap-1.5 pt-2 border-t border-black-800/60">
+        <span className="text-[9px] font-mono text-black-600 uppercase tracking-wider">Universal concept:</span>
+        <span className="text-[9px] font-mono text-matrix-500 font-semibold">{segment.universal}</span>
+        {segment.confidence > 0 && (
+          <span className="text-[8px] font-mono font-bold ml-1" style={{ color: confidenceColor(segment.confidence) }}>
+            {segment.confidence}%
+          </span>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+function SentenceTranslator({ userLexicons = [] }) {
+  const [stFromId, setStFromId] = useState('medicine')
+  const [stToId, setStToId]     = useState('engineering')
+  const [sourceText, setSourceText] = useState(
+    'The differential diagnosis revealed comorbidities requiring prophylactic treatment.'
+  )
+  const [result, setResult]         = useState(null)
+  const [activeTermIdx, setActiveTermIdx] = useState(null)
+  const [copied, setCopied]         = useState(false)
+
+  const handleStFromChange = useCallback((id) => {
+    setStFromId(id)
+    setResult(null)
+    setActiveTermIdx(null)
+    const example = EXAMPLE_SENTENCES[id]
+    if (example) setSourceText(example)
+  }, [])
+
+  const handleStToChange = useCallback((id) => {
+    setStToId(id)
+    setResult(null)
+    setActiveTermIdx(null)
+  }, [])
+
+  const handleTranslate = useCallback(() => {
+    if (!stFromId || !stToId || !sourceText.trim()) return
+    const r = translateSentence(sourceText.trim(), stFromId, stToId)
+    setResult(r)
+    setActiveTermIdx(null)
+  }, [stFromId, stToId, sourceText])
+
+  const handleTermClick = useCallback((idx) => {
+    setActiveTermIdx(prev => prev === idx ? null : idx)
+  }, [])
+
+  const handleCopy = useCallback(() => {
+    if (!result?.translatedText) return
+    navigator.clipboard.writeText(result.translatedText).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [result])
+
+  const activeSegment = result && activeTermIdx !== null ? result.segments[activeTermIdx] : null
+
+  function getLexiconMeta(id) {
+    if (!id) return null
+    if (id.startsWith('user:')) {
+      const userId = id.slice(5)
+      const lex = userLexicons.find(u => u.userId === userId)
+      return { name: lex?.domain || userId, color: USER_LEXICON_COLOR }
+    }
+    return AGENT_MAP[id] || null
+  }
+
+  const fromMeta = getLexiconMeta(stFromId)
+  const toMeta   = getLexiconMeta(stToId)
+
+  const termSegments = useMemo(
+    () => (result ? result.segments.filter(s => s.type === 'term') : []),
+    [result]
+  )
+
+  const canTranslate = stFromId && stToId && sourceText.trim().length > 0
+
+  return (
+    <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            Sentence Translator
+            <span
+              className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(0,255,65,0.12)', color: '#00ff41' }}
+            >
+              NEW
+            </span>
+          </h2>
+          <p className="text-black-500 text-[10px] font-mono mt-0.5">
+            Paste a paragraph from your field. Every recognized term is highlighted and translated. Click any highlighted word to reveal the universal concept.
+          </p>
+        </div>
+      </div>
+
+      {/* Domain selectors */}
+      <div className="flex gap-3 mt-4 mb-3">
+        <LexiconSelect
+          label="Source Domain"
+          value={stFromId}
+          onChange={handleStFromChange}
+          excludeId={stToId}
+          userLexicons={userLexicons}
+        />
+        <div className="flex items-end pb-0.5">
+          <button
+            onClick={() => {
+              const tmp = stFromId
+              handleStFromChange(stToId)
+              handleStToChange(tmp)
+            }}
+            className="w-8 h-9 flex items-center justify-center rounded-lg border border-black-700 bg-black-900/60 text-black-500 hover:text-matrix-400 hover:border-matrix-700 transition-colors"
+            title="Swap domains"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          </button>
+        </div>
+        <LexiconSelect
+          label="Target Domain"
+          value={stToId}
+          onChange={handleStToChange}
+          excludeId={stFromId}
+          userLexicons={userLexicons}
+        />
+      </div>
+
+      {/* Two-panel layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left: source input */}
+        <div>
+          <label className="flex items-center gap-1.5 text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+            <AgentDot color={fromMeta?.color || '#94a3b8'} size={6} />
+            Source — {fromMeta?.name || 'Domain'}
+          </label>
+          <div className="relative">
+            <textarea
+              value={sourceText}
+              onChange={(e) => { setSourceText(e.target.value); setResult(null); setActiveTermIdx(null) }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleTranslate() }}
+              rows={5}
+              placeholder="Paste a paragraph from your field..."
+              className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors resize-none"
+            />
+            <span className="absolute bottom-2 right-3 text-[9px] font-mono text-black-700">Ctrl+Enter</span>
+          </div>
+          <button
+            onClick={handleTranslate}
+            disabled={!canTranslate}
+            className={'w-full mt-2 py-2.5 rounded-lg font-mono text-sm font-bold transition-all ' + (
+              canTranslate
+                ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]'
+                : 'bg-black-800 text-black-600 cursor-not-allowed'
+            )}
+          >
+            Translate Paragraph
+          </button>
+        </div>
+
+        {/* Right: annotated output */}
+        <div>
+          <label className="flex items-center gap-1.5 text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+            <AgentDot color={toMeta?.color || '#94a3b8'} size={6} />
+            Translated — {toMeta?.name || 'Domain'}
+          </label>
+
+          {result ? (
+            <div className="space-y-3">
+              {/* Annotated source view with clickable highlights */}
+              <div className="p-3 bg-black-900/60 rounded-lg border border-black-800 min-h-[100px]">
+                <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider mb-2">
+                  Annotated source — click highlighted terms
+                </div>
+                <HighlightedText
+                  segments={result.segments}
+                  onTermClick={handleTermClick}
+                  activeTermIndex={activeTermIdx}
+                />
+              </div>
+
+              {/* Clean translated output */}
+              <div className="relative p-3 bg-black-900/60 rounded-lg border border-matrix-800/30 min-h-[80px]">
+                <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider mb-2">
+                  Translated output
+                </div>
+                <p className="text-sm font-mono text-white/90 leading-relaxed whitespace-pre-wrap break-words pr-6">
+                  {result.translatedText}
+                </p>
+                <button
+                  onClick={handleCopy}
+                  className="absolute top-2 right-2 text-black-600 hover:text-matrix-400 transition-colors"
+                  title="Copy translated text"
+                >
+                  {copied ? (
+                    <svg className="w-3.5 h-3.5 text-matrix-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-[10px] font-mono text-black-500">
+                  {result.matchCount} term{result.matchCount !== 1 ? 's' : ''} recognized
+                </span>
+                <span className="text-black-700 text-[10px]">/</span>
+                <span className="text-[10px] font-mono" style={{ color: '#00ff41' }}>
+                  {result.translatedCount} translated
+                </span>
+                {result.matchCount > result.translatedCount && (
+                  <>
+                    <span className="text-black-700 text-[10px]">/</span>
+                    <span className="text-[10px] font-mono text-black-500">
+                      {result.matchCount - result.translatedCount} no equivalent
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] rounded-lg border border-black-800 border-dashed">
+              <div className="text-center">
+                <p className="text-black-600 text-xs font-mono">Translation appears here</p>
+                <p className="text-black-800 text-[10px] font-mono mt-1">Hit Translate Paragraph to begin</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Term detail tooltip */}
+      <AnimatePresence>
+        {activeSegment && (
+          <TermTooltipPanel
+            key={activeTermIdx}
+            segment={activeSegment}
+            fromMeta={fromMeta}
+            toMeta={toMeta}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Term glossary chips */}
+      {result && termSegments.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="mt-4 pt-4 border-t border-black-800"
+        >
+          <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider mb-2">
+            Term map — {termSegments.length} domain term{termSegments.length !== 1 ? 's' : ''} detected
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {termSegments.map((seg, chipIdx) => {
+              const color = seg.toTerm ? confidenceColor(seg.confidence) : '#94a3b8'
+              let segIdx = -1
+              let count = 0
+              for (let si = 0; si < result.segments.length; si++) {
+                if (result.segments[si].type === 'term') {
+                  if (count === chipIdx) { segIdx = si; break }
+                  count++
+                }
+              }
+              const isActive = activeTermIdx === segIdx
+              return (
+                <button
+                  key={'chip-' + chipIdx}
+                  onClick={() => segIdx !== -1 && handleTermClick(segIdx)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono transition-all"
+                  style={{
+                    backgroundColor: isActive ? color + '25' : color + '12',
+                    border: '1px solid ' + (isActive ? color : color + '40'),
+                    color: color,
+                  }}
+                >
+                  <span>{seg.text}</span>
+                  {seg.toTerm && (
+                    <>
+                      <svg className="w-2.5 h-2.5 mx-0.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                      <span style={{ opacity: 0.8 }}>{seg.toTerm.replace(/_/g, ' ')}</span>
+                    </>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
+    </GlassCard>
+  )
+}
+
+
 // ============ Ten Covenants Section ============
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
@@ -1715,6 +2135,9 @@ export default function RosettaPage() {
 
       {/* ============ Discover Section ============ */}
       <DiscoverSection />
+
+      {/* ============ Sentence Translator ============ */}
+      <SentenceTranslator userLexicons={userLexicons} />
 
       {/* ============ Translation Interface ============ */}
       <GlassCard glowColor="matrix" className="p-5 mb-6">

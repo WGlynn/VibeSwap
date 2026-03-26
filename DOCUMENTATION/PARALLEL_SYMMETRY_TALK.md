@@ -87,4 +87,4 @@ Parallel all the way down.
 
 ---
 
-*Interested in the technical details? Check out our other posts on [provable fairness](/link), [wallet security](/link), and [the UTXO advantage](/link).*
+*Interested in the technical details? Check out our other posts on [provable fairness](FORMAL_FAIRNESS_PROOFS.md), [wallet security](WALLET_SECURITY_TALK.md), and [the UTXO advantage](VIBESWAP_UTXO_BENEFITS.md).*

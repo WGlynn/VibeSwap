@@ -2839,6 +2839,366 @@ function ThemeToggle({ isDark, onToggle }) {
   )
 }
 
+// ============ Concept Web — Hub-and-Spoke Visualization ============
+
+function ConceptWeb() {
+  const [hoveredConcept, setHoveredConcept] = useState(null)
+  const [hoveredDomain, setHoveredDomain] = useState(null)
+
+  const topConcepts = useMemo(() => getTopConnectedConcepts(10), [])
+
+  const conceptDomainSets = useMemo(() => {
+    const map = {}
+    for (const c of topConcepts) {
+      map[c.universal] = new Set(c.mappings.map(m => m.lexiconId))
+    }
+    return map
+  }, [topConcepts])
+
+  const allDomains = useMemo(() => [...AGENT_LEXICONS, ...HUMAN_LEXICONS], [])
+
+  const SVG_W = 520
+  const SVG_H = 520
+  const CX = SVG_W / 2
+  const CY = SVG_H / 2
+  const R_CONCEPT = 148
+  const R_DOMAIN = 230
+
+  const conceptPositions = useMemo(
+    () =>
+      topConcepts.map((c, i) => {
+        const angle = (2 * Math.PI * i) / topConcepts.length - Math.PI / 2
+        return { ...c, x: CX + R_CONCEPT * Math.cos(angle), y: CY + R_CONCEPT * Math.sin(angle) }
+      }),
+    [topConcepts],
+  )
+
+  const domainPositions = useMemo(
+    () =>
+      allDomains.map((d, i) => {
+        const angle = (2 * Math.PI * i) / allDomains.length - Math.PI / 2
+        return { ...d, x: CX + R_DOMAIN * Math.cos(angle), y: CY + R_DOMAIN * Math.sin(angle) }
+      }),
+    [allDomains],
+  )
+
+  function isConceptActive(key) {
+    if (hoveredConcept) return hoveredConcept === key
+    if (hoveredDomain) return conceptDomainSets[key]?.has(hoveredDomain)
+    return false
+  }
+
+  function isDomainActive(id) {
+    if (hoveredDomain) return hoveredDomain === id
+    if (hoveredConcept) return conceptDomainSets[hoveredConcept]?.has(id)
+    return false
+  }
+
+  function isLineActive(conceptKey, domainId) {
+    if (!conceptDomainSets[conceptKey]?.has(domainId)) return false
+    if (hoveredConcept) return hoveredConcept === conceptKey
+    if (hoveredDomain) return hoveredDomain === domainId
+    return false
+  }
+
+  const anyHover = hoveredConcept || hoveredDomain
+
+  const minCount = Math.min(...topConcepts.map(c => c.lexiconCount))
+  const maxCount = Math.max(...topConcepts.map(c => c.lexiconCount))
+  function nodeRadius(count) {
+    if (maxCount === minCount) return 12
+    return 8 + ((count - minCount) / (maxCount - minCount)) * 9
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.1 }}
+      className="mb-6"
+    >
+      <GlassCard glowColor="matrix" spotlight className="p-5">
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Concept Web</h2>
+            <p className="text-[10px] font-mono text-black-500 mt-0.5">
+              Top 10 universal concepts &times; {allDomains.length} domain lexicons &mdash; hover to
+              highlight
+            </p>
+          </div>
+          <span
+            className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+            style={{
+              background: 'rgba(0,255,65,0.08)',
+              border: '1px solid rgba(0,255,65,0.2)',
+              color: '#00ff41',
+            }}
+          >
+            hub-and-spoke
+          </span>
+        </div>
+
+        <div className="flex justify-center overflow-x-auto">
+          <svg
+            viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+            width="100%"
+            style={{ maxWidth: SVG_W, display: 'block', userSelect: 'none' }}
+            aria-label="Concept web diagram"
+          >
+            {conceptPositions.map(cp =>
+              domainPositions.map(dp => {
+                if (!conceptDomainSets[cp.universal]?.has(dp.id)) return null
+                const active = isLineActive(cp.universal, dp.id)
+                const dimmed = anyHover && !active
+                return (
+                  <line
+                    key={`${cp.universal}-${dp.id}`}
+                    x1={cp.x}
+                    y1={cp.y}
+                    x2={dp.x}
+                    y2={dp.y}
+                    stroke={active ? dp.color : 'rgba(255,255,255,0.08)'}
+                    strokeWidth={active ? 1.5 : 0.7}
+                    strokeOpacity={dimmed ? 0.04 : active ? 0.85 : 0.35}
+                    style={{ transition: 'stroke 0.2s, stroke-opacity 0.2s, stroke-width 0.2s' }}
+                  />
+                )
+              }),
+            )}
+
+            {domainPositions.map(dp => {
+              const active = isDomainActive(dp.id)
+              const dimmed = anyHover && !active
+              const r = active ? 7 : 5
+              return (
+                <g
+                  key={dp.id}
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredDomain(dp.id)}
+                  onMouseLeave={() => setHoveredDomain(null)}
+                >
+                  <circle cx={dp.x} cy={dp.y} r={r + 6} fill="transparent" />
+                  <circle
+                    cx={dp.x}
+                    cy={dp.y}
+                    r={r}
+                    fill={dp.color}
+                    fillOpacity={dimmed ? 0.15 : active ? 1 : 0.55}
+                    stroke={active ? dp.color : 'transparent'}
+                    strokeWidth={active ? 2 : 0}
+                    style={{
+                      filter: active ? `drop-shadow(0 0 5px ${dp.color})` : 'none',
+                      transition: 'all 0.2s',
+                    }}
+                  />
+                  {active && (
+                    <text
+                      x={dp.x + (dp.x < CX ? -11 : 11)}
+                      y={dp.y + 1}
+                      textAnchor={dp.x < CX ? 'end' : 'start'}
+                      dominantBaseline="middle"
+                      fontSize="9"
+                      fontFamily="monospace"
+                      fill={dp.color}
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {dp.name}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
+
+            {conceptPositions.map(cp => {
+              const active = isConceptActive(cp.universal)
+              const dimmed = anyHover && !active
+              const r = nodeRadius(cp.lexiconCount)
+              const rDisp = active ? r + 3 : r
+              const nodeColor = '#00ff41'
+              return (
+                <g
+                  key={cp.universal}
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredConcept(cp.universal)}
+                  onMouseLeave={() => setHoveredConcept(null)}
+                >
+                  <circle cx={cp.x} cy={cp.y} r={rDisp + 8} fill="transparent" />
+                  {active && (
+                    <circle
+                      cx={cp.x}
+                      cy={cp.y}
+                      r={rDisp + 5}
+                      fill="none"
+                      stroke={nodeColor}
+                      strokeWidth={1}
+                      strokeOpacity={0.3}
+                    />
+                  )}
+                  <circle
+                    cx={cp.x}
+                    cy={cp.y}
+                    r={rDisp}
+                    fill={active ? nodeColor : 'rgba(0,255,65,0.12)'}
+                    fillOpacity={dimmed ? 0.15 : 1}
+                    stroke={nodeColor}
+                    strokeWidth={active ? 2 : 1}
+                    strokeOpacity={dimmed ? 0.15 : active ? 1 : 0.45}
+                    style={{
+                      filter: active ? `drop-shadow(0 0 6px ${nodeColor})` : 'none',
+                      transition: 'all 0.2s',
+                    }}
+                  />
+                  <text
+                    x={cp.x}
+                    y={cp.y + rDisp + 11}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={active ? '9' : '8'}
+                    fontFamily="monospace"
+                    fill={
+                      dimmed ? 'rgba(0,255,65,0.2)' : active ? nodeColor : 'rgba(0,255,65,0.65)'
+                    }
+                    fontWeight={active ? 'bold' : 'normal'}
+                    style={{ pointerEvents: 'none', transition: 'fill 0.2s' }}
+                  >
+                    {cp.universal.replace(/_/g, ' ')}
+                  </text>
+                  <text
+                    x={cp.x}
+                    y={cp.y + 0.5}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={active ? '8' : '7'}
+                    fontFamily="monospace"
+                    fill={active ? '#000' : dimmed ? 'rgba(0,255,65,0.15)' : 'rgba(0,255,65,0.6)'}
+                    fontWeight="bold"
+                    style={{ pointerEvents: 'none', transition: 'fill 0.2s' }}
+                  >
+                    {cp.lexiconCount}
+                  </text>
+                </g>
+              )
+            })}
+
+            <g>
+              <circle
+                cx={CX}
+                cy={CY}
+                r={40}
+                fill="rgba(0,255,65,0.04)"
+                stroke="rgba(0,255,65,0.12)"
+                strokeWidth={1}
+              />
+              <text
+                x={CX}
+                y={CY - 6}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="9"
+                fontFamily="monospace"
+                fill="rgba(0,255,65,0.5)"
+                fontWeight="bold"
+                letterSpacing="1"
+              >
+                UNIVERSAL
+              </text>
+              <text
+                x={CX}
+                y={CY + 7}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="9"
+                fontFamily="monospace"
+                fill="rgba(0,255,65,0.5)"
+                fontWeight="bold"
+                letterSpacing="1"
+              >
+                CONCEPTS
+              </text>
+            </g>
+          </svg>
+        </div>
+
+        <div className="mt-2 min-h-[40px] flex flex-col items-center justify-center">
+          {hoveredConcept &&
+            (() => {
+              const c = topConcepts.find(x => x.universal === hoveredConcept)
+              if (!c) return null
+              return (
+                <div className="text-center">
+                  <span
+                    className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold mb-1"
+                    style={{
+                      background: 'rgba(0,255,65,0.12)',
+                      border: '1px solid rgba(0,255,65,0.3)',
+                      color: '#00ff41',
+                    }}
+                  >
+                    {c.universal.replace(/_/g, ' ')} &mdash; {c.lexiconCount} lexicons
+                  </span>
+                  <p className="text-[10px] font-mono text-black-400 max-w-sm">{c.definition}</p>
+                </div>
+              )
+            })()}
+          {hoveredDomain &&
+            !hoveredConcept &&
+            (() => {
+              const d = allDomains.find(x => x.id === hoveredDomain)
+              if (!d) return null
+              const connected = topConcepts.filter(c => conceptDomainSets[c.universal]?.has(d.id))
+              return (
+                <div className="text-center">
+                  <span
+                    className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold mb-1"
+                    style={{
+                      background: `${d.color}15`,
+                      border: `1px solid ${d.color}40`,
+                      color: d.color,
+                    }}
+                  >
+                    {d.name} &mdash; {connected.length} top-concept connections
+                  </span>
+                  <p className="text-[10px] font-mono text-black-500">
+                    {connected.map(c => c.universal.replace(/_/g, ' ')).join(' · ')}
+                  </p>
+                </div>
+              )
+            })()}
+          {!hoveredConcept && !hoveredDomain && (
+            <p className="text-[10px] font-mono text-black-700 italic">
+              hover a node or dot to trace its connections
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-4 mt-3 pt-3 border-t border-black-800">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-3.5 h-3.5 rounded-full border"
+              style={{ background: 'rgba(0,255,65,0.12)', borderColor: 'rgba(0,255,65,0.45)' }}
+            />
+            <span className="text-[9px] font-mono text-black-500">
+              concept node (number = lexicon count)
+            </span>
+          </div>
+          {[
+            { label: 'AI agent', color: '#3b82f6' },
+            { label: 'human domain', color: '#ef4444' },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-1">
+              <span
+                className="inline-block w-2 h-2 rounded-full"
+                style={{ background: item.color, boxShadow: `0 0 4px ${item.color}80` }}
+              />
+              <span className="text-[9px] font-mono text-black-500">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+    </motion.div>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
@@ -2872,6 +3232,39 @@ export default function RosettaPage() {
   const [translationResult, setTranslationResult] = useState(null)
   const [translateAllResults, setTranslateAllResults] = useState(null)
   const translationResultRef = useRef(null)
+
+  // ---- Parse hash on mount: #translate/fromId/toId/term ----
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash.startsWith('#translate/')) return
+    const parts = hash.slice('#translate/'.length).split('/')
+    if (parts.length < 3) return
+    const [hFrom, hTo, ...termParts] = parts
+    const hTerm = decodeURIComponent(termParts.join('/'))
+    if (!hFrom || !hTo || !hTerm) return
+    const fromExists = ALL_LEXICONS.some(l => l.id === hFrom)
+    if (!fromExists) return
+    if (hTo === 'all') {
+      setFromId(hFrom)
+      setConcept(hTerm)
+      setTranslateAll(true)
+      const results = translateToAll(hFrom, hTerm)
+      setTranslateAllResults(results)
+    } else {
+      const toExists = ALL_LEXICONS.some(l => l.id === hTo)
+      if (!toExists) return
+      setFromId(hFrom)
+      setToId(hTo)
+      setConcept(hTerm)
+      setTranslateAll(false)
+      const result = translate(hFrom, hTo, hTerm)
+      setTranslationResult(result)
+    }
+    setTimeout(() => {
+      translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 200)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ---- Protocol stats (computed client-side) ----
   const [protocolData] = useState(() => getProtocolStats())
@@ -2912,9 +3305,11 @@ export default function RosettaPage() {
     if (translateAll) {
       const results = translateToAll(fromId, concept.trim())
       setTranslateAllResults(results)
+      window.location.hash = `translate/${fromId}/all/${encodeURIComponent(concept.trim())}`
     } else {
       const result = translate(fromId, toId, concept.trim())
       setTranslationResult(result)
+      window.location.hash = `translate/${fromId}/${toId}/${encodeURIComponent(concept.trim())}`
     }
 
     // Smooth scroll to result after state update
@@ -2934,6 +3329,7 @@ export default function RosettaPage() {
     // Auto-translate immediately
     const result = translate(pair.fromId, pair.toId, pair.term)
     setTranslationResult(result)
+    window.location.hash = `translate/${pair.fromId}/${pair.toId}/${encodeURIComponent(pair.term)}`
     setTimeout(() => {
       translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }, 80)

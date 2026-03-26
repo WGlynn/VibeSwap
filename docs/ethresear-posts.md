@@ -312,3 +312,39 @@ This creates a market where:
 **Question:** What bonding curve exponent best matches empirical academic citation distributions? We used 1.5 based on Lotka's law, but the optimal value may depend on the knowledge domain.
 
 ---
+
+## Post 10: Proof of Mind — Cognitive Work as Consensus Security
+
+**Category**: Consensus
+
+Proof of Work secures Bitcoin through electricity expenditure. Proof of Stake secures Ethereum through capital lockup. Both are proxies for commitment — the participant has something to lose. We present Proof of Mind (PoM), a consensus weight function that incorporates cognitive contribution as a third factor:
+
+```
+vote_weight = (stake × 0.3) + (pow × 0.1) + (mind × 0.6)
+```
+
+Where `mind` is a logarithmically-accumulated score of verified cognitive contributions (code commits, research publications, verified evaluations). The logarithmic growth prevents plutocracy — doubling your mind score requires exponentially more genuine work.
+
+**Why 60% weight on mind?**
+
+Stake can be borrowed (flash loans). Hashpower can be rented (NiceHash). Neither represents genuine commitment to the system's long-term health. Cognitive contribution cannot be faked at scale because it requires sustained, verified intellectual output over time. An attacker cannot accumulate 5 years of genuine research contributions in 5 weeks.
+
+**Attack cost formula:**
+
+```
+attack_cost = stake_needed + compute_needed + TIME_OF_GENUINE_CONTRIBUTION
+```
+
+The third factor is asymptotically impossible to compress. This is the key security property: PoM makes the cost of attack a function of calendar time, not just capital or computation.
+
+**Knowledge chain selection:**
+
+When forks occur in the knowledge state (two shards disagree on what is true), the chain with higher aggregate value density wins — replacing hash rate with knowledge quality as the selection criterion. This is Nakamoto consensus with cognitive work replacing computational work.
+
+**Implementation:** `ProofOfMind.sol` (584 lines), deployed alongside `NakamotoConsensusInfinity.sol` for 3D consensus. Mind scores are recorded via `recordContribution()` after verification by commit-reveal pairwise comparison (CRPC).
+
+**Observation:** In practice, the 60% mind weight means that new validators need months of genuine participation before their votes carry significant weight. This creates a natural immune system — attackers cannot gain consensus influence quickly, even with unlimited capital and compute.
+
+**Question:** Is there an optimal decay function for mind scores? We use logarithmic accumulation (no decay), which means early contributors permanently retain influence. An alternative is exponential decay with a long half-life (e.g., 2 years), which would require sustained contribution to maintain influence. The tradeoff is network stability vs. fresh-blood incentive.
+
+---

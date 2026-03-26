@@ -53,7 +53,7 @@ export default function PoolCardMini({
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <span className="text-[9px] font-mono text-black-600 block">APY</span>
+          <span className="text-[9px] font-mono text-black-600 block">30d Fees</span>
           <span className="text-[10px] font-mono font-bold text-green-400">{apy.toFixed(1)}%</span>
         </div>
         <div>

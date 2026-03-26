@@ -395,7 +395,7 @@ function PoolDetailsPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-5 border-t border-black-700/40">
               {[['TVL',fmt(pool.tvl)],['Volume 24h',fmt(pool.vol24)],['Fees 24h',fmt(pool.fees24)],
-                ['APR',fmtPct(pool.apr),'text-green-400'],['Transactions',pool.txns.toLocaleString()]
+                ['7d Fees',fmtPct(pool.apr),'text-green-400'],['Transactions',pool.txns.toLocaleString()]
               ].map(([l,v,c])=>(
                 <div key={l}><div className="text-[10px] text-black-500 font-mono uppercase tracking-wider mb-0.5">{l}</div>
                   <div className={`text-sm font-semibold font-mono ${c||''}`}>{v}</div></div>

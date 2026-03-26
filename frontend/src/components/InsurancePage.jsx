@@ -685,7 +685,7 @@ export default function InsurancePage() {
                 { label: 'Pool TVL', value: fmt(poolTVL), color: CYAN },
                 { label: 'Your Stake', value: fmt(userStake), color: '#22c55e' },
                 { label: 'Earned Premiums', value: fmt(earnedPremiums), color: '#a855f7' },
-                { label: 'Pool APY', value: poolAPY.toFixed(1) + '%', color: '#eab308' },
+                { label: 'Pool Rate', value: poolAPY.toFixed(1) + '%', color: '#eab308' },
               ].map(({ label, value, color }) => (
                 <GlassCard key={label} glowColor="terminal" className="p-4">
                   <div className="text-xs text-black-400 mb-1">{label}</div>
@@ -713,7 +713,7 @@ export default function InsurancePage() {
 
               <div className="p-4 rounded-xl bg-black-900/50 space-y-2 mb-4">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-black-400">Current APY</span>
+                  <span className="text-black-400">Current Rate</span>
                   <span className="font-mono text-green-400">{poolAPY}%</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">

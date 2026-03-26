@@ -74,7 +74,7 @@ const rng = seededRandom(42)
 const MOCK_PROPOSALS = [
   {
     id: 'VSP-001',
-    title: 'Increase JUL staking rewards from 8% to 12% APY',
+    title: 'Increase JUL staking rewards from 8% to 12% Rate',
     description: 'Proposal to raise base staking yields to attract more long-term holders and deepen protocol liquidity. The increased rewards would be funded from the treasury surplus accumulated in Q1 2026.',
     author: '0x7a3B...f91E',
     status: 'active',

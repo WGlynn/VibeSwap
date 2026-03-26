@@ -284,7 +284,7 @@ export default function StakingPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Total Staked', value: isConnected ? '0 JUL' : '2.4M JUL' },
-            { label: 'Current APY', value: `${activeTier.apy}%` },
+            { label: 'Current Rate', value: `${activeTier.apy}%` },
             { label: 'Your Stake', value: isConnected ? '0 JUL' : '19.5K JUL' },
             { label: 'Pending Rewards', value: isConnected ? '0 JUL' : '490.66 JUL' },
           ].map((s, i) => (
@@ -316,7 +316,7 @@ export default function StakingPage() {
                     {tier.mult}x
                   </div>
                   <div className="text-[10px] font-mono text-gray-500">
-                    {tier.days === 0 ? 'No lock' : `${tier.lock} lock`} / {tier.apy}% APY
+                    {tier.days === 0 ? 'No lock' : `${tier.lock} lock`} / {tier.apy}% Rate
                   </div>
                   <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: '#1f2937' }}>
                     <motion.div className="h-full rounded-full"
@@ -371,7 +371,7 @@ export default function StakingPage() {
             ))}
           </div>
           <div className="mt-3 text-center text-xs font-mono text-gray-500">
-            {projections.tier.apy}% base APY x {projections.mult} loyalty multiplier = {(projections.tier.apy * projections.mult).toFixed(1)}% effective
+            {projections.tier.apy}% base Rate x {projections.mult} loyalty multiplier = {(projections.tier.apy * projections.mult).toFixed(1)}% effective
           </div>
         </GlassCard>
       </Section>
@@ -417,7 +417,7 @@ export default function StakingPage() {
           </div>
           <div className="flex items-center justify-between text-xs font-mono text-gray-500">
             <span>Balance: {fmt(userBalance)} JUL</span>
-            <span>Tier: {activeTier.label} ({activeTier.mult}x) @ {activeTier.apy}% APY</span>
+            <span>Tier: {activeTier.label} ({activeTier.mult}x) @ {activeTier.apy}% Rate</span>
           </div>
         </GlassCard>
       </Section>
@@ -627,7 +627,7 @@ export default function StakingPage() {
                 exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                 <div className="mt-4 p-3 rounded-xl border" style={{ background: `${CYAN}08`, borderColor: `${CYAN}20` }}>
                   <div className="font-mono text-xs text-gray-300">
-                    Compounding at {activeTier.apy}% APY ({activeTier.mult}x multiplier): effective yield ~{(activeTier.apy * activeTier.mult * 1.06).toFixed(1)}% with daily restaking.
+                    Compounding at {activeTier.apy}% Rate ({activeTier.mult}x multiplier): effective yield ~{(activeTier.apy * activeTier.mult * 1.06).toFixed(1)}% with daily restaking.
                   </div>
                 </div>
               </motion.div>

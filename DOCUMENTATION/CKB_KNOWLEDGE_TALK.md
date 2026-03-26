@@ -349,8 +349,8 @@ CKB × CKB: Where blockchain meets philosophy.
 
 ## Q&A
 
-Contact: [your contact]
-GitHub: [repo link]
+GitHub: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
+X: [@viaborz](https://x.com/viaborz)
 
 ---
 

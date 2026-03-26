@@ -24,11 +24,11 @@ That question changes everything.
 
 But this paper goes further than that. It will argue that an economy is not a machine. It is a living system — a mind made of minds. That prices are not numbers on a screen but neurons firing in a distributed brain. That game theory is not a tool we invented to model strategic behavior — it is the substrate of reality itself, the language in which physics, biology, and consciousness are written. And that the mathematics of cooperation, when properly understood, doesn't just describe how markets *should* work. It describes how the universe already works. We've just been too distracted by extraction to notice.
 
-This sounds like madness. It's backed by seventy years of mathematics that nobody bothered to connect.
+This is a large claim. It's backed by seventy years of mathematics that nobody thought to connect.
 
 No jargon without explanation. No math without intuition. No claims without proof.
 
-If you can do basic arithmetic, you can follow this paper. The ideas are not complicated. They have been made to *seem* complicated by people whose income depends on your confusion.
+If you can do basic arithmetic, you can follow this paper. The ideas are not complicated. They have been made to *seem* complicated — sometimes deliberately, sometimes through the inertia of institutions that never had to explain themselves clearly.
 
 ---
 
@@ -102,7 +102,7 @@ When you buy a loaf of bread for $3, you are broadcasting: "I value this bread m
 
 Multiply this by billions of transactions and you get a global information system that no central planner could ever replicate. No government, no matter how powerful or well-intentioned, can know the preferences of 8 billion people. Prices aggregate that knowledge automatically.
 
-This is the knowledge problem. And it's real. Soviet central planning failed not because the planners were stupid, but because the problem is literally impossible. You cannot compute the optimal allocation of resources for a complex economy. But you can let prices compute it for you — if the prices are honest.
+This is the knowledge problem. And it's real. Soviet central planning failed not because the planners were incompetent, but because the problem is literally impossible. You cannot compute the optimal allocation of resources for a complex economy. But you can let prices compute it for you — if the prices are honest.
 
 ## 2.3 When Prices Lie
 
@@ -284,7 +284,7 @@ I am now going to make the most ambitious claim in this paper. Everything up to 
 
 **Game theory is not a model of reality. It *is* reality.**
 
-This sounds like the kind of thing someone writes at 3 AM after too much coffee. But the mathematics is unambiguous. Every interaction in the physical universe — from subatomic particles to human civilizations — can be described as a game: agents with strategies, payoffs, and equilibria. This is not because game theory is a flexible tool that can be stretched to fit anything. It is because the mathematical structure of strategic interaction is the same mathematical structure that governs physics, evolution, and cognition.
+This requires justification. The mathematics is unambiguous. Every interaction in the physical universe — from subatomic particles to human civilizations — can be described as a game: agents with strategies, payoffs, and equilibria. This is not because game theory is a flexible tool that can be stretched to fit anything. It is because the mathematical structure of strategic interaction is the same mathematical structure that governs physics, evolution, and cognition.
 
 Let me show you what I mean.
 
@@ -324,7 +324,7 @@ This is mechanism design — the field that earned Leonid Hurwicz, Roger Myerson
 
 ## 6.5 Consciousness Is a Game
 
-This is the "schizo" part. But it's backed by mathematics, so bear with me.
+This is the most ambitious claim in this paper. It's backed by mathematics.
 
 Giulio Tononi's Integrated Information Theory (IIT) proposes that consciousness arises from the integration of information — from the degree to which a system is more than the sum of its parts. A system is conscious to the extent that it generates emergent information that cannot be reduced to its components.
 
@@ -476,6 +476,8 @@ This is the same mechanism that makes society function. Not government. Not law.
 
 # X. The Measurement
 
+So far this paper has argued that prices are information, that markets are living systems, that game theory is the substrate of reality, and that cooperation dominates extraction mathematically. All of these claims share a common requirement: they must be *measurable*. A claim you cannot measure is a claim you cannot verify. And a system you cannot verify is a system you must trust — which defeats the entire purpose.
+
 ## 10.1 What Economítra Measures
 
 The title of this paper is not metaphorical. Economítra is a measurement framework.
@@ -537,6 +539,8 @@ The measurement of all things economic. Not as we wish they were. As they actual
 *Economítra.*
 
 *Economítra is a living document. As the protocol evolves, so does the theory. But the core claim stands immutable: cooperation is more profitable than extraction. The math doesn't lie.*
+
+*I didn't write this paper because I wanted to build a company. I wrote it because I looked at the way money works — the way it extracts from the people furthest from the machine and rewards the people closest to it — and I couldn't look away. Once you see it, you can't unsee it. And once you can't unsee it, you either build something or you accept it. I don't accept it.*
 
 ---
 
@@ -642,4 +646,4 @@ The measurement of all things economic. Not as we wish they were. As they actual
 ---
 
 *© 2026 Will Glynn. Published under Creative Commons BY-SA 4.0.*
-*The math doesn't care about your politics.*
+*The math is the same for everyone. That's the point.*

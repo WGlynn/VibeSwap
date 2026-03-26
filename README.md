@@ -195,7 +195,7 @@ vibeswap/
 ├── script/                    # Deployment scripts
 ├── frontend/                  # React 18 + Vite 5 (338 components, 72 hooks)
 ├── oracle/                    # Python Kalman filter price oracle
-├── DOCUMENTATION/             # 242 original research papers
+├── DOCUMENTATION/             # 51 original research papers
 └── docs/                      # Proposals and additional docs
 ```
 
@@ -213,7 +213,7 @@ vibeswap/
 | [Formal Fairness Proofs](DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) | Mathematical proofs of fairness properties |
 | [Proof Index](DOCUMENTATION/PROOF_INDEX.md) | Master catalog: 18 theorems, 18 dilemmas dissolved, 5 trilemmas, 4 quadrilemmas |
 
-See [`DOCUMENTATION/`](DOCUMENTATION/) for all 242 papers.
+See [`DOCUMENTATION/`](DOCUMENTATION/) for all 51 papers.
 
 ---
 

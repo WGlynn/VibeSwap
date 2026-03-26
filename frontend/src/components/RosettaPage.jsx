@@ -2683,43 +2683,6 @@ const POPULAR_PAIRS = [
     insight: 'Support level — a price the market tested and respected; it carries weight.',
   },
 ]
-    fromColor: '#eab308',
-    toColor: '#ef4444',
-    insight: 'Perfusion — resources must flow to where they are needed or the system fails.',
-  },
-  {
-    fromId: 'cooking',
-    toId: 'military',
-    term: 'mise en place',
-    fromColor: '#f59e0b',
-    toColor: '#78716c',
-    insight: 'OPSEC brief — arrange everything before the chaos starts, or it wins.',
-  },
-  {
-    fromId: 'music',
-    toId: 'psychology',
-    term: 'cadence',
-    fromColor: '#ec4899',
-    toColor: '#8b5cf6',
-    insight: 'Closure — the sequence resolves, the phrase ends, the mind can rest.',
-  },
-  {
-    fromId: 'philosophy',
-    toId: 'engineering',
-    term: 'axiom',
-    fromColor: '#06b6d4',
-    toColor: '#f97316',
-    insight: 'Spec — ground truth so basic it cannot be derived from anything simpler.',
-  },
-  {
-    fromId: 'law',
-    toId: 'trading',
-    term: 'precedent',
-    fromColor: '#6b7280',
-    toColor: '#eab308',
-    insight: 'Support level — a price the market tested and respected; it carries weight.',
-  },
-]
 
 function PopularTranslations({ onTryPair }) {
   return (

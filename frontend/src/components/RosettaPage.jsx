@@ -5332,6 +5332,9 @@ export default function RosettaPage() {
   // ---- Translation history ----
   const { history: translationHistory, addToHistory, clearHistory } = useTranslationHistory()
 
+  // ---- Pending community suggestions ----
+  const { pendingSuggs, addSuggestion } = usePendingSuggestions()
+
   // ---- Compute agent lexicon terms on demand — memoized so grid re-renders don't recompute ----
   const lexiconTerms = useMemo(() =>
     selectedAgent
@@ -5942,6 +5945,13 @@ export default function RosettaPage() {
           onImported={refreshUserLexicons}
         />
       </div>
+
+
+      {/* ============ Suggest a Term — Community Lexicon Growth ============ */}
+      <SuggestTermForm
+        pendingSuggestions={pendingSuggs}
+        onAdd={addSuggestion}
+      />
 
       {/* Ten Covenants moved to dedicated governance page */}
 

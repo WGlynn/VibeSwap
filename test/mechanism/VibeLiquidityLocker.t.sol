@@ -276,7 +276,7 @@ contract VibeLiquidityLockerTest is Test {
         locker.claimVested(lockId);
 
         (, , , , , , , , bool active) = locker.locks(lockId);
-        assertFalse(active);
+        assertFalse(active); // index 8: active
     }
 
     function test_claimVested_incrementalClaims() public {
@@ -306,20 +306,20 @@ contract VibeLiquidityLockerTest is Test {
     function test_extendLock_updatesVestingEnd() public {
         uint256 lockId = _lock(alice, 1000 ether, CLIFF_1W, VESTING_4W);
 
-        (,,,,,  uint256 currentVestingEnd, , ) = locker.locks(lockId);
+        (, , , , , , uint256 currentVestingEnd, , ) = locker.locks(lockId);
         uint256 newVestingEnd = currentVestingEnd + 30 days;
 
         vm.prank(alice);
         locker.extendLock(lockId, newVestingEnd);
 
-        (, , , , , uint256 updatedEnd, , ) = locker.locks(lockId);
+        (, , , , , , uint256 updatedEnd, , ) = locker.locks(lockId);
         assertEq(updatedEnd, newVestingEnd);
     }
 
     function test_extendLock_emitsEvent() public {
         uint256 lockId = _lock(alice, 1000 ether, CLIFF_1W, VESTING_4W);
 
-        (,,,,, uint256 currentVestingEnd,,) = locker.locks(lockId);
+        (, , , , , , uint256 currentVestingEnd, , ) = locker.locks(lockId);
         uint256 newVestingEnd = currentVestingEnd + 30 days;
 
         vm.expectEmit(true, false, false, true);
@@ -332,7 +332,7 @@ contract VibeLiquidityLockerTest is Test {
     function test_extendLock_cannotShorten_reverts() public {
         uint256 lockId = _lock(alice, 1000 ether, CLIFF_1W, VESTING_4W);
 
-        (,,,,, uint256 currentVestingEnd,,) = locker.locks(lockId);
+        (, , , , , , uint256 currentVestingEnd, , ) = locker.locks(lockId);
 
         vm.prank(alice);
         vm.expectRevert("Must extend");
@@ -342,7 +342,7 @@ contract VibeLiquidityLockerTest is Test {
     function test_extendLock_notOwner_reverts() public {
         uint256 lockId = _lock(alice, 1000 ether, CLIFF_1W, VESTING_4W);
 
-        (,,,,, uint256 currentVestingEnd,,) = locker.locks(lockId);
+        (, , , , , , uint256 currentVestingEnd, , ) = locker.locks(lockId);
 
         vm.prank(bob);
         vm.expectRevert("Not owner");
@@ -357,7 +357,7 @@ contract VibeLiquidityLockerTest is Test {
         vm.prank(alice);
         locker.transferLock(lockId, bob);
 
-        (, address newOwner, , , , , , ) = locker.locks(lockId);
+        (, address newOwner, , , , , , , ) = locker.locks(lockId);
         assertEq(newOwner, bob);
     }
 

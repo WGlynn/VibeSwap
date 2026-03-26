@@ -33,11 +33,26 @@ function HeaderMinimal() {
   const [showRecoverySetup, setShowRecoverySetup] = useState(false)
   const [gasGwei, setGasGwei] = useState(18)
 
-  // Simulated live gas price
+  // Fetch real gas price from Base L2 (fallback to simulated)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setGasGwei((prev) => Math.max(5, Math.min(80, prev + (Math.random() - 0.48) * 2)))
-    }, 5000)
+    async function fetchGas() {
+      try {
+        const res = await fetch('https://mainnet.base.org', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_gasPrice', params: [], id: 1 }),
+        })
+        const data = await res.json()
+        if (data.result) {
+          const gwei = parseInt(data.result, 16) / 1e9
+          setGasGwei(Math.round(gwei * 100) / 100)
+          return
+        }
+      } catch { /* fallback to simulated */ }
+      setGasGwei((prev) => Math.max(0.001, Math.min(1, prev + (Math.random() - 0.48) * 0.01)))
+    }
+    fetchGas()
+    const interval = setInterval(fetchGas, 15000)
     return () => clearInterval(interval)
   }, [])
 

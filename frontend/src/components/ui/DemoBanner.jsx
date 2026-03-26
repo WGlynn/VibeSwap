@@ -22,7 +22,7 @@ export default function DemoBanner() {
         color: 'rgba(245, 158, 11, 0.9)',
       }}
     >
-      DEMO MODE — All data shown is simulated
+      DEMO MODE — Connect a wallet to see real data
     </div>
   )
 }

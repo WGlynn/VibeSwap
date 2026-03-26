@@ -689,7 +689,7 @@ export default function OptionsPage() {
       <Section num="12" title="Market Maker Rewards" delay={1.0 * PHI}>
         <GlassCard glowColor="terminal" className="p-4">
           <div className="grid grid-cols-3 gap-4 mb-4">
-            {[['18.4%', 'Avg APY for Writers', CYAN], ['$2.4M', 'Total Premiums Earned', '#10b981'], ['142', 'Active Market Makers', '#a855f7']].map(([v, l, c]) => (
+            {[['18.4%', 'Avg Rate for Writers', CYAN], ['$2.4M', 'Total Premiums Earned', '#10b981'], ['142', 'Active Market Makers', '#a855f7']].map(([v, l, c]) => (
               <div key={l} className="rounded-xl bg-black-800 p-4 text-center">
                 <div className="text-2xl font-bold font-mono" style={{ color: c }}>{v}</div>
                 <div className="text-xs text-black-400 mt-1">{l}</div>

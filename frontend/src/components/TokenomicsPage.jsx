@@ -68,7 +68,7 @@ const EMISSION_YEARS = [
 const ACCRUAL_CARDS = [
   { title: 'Zero Protocol Fees', value: '0%', desc: 'Zero protocol fees on swaps — 100% of LP fees go to liquidity providers.', color: MATRIX, icon: '\u2694' },
   { title: 'Buyback & Burn', value: '15%', desc: 'Of priority bid revenue used to buy VIBE on open market and send to dead address.', color: '#ef4444', icon: '\uD83D\uDD25' },
-  { title: 'Staking Rewards', value: '8-14%', desc: 'Real yield from priority bid revenue and emissions. Lock longer for higher APR.', color: CYAN, icon: '\u26A1' },
+  { title: 'Staking Rewards', value: '8-14%', desc: 'Real yield from priority bid revenue and emissions. Lock longer for higher Fees.', color: CYAN, icon: '\u26A1' },
   { title: 'Governance Power', value: '1:1', desc: 'Staked VIBE = voting weight. Quadratic scaling prevents whale domination.', color: '#8b5cf6', icon: '\u2696' },
 ]
 

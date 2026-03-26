@@ -616,7 +616,7 @@ export default function PortfolioAnalyticsPage() {
                       <th className="pb-3 font-medium">Type</th>
                       <th className="pb-3 font-medium">Token</th>
                       <th className="pb-3 font-medium text-right">Value</th>
-                      <th className="pb-3 font-medium text-right">APY</th>
+                      <th className="pb-3 font-medium text-right">30d Fees</th>
                       <th className="pb-3 font-medium text-right">Share</th>
                     </tr>
                   </thead>

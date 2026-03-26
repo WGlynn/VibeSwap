@@ -241,7 +241,7 @@ export default function BondsPage() {
             <div className="grid grid-cols-2 gap-2">
               {[{ l: 'You Pay', v: `$${fmt(calcResult.cost)}` }, { l: 'You Receive', v: `${fmt(parseFloat(calcFace) || 0)} JUL`, cy: true },
                 { l: 'ROI', v: `${calcResult.roi.toFixed(2)}%`, g: true }, { l: 'Profit', v: `$${fmt(calcResult.profit)}`, g: true },
-                { l: 'Maturity Date', v: fmtDate(calcResult.maturityDate) }, { l: 'Effective APY', v: `${calcResult.annualized.toFixed(0)}%`, cy: true },
+                { l: 'Maturity Date', v: fmtDate(calcResult.maturityDate) }, { l: 'Effective Rate', v: `${calcResult.annualized.toFixed(0)}%`, cy: true },
               ].map((x) => (
                 <div key={x.l} className="p-2.5 rounded-xl border text-center" style={{ background: 'rgba(0,0,0,0.3)', borderColor: x.cy ? `${CYAN}20` : '#1f2937' }}>
                   <div className="text-[9px] font-mono text-gray-500">{x.l}</div>

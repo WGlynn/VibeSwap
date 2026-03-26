@@ -213,11 +213,11 @@ function PositionCard({ pos, index, onManage }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           {[['Value', fmt(value), null], ['Fees Earned', fmt(feesEarned), 'text-green-400'],
             ['IL Impact', fmtPct(ilPct), ilPct < -2 ? 'text-red-400' : ilPct < -0.5 ? 'text-amber-400' : 'text-green-400'],
-            ['APR', `${apr.toFixed(1)}%`, null]].map(([label, val, cls], i) => (
+            ['7d Fees', `${apr.toFixed(1)}%`, null]].map(([label, val, cls], i) => (
             <div key={label} className="p-2.5 rounded-lg bg-black-800/60">
               <div className="text-[10px] text-black-500 mb-0.5">{label}</div>
               <div className={`text-sm font-semibold font-mono ${cls || ''}`}
-                style={label === 'APR' ? { color: CYAN } : undefined}>{val}</div>
+                style={label === '7d Fees' ? { color: CYAN } : undefined}>{val}</div>
             </div>
           ))}
         </div>
@@ -250,7 +250,7 @@ function RangeSelectorModal({ position, onClose }) {
   const [minPrice, setMinPrice] = useState(position?.priceLower?.toFixed(0) || '')
   const [maxPrice, setMaxPrice] = useState(position?.priceUpper?.toFixed(0) || '')
   const width = useMemo(() => { const mn = parseFloat(minPrice)||0, mx = parseFloat(maxPrice)||0; return mx > mn ? mx - mn : 0 }, [minPrice, maxPrice])
-  const concentration = !width ? 'Full Range' : width < 200 ? 'Narrow (High Risk / High APR)' : width < 600 ? 'Medium (Balanced)' : 'Wide (Low Risk / Low APR)'
+  const concentration = !width ? 'Full Range' : width < 200 ? 'Narrow (High Risk / High Fees)' : width < 600 ? 'Medium (Balanced)' : 'Wide (Low Risk / Low Fees)'
   const concColor = !width ? 'text-black-400' : width < 200 ? 'text-red-400' : width < 600 ? 'text-amber-400' : 'text-green-400'
   const inputCls = "w-full px-3 py-2.5 bg-black-800 border border-black-700/50 rounded-lg text-sm font-mono outline-none focus:border-cyan-500/40 transition-colors"
   return (
@@ -456,7 +456,7 @@ export default function LPPositionsPage() {
           <Section index={0} title="Portfolio Overview" subtitle="Total value and earnings across all LP positions">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[['Total Value', fmt(totals.value), null], ['Fees Earned', fmt(totals.fees), '#22c55e'],
-                ['IL Impact', fmt(Math.abs(totals.ilTotal)), '#ef4444'], ['Avg APR', `${totals.avgApr.toFixed(1)}%`, CYAN],
+                ['IL Impact', fmt(Math.abs(totals.ilTotal)), '#ef4444'], ['Avg Fees', `${totals.avgApr.toFixed(1)}%`, CYAN],
               ].map(([label, val, color]) => (
                 <div key={label} className="p-3 rounded-xl bg-black-700/50 text-center">
                   <div className="text-[10px] text-black-500 mb-1 uppercase tracking-wider font-mono">{label}</div>
@@ -536,7 +536,7 @@ export default function LPPositionsPage() {
 
           {/* Footer */}
           <motion.div custom={6} variants={sectionVariants} initial="hidden" animate="visible" className="text-center pb-8">
-            <p className="text-xs text-black-500">APR and fee estimates are based on trailing 7-day averages. Impermanent loss depends on price divergence.</p>
+            <p className="text-xs text-black-500">Fees and fee estimates are based on trailing 7-day averages. Impermanent loss depends on price divergence.</p>
             <div className="flex items-center justify-center gap-2 mt-2 text-xs text-black-600">
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>

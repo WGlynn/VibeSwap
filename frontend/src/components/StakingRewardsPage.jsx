@@ -219,7 +219,7 @@ export default function StakingRewardsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Total Staked', value: `${fmt(PROTOCOL_STATS.totalStaked)} JUL`, sub: 'protocol-wide' },
-            { label: 'Current APY', value: `${PROTOCOL_STATS.currentApy}%`, color: CYAN, sub: 'weighted average' },
+            { label: 'Current Rate', value: `${PROTOCOL_STATS.currentApy}%`, color: CYAN, sub: 'weighted average' },
             { label: 'Your Stake', value: `${fmt(PROTOCOL_STATS.yourStake)} JUL`, sub: 'across all tiers' },
             { label: 'Pending Rewards', value: `${fmt(PROTOCOL_STATS.pendingRewards)} VIBE`, color: '#34d399', sub: 'claimable now' },
           ].map((s, i) => (
@@ -285,8 +285,8 @@ export default function StakingRewardsPage() {
             ))}
           </div>
           <div className="mt-3 text-center text-xs font-mono text-gray-500">
-            {TIERS[calcTier].baseApy}% base APY x {TIERS[calcTier].mult} tier multiplier
-            = <span style={{ color: CYAN }}>{projections.effectiveApy.toFixed(1)}%</span> effective APY
+            {TIERS[calcTier].baseApy}% base Rate x {TIERS[calcTier].mult} tier multiplier
+            = <span style={{ color: CYAN }}>{projections.effectiveApy.toFixed(1)}%</span> effective Rate
             {TIERS[calcTier].lockDays > 0 && <span className="text-gray-600"> / {TIERS[calcTier].lockLabel} lock</span>}
           </div>
         </GlassCard>
@@ -347,7 +347,7 @@ export default function StakingRewardsPage() {
                       <div>
                         <div className="font-mono text-sm font-bold text-white">{fmt(stake.amount)} JUL</div>
                         <div className="text-[10px] font-mono text-gray-500">
-                          {stake.tier.label} tier / {(stake.tier.baseApy * stake.tier.mult).toFixed(1)}% APY
+                          {stake.tier.label} tier / {(stake.tier.baseApy * stake.tier.mult).toFixed(1)}% Rate
                         </div>
                       </div>
                     </div>
@@ -449,8 +449,8 @@ export default function StakingRewardsPage() {
       <Section num="06" title="Tier Comparison" delay={0.36}>
         <GlassCard glowColor="terminal" className="overflow-hidden">
           <div className="hidden sm:grid grid-cols-6 gap-2 px-5 py-3 text-[10px] font-mono text-gray-500 uppercase border-b border-gray-800">
-            <div>Tier</div><div>Lock Period</div><div>Base APY</div>
-            <div>Multiplier</div><div>Effective APY</div><div className="text-right">10K Staked / Year</div>
+            <div>Tier</div><div>Lock Period</div><div>Base Rate</div>
+            <div>Multiplier</div><div>Effective Rate</div><div className="text-right">10K Staked / Year</div>
           </div>
           {TIERS.map((tier, i) => (
             <motion.div key={tier.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
@@ -519,7 +519,7 @@ export default function StakingRewardsPage() {
       {/* ============ Footer ============ */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.50 }} className="text-center pb-4">
         <p className="text-[10px] font-mono text-gray-600 leading-relaxed max-w-xl mx-auto">
-          All APYs are variable and subject to change based on protocol revenue and total staked supply.
+          All Rates are variable and subject to change based on protocol revenue and total staked supply.
           Rewards are distributed per batch settlement. Compounding frequency affects realized yield.
         </p>
         <div className="flex items-center justify-center gap-1.5 mt-2 text-[10px] text-gray-700">

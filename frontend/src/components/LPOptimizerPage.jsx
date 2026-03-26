@@ -150,7 +150,7 @@ function TopOpportunities({ pools, onCompare, compareIds }) {
             onChange={e => setSortBy(e.target.value)}
             className="px-3 py-1 rounded-lg text-xs font-mono bg-black-800/50 text-black-300 border border-black-700/50 outline-none"
           >
-            <option value="totalAPY">Sort: APY</option>
+            <option value="totalAPY">Sort: Rate</option>
             <option value="tvl">Sort: TVL</option>
             <option value="volumeTvlRatio">Sort: Vol/TVL</option>
             <option value="ilRisk">Sort: IL Risk</option>
@@ -160,7 +160,7 @@ function TopOpportunities({ pools, onCompare, compareIds }) {
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] font-mono text-black-500 uppercase tracking-wider border-b border-black-700/50">
           <div className="col-span-3">Pair</div>
-          <div className="col-span-2 text-right">APY</div>
+          <div className="col-span-2 text-right">30d Fees</div>
           <div className="col-span-2 text-right">TVL</div>
           <div className="col-span-2 text-right">Vol/TVL</div>
           <div className="col-span-2 text-center">IL Risk</div>
@@ -393,7 +393,7 @@ function PositionSimulator() {
               className="w-full px-3 py-2 rounded-lg text-sm font-mono bg-black-800/50 text-black-200 border border-black-700/50 outline-none"
             >
               {POOL_DATA.map((p, i) => (
-                <option key={p.id} value={i}>{p.tokenA}/{p.tokenB} ({p.totalAPY}% APY)</option>
+                <option key={p.id} value={i}>{p.tokenA}/{p.tokenB} ({p.totalAPY}% Rate)</option>
               ))}
             </select>
           </div>
@@ -438,7 +438,7 @@ function PositionSimulator() {
             <span>TVL: <span className="text-black-300">{fmtUSD(pool.tvl)}</span></span>
             <span>Vol/TVL: <span style={{ color: CYAN }}>{pool.volumeTvlRatio.toFixed(2)}</span></span>
             <span>IL Risk: <span className={pool.ilRisk > 5 ? 'text-red-400' : pool.ilRisk > 2 ? 'text-yellow-400' : 'text-green-400'}>{pool.ilRisk.toFixed(1)}</span></span>
-            <span>Base APY: <span className="text-green-400">{pool.baseAPY}%</span></span>
+            <span>Base Rate: <span className="text-green-400">{pool.baseAPY}%</span></span>
           </div>
         )}
       </GlassCard>
@@ -523,7 +523,7 @@ function MyPositions({ isConnected }) {
                     <span className="text-[10px] font-mono text-black-500">{pos.daysActive}d active</span>
                   </div>
                   <span className={`text-sm font-mono font-bold ${pos.netAPY >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {fmtPct(pos.netAPY)} APY
+                    {fmtPct(pos.netAPY)} Rate
                   </span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -674,7 +674,7 @@ function RangeOptimization() {
             {/* Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'Effective APY', value: `${rangeData.effectiveAPY}%`, color: 'text-green-400' },
+                { label: 'Effective Rate', value: `${rangeData.effectiveAPY}%`, color: 'text-green-400' },
                 { label: 'In Range', value: `${rangeData.inRangePct}%`, color: parseFloat(rangeData.inRangePct) > 80 ? 'text-green-400' : 'text-yellow-400' },
                 { label: '24h Volatility', value: `${rangeData.volatility}%`, color: parseFloat(rangeData.volatility) > 10 ? 'text-red-400' : 'text-black-300' },
                 { label: 'Rebalance', value: rangeData.rebalanceFreq, color: 'text-black-300' },
@@ -691,7 +691,7 @@ function RangeOptimization() {
               <p className="text-[11px] font-mono text-black-400 leading-relaxed">
                 {riskLevel === 'conservative' && 'Wide range for maximum time in range. Lower capital efficiency but minimal rebalancing needed. Best for passive LPs.'}
                 {riskLevel === 'balanced' && 'Moderate range balancing capital efficiency with time in range. Requires daily monitoring. Recommended for most users.'}
-                {riskLevel === 'aggressive' && 'Tight range for maximum capital efficiency. High APY but requires frequent rebalancing. Significant out-of-range risk.'}
+                {riskLevel === 'aggressive' && 'Tight range for maximum capital efficiency. High Rate but requires frequent rebalancing. Significant out-of-range risk.'}
               </p>
             </div>
           </>
@@ -725,9 +725,9 @@ function PoolComparison({ compareIds, pools, onRemove }) {
   }
 
   const metrics = [
-    { key: 'totalAPY', label: 'Total APY', fmt: v => v + '%', best: 'max' },
-    { key: 'baseAPY', label: 'Base APY', fmt: v => v + '%', best: 'max' },
-    { key: 'rewardAPY', label: 'Reward APY', fmt: v => v + '%', best: 'max' },
+    { key: 'totalAPY', label: 'Total Rate', fmt: v => v + '%', best: 'max' },
+    { key: 'baseAPY', label: 'Base Rate', fmt: v => v + '%', best: 'max' },
+    { key: 'rewardAPY', label: 'Reward Rate', fmt: v => v + '%', best: 'max' },
     { key: 'tvl', label: 'TVL', fmt: v => fmtUSD(v), best: 'max' },
     { key: 'volume24h', label: '24h Volume', fmt: v => fmtUSD(v), best: 'max' },
     { key: 'volumeTvlRatio', label: 'Vol/TVL', fmt: v => v.toFixed(4), best: 'max' },
@@ -838,7 +838,7 @@ export default function LPOptimizerPage() {
         <div className="flex flex-wrap gap-3 justify-center">
           {[
             { label: 'Active Pools', value: POOL_DATA.length.toString(), accent: false },
-            { label: 'Highest APY', value: Math.max(...POOL_DATA.map(p => p.totalAPY)).toFixed(1) + '%', accent: true },
+            { label: 'Highest Rate', value: Math.max(...POOL_DATA.map(p => p.totalAPY)).toFixed(1) + '%', accent: true },
             { label: 'Total TVL', value: fmtUSD(POOL_DATA.reduce((s, p) => s + p.tvl, 0)), accent: false },
             { label: 'Avg IL Risk', value: (POOL_DATA.reduce((s, p) => s + p.ilRisk, 0) / POOL_DATA.length).toFixed(1), accent: false },
           ].map((stat, i) => (

@@ -233,7 +233,7 @@ export default function RWAHub() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-mono font-bold text-emerald-400">{a.apy}</div>
-                    <div className="text-[9px] font-mono text-black-500 uppercase">APY</div>
+                    <div className="text-[9px] font-mono text-black-500 uppercase">30d Fees</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-3">
@@ -351,7 +351,7 @@ export default function RWAHub() {
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-mono font-bold flex-shrink-0" style={{ background: `${p.color}18`, border: `1px solid ${p.color}35`, color: p.color }}>{p.ticker.slice(1)}</div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-bold text-white">{p.name}</div>
-                      <div className="text-[10px] font-mono text-black-500">{p.qty.toLocaleString()} {p.ticker} {'\u00B7'} {p.apy} APY</div>
+                      <div className="text-[10px] font-mono text-black-500">{p.qty.toLocaleString()} {p.ticker} {'\u00B7'} {p.apy} Rate</div>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-sm font-mono font-bold text-white">${p.currentVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
@@ -459,7 +459,7 @@ export default function RWAHub() {
             </div>
             <div>
               <label className="text-[10px] font-mono text-black-500 uppercase tracking-wider block mb-1">Est. Annual Yield</label>
-              <div className="bg-black-900 border border-black-700 rounded-lg px-3 py-2 text-sm font-mono text-emerald-400">${estYield} <span className="text-black-500">({active?.apy} APY)</span></div>
+              <div className="bg-black-900 border border-black-700 rounded-lg px-3 py-2 text-sm font-mono text-emerald-400">${estYield} <span className="text-black-500">({active?.apy} Rate)</span></div>
             </div>
           </div>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full mt-5 py-3 rounded-xl text-sm font-mono font-bold" style={{ background: isBuy ? `linear-gradient(135deg, ${CYAN}, #0891b2)` : 'linear-gradient(135deg, #f43f5e, #e11d48)', color: isBuy ? '#000' : '#fff' }}>

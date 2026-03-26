@@ -31,7 +31,7 @@ const RISK_LEVELS = [
   { level: 5, label: 'High', desc: 'Leveraged strategies with liquidation risk. Recursive borrowing amplifies gains and losses.' },
 ]
 
-// APY history (mock 30-day data per strategy)
+// Rate history (mock 30-day data per strategy)
 const generateApyHistory = (baseApy, vol) => {
   const pts = []
   let cur = baseApy
@@ -42,7 +42,7 @@ const generateApyHistory = (baseApy, vol) => {
   }
   return pts
 }
-const APY_HISTORIES = Object.fromEntries(
+const Rate_HISTORIES = Object.fromEntries(
   STRATEGIES.map(s => [s.id, generateApyHistory(s.apy, s.risk * 0.5)])
 )
 
@@ -93,7 +93,7 @@ function Section({ index, title, subtitle, children }) {
 }
 
 function ApyChart({ strategyId }) {
-  const data = APY_HISTORIES[strategyId] || []
+  const data = Rate_HISTORIES[strategyId] || []
   if (!data.length) return null
   const max = Math.max(...data.map(d => d.apy)), min = Math.min(...data.map(d => d.apy))
   const range = max - min || 1, W = 400, H = 120, pad = 10
@@ -138,7 +138,7 @@ function CompoundCalculator() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3">
-        {[['Principal ($)', principal, setPrincipal], ['APY (%)', apy, setApy], ['Years', years, setYears]].map(([label, val, set]) => (
+        {[['Principal ($)', principal, setPrincipal], ['Rate (%)', apy, setApy], ['Years', years, setYears]].map(([label, val, set]) => (
           <div key={label}>
             <label className="text-xs text-black-400 block mb-1">{label}</label>
             <input type="number" value={val} onChange={e => set(e.target.value)} className={inputCls} />
@@ -176,7 +176,7 @@ function DepositForm({ strategies, isConnected, connect }) {
         <label className="text-xs text-black-400 block mb-2">Strategy</label>
         <select value={selId} onChange={e => setSelId(e.target.value)}
           className="w-full bg-black-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-cyan-500/50 appearance-none cursor-pointer">
-          {strategies.map(s => <option key={s.id} value={s.id}>{s.name} ({s.apy}% APY)</option>)}
+          {strategies.map(s => <option key={s.id} value={s.id}>{s.name} ({s.apy}% Rate)</option>)}
         </select>
       </div>
       <div>
@@ -253,7 +253,7 @@ export default function YieldPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               ['Total Deposited', `$${fmt(totalDeposited)}`, null],
-              ['Average APY', `${avgApy.toFixed(1)}%`, CYAN],
+              ['Average Rate', `${avgApy.toFixed(1)}%`, CYAN],
               ['Your Deposits', isConnected ? positions.length : '--', null],
               ['Pending Harvest', null, null],
             ].map(([label, val, color], i) => (
@@ -282,7 +282,7 @@ export default function YieldPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-bold font-mono" style={{ color: CYAN }}>{s.apy}%</div>
-                    <div className="text-[10px] text-black-500 uppercase tracking-wider">APY</div>
+                    <div className="text-[10px] text-black-500 uppercase tracking-wider">30d Fees</div>
                   </div>
                 </div>
                 <p className="text-xs text-black-400 mb-3 leading-relaxed">{s.desc}</p>
@@ -332,7 +332,7 @@ export default function YieldPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs text-black-500 uppercase tracking-wider">
-                      {['Strategy', 'Deposited', 'Current', 'Earned', 'APY', 'Actions'].map((h, i) => (
+                      {['Strategy', 'Deposited', 'Current', 'Earned', '30d Fees', 'Actions'].map((h, i) => (
                         <th key={h} className={`${i === 0 ? 'text-left' : 'text-right'} pb-3 ${i < 5 ? 'pr-4' : ''}`}>{h}</th>
                       ))}
                     </tr>
@@ -378,8 +378,8 @@ export default function YieldPage() {
           )}
         </Section>
 
-        {/* ============ 5. APY History Chart ============ */}
-        <Section index={4} title="APY History" subtitle="30-day historical APY for each strategy">
+        {/* ============ 5. Rate History Chart ============ */}
+        <Section index={4} title="Fee History" subtitle="30-day historical rate for each strategy">
           <div className="mb-4 flex flex-wrap gap-2">
             {STRATEGIES.map(s => (
               <button key={s.id} onClick={() => setChartStrategy(s.id)}
@@ -393,7 +393,7 @@ export default function YieldPage() {
           </div>
           <ApyChart strategyId={chartStrategy} />
           <div className="mt-3 text-center text-xs text-black-500">
-            Current: <span style={{ color: CYAN }} className="font-mono font-medium">{STRATEGIES.find(s => s.id === chartStrategy)?.apy}% APY</span>
+            Current: <span style={{ color: CYAN }} className="font-mono font-medium">{STRATEGIES.find(s => s.id === chartStrategy)?.apy}% Rate</span>
           </div>
         </Section>
 
@@ -404,7 +404,7 @@ export default function YieldPage() {
               <thead>
                 <tr className="text-xs text-black-500 uppercase tracking-wider">
                   <th className="text-left pb-3 pr-4">Strategy</th>
-                  <th className="text-right pb-3 pr-4">APY</th>
+                  <th className="text-right pb-3 pr-4">30d Fees</th>
                   <th className="text-center pb-3 pr-4">Risk</th>
                   <th className="text-right pb-3 pr-4">TVL</th>
                   <th className="text-right pb-3">Lock Period</th>
@@ -473,7 +473,7 @@ export default function YieldPage() {
 
         {/* ============ Footer ============ */}
         <motion.div custom={8} variants={sectionVariants} initial="hidden" animate="visible" className="text-center pb-8">
-          <p className="text-xs text-black-500">All APYs are variable and based on current market conditions. Past performance does not guarantee future results.</p>
+          <p className="text-xs text-black-500">All Rates are variable and based on current market conditions. Past performance does not guarantee future results.</p>
           <div className="flex items-center justify-center space-x-2 mt-2 text-xs text-black-600">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

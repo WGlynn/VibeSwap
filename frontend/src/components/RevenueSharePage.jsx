@@ -443,7 +443,7 @@ export default function RevenueSharePage() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-mono text-gray-400 mb-1.5 block">Current Revenue APR</label>
+              <label className="text-xs font-mono text-gray-400 mb-1.5 block">Current Revenue Fees</label>
               <div className="w-full rounded-xl px-4 py-3 font-mono text-lg font-bold flex items-center gap-2"
                 style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #1f2937' }}>
                 <span style={{ color: activeTab === 'staker' ? CYAN : '#34d399' }}>

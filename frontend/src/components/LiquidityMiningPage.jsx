@@ -136,7 +136,7 @@ function BoostBadge({ multiplier }) {
   )
 }
 
-// ============ APR Bar ============
+// ============ Fees Bar ============
 function AprBar({ apr }) {
   const pct = Math.min(100, (apr / 200) * 100)
   const color = apr > 100 ? '#22c55e' : apr > 50 ? CYAN : '#eab308'
@@ -176,7 +176,7 @@ function FarmCard({ farm, isConnected, connect, onStake }) {
         </div>
         <div className="text-right">
           <div className="text-lg font-bold font-mono" style={{ color: farm.apr > 80 ? '#22c55e' : CYAN }}>{farm.apr}%</div>
-          <div className="text-[10px] text-black-500 uppercase tracking-wider">APR</div>
+          <div className="text-[10px] text-black-500 uppercase tracking-wider">7d Fees</div>
         </div>
       </div>
       <AprBar apr={farm.apr} />
@@ -245,7 +245,7 @@ function RewardsCalculator({ farms }) {
           <label className="text-xs text-black-400 block mb-1">Farm</label>
           <select value={selectedFarm} onChange={e => setSelectedFarm(e.target.value)}
             className="w-full bg-black-700 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-cyan-500/50 appearance-none cursor-pointer font-mono">
-            {farms.map(f => <option key={f.id} value={f.id}>{f.tokenA.symbol}/{f.tokenB.symbol} ({f.apr}% APR)</option>)}
+            {farms.map(f => <option key={f.id} value={f.id}>{f.tokenA.symbol}/{f.tokenB.symbol} ({f.apr}% Fees)</option>)}
           </select>
         </div>
         <div>
@@ -454,7 +454,7 @@ export default function LiquidityMiningPage() {
 
         {/* ============ 2. Featured Farms ============ */}
         {featuredFarms.length > 0 && (
-          <Section index={1} title="Featured Farms" subtitle="Highest APR opportunities right now">
+          <Section index={1} title="Featured Farms" subtitle="Highest Fees opportunities right now">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {featuredFarms.map(farm => (
                 <FarmCard
@@ -508,7 +508,7 @@ export default function LiquidityMiningPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-xs text-black-500 uppercase tracking-wider">
-                          {['Farm', 'Staked', 'APR', 'Earned', 'Epoch'].map((h, i) => (
+                          {['Farm', 'Staked', '7d Fees', 'Earned', 'Epoch'].map((h, i) => (
                             <th key={h} className={`${i === 0 ? 'text-left' : 'text-right'} pb-3 ${i < 4 ? 'pr-4' : ''}`}>{h}</th>
                           ))}
                         </tr>
@@ -621,7 +621,7 @@ export default function LiquidityMiningPage() {
         {/* ============ Footer Disclaimer ============ */}
         <motion.div custom={8} variants={sectionVariants} initial="hidden" animate="visible" className="text-center pb-8">
           <p className="text-xs text-black-500">
-            APR values are variable and depend on total staked liquidity, token prices, and boost level.
+            Fees values are variable and depend on total staked liquidity, token prices, and boost level.
             Past performance does not guarantee future results.
           </p>
           <div className="flex items-center justify-center space-x-2 mt-2 text-xs text-black-600">

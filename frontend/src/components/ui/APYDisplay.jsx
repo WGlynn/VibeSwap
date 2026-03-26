@@ -1,13 +1,13 @@
 import { motion } from 'framer-motion'
 
 // ============================================================
-// APYDisplay — Formatted APY with breakdown tooltip
+// RateDisplay — Formatted Rate with breakdown tooltip
 // Used for vaults, staking, farming, lending rates
 // ============================================================
 
 const CYAN = '#06b6d4'
 
-export default function APYDisplay({
+export default function RateDisplay({
   apy = 0,
   baseApy,
   rewardApy,
@@ -38,7 +38,7 @@ export default function APYDisplay({
         >
           {formatted}%
         </motion.span>
-        <span className={`${s.label} font-mono text-black-500`}>APY</span>
+        <span className={`${s.label} font-mono text-black-500`}>30d Fees</span>
       </div>
 
       {(baseApy !== undefined || rewardApy !== undefined) && (

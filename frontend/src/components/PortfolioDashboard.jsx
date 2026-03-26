@@ -469,7 +469,7 @@ export default function PortfolioDashboard() {
                     <span className="text-xs text-gray-300">{p.amount.toLocaleString()} {p.token}</span>
                     {p.lockDays > 0 && <span className="text-[9px] text-gray-600 ml-1">{p.lockDays}d lock</span>}
                   </div>
-                  <span className="text-[10px] text-green-400">{p.apr}% APR</span>
+                  <span className="text-[10px] text-green-400">{p.apr}% Fees</span>
                 </div>
               ))}
             </GlassCard>
@@ -487,7 +487,7 @@ export default function PortfolioDashboard() {
                     <span className="text-xs text-gray-300">{p.pair}</span>
                     <span className="text-[9px] text-gray-600 ml-1">${p.value.toLocaleString()}</span>
                   </div>
-                  <span className="text-[10px] text-green-400">{p.apr}% APR</span>
+                  <span className="text-[10px] text-green-400">{p.apr}% Fees</span>
                 </div>
               ))}
             </GlassCard>
@@ -505,7 +505,7 @@ export default function PortfolioDashboard() {
                     <span className="text-xs text-gray-300">{p.supplied.toLocaleString()} {p.token}</span>
                     <span className="text-[9px] text-gray-600 ml-1">+${p.earned.toFixed(2)} earned</span>
                   </div>
-                  <span className="text-[10px] text-green-400">{p.apy}% APY</span>
+                  <span className="text-[10px] text-green-400">{p.apy}% Rate</span>
                 </div>
               ))}
             </GlassCard>

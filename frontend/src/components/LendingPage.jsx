@@ -302,7 +302,7 @@ export default function LendingPage() {
               {[
                 { label: 'Total Supplied', value: fmt(userTotalSupplied), color: CYAN },
                 { label: 'Total Borrowed', value: fmt(userTotalBorrowed), color: AMBER },
-                { label: 'Net APY', value: `${netAPY.toFixed(2)}%`, color: netAPY >= 0 ? GREEN : RED },
+                { label: 'Net Rate', value: `${netAPY.toFixed(2)}%`, color: netAPY >= 0 ? GREEN : RED },
               ].map((s, i) => (
                 <GlassCard key={s.label} glowColor="terminal" hover>
                   <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.06 * PHI }} className="p-3 text-center">
@@ -328,7 +328,7 @@ export default function LendingPage() {
                             <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border" style={{ borderColor: `${m.color}40`, color: m.color, backgroundColor: `${m.color}10` }}>{m.icon}</span>
                             <span className="text-white text-xs font-bold">{m.asset}</span>
                           </div>
-                          <span className="text-xs font-mono font-bold" style={{ color: CYAN }}>+{m.supplyAPY}% APY</span>
+                          <span className="text-xs font-mono font-bold" style={{ color: CYAN }}>+{m.supplyAPY}% Rate</span>
                         </div>
                         <div className="flex items-center justify-between text-[10px] font-mono">
                           <span className="text-gray-400">{fmtNum(m.userSupply)} {m.asset} ({fmt(m.userSupply * m.price)})</span>
@@ -361,7 +361,7 @@ export default function LendingPage() {
                             <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border" style={{ borderColor: `${m.color}40`, color: m.color, backgroundColor: `${m.color}10` }}>{m.icon}</span>
                             <span className="text-white text-xs font-bold">{m.asset}</span>
                           </div>
-                          <span className="text-xs font-mono font-bold" style={{ color: AMBER }}>-{m.borrowAPY}% APY</span>
+                          <span className="text-xs font-mono font-bold" style={{ color: AMBER }}>-{m.borrowAPY}% Rate</span>
                         </div>
                         <div className="flex items-center justify-between text-[10px] font-mono">
                           <span className="text-gray-400">{fmtNum(m.userBorrow)} {m.asset} ({fmt(m.userBorrow * m.price)})</span>
@@ -540,9 +540,9 @@ export default function LendingPage() {
               </div>
               {numAmount > 0 && <div className="text-[10px] text-gray-500 font-mono mt-1">~ {fmt(numAmount * (selected?.price || 0))}</div>}
             </div>
-            {/* Estimated APY */}
+            {/* Historical Rate */}
             <div className="flex items-center justify-between text-xs mb-4">
-              <span className="text-gray-400 font-mono">Estimated APY</span>
+              <span className="text-gray-400 font-mono">Historical Rate</span>
               <span className="font-mono font-bold" style={{ color: activeTab === 'supply' ? CYAN : AMBER }}>{estimatedAPY?.toFixed(1) || '0.0'}%</span>
             </div>
             <button disabled={numAmount <= 0 || !isConnected}
@@ -561,8 +561,8 @@ export default function LendingPage() {
             <table className="w-full text-xs font-mono">
               <thead><tr className="text-gray-500 border-b border-gray-800">
                 <th className="text-left p-3">Token</th>
-                <th className="text-right p-3" style={{ color: CYAN }}>Supply APY</th>
-                <th className="text-right p-3" style={{ color: AMBER }}>Borrow APY</th>
+                <th className="text-right p-3" style={{ color: CYAN }}>Supply Rate</th>
+                <th className="text-right p-3" style={{ color: AMBER }}>Borrow Rate</th>
                 <th className="text-right p-3 hidden sm:table-cell">Total Supply</th>
                 <th className="text-right p-3 hidden sm:table-cell">Utilization</th>
                 <th className="text-right p-3">Your Position</th>

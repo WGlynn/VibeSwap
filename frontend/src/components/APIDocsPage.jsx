@@ -217,7 +217,7 @@ const REST_ENDPOINTS = [
   {
     method: 'GET',
     path: '/api/v1/pool/:id',
-    description: 'Detailed information about a liquidity pool including reserves, APR, fee earnings, and impermanent loss metrics.',
+    description: 'Detailed information about a liquidity pool including reserves, Fees, fee earnings, and impermanent loss metrics.',
     response: {
       pool_id: "eth-usdc-001",
       token_a: { symbol: "ETH", reserve: "14520.45" },
@@ -689,7 +689,7 @@ function SDKSection() {
               { method: 'batchCommit(params)', returns: 'CommitResponse', desc: 'Submit a batch commit hash' },
               { method: 'batchReveal(params)', returns: 'RevealResponse', desc: 'Reveal order during reveal phase' },
               { method: 'getBatch(id)', returns: 'BatchStatus', desc: 'Query batch auction status' },
-              { method: 'getPool(id)', returns: 'PoolInfo', desc: 'Pool reserves, APR, and metrics' },
+              { method: 'getPool(id)', returns: 'PoolInfo', desc: 'Pool reserves, Fees, and metrics' },
               { method: 'addLiquidity(params)', returns: 'LPReceipt', desc: 'Provide liquidity to a pool' },
               { method: 'removeLiquidity(params)', returns: 'WithdrawReceipt', desc: 'Withdraw liquidity from a pool' },
               { method: 'getPortfolio(address)', returns: 'Portfolio', desc: 'Full portfolio summary' },

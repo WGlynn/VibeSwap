@@ -7,14 +7,18 @@
 **On EVERY new session or after context compression:**
 
 ```
+0. Check .claude/WAL.md                → If ACTIVE: crash recovery FIRST (AAP)
 1. Read .claude/JarvisxWill_CKB.md     → Core alignment primitives
 2. Read CLAUDE.md (this file)          → Project context
 3. Read .claude/SESSION_STATE.md       → Block header (recent work state)
 4. git pull origin master              → Latest code
-5. Resume work
+5. Resume work (or recovery)
 ```
 
+**Step 0 (Anti-Amnesia)**: If WAL status is ACTIVE, a crash happened mid-execution (PC failure, OOM, user closed terminal, ANY unclean exit). Run recovery protocol before anything else. See `docs/ANTI_AMNESIA_PROTOCOL.md`.
+
 **Common Knowledge Base**: `.claude/JarvisxWill_CKB.md` (GitHub synced)
+**WAL Location**: `.claude/WAL.md` (crash recovery log, synced via git)
 
 ## SESSION END PROTOCOL (MANDATORY)
 

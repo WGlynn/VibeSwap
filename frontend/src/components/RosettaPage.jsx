@@ -455,6 +455,251 @@ function LexiconPanel({ agent, terms }) {
   )
 }
 
+// ============ Concept Explorer ============
+
+// Build a domain-label lookup: lexiconId -> { name, color, isUser }
+function getLexiconLabel(lexiconId, userLexicons) {
+  if (!userLexicons) userLexicons = []
+  if (lexiconId.startsWith('user:')) {
+    const userId = lexiconId.slice(5)
+    const lex = userLexicons.find(u => u.userId === userId)
+    return { name: lex?.domain || userId, color: USER_LEXICON_COLOR, isUser: true }
+  }
+  const agent = AGENT_MAP[lexiconId]
+  return agent ? { name: agent.name, color: agent.color, isUser: false } : null
+}
+
+function ConceptExplorer({ userLexicons = [] }) {
+  const [filter, setFilter] = useState('')
+  const [expandedConcept, setExpandedConcept] = useState(null)
+
+  // Compute top concepts once on mount
+  const [topConcepts] = useState(() => getTopConnectedConcepts(30))
+
+  // Filter by concept key, definition, term name, or domain name
+  const filtered = filter.trim()
+    ? topConcepts.filter(c => {
+        const q = filter.toLowerCase()
+        if (c.universal.toLowerCase().includes(q)) return true
+        if (c.definition.toLowerCase().includes(q)) return true
+        if (c.mappings.some(m => m.term.toLowerCase().includes(q))) return true
+        if (c.mappings.some(m => {
+          const meta = getLexiconLabel(m.lexiconId, userLexicons)
+          return meta?.name?.toLowerCase().includes(q)
+        })) return true
+        return false
+      })
+    : topConcepts
+
+  const handleToggle = (universal) => {
+    setExpandedConcept(prev => prev === universal ? null : universal)
+  }
+
+  return (
+    <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+            Concept Explorer
+          </h2>
+          <p className="text-black-500 text-[10px] font-mono mt-0.5">
+            Browse the universal concept graph &mdash; see unexpected connections across every domain.
+          </p>
+        </div>
+        <span className="text-[10px] font-mono text-black-600 flex-shrink-0 ml-4 mt-0.5">
+          {filtered.length} concepts
+        </span>
+      </div>
+
+      {/* Search */}
+      <div className="relative mt-3 mb-4">
+        <input
+          type="text"
+          value={filter}
+          onChange={(e) => { setFilter(e.target.value); setExpandedConcept(null) }}
+          placeholder="Search concepts, terms, or domains..."
+          className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 pr-10 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+        />
+        {filter && (
+          <button
+            onClick={() => { setFilter(''); setExpandedConcept(null) }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Concept list */}
+      <div className="space-y-1.5 max-h-[520px] overflow-y-auto scrollbar-thin pr-1">
+        <AnimatePresence initial={false}>
+          {filtered.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-8 border border-black-800 rounded-lg"
+            >
+              <p className="text-black-500 text-xs font-mono">No concepts match &ldquo;{filter}&rdquo;</p>
+            </motion.div>
+          ) : (
+            filtered.map((concept, i) => {
+              const isExpanded = expandedConcept === concept.universal
+
+              // Deduplicate mappings by lexiconId for the preview dots
+              const seen = new Set()
+              const uniqueLexicons = concept.mappings.filter(m => {
+                if (seen.has(m.lexiconId)) return false
+                seen.add(m.lexiconId)
+                return true
+              })
+
+              return (
+                <motion.div
+                  key={concept.universal}
+                  layout
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.3) }}
+                >
+                  {/* Row — click to expand */}
+                  <button
+                    onClick={() => handleToggle(concept.universal)}
+                    className="w-full text-left p-3 rounded-xl border transition-all duration-200"
+                    style={{
+                      backgroundColor: isExpanded ? 'rgba(0,255,65,0.04)' : 'rgba(15,20,15,0.6)',
+                      borderColor: isExpanded ? 'rgba(0,255,65,0.25)' : 'rgba(37,37,37,0.8)',
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Concept key + count badge */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-white text-xs font-mono font-semibold">
+                            {concept.universal}
+                          </span>
+                          <span
+                            className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: 'rgba(0,255,65,0.1)', color: '#00ff41' }}
+                          >
+                            {concept.lexiconCount} domain{concept.lexiconCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        {concept.definition && (
+                          <p className="text-[10px] font-mono text-black-500 mt-0.5 truncate">
+                            {concept.definition}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Domain color dots preview (up to 8) */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {uniqueLexicons.slice(0, 8).map((m) => {
+                          const meta = getLexiconLabel(m.lexiconId, userLexicons)
+                          if (!meta) return null
+                          return (
+                            <span
+                              key={m.lexiconId}
+                              className="inline-block rounded-full flex-shrink-0"
+                              style={{
+                                width: 7,
+                                height: 7,
+                                backgroundColor: meta.color,
+                                boxShadow: `0 0 4px ${meta.color}60`,
+                              }}
+                              title={meta.name}
+                            />
+                          )
+                        })}
+                        {uniqueLexicons.length > 8 && (
+                          <span className="text-[9px] font-mono text-black-600">
+                            +{uniqueLexicons.length - 8}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Expand chevron */}
+                      <svg
+                        className={`w-3.5 h-3.5 text-black-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  {/* Expanded mappings panel */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeInOut' }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-1.5 pb-1 pl-3 pr-1">
+                          <div className="flex flex-wrap gap-2 p-3 bg-black-900/60 rounded-xl border border-black-800">
+                            {concept.mappings.map((m, mi) => {
+                              const meta = getLexiconLabel(m.lexiconId, userLexicons)
+                              if (!meta) return null
+                              return (
+                                <motion.div
+                                  key={`${m.lexiconId}-${m.term}-${mi}`}
+                                  initial={{ opacity: 0, scale: 0.9 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: mi * 0.03 }}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border flex-shrink-0"
+                                  style={{
+                                    backgroundColor: `${meta.color}0d`,
+                                    borderColor: `${meta.color}30`,
+                                  }}
+                                  title={m.desc || undefined}
+                                >
+                                  <span
+                                    className="inline-block rounded-full flex-shrink-0"
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      backgroundColor: meta.color,
+                                      boxShadow: `0 0 5px ${meta.color}80`,
+                                    }}
+                                  />
+                                  <span
+                                    className="text-[10px] font-mono"
+                                    style={{ color: meta.color }}
+                                  >
+                                    {meta.name}:
+                                  </span>
+                                  <span className="text-white text-[10px] font-mono font-semibold">
+                                    {m.term}
+                                  </span>
+                                </motion.div>
+                              )
+                            })}
+                          </div>
+                          {concept.definition && (
+                            <p className="text-[10px] font-mono text-black-600 mt-1.5 px-1">
+                              {concept.definition}
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )
+            })
+          )}
+        </AnimatePresence>
+      </div>
+    </GlassCard>
+  )
+}
+
 // ============ Discover Section ============
 
 function DiscoverSection() {
@@ -913,6 +1158,194 @@ function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
   )
 }
 
+// ============ Ten Covenants Section ============
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
+
+const ENFORCEMENT_META = {
+  hard:      { label: 'HARD',      bg: 'rgba(239,68,68,0.15)',   border: 'rgba(239,68,68,0.35)',   text: '#ef4444' },
+  soft:      { label: 'SOFT',      bg: 'rgba(245,158,11,0.15)',  border: 'rgba(245,158,11,0.35)',  text: '#f59e0b' },
+  immutable: { label: 'IMMUTABLE', bg: 'rgba(168,85,247,0.15)',  border: 'rgba(168,85,247,0.35)',  text: '#a855f7' },
+  spirit:    { label: 'SPIRIT',    bg: 'rgba(16,185,129,0.15)',  border: 'rgba(16,185,129,0.35)',  text: '#10b981' },
+}
+
+function CovenantCard({ covenant, index }) {
+  const [open, setOpen] = useState(false)
+  const meta = ENFORCEMENT_META[covenant.enforcement] || ENFORCEMENT_META.soft
+  const roman = ROMAN[index] || String(index + 1)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.05, ease: "easeOut" }}
+      className="relative rounded-xl overflow-hidden border"
+      style={{
+        background: "linear-gradient(135deg, rgba(10,10,10,0.95) 0%, rgba(18,14,8,0.95) 100%)",
+        borderColor: "rgba(120,90,40,0.3)",
+        boxShadow: "0 2px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(212,170,80,0.06)",
+      }}
+    >
+      {/* Stone texture overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at 50% 0%, rgba(212,170,80,0.04) 0%, transparent 60%)",
+        }}
+      />
+
+      <div className="relative z-10 p-4">
+        {/* Top row: Roman numeral + badge */}
+        <div className="flex items-center justify-between mb-3">
+          <span
+            className="font-mono font-bold text-lg leading-none"
+            style={{ color: "rgba(212,170,80,0.6)", textShadow: "0 0 12px rgba(212,170,80,0.2)" }}
+          >
+            {roman}
+          </span>
+          <span
+            className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full tracking-widest uppercase"
+            style={{ background: meta.bg, border: `1px solid ${meta.border}`, color: meta.text }}
+          >
+            {meta.label}
+          </span>
+        </div>
+
+        {/* Covenant text */}
+        <p
+          className="text-sm font-mono leading-relaxed mb-3"
+          style={{ color: "#d4aa50", textShadow: "0 0 8px rgba(212,170,80,0.1)" }}
+        >
+          {covenant.covenant}
+        </p>
+
+        {/* Collapsible spirit button */}
+        <button
+          onClick={() => setOpen(v => !v)}
+          className="flex items-center gap-1.5 text-[10px] font-mono transition-colors"
+          style={{ color: open ? "rgba(212,170,80,0.7)" : "rgba(100,80,40,0.8)" }}
+        >
+          <svg
+            className="w-3 h-3 transition-transform"
+            style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          {open ? "hide spirit" : "reveal spirit"}
+        </button>
+
+        {/* Spirit text — collapsible */}
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="overflow-hidden"
+            >
+              <div
+                className="mt-3 pt-3 border-t text-[11px] font-mono leading-relaxed italic"
+                style={{ borderColor: "rgba(120,90,40,0.25)", color: "rgba(180,140,60,0.7)" }}
+              >
+                {covenant.spirit}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  )
+}
+
+function TenCovenantsSection() {
+  const [hashCopied, setHashCopied] = useState(false)
+
+  const handleCopyHash = useCallback(() => {
+    navigator.clipboard.writeText(COVENANT_HASH).then(() => {
+      setHashCopied(true)
+      setTimeout(() => setHashCopied(false), 2000)
+    })
+  }, [])
+
+  return (
+    <div className="mb-8">
+      {/* Section heading */}
+      <div className="text-center mb-6">
+        <h2
+          className="text-2xl sm:text-3xl font-bold font-display uppercase tracking-widest"
+          style={{ color: "#d4aa50", textShadow: "0 0 30px rgba(212,170,80,0.25)" }}
+        >
+          The Ten Covenants
+        </h2>
+        <p className="text-[11px] font-mono mt-1.5" style={{ color: "rgba(140,110,50,0.8)" }}>
+          Tet&apos;s Law — The governance backbone of the Rosetta Protocol
+        </p>
+
+        {/* Covenant hash — prominent */}
+        <div
+          className="inline-flex items-center gap-2 mt-3 px-4 py-2 rounded-lg border"
+          style={{
+            background: "rgba(10,8,4,0.8)",
+            borderColor: "rgba(120,90,40,0.4)",
+            boxShadow: "0 0 20px rgba(212,170,80,0.08), inset 0 1px 0 rgba(212,170,80,0.05)",
+          }}
+        >
+          <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: "rgba(120,90,40,0.8)" }}>
+            Covenant Hash
+          </span>
+          <span
+            className="text-[11px] font-mono font-bold tracking-wider"
+            style={{ color: "#d4aa50" }}
+          >
+            0x{COVENANT_HASH}
+          </span>
+          <button
+            onClick={handleCopyHash}
+            className="transition-colors"
+            title="Copy full hash"
+            style={{ color: hashCopied ? "#10b981" : "rgba(140,110,50,0.7)" }}
+          >
+            {hashCopied ? (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
+        </div>
+
+        {/* Enforcement legend */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+          {Object.entries(ENFORCEMENT_META).map(([key, m]) => (
+            <span
+              key={key}
+              className="text-[9px] font-mono font-bold px-2.5 py-1 rounded-full tracking-widest uppercase"
+              style={{ background: m.bg, border: `1px solid ${m.border}`, color: m.text }}
+            >
+              {m.label}
+            </span>
+          ))}
+          <span className="text-[9px] font-mono" style={{ color: "rgba(80,65,35,0.8)" }}>
+            — enforcement types
+          </span>
+        </div>
+      </div>
+
+      {/* Covenant cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {TEN_COVENANTS.map((covenant, i) => (
+          <CovenantCard key={covenant.number} covenant={covenant} index={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
@@ -1035,6 +1468,9 @@ export default function RosettaPage() {
         ))}
       </div>
 
+      {/* ============ Concept Explorer ============ */}
+      <ConceptExplorer userLexicons={userLexicons} />
+
       {/* ============ Discover Section ============ */}
       <DiscoverSection />
 
@@ -1156,6 +1592,9 @@ export default function RosettaPage() {
           isConnected={isConnected}
         />
       </div>
+
+      {/* ============ Ten Covenants ============ */}
+      <TenCovenantsSection />
 
       {/* ============ Lexicon Grid — AI Agents ============ */}
       <div className="mb-4">

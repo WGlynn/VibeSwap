@@ -66,6 +66,9 @@ export default function Modal({
             className={`fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none`}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={title || 'Dialog'}
               className={`w-full ${sizes[size] || sizes.md} rounded-2xl border border-black-600 overflow-hidden pointer-events-auto ${className}`}
               style={{
                 background: 'rgba(8,8,12,0.95)',
@@ -84,6 +87,7 @@ export default function Modal({
                     <button
                       onClick={onClose}
                       className="p-1 rounded-lg hover:bg-black-700 transition-colors"
+                      aria-label="Close"
                     >
                       <svg className="w-4 h-4 text-black-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

@@ -52,9 +52,9 @@ function seededRandom(seed) {
 
 // ============ Vault Strategies ============
 const VAULT_STRATEGIES = [
-  { id: 'conservative', name: 'Conservative Yield', assets: 'USDC/USDT', tvl: 423e6, apy: 6.2, risk: 'Low', riskLevel: 1, sharpe: 2.41, maxDrawdown: 1.2, volatility: 3.1, benchmarkDelta: 1.8, desc: 'Stable-pair lending with principal protection' },
-  { id: 'balanced', name: 'Balanced Growth', assets: 'ETH/USDC', tvl: 287e6, apy: 11.5, risk: 'Medium', riskLevel: 3, sharpe: 1.87, maxDrawdown: 8.4, volatility: 12.6, benchmarkDelta: 3.2, desc: 'Diversified LP positions with auto-rebalancing' },
-  { id: 'aggressive', name: 'Alpha Seeker', assets: 'ETH/WBTC', tvl: 142e6, apy: 19.8, risk: 'High', riskLevel: 5, sharpe: 1.24, maxDrawdown: 18.7, volatility: 24.3, benchmarkDelta: 7.1, desc: 'Leveraged strategies targeting maximum yield' },
+  { id: 'conservative', name: 'Stable Pair', assets: 'USDC/USDT', tvl: 423e6, apy: 6.2, risk: 'Low', riskLevel: 1, sharpe: 2.41, maxDrawdown: 1.2, volatility: 3.1, benchmarkDelta: 1.8, desc: 'Stable-pair fee earning with principal protection' },
+  { id: 'balanced', name: 'Balanced', assets: 'ETH/USDC', tvl: 287e6, apy: 11.5, risk: 'Medium', riskLevel: 3, sharpe: 1.87, maxDrawdown: 8.4, volatility: 12.6, benchmarkDelta: 3.2, desc: 'Diversified LP positions with auto-rebalancing' },
+  { id: 'aggressive', name: 'Concentrated', assets: 'ETH/WBTC', tvl: 142e6, apy: 19.8, risk: 'High', riskLevel: 5, sharpe: 1.24, maxDrawdown: 18.7, volatility: 24.3, benchmarkDelta: 7.1, desc: 'Tight-range positions capturing more fees per dollar' },
   { id: 'delta-neutral', name: 'Delta Neutral', assets: 'ETH/USDC', tvl: 198e6, apy: 8.9, risk: 'Low', riskLevel: 2, sharpe: 2.18, maxDrawdown: 3.1, volatility: 5.8, benchmarkDelta: 2.4, desc: 'Hedged positions capturing funding rate differentials' },
 ]
 
@@ -545,7 +545,7 @@ function VaultPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold font-mono" style={{ color: CYAN }}>{s.apy}%</div>
-                      <div className="text-[10px] text-black-500 uppercase tracking-wider">APY</div>
+                      <div className="text-[10px] text-black-500 uppercase tracking-wider">30d Fees</div>
                     </div>
                   </div>
                   <p className="text-xs text-black-400 mb-3 leading-relaxed">{s.desc}</p>
@@ -582,7 +582,7 @@ function VaultPage() {
             </div>
             <PerformanceChart strategyId={chartStrategy} />
             <div className="mt-3 flex items-center justify-between text-xs text-black-500">
-              <span>Current: <span style={{ color: CYAN }} className="font-mono font-medium">{VAULT_STRATEGIES.find(s => s.id === chartStrategy)?.apy}% APY</span></span>
+              <span>Current: <span style={{ color: CYAN }} className="font-mono font-medium">{VAULT_STRATEGIES.find(s => s.id === chartStrategy)?.apy}% 30d Fees</span></span>
               <span>vs Benchmark: <span className="font-mono text-black-400">+{VAULT_STRATEGIES.find(s => s.id === chartStrategy)?.benchmarkDelta}%</span></span>
             </div>
           </GlassCard>

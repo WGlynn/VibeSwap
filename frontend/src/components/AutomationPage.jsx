@@ -20,31 +20,31 @@ const STRATEGY_TEMPLATES = [
   {
     id: 'buy-dip', name: 'Buy the Dip', icon: 'TrendingDown',
     description: 'Automatically buy when the price drops a configurable percentage below the moving average. Catches discounts while you sleep.',
-    estimatedReturn: '+12-18% annually', riskLevel: 'Medium',
+    estimatedReturn: 'Fee-based', riskLevel: 'Medium',
     riskColor: '#eab308', trigger: 'Price crosses below', action: 'Buy',
   },
   {
     id: 'take-profit', name: 'Take Profit Ladder', icon: 'Layers',
     description: 'Sell portions of your position at escalating price targets. Lock in gains progressively without timing the exact top.',
-    estimatedReturn: '+8-15% per cycle', riskLevel: 'Low',
+    estimatedReturn: 'Rule-based exits', riskLevel: 'Low',
     riskColor: '#22c55e', trigger: 'Price crosses above', action: 'Sell',
   },
   {
     id: 'rebalance', name: 'Rebalance Portfolio', icon: 'RefreshCw',
     description: 'Auto-rebalance your portfolio to target allocations when drift exceeds your threshold. Maintains your risk profile passively.',
-    estimatedReturn: '+3-7% risk-adjusted', riskLevel: 'Low',
+    estimatedReturn: 'Target allocation', riskLevel: 'Low',
     riskColor: '#22c55e', trigger: 'Portfolio drift', action: 'Rebalance',
   },
   {
     id: 'yield-opt', name: 'Yield Optimizer', icon: 'Zap',
-    description: 'Auto-compound LP rewards and staking yields at mathematically optimal intervals. Maximizes APY without manual harvesting.',
-    estimatedReturn: '+20-40% APY boost', riskLevel: 'Medium',
+    description: 'Auto-compound LP rewards at mathematically optimal intervals. Reinvests earned fees without manual harvesting.',
+    estimatedReturn: 'Auto-compound', riskLevel: 'Medium',
     riskColor: '#eab308', trigger: 'Time-based', action: 'Compound',
   },
   {
     id: 'grid-trade', name: 'Grid Trading', icon: 'Grid',
     description: 'Place buy and sell orders at fixed price intervals within a range. Profits from sideways volatility in ranging markets.',
-    estimatedReturn: '+15-25% in range', riskLevel: 'High',
+    estimatedReturn: 'Range-bound', riskLevel: 'High',
     riskColor: '#ef4444', trigger: 'Price crosses above', action: 'Buy',
   },
   {
@@ -374,7 +374,7 @@ export default function AutomationPage() {
                 </div>
                 <p className="text-[11px] font-mono text-gray-400 leading-relaxed mb-3">{tpl.description}</p>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-mono text-gray-500">Est. return: <span style={{ color: CYAN }}>{tpl.estimatedReturn}</span></span>
+                  <span className="text-[10px] font-mono text-gray-500">Strategy: <span style={{ color: CYAN }}>{tpl.estimatedReturn}</span></span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded"
                     style={{ background: `${tpl.riskColor}15`, color: tpl.riskColor, border: `1px solid ${tpl.riskColor}30` }}>
                     {tpl.riskLevel} Risk

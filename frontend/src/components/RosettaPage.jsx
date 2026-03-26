@@ -2652,6 +2652,431 @@ function SentenceTranslator({ userLexicons = [] }) {
 }
 
 
+// ============ Compare Lexicons ============
+// Diff-view for vocabularies: 2-3 domains side by side, rows = universal concept,
+// cells = each domain's term (or a gap marker if the domain doesn't cover it).
+// Rows where all selected domains share the concept are highlighted (shared row).
+// Rows where only one domain has the concept show as unique/gap rows.
+
+function CompareLexicons({ userLexicons = [] }) {
+  const [selectedIds, setSelectedIds] = useState(['medicine', 'engineering'])
+  const [pendingId, setPendingId] = useState('')
+  const [filterMode, setFilterMode] = useState('all') // 'all' | 'shared' | 'unique'
+  const [searchQ, setSearchQ] = useState('')
+
+  const canAddMore = selectedIds.length < 3
+
+  function getLexiconMetaLocal(id) {
+    if (!id) return null
+    if (id.startsWith('user:')) {
+      const userId = id.slice(5)
+      const lex = userLexicons.find(u => u.userId === userId)
+      return { name: lex?.domain || userId, color: USER_LEXICON_COLOR }
+    }
+    return AGENT_MAP[id] || null
+  }
+
+  function getConceptsForLexicon(id) {
+    if (!id) return {}
+    if (id.startsWith('user:')) {
+      const userId = id.slice(5)
+      const lex = userLexicons.find(u => u.userId === userId)
+      if (!lex) return {}
+      const map = {}
+      for (const t of (lex.terms || [])) {
+        if (t.universal) map[t.universal] = { term: t.term, desc: t.description || '' }
+      }
+      return map
+    }
+    const lex = LEXICONS[id]
+    if (!lex) return {}
+    const map = {}
+    for (const [termKey, mapping] of Object.entries(lex.concepts || {})) {
+      map[mapping.universal] = { term: termKey, desc: mapping.desc || '' }
+    }
+    return map
+  }
+
+  const alignmentRows = useMemo(() => {
+    if (selectedIds.length < 2) return []
+    const lexiconConceptMaps = selectedIds.map(id => getConceptsForLexicon(id))
+    const allUniversals = new Set()
+    for (const m of lexiconConceptMaps) {
+      for (const k of Object.keys(m)) allUniversals.add(k)
+    }
+    const rows = []
+    for (const universal of allUniversals) {
+      const cells = lexiconConceptMaps.map(m => m[universal] || null)
+      const presentCount = cells.filter(Boolean).length
+      rows.push({
+        universal,
+        cells,
+        isShared: presentCount === selectedIds.length,
+        isUnique: presentCount === 1,
+        presentCount,
+      })
+    }
+    rows.sort((a, b) => {
+      if (b.presentCount !== a.presentCount) return b.presentCount - a.presentCount
+      return a.universal.localeCompare(b.universal)
+    })
+    return rows
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, userLexicons])
+
+  const visibleRows = useMemo(() => {
+    let rows = alignmentRows
+    if (filterMode === 'shared') rows = rows.filter(r => r.isShared)
+    if (filterMode === 'unique') rows = rows.filter(r => r.isUnique)
+    if (searchQ.trim()) {
+      const q = searchQ.trim().toLowerCase()
+      rows = rows.filter(r =>
+        r.universal.toLowerCase().includes(q) ||
+        r.cells.some(c => c && c.term.toLowerCase().includes(q))
+      )
+    }
+    return rows
+  }, [alignmentRows, filterMode, searchQ])
+
+  const sharedCount = alignmentRows.filter(r => r.isShared).length
+  const uniqueCount = alignmentRows.filter(r => r.isUnique).length
+
+  const handleAddDomain = () => {
+    if (!pendingId || selectedIds.includes(pendingId) || !canAddMore) return
+    setSelectedIds(prev => [...prev, pendingId])
+    setPendingId('')
+  }
+
+  const handleRemoveDomain = (id) => {
+    if (selectedIds.length <= 2) return
+    setSelectedIds(prev => prev.filter(x => x !== id))
+  }
+
+  const handleSwapLeft = (idx) => {
+    if (idx <= 0) return
+    setSelectedIds(prev => {
+      const next = [...prev]
+      const tmp = next[idx - 1]
+      next[idx - 1] = next[idx]
+      next[idx] = tmp
+      return next
+    })
+  }
+
+  return (
+    <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
+      <div className="flex items-start justify-between mb-1">
+        <div>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            Compare Lexicons
+            <span
+              className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(0,255,65,0.12)', color: '#00ff41' }}
+            >
+              NEW
+            </span>
+          </h2>
+          <p className="text-black-500 text-[10px] font-mono mt-0.5">
+            Select 2&ndash;3 domains to see their vocabularies aligned by universal concept. Shared concepts are highlighted. Gaps show where a domain has no equivalent.
+          </p>
+        </div>
+      </div>
+
+      {/* Domain selector row */}
+      <div className="mt-4 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {selectedIds.map((id, idx) => {
+            const meta = getLexiconMetaLocal(id)
+            if (!meta) return null
+            return (
+              <div
+                key={id}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border flex-shrink-0"
+                style={{ backgroundColor: meta.color + '10', borderColor: meta.color + '35' }}
+              >
+                <AgentDot color={meta.color} size={7} />
+                <span className="text-[11px] font-mono font-semibold" style={{ color: meta.color }}>
+                  {meta.name}
+                </span>
+                {idx > 0 && (
+                  <button
+                    onClick={() => handleSwapLeft(idx)}
+                    className="text-black-600 hover:text-black-400 transition-colors ml-0.5"
+                    title="Move left"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                )}
+                {selectedIds.length > 2 && (
+                  <button
+                    onClick={() => handleRemoveDomain(id)}
+                    className="text-black-600 hover:text-red-400 transition-colors ml-0.5"
+                    title={'Remove ' + meta.name}
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )
+          })}
+
+          {canAddMore && (
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <select
+                  value={pendingId}
+                  onChange={(e) => setPendingId(e.target.value)}
+                  className="appearance-none bg-black-900/80 border border-black-700 rounded-lg pl-3 pr-7 py-1.5 text-[11px] text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
+                >
+                  <option value="">+ Add domain…</option>
+                  <optgroup label="AI Agents">
+                    {AGENT_LEXICONS.filter(l => !selectedIds.includes(l.id)).map(l => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Human Domains">
+                    {HUMAN_LEXICONS.filter(l => !selectedIds.includes(l.id)).map(l => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </optgroup>
+                  {userLexicons.length > 0 && (
+                    <optgroup label="User Lexicons">
+                      {userLexicons
+                        .filter(u => !selectedIds.includes('user:' + u.userId))
+                        .map(u => (
+                          <option key={'user:' + u.userId} value={'user:' + u.userId}>
+                            {u.domain || u.userId}
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                </select>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-black-500">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+              {pendingId && (
+                <button
+                  onClick={handleAddDomain}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-bold transition-all hover:opacity-90"
+                  style={{ backgroundColor: 'rgba(0,255,65,0.15)', border: '1px solid rgba(0,255,65,0.35)', color: '#00ff41' }}
+                >
+                  Add
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Filter tabs + search */}
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { key: 'all',    label: 'All (' + alignmentRows.length + ')' },
+            { key: 'shared', label: 'Shared (' + sharedCount + ')' },
+            { key: 'unique', label: 'Unique (' + uniqueCount + ')' },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setFilterMode(tab.key)}
+              className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold transition-all"
+              style={
+                filterMode === tab.key
+                  ? { backgroundColor: 'rgba(0,255,65,0.15)', border: '1px solid rgba(0,255,65,0.35)', color: '#00ff41' }
+                  : { backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b' }
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+
+          <div className="flex-1 min-w-[140px] relative">
+            <input
+              id="rosetta-compare-search"
+              type="text"
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+              placeholder="Search concepts or terms..."
+              className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-1.5 text-[11px] text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+            />
+            {searchQ && (
+              <button
+                onClick={() => setSearchQ('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors"
+                aria-label="Clear search"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        {[
+          { bg: 'rgba(0,255,65,0.12)',    border: 'rgba(0,255,65,0.3)',     label: 'shared by all domains' },
+          { bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.2)',  label: 'partial overlap' },
+          { bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.06)',label: 'unique to one domain' },
+        ].map(item => (
+          <div key={item.label} className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-3 h-3 rounded-sm flex-shrink-0"
+              style={{ backgroundColor: item.bg, border: '1px solid ' + item.border }}
+            />
+            <span className="text-[9px] font-mono text-black-500">{item.label}</span>
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] font-mono text-black-600 font-bold">&mdash;</span>
+          <span className="text-[9px] font-mono text-black-500">gap (no equivalent in that domain)</span>
+        </div>
+      </div>
+
+      {/* Alignment table */}
+      {visibleRows.length === 0 ? (
+        <div className="text-center py-8 border border-black-800 rounded-lg">
+          <p className="text-black-500 text-xs font-mono">
+            {searchQ ? 'No concepts match “' + searchQ + '”' : 'No concepts to show'}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-black-800">
+          <table className="w-full border-collapse" style={{ minWidth: selectedIds.length > 2 ? 640 : 480 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(37,37,37,0.8)' }}>
+                <th
+                  className="text-left px-3 py-2.5 text-[9px] font-mono font-bold uppercase tracking-widest text-black-500"
+                  style={{ background: 'rgba(5,10,8,0.9)', width: '160px', minWidth: '160px' }}
+                >
+                  Universal Concept
+                </th>
+                {selectedIds.map(id => {
+                  const meta = getLexiconMetaLocal(id)
+                  return (
+                    <th
+                      key={id}
+                      className="text-left px-3 py-2.5"
+                      style={{ background: 'rgba(5,10,8,0.9)', minWidth: 160 }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <AgentDot color={meta ? meta.color : '#94a3b8'} size={6} />
+                        <span
+                          className="text-[10px] font-mono font-bold"
+                          style={{ color: meta ? meta.color : '#94a3b8' }}
+                        >
+                          {meta ? meta.name : id}
+                        </span>
+                      </div>
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => {
+                let rowBg, rowBorder
+                if (row.isShared) {
+                  rowBg = 'rgba(0,255,65,0.04)'
+                  rowBorder = 'rgba(0,255,65,0.10)'
+                } else if (row.isUnique) {
+                  rowBg = 'rgba(255,255,255,0.012)'
+                  rowBorder = 'rgba(255,255,255,0.04)'
+                } else {
+                  rowBg = 'rgba(251,191,36,0.025)'
+                  rowBorder = 'rgba(251,191,36,0.08)'
+                }
+                return (
+                  <tr
+                    key={row.universal}
+                    style={{ backgroundColor: rowBg, borderBottom: '1px solid ' + rowBorder }}
+                  >
+                    <td className="px-3 py-2 align-top" style={{ width: '160px', minWidth: '160px' }}>
+                      <div className="flex items-start gap-1.5">
+                        <span
+                          className="inline-block w-1.5 h-1.5 rounded-full mt-[3px] flex-shrink-0"
+                          style={{
+                            backgroundColor: row.isShared ? '#00ff41' : row.isUnique ? '#475569' : '#fbbf24',
+                            boxShadow: row.isShared ? '0 0 4px rgba(0,255,65,0.5)' : 'none',
+                          }}
+                        />
+                        <span
+                          className="text-[10px] font-mono leading-snug"
+                          style={{
+                            color: row.isShared
+                              ? 'rgba(0,255,65,0.85)'
+                              : row.isUnique
+                              ? '#475569'
+                              : 'rgba(251,191,36,0.7)',
+                          }}
+                        >
+                          {row.universal.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                    </td>
+                    {row.cells.map((cell, ci) => {
+                      const domainMeta = getLexiconMetaLocal(selectedIds[ci])
+                      return (
+                        <td key={ci} className="px-3 py-2 align-top" style={{ minWidth: 160 }}>
+                          {cell ? (
+                            <div>
+                              <span
+                                className="text-[11px] font-mono font-semibold"
+                                style={{ color: domainMeta ? domainMeta.color : '#94a3b8' }}
+                              >
+                                {cell.term.replace(/_/g, ' ')}
+                              </span>
+                              {cell.desc && (
+                                <p className="text-[9px] font-mono text-black-600 mt-0.5 leading-snug">
+                                  {cell.desc.length > 70 ? cell.desc.slice(0, 70) + '…' : cell.desc}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span
+                              className="text-[10px] font-mono text-black-700 italic select-none"
+                              title="This domain has no equivalent for this concept"
+                            >
+                              &mdash;
+                            </span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Row count footer */}
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-[9px] font-mono text-black-600">
+          {visibleRows.length + ' row' + (visibleRows.length !== 1 ? 's' : '') + ' shown'}
+          {(filterMode !== 'all' || searchQ) ? ' (filtered from ' + alignmentRows.length + ')' : ''}
+        </span>
+        {(filterMode !== 'all' || searchQ) && (
+          <button
+            onClick={() => { setFilterMode('all'); setSearchQ('') }}
+            className="text-[9px] font-mono text-black-500 hover:text-matrix-400 transition-colors"
+          >
+            clear filters
+          </button>
+        )}
+      </div>
+    </GlassCard>
+  )
+}
+
 // ============ Related Concepts Panel ============
 
 function RelatedConceptsPanel({ universalKey, onClose, userLexicons = [] }) {

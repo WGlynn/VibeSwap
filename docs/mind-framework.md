@@ -390,7 +390,7 @@ Session Handoff:
 
 **Injection point**: Define project-specific session protocols.
 
-**Jarvis implementation**: 4 modes (Fresh, Continue, Recovery, Task-Specific), push to both remotes.
+**Jarvis implementation**: 4 modes (Fresh, Continue, Recovery, Task-Specific), push to origin.
 
 ---
 

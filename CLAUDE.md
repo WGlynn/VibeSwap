@@ -46,7 +46,7 @@
 [What to pick up, blockers, pending verifications]
 ```
 
-Then commit and push to both remotes. This is the chain tip — like a block header, it enables full state reconstruction without storing the full state.
+Then commit and push to origin. This is the chain tip — like a block header, it enables full state reconstruction without storing the full state.
 
 ---
 
@@ -75,7 +75,7 @@ Then read `.claude/SESSION_STATE.md` for latest context.
 **At END of each response** (after completing the user's request):
 1. Update `.claude/SESSION_STATE.md` if anything meaningful changed
 2. Commit all changes with descriptive message
-3. Push to BOTH remotes: `git push origin master && git push stealth master`
+3. Push to origin: `git push origin master`
 
 **Pull first, push last = no conflicts ever.**
 
@@ -83,7 +83,7 @@ Example:
 1. User: "Fix the login bug"
 2. `git pull origin master` (get latest)
 3. Fix bug (multiple tool calls)
-4. Update SESSION_STATE.md, commit, push to both remotes
+4. Update SESSION_STATE.md, commit, push to origin
 5. Done
 
 This ensures real-time sync between all sessions (desktop, mobile, any device).
@@ -165,7 +165,7 @@ vibeswap/
 │   ├── mechanism/      # IntelligenceExchange (SIE), DataMarketplace, CognitiveConsensusMarket
 │   ├── agents/         # VibeAgentProtocol, VibeAgentNetwork
 │   ├── governance/     # DAOTreasury, TreasuryStabilizer
-│   ├── incentives/     # ShapleyDistributor, ILProtection, LoyaltyRewards
+│   ├── incentives/     # ShapleyDistributor, ILProtectionVault, LoyaltyRewardsManager
 │   ├── messaging/      # CrossChainRouter (LayerZero)
 │   └── libraries/      # DeterministicShuffle, BatchMath, TWAPOracle
 ├── test/               # Foundry tests (fuzz/, security/, integration/)
@@ -224,14 +224,9 @@ python -m oracle.main
 
 ---
 
-## Recent Session State (Feb 2025)
+## Recent Session State
 
-### Just Completed
-- Fixed wallet detection for BOTH external wallets (MetaMask etc) AND device wallets (WebAuthn/passkeys)
-- All pages now use combined wallet state: `isConnected = isExternalConnected || isDeviceConnected`
-- BridgePage: Fixed layout overflow, button says "Send" not "Get Started", 0% protocol fees
-- Created `useBalances` hook for balance tracking (mock + real blockchain)
-- Deployed to Vercel: https://frontend-jade-five-87.vercel.app
+For current session state, see `.claude/SESSION_STATE.md` (updated every session).
 
 ### Key Patterns
 ```javascript
@@ -244,14 +239,7 @@ const { isConnected: isDeviceConnected } = useDeviceWallet()
 const isConnected = isExternalConnected || isDeviceConnected
 ```
 
-### Important Files Recently Modified
-- `frontend/src/components/HeaderMinimal.jsx` - Main header with wallet button
-- `frontend/src/components/BridgePage.jsx` - Send money page (0% fees, LayerZero bridge)
-- `frontend/src/hooks/useBalances.jsx` - Balance tracking for demo/real modes
-- `frontend/src/hooks/useDeviceWallet.jsx` - WebAuthn/passkey wallet
-
 ### Git Remotes
 - `origin`: https://github.com/wglynn/vibeswap.git (public)
-- `stealth`: https://github.com/WGlynn/vibeswap-private.git (private)
-- Both repos have identical content, push to both when committing
+- Push to origin only (stealth remote retired 2026-03-25)
 

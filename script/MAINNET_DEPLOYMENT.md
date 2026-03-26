@@ -49,7 +49,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/WGlynn/vibeswap-private.git
+git clone https://github.com/wglynn/vibeswap.git
 cd vibeswap
 
 # Install dependencies

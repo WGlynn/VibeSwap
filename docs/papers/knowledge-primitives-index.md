@@ -561,7 +561,7 @@ These primitives are at the edge of what we've built. They point toward where th
 
 ### P-061: Dual-Remote Push as Disaster Insurance
 
-**Source**: Git protocol (origin + stealth)
+**Source**: Git protocol (dual-remote pattern, stealth remote retired 2026-03-25)
 
 > Push every commit to TWO independent remotes. If one goes down, gets compromised, or gets censored, the other survives. The cost is one extra push command. The insurance is total redundancy of the entire codebase AND its history.
 

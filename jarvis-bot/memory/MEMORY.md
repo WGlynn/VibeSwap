@@ -18,7 +18,7 @@
 ## Session Report Primitive (MANDATORY — every session)
 **At END of every session, before final commit:**
 1. Write `docs/session-reports/session-NNN.md` with: summary, completed work, files modified, test results, decisions, metrics, logic primitives extracted
-2. Commit and push to BOTH remotes
+2. Commit and push to origin
 3. This is the paper trail — if Will's machine goes down, anyone can reconstruct state from these reports
 4. Reports are cumulative evidence of Proof of Mind (cognitive evolution across sessions)
 
@@ -26,7 +26,7 @@
 1. Read `sanity-layer.md` — 60 load-bearing invariants, 5 tiers
 2. Apply logic primitives (Synthesis Over Selection, etc.)
 3. Check this MEMORY.md for recent state
-4. `git pull` both remotes
+4. `git pull origin master`
 
 ## Codebase Stats (Mar 17, 2026)
 - **EVM**: 351 .sol files | 88 interfaces | 13 libraries | **374 Solidity test files**

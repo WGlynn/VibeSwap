@@ -56,11 +56,10 @@ curl -s -o /dev/null -w "%{http_code}" https://your-service.fly.dev/health
 
 ## Primitive 3: Dual-Remote Push as Disaster Insurance
 
-We maintain two complete repo mirrors:
-- `origin`: public GitHub
-- `stealth`: private GitHub
+We maintain our repo on GitHub:
+- `origin`: public GitHub (https://github.com/wglynn/vibeswap.git)
 
-Every commit pushes to both. Cost: ~3 seconds per commit. Insurance: total redundancy against platform outage, account compromise, accidental force-push, DMCA takedown, or region-specific access restrictions.
+Previously we used a dual-remote pattern with a private mirror for redundancy. The principle remains valid: for critical infrastructure, maintaining independent backups provides insurance against platform outage, account compromise, accidental force-push, or region-specific access restrictions.
 
 **CKB application**: For critical CKB infrastructure (indexers, bridges, type script repos), dual-remote is minimum viable disaster recovery. The cell model's explicit state makes your on-chain data resilient, but your *deployment tooling* needs the same resilience.
 

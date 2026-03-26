@@ -2196,6 +2196,415 @@ function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
 }
 
 
+
+// ============ usePendingSuggestions Hook ============
+
+const PENDING_SUGGESTIONS_KEY = 'rosetta-pending-suggestions'
+
+function usePendingSuggestions() {
+  const [pendingSuggs, setPendingSuggs] = useState(() => {
+    try {
+      const raw = localStorage.getItem(PENDING_SUGGESTIONS_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch { return [] }
+  })
+
+  const addSuggestion = useCallback((suggestion) => {
+    setPendingSuggs(prev => {
+      const next = [...prev, { ...suggestion, id: Date.now(), submittedAt: new Date().toISOString() }]
+      try { localStorage.setItem(PENDING_SUGGESTIONS_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  const clearSuggestions = useCallback(() => {
+    setPendingSuggs([])
+    try { localStorage.removeItem(PENDING_SUGGESTIONS_KEY) } catch {}
+  }, [])
+
+  const removeSuggestion = useCallback((id) => {
+    setPendingSuggs(prev => {
+      const next = prev.filter(s => s.id !== id)
+      try { localStorage.setItem(PENDING_SUGGESTIONS_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  return { pendingSuggs, addSuggestion, clearSuggestions, removeSuggestion }
+}
+
+// ============ Suggest a Term Form ============
+
+function SuggestTermForm({ pendingSuggestions, onAdd }) {
+  const [sugDomain, setSugDomain] = useState('')
+  const [sugTerm, setSugTerm] = useState('')
+  const [sugUniversal, setSugUniversal] = useState('')
+  const [sugDescription, setSugDescription] = useState('')
+  const [sugStatus, setSugStatus] = useState(null)
+  const [conceptHits, setConceptHits] = useState([])
+  const [showConceptDrop, setShowConceptDrop] = useState(false)
+  const [activeConceptIdx, setActiveConceptIdx] = useState(-1)
+  const conceptInputRef = useRef(null)
+  const conceptDropRef = useRef(null)
+
+  const handleUniversalChange = useCallback((value) => {
+    setSugUniversal(value)
+    setActiveConceptIdx(-1)
+    if (!value.trim()) {
+      setConceptHits([])
+      setShowConceptDrop(false)
+      return
+    }
+    const hits = autocomplete(value, 8)
+    const seen = new Set()
+    const concepts = []
+    for (const hit of hits) {
+      if (hit.universal && !seen.has(hit.universal)) {
+        seen.add(hit.universal)
+        concepts.push({ universal: hit.universal, term: hit.term, lexiconId: hit.lexiconId })
+      }
+    }
+    setConceptHits(concepts)
+    setShowConceptDrop(concepts.length > 0)
+  }, [])
+
+  const commitConcept = useCallback((concept) => {
+    setSugUniversal(concept.universal.replace(/_/g, ' '))
+    setConceptHits([])
+    setShowConceptDrop(false)
+    setActiveConceptIdx(-1)
+    conceptInputRef.current?.focus()
+  }, [])
+
+  const handleConceptKeyDown = useCallback((e) => {
+    if (!showConceptDrop || conceptHits.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveConceptIdx(i => Math.min(i + 1, conceptHits.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveConceptIdx(i => Math.max(i - 1, -1))
+    } else if (e.key === 'Enter' && activeConceptIdx >= 0) {
+      e.preventDefault()
+      commitConcept(conceptHits[activeConceptIdx])
+    } else if (e.key === 'Escape') {
+      setShowConceptDrop(false)
+      setActiveConceptIdx(-1)
+    }
+  }, [showConceptDrop, conceptHits, activeConceptIdx, commitConcept])
+
+  const handleConceptBlur = useCallback(() => {
+    setTimeout(() => {
+      if (!conceptDropRef.current?.contains(document.activeElement)) {
+        setShowConceptDrop(false)
+        setActiveConceptIdx(-1)
+      }
+    }, 150)
+  }, [])
+
+  const handleSubmit = useCallback(() => {
+    if (!sugDomain || !sugTerm.trim() || !sugUniversal.trim()) return
+    setSugStatus(null)
+    onAdd({
+      domain: sugDomain,
+      term: sugTerm.trim(),
+      universal: sugUniversal.trim().replace(/\s+/g, '_'),
+      description: sugDescription.trim(),
+    })
+    const msg = 'Suggestion for "' + sugTerm.trim() + '" saved locally!'
+    setSugStatus({ type: 'success', message: msg })
+    setSugTerm('')
+    setSugUniversal('')
+    setSugDescription('')
+    setTimeout(() => setSugStatus(null), 3000)
+  }, [sugDomain, sugTerm, sugUniversal, sugDescription, onAdd])
+
+  const canSubmit = sugDomain && sugTerm.trim() && sugUniversal.trim()
+
+  return (
+    <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] rounded-t-2xl"
+        style={{ background: 'linear-gradient(90deg, #00ff41, #22d3ee)' }}
+      />
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            Suggest a Term
+            <span
+              className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(0,255,65,0.12)', color: '#00ff41' }}
+            >
+              COMMUNITY
+            </span>
+          </h2>
+          <p className="text-black-500 text-[10px] font-mono mt-0.5">
+            Help grow the Rosetta lexicon &mdash; suggest a term for any existing domain. Saves locally.
+          </p>
+        </div>
+
+        {pendingSuggestions.length > 0 && (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="flex-shrink-0 ml-3 mt-0.5"
+          >
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold"
+              style={{
+                backgroundColor: 'rgba(251,191,36,0.12)',
+                border: '1px solid rgba(251,191,36,0.35)',
+                color: '#fbbf24',
+              }}
+            >
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {pendingSuggestions.length} pending suggestion{pendingSuggestions.length !== 1 ? 's' : ''}
+            </span>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Form grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        {/* Domain */}
+        <div>
+          <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+            Domain
+          </label>
+          <div className="relative">
+            <select
+              value={sugDomain}
+              onChange={(e) => setSugDomain(e.target.value)}
+              className="w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg py-2.5 pr-9 text-sm text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
+              style={{ paddingLeft: sugDomain ? '2rem' : '0.75rem' }}
+            >
+              <option value="">Select a domain...</option>
+              <optgroup label="AI Agents">
+                {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </optgroup>
+              <optgroup label="Human Domains">
+                {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </optgroup>
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-black-500">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            {sugDomain && (
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <AgentDot color={LEXICON_MAP[sugDomain]?.color || '#94a3b8'} size={7} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Term */}
+        <div>
+          <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+            Term
+          </label>
+          <input
+            type="text"
+            value={sugTerm}
+            onChange={(e) => setSugTerm(e.target.value)}
+            placeholder="e.g. prognosis, arbitrage, motif..."
+            className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+          />
+        </div>
+
+        {/* Universal concept with autocomplete */}
+        <div>
+          <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+            Suggested Universal Concept
+          </label>
+          <div className="relative">
+            <input
+              ref={conceptInputRef}
+              type="text"
+              value={sugUniversal}
+              onChange={(e) => handleUniversalChange(e.target.value)}
+              onKeyDown={handleConceptKeyDown}
+              onBlur={handleConceptBlur}
+              onFocus={() => { if (conceptHits.length > 0) setShowConceptDrop(true) }}
+              placeholder="e.g. causal chain, constraint choice..."
+              autoComplete="off"
+              aria-label="Suggested universal concept"
+              aria-autocomplete="list"
+              aria-expanded={showConceptDrop}
+              className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+            />
+
+            <AnimatePresence>
+              {showConceptDrop && conceptHits.length > 0 && (
+                <motion.div
+                  ref={conceptDropRef}
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute left-0 right-0 top-full mt-1 z-50 rounded-lg border border-black-700 overflow-hidden"
+                  style={{ background: 'rgba(5,10,8,0.97)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+                >
+                  {conceptHits.map((c, i) => {
+                    const meta = LEXICON_MAP[c.lexiconId]
+                    const dotColor = meta?.color || '#94a3b8'
+                    return (
+                      <button
+                        key={c.lexiconId + ':' + c.universal + ':' + i}
+                        onMouseDown={(e) => { e.preventDefault(); commitConcept(c) }}
+                        onMouseEnter={() => setActiveConceptIdx(i)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-black-800 last:border-b-0 focus-visible:outline-none"
+                        style={{ background: i === activeConceptIdx ? 'rgba(0,255,65,0.07)' : 'transparent' }}
+                        aria-label={'Use concept: ' + c.universal}
+                      >
+                        <span
+                          className="inline-block rounded-full flex-shrink-0"
+                          style={{ width: 7, height: 7, backgroundColor: dotColor, boxShadow: '0 0 5px ' + dotColor + '70' }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[12px] font-mono text-white">
+                            <HighlightMatch text={c.universal.replace(/_/g, ' ')} query={sugUniversal} />
+                          </span>
+                          <span className="text-[9px] font-mono text-black-500 ml-2">
+                            via &ldquo;{c.term}&rdquo;
+                          </span>
+                        </div>
+                        <span
+                          className="flex-shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded"
+                          style={{ backgroundColor: dotColor + '15', color: dotColor, border: '1px solid ' + dotColor + '30' }}
+                        >
+                          {meta?.name || c.lexiconId}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          <p className="text-[10px] font-mono text-black-700 mt-1">
+            Type to search existing concepts or enter a new one
+          </p>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+            Description <span className="text-black-700">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={sugDescription}
+            onChange={(e) => setSugDescription(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) handleSubmit() }}
+            placeholder="Short explanation of the term..."
+            className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+          />
+        </div>
+      </div>
+
+      {/* Submit */}
+      <button
+        onClick={handleSubmit}
+        disabled={!canSubmit}
+        className={'w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all flex items-center justify-center gap-2 ' + (
+          canSubmit ? 'hover:opacity-90 active:scale-[0.99]' : 'bg-black-800 text-black-600 cursor-not-allowed'
+        )}
+        style={canSubmit ? { backgroundColor: 'rgba(0,255,65,0.85)', color: '#000' } : {}}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        Submit Suggestion
+      </button>
+
+      {/* Status toast */}
+      <AnimatePresence>
+        {sugStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className={'mt-3 p-2.5 rounded-lg text-xs font-mono text-center ' + (
+              sugStatus.type === 'success'
+                ? 'bg-matrix-500/10 text-matrix-400 border border-matrix-500/20'
+                : 'bg-red-500/10 text-red-400 border border-red-500/20'
+            )}
+          >
+            {sugStatus.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Pending list */}
+      <AnimatePresence>
+        {pendingSuggestions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="mt-4 pt-4 border-t overflow-hidden"
+            style={{ borderColor: 'rgba(0,255,65,0.1)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
+                Pending Suggestions
+              </span>
+              <span
+                className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24' }}
+              >
+                {pendingSuggestions.length}
+              </span>
+            </div>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto scrollbar-thin">
+              {pendingSuggestions.map((s, i) => {
+                const domMeta = LEXICON_MAP[s.domain]
+                const domColor = domMeta?.color || '#94a3b8'
+                return (
+                  <motion.div
+                    key={s.id}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                    className="flex items-center gap-2.5 p-2.5 rounded-lg border"
+                    style={{ backgroundColor: 'rgba(15,20,15,0.5)', borderColor: 'rgba(37,37,37,0.8)' }}
+                  >
+                    <span
+                      className="inline-block rounded-full flex-shrink-0"
+                      style={{ width: 7, height: 7, backgroundColor: domColor, boxShadow: '0 0 5px ' + domColor + '80' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-white text-[11px] font-mono font-semibold">{s.term}</span>
+                        <span className="text-[9px] font-mono" style={{ color: domColor }}>
+                          {domMeta?.name || s.domain}
+                        </span>
+                        <span className="text-[9px] font-mono text-matrix-500">
+                          {s.universal.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      {s.description && (
+                        <div className="text-[10px] text-black-600 mt-0.5 truncate">{s.description}</div>
+                      )}
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </GlassCard>
+  )
+}
+
 // ============ Sentence Translator ============
 
 // Example sentences keyed by lexicon id for the placeholder hints

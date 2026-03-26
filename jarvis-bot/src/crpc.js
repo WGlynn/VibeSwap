@@ -70,6 +70,7 @@ const TASK_TYPES = {
   PROACTIVE: 'proactive',
   PROMOTION: 'promotion',
   DISPUTE: 'dispute',
+  KNOWLEDGE_VERIFICATION: 'knowledge_verification',
 };
 
 // ============ State ============

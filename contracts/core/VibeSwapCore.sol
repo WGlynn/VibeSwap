@@ -183,7 +183,7 @@ contract VibeSwapCore is
     FailedExecution[] public failedExecutions;
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[48] private __gap;
+    uint256[46] private __gap;
 
     // ============ Events ============
 
@@ -767,7 +767,7 @@ contract VibeSwapCore is
     function setSupportedToken(
         address token,
         bool supported
-    ) external onlyOwner {
+    ) external onlyGovernance {
         supportedTokens[token] = supported;
         emit TokenSupported(token, supported);
     }
@@ -824,7 +824,7 @@ contract VibeSwapCore is
      * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      * Infrastructure wiring — governance-appropriate post-bootstrap.
      */
-    function setWBAR(address _wbar) external onlyOwner {
+    function setWBAR(address _wbar) external onlyGovernance {
         wbar = IwBAR(_wbar);
         emit WBARUpdated(_wbar);
     }
@@ -835,7 +835,7 @@ contract VibeSwapCore is
      *
      * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      */
-    function setIncentiveController(address _controller) external onlyOwner {
+    function setIncentiveController(address _controller) external onlyGovernance {
         incentiveController = IIncentiveController(_controller);
         emit IncentiveControllerUpdated(_controller);
     }
@@ -1324,7 +1324,7 @@ contract VibeSwapCore is
      * Target Grade B: guardian multisig + governance can blacklist.
      * Cannot be permissionless (griefing: anyone blacklists competitors).
      */
-    function setBlacklist(address user, bool status) external onlyOwner {
+    function setBlacklist(address user, bool status) external onlyGovernance {
         blacklisted[user] = status;
         emit UserBlacklisted(user, status);
     }
@@ -1348,7 +1348,7 @@ contract VibeSwapCore is
      * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
      * Contract whitelisting determines which integrations can interact with the protocol.
      */
-    function setContractWhitelist(address contractAddr, bool status) external onlyOwner {
+    function setContractWhitelist(address contractAddr, bool status) external onlyGovernance {
         whitelistedContracts[contractAddr] = status;
         emit ContractWhitelisted(contractAddr, status);
     }

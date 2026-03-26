@@ -200,7 +200,7 @@ In major crypto markets, reported daily volume sits between $50-100 billion. But
 
 The signal-to-noise ratio of crypto markets is roughly 0.1 to 0.3. Meaning 70-90% of what you see is noise.
 
-For context, an analog radio station has an SNR of about 50. Your wifi connection has an SNR of about 100. Crypto markets have an SNR of about 0.2. You would throw a radio away if it performed this badly.
+For context, an analog radio station has an SNR of about 50. Your wifi connection has an SNR of about 100. Crypto markets have an SNR of about 0.2. You would throw a radio away if it performed this badly. (Note: radio and WiFi SNR are measured in decibels, a logarithmic scale; the comparison is structural, not unit-equivalent.)
 
 ## 4.4 Filtering: How to Recover the Signal
 
@@ -360,7 +360,7 @@ In a traditional order book, every trade happens at a different price. The first
 
 A **single clearing price** is simpler: collect all buy and sell orders over a fixed window, then find the one price at which the maximum number of orders can be filled. Everyone trades at that price.
 
-Three buyers willing to pay at most: $105, $102, $98. Three sellers willing to accept at least: $95, $100, $103. At a clearing price of $100, two buyers execute (both above $100) and two sellers execute (both at or below $100). Maximum volume, two trades. Everyone pays or receives the same price.
+Three buyers willing to pay at most: $105, $102, $98. Three sellers willing to accept at least: $95, $100, $103. At a clearing price of $100, two buyers execute (both above $100) and two sellers execute (both at or below $100). Maximum volume, two trades. Everyone pays or receives the same price. (In this example, $100 is the midpoint of the maximum-volume range — any price from $98 to $102 clears the same two trades. A tiebreaker rule, such as selecting the midpoint, picks the single clearing price.)
 
 This is provably optimal: no other price clears more volume. It's also provably fair: no participant received a better or worse price based on their identity, timing, or order size. The mathematical proof that uniform clearing maximizes total surplus is a direct consequence of supply-demand intersection theory — the clearing price is the unique point where willingness-to-pay and willingness-to-accept cross, where total gains from trade are maximized.
 
@@ -594,7 +594,7 @@ The measurement of all things economic. Not as we wish they were. As they actual
 **Price Discovery & Oracle**
 - `DOCUMENTATION/TRUE_PRICE_DISCOVERY.md` — Cooperative price discovery framework
 - `DOCUMENTATION/TRUE_PRICE_ORACLE.md` — Kalman filter oracle specification (v2.0)
-- `oracle/` — Python reference implementation with 136 passing tests
+- `oracle/` — Python reference implementation with thousands of passing tests
 
 **Economic Theory**
 - `DOCUMENTATION/COOPERATIVE_MARKETS_PHILOSOPHY.md` — Multilevel selection theory applied to markets

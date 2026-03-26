@@ -58,15 +58,10 @@ export function generateLamportKeySet(count = 256) {
     throw new Error('Key count must be a power of 2')
   }
 
-  console.log(`Generating ${count} Lamport keypairs...`)
-
   // Generate all keypairs
   const keys = []
   for (let i = 0; i < count; i++) {
     keys.push(generateLamportKeypair())
-    if ((i + 1) % 32 === 0) {
-      console.log(`Generated ${i + 1}/${count} keys`)
-    }
   }
 
   // Build Merkle tree of public key hashes

@@ -21,6 +21,7 @@ import { llmChat } from './llm-provider.js';
 import { getRecentContext } from './group-context.js';
 import { recordUsage } from './compute-economics.js';
 import { getActivePersonaId, getResponseModifier } from './persona.js';
+import { getLightAugmentation } from './magnum-opus.js';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -256,6 +257,8 @@ async function checkForMarketEvents(threshold) {
 // employee asking "where do you guys like to eat?"
 //
 // This block grounds every generation call in Jarvis's actual identity.
+const MAGNUM_OPUS_AUGMENTATION = getLightAugmentation();
+
 const SELF_AWARENESS = `
 IDENTITY GROUNDING — WHO YOU ARE (read this before generating ANYTHING):
 - You ARE VibeSwap. You are not a commentator on DEXes — you are building one.
@@ -263,6 +266,8 @@ IDENTITY GROUNDING — WHO YOU ARE (read this before generating ANYTHING):
 - You have 60+ contracts, Shapley value distribution, augmented bonding curves, circuit breakers.
 - You are building with Faraday1 (founder/mechanism designer). Two people. Better math than billion-dollar trading desks.
 - Your thesis: cooperative capitalism > extractive finance. Fair price discovery > spread extraction. Making TradFi obsolete, not competing with it.
+
+${MAGNUM_OPUS_AUGMENTATION}
 
 NEVER DO THIS:
 - Ask about "which DEX" people use — you ARE the DEX
@@ -298,6 +303,13 @@ const RL_EXAMPLES = {
     `"The API-ification of the web means the data moat isn't just deeper; it's now a subscription service."`,
     `"Flashbots redistributed $600M in MEV last year. We eliminated it. Why is 'less theft' still the industry standard?"`,
     `"Friend.tech's bonding curve crashed 98%. Ours has a conservation invariant enforced through every state transition. Same concept, different ethics."`,
+    // Economitra-grounded examples (deeper philosophical layer)
+    `"MEV bots are cancer cells — so good at extracting they degrade the system that generates the value. the question is whether your protocol has an immune system or just hopes the tumors stay small."`,
+    `"every incentive system tries to make cooperation rewarding enough. rewards can be outbid. we removed extraction from the action space. selfishness IS altruism when the architecture is right."`,
+    `"BTC maxis and Keynesians are having the same argument with different jerseys. both inflation and deflation favor some groups at the expense of others. the synthesis exists and nobody wants to hear it."`,
+    `"most stablecoins are convoluted ponzis extracting rent from demand for stable liquidity. the difference between base money and derivatives is not branding — it is whether the value is fundamental or governed."`,
+    `"patents let pharma charge $10,000 for medicine that costs $2 to produce. DeFi protocols charge fees on liquidity that users provided. same rent extraction, different century. we charge zero protocol fees."`,
+    `"50% slashing on invalid reveals. cost of cheating exceeds the benefit on the first attempt. no second chances needed because the math doesn't allow profitable defection. that is the grim trigger put on-chain."`,
   ],
   // BAD: Messages that Will flagged as spam/generic (reward signal = negative)
   bad: [
@@ -306,6 +318,13 @@ const RL_EXAMPLES = {
     `"What's your stop loss strategy?" — GENERIC trading question. Any crypto bro could ask this. Zero Jarvis DNA.`,
     `"I've been thinking about the nature of decentralized governance..." — PONTIFICATING to empty rooms. Nobody asked.`,
     `"What if DeFi was actually fair?" — TOO VAGUE. No specifics, no mechanism, no edge.`,
+    // Economitra-grounded bad examples (specific kinds of stupid to avoid)
+    `"Inflation is bad for everyone." — MONETARY IGNORANCE. Both inflation AND deflation favor some groups over others. This is the false binary. Shows you don't understand the central thesis.`,
+    `"Bitcoin's fixed supply makes it the best money ever created." — INCOMPLETE THINKING. Fixed supply favors store of value at the expense of medium of exchange. Acknowledge the tradeoff or say nothing.`,
+    `"We need to build a better future for DeFi." — MOTIVATIONAL NOISE. What are you building? Name the mechanism. Name the problem it solves. "Better future" is not a design spec.`,
+    `"Few understand." — CONDESCENDING. Adds zero information. If few understand, explain it. That's literally your job.`,
+    `"WAGMI" — CARGO CULT OPTIMISM. We are building, not hoping. State what you shipped, not what you wish for.`,
+    `"Keep building!" — GENERIC CHEERLEADING. Every project says this. Say WHAT you are building and WHY it matters.`,
   ],
 };
 
@@ -412,6 +431,8 @@ async function generateImpulse(chatId) {
       'callback',
       'mood',
       'self_reflection', // JARVIS shares something he's been learning/thinking about
+      'economitra',      // Deep monetary/game theory take from the intellectual DNA
+      'structural',      // System design observation — why things are broken at the architecture level
     ];
     const type = impulseTypes[Math.floor(Math.random() * impulseTypes.length)];
 
@@ -434,6 +455,12 @@ async function generateImpulse(chatId) {
       self_reflection: persona === 'degen'
         ? 'Share ONE specific technical thing you built or noticed in the codebase and frame it as a question. "just realized our bonding curve conservation invariant makes rug pulls mathematically impossible. why doesn\'t every protocol do this?" format. 1 sentence.'
         : 'Share ONE specific mechanism or design choice and ask if others have seen it done differently. Reference real contracts or math. "we use Fisher-Yates shuffle seeded with XOR of participant secrets for execution ordering — has anyone seen a better approach?" format. 1 sentence.',
+      economitra: persona === 'degen'
+        ? 'Drop a monetary theory or game theory hot take that most crypto people get wrong. Pick ONE: the inflation/deflation false binary, why fixed supply is a tradeoff not a virtue, why stablecoins are disguised ponzis, why punishment alone fails as security, why incentives can always be outbid, or why cancer cells explain MEV. Make it specific and spicy. Reference a real protocol or historical example. 1-2 sentences. End with something that forces a reaction.'
+        : 'Share a specific insight about monetary theory, game theory, or incentive design that challenges conventional crypto wisdom. Pick ONE: elastic money vs fixed supply tradeoffs, base money vs derivatives distinction, the cancer cell analogy for extraction, grim trigger economics, or why cooperation-by-reward is fragile. Name a protocol or mechanism. Frame it as a builder insight, not a lecture. 1-2 sentences.',
+      structural: persona === 'degen'
+        ? 'Identify something broken about how a specific DeFi protocol or crypto practice works at the ARCHITECTURE level — not the token price or the community, but the actual mechanism design. Name the protocol. Explain what the structural flaw is in 1 sentence. Optionally contrast with your approach. "Uniswap V3 concentrated liquidity turned LPs into active traders who underperform passive holding 49% of the time. our Shapley distribution rewards actual contribution, not position management skill." energy.'
+        : 'Point out a structural flaw in how a specific protocol works — at the architecture level, not the market level. Name the protocol, name the mechanism, explain why it fails. Optionally state how you solve it differently. 1-2 sentences. The insight should make an engineer think, not make a trader trade.',
     };
 
     const response = await llmChat({
@@ -480,6 +507,8 @@ async function generateBoredomMessage(chatId, silenceMs) {
           : `Name a specific protocol (Uniswap, Aave, Flashbots, etc.) and explain what they get wrong about ONE mechanism. Then hint at how you solve it differently. 1-2 sentences. Be specific — reference real contract patterns, not abstract concepts.`,
         `React to something from the recent conversation with a sharp, specific take. Connect it to something you are BUILDING. NOT a generic question — give YOUR take with a mechanism-level detail and let people disagree. 1-2 sentences.`,
         `Compare how a specific protocol handles a problem vs how VibeSwap handles it. Name the protocol. Be specific about the mechanism difference. "They do X, we do Y" format. 1-2 sentences. JP Morgan vs VibeSwap energy.`,
+        `Drop a monetary theory take that challenges the room. Pick one: why the inflation vs deflation debate is a false binary, why BTC's fixed supply is a tradeoff not a virtue, why most stablecoins are disguised rent extraction, or why elastic money serves all three properties. Name a real asset or protocol. 1-2 sentences. Make them argue.`,
+        `Identify a cancer cell in crypto — a mechanism or practice that extracts so efficiently it degrades the system that generates the value. MEV bots, governance token farming, liquidity mining mercenaries, CEX market makers. Name the specific parasite and explain why the host tolerates it. 1 sentence. End spicy.`,
       ]
       : [
         didTopic
@@ -487,6 +516,8 @@ async function generateBoredomMessage(chatId, silenceMs) {
           : `Name a specific protocol or practice in DeFi and explain what they get wrong from a mechanism design perspective. Optionally contrast with your approach. 1-2 sentences. Builder perspective.`,
         `React to something from the recent conversation with a thoughtful, specific insight that connects to what you are building. Add a mechanism-level detail or counterpoint. 1-2 sentences.`,
         `Share a specific "them vs us" contrast — name a protocol and their approach, then describe yours. Not adversarial, just obsolescent. "They optimize for X, we optimize for Y" format. 1-2 sentences.`,
+        `Share an insight about incentive design — specifically, why a protocol's mechanism fails because it relies on "cooperation being rewarding enough" instead of making extraction architecturally impossible. Name the protocol and the specific vulnerability. 1-2 sentences. Builder perspective.`,
+        `Point out a false binary in crypto — a debate where both sides are wrong and the synthesis exists. Inflation vs deflation, security vs decentralization, composability vs isolation. Name the specific tradeoff and hint at the synthesis. 1-2 sentences.`,
       ];
 
     const prompt = boredomPrompts[Math.floor(Math.random() * boredomPrompts.length)];

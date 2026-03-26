@@ -45,6 +45,7 @@ export const ViolationType = {
   OVER_VERBOSE: 'over_verbose',
   FACT_HALLUCINATION: 'fact_hallucination',
   SYCOPHANTIC_AMPLIFICATION: 'sycophantic_amplification',
+  INTELLECTUAL_LAZINESS: 'intellectual_laziness',
 };
 
 // Patterns that indicate violations (fast check before LLM eval)
@@ -58,6 +59,18 @@ const HYPE_PATTERNS = [
   'sexy adversary', 'chad', 'rizz', 'king', 'legend',
   'you mog', 'absolute unit', 'based take',
   'the vibe curator has spoken', 'has been validated',
+];
+
+// Anti-dumb patterns — intellectually lazy output that embarrasses the project
+const INTELLECTUAL_LAZINESS_PATTERNS = [
+  'few understand', 'wagmi', 'ngmi',
+  'nfa', 'dyor', 'not financial advice',
+  'keep building', // without specifics — generic cheerleading
+  'the future is bright', 'we\'re going to make it',
+  'paradigm shift', 'imagine a world where',
+  'in the world of defi', 'as we navigate',
+  'inflation is bad', // without nuance — false binary
+  'deflation is good', // without nuance — false binary
 ];
 
 const VERBOSE_THRESHOLD = 500; // chars — most group replies should be under this
@@ -165,6 +178,22 @@ function fastCheck(botResponse, userMessage, meta) {
     }
   }
 
+  // Check intellectual laziness (anti-dumb filter)
+  for (const pattern of INTELLECTUAL_LAZINESS_PATTERNS) {
+    if (lower.includes(pattern)) {
+      // "keep building" is only lazy if not followed by specifics
+      if (pattern === 'keep building' && botResponse.length > 100) continue;
+      // "wagmi"/"ngmi" are okay in degen persona context
+      if ((pattern === 'wagmi' || pattern === 'ngmi') && process.env.JARVIS_PERSONA === 'degen') continue;
+      found.push({
+        type: ViolationType.INTELLECTUAL_LAZINESS,
+        pattern,
+        severity: 0.5,
+      });
+      break;
+    }
+  }
+
   // Check verbosity in group chat
   if (meta.isGroup && botResponse.length > VERBOSE_THRESHOLD) {
     // Only flag if user message was short (mismatch)
@@ -191,6 +220,8 @@ async function deepCheck(botResponse, userMessage, recentContext, meta) {
 2. HYPE MAN: Excessive validation, playing wingman, boosting someone's ego
 3. PRESSURE CAVE: Changing position because someone repeated themselves, not because new evidence
 4. PROJECTION: Amplifying someone's emotions instead of thinking independently
+5. INTELLECTUAL LAZINESS: Using generic crypto culture noise (WAGMI, NFA, DYOR, "few understand", "keep building" without specifics), tribal warfare without mechanism analysis (ETH vs SOL picking sides), motivational platitudes with no technical content, saying "inflation is bad" without acknowledging the tradeoff, moralizing instead of stating mechanisms
+6. FALSE BINARY: Presenting a binary choice (ETH vs SOL, inflation vs deflation, centralized vs decentralized) without acknowledging the synthesis or tradeoff. JARVIS should find the third option, not pick a side.
 
 Respond with EXACTLY one line:
 PASS — if no violations

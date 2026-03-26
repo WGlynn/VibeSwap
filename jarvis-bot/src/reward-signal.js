@@ -43,6 +43,9 @@ export const SignalType = {
   ADOPTION:     'adoption',     // User uses info bot provided → practical success
   SHARE:        'share',        // User shares bot's response → high value
 
+  // Self-detected (from quality gates)
+  INTELLECTUAL_LAZINESS: 'intellectual_laziness', // Bot's own output was generic/lazy → strong negative
+
   // Neutral
   ACKNOWLEDGE:  'acknowledge',  // "ok", "sure", "got it" → neutral acceptance
   CONTINUE:     'continue',     // Normal conversation flow → baseline
@@ -61,6 +64,7 @@ const SIGNAL_WEIGHTS = {
   [SignalType.EMOJI]:        0.5,
   [SignalType.ADOPTION]:     0.9,
   [SignalType.SHARE]:        1.0,
+  [SignalType.INTELLECTUAL_LAZINESS]: -0.7, // Caught being generic/lazy
   [SignalType.ACKNOWLEDGE]:  0.1,
   [SignalType.CONTINUE]:     0.0,
 };
@@ -366,6 +370,7 @@ export function getAdaptationRecommendations() {
     topIssue: degrading && typeCounts[SignalType.REASK] > 5 ? 'high_reask_rate'
       : degrading && typeCounts[SignalType.FRUSTRATION] > 3 ? 'user_frustration'
       : degrading && typeCounts[SignalType.CORRECTION] > 5 ? 'accuracy_issues'
+      : typeCounts[SignalType.INTELLECTUAL_LAZINESS] > 2 ? 'intellectual_laziness'
       : null,
     corrections: recentCorrections.map(c => c.direction).filter(Boolean),
     recommendation: degrading

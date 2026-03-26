@@ -168,6 +168,13 @@ contract JouleInvariantTest is StdInvariant, Test {
         assertGt(supply, 0, "SUPPLY: must be positive after pre-mining");
     }
 
+    // ============ Invariant: rebase scalar >= MIN_REBASE_SCALAR (C-04) ============
+
+    function invariant_scalarFloor() public view {
+        uint256 scalar = joule.getRebaseScalar();
+        assertGe(scalar, 1e14, "SCALAR FLOOR: must be >= MIN_REBASE_SCALAR (C-04)");
+    }
+
     // ============ Invariant: totalBlocksMined unchanged (no mining in handler) ============
 
     function invariant_blocksMineStable() public view {

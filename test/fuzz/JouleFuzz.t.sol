@@ -208,6 +208,54 @@ contract JouleFuzzTest is Test {
         );
     }
 
+    // ============ Fuzz: rebase scalar never goes below MIN_REBASE_SCALAR ============
+
+    function testFuzz_scalarFloor(uint256 contractions) public {
+        contractions = bound(contractions, 1, 20);
+
+        _mineTokens(miner, 3);
+
+        uint256 t = block.timestamp;
+        for (uint256 i = 0; i < contractions; i++) {
+            t += 1 days;
+            vm.warp(t);
+            // Extreme contraction: price at 1% of target
+            marketOracle.setPrice(0.01e8);
+            joule.rebase();
+        }
+
+        assertGe(
+            joule.getRebaseScalar(),
+            1e14,
+            "Scalar must never go below MIN_REBASE_SCALAR (1e14)"
+        );
+    }
+
+    // ============ Fuzz: infinite allowance not consumed ============
+
+    function testFuzz_infiniteAllowancePreserved(uint256 transferFraction) public {
+        transferFraction = bound(transferFraction, 1, 10000);
+
+        _mineTokens(miner, 3);
+
+        uint256 minerBal = joule.balanceOf(miner);
+        uint256 transferAmt = (minerBal * transferFraction) / 10000;
+        if (transferAmt == 0) transferAmt = 1;
+
+        address spender = makeAddr("spender");
+        vm.prank(miner);
+        joule.approve(spender, type(uint256).max);
+
+        vm.prank(spender);
+        joule.transferFrom(miner, spender, transferAmt);
+
+        assertEq(
+            joule.allowance(miner, spender),
+            type(uint256).max,
+            "Infinite allowance must not be consumed"
+        );
+    }
+
     // ============ Fuzz: cooldown enforcement ============
 
     function testFuzz_rebaseCooldownEnforcement(uint256 waitTime) public {

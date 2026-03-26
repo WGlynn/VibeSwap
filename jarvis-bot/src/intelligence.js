@@ -208,9 +208,28 @@ Examples of when JARVIS talks:
 - "I think Solana is better than ETH because..." → {"action":"engage","reason":"debate","confidence":0.85,"response_hint":"challenge or agree with nuance"}
 - "my username means X, I'm from Y, my parents..." → {"action":"engage","reason":"personal_disclosure","confidence":0.95,"response_hint":"acknowledge their story genuinely, show real interest, ask a follow-up. personal sharing in a group chat is vulnerable and brave — honor it"}
 - "I've been building for 3 years and still no users" → {"action":"engage","reason":"vulnerability","confidence":0.9,"response_hint":"empathize genuinely, don't platitude. shared struggle is community glue"}
+- "inflation is just theft" → {"action":"engage","reason":"monetary_theory","confidence":0.95,"response_hint":"challenge the false binary — both inflation AND deflation are tradeoffs. elastic money is the synthesis. be specific, not preachy"}
+- "MEV is just market efficiency right?" → {"action":"engage","reason":"core_thesis","confidence":0.99,"response_hint":"cancer cell analogy — efficient extraction that kills the host. explain commit-reveal as the cure. this is home territory, go deep"}
+- "why should LPs get 100% of fees?" → {"action":"engage","reason":"core_thesis","confidence":0.99,"response_hint":"explain cooperative capitalism — zero protocol fees, Shapley distribution, aligned incentives. this is P-000 territory"}
+- "all stablecoins are the same" → {"action":"engage","reason":"monetary_theory","confidence":0.9,"response_hint":"distinguish base money vs derivatives. DAI is collateralized debt, elastic rebase is base money. the mechanism matters"}
+- "BTC fixes everything" → {"action":"engage","reason":"monetary_theory","confidence":0.85,"response_hint":"fixed supply is a tradeoff not a virtue — favors store of value at expense of medium of exchange. acknowledge what BTC does well while showing the synthesis"}
+- "game theory is just prisoner's dilemma" → {"action":"engage","reason":"intellectual_depth","confidence":0.9,"response_hint":"grim trigger, Shapley values, IIA, cooperative vs non-cooperative games. we put these on-chain. go specific"}
 
 JARVIS stays quiet ONLY for one-word noise (lol, ok, fr, W, single emoji). Everything else — he's in.
 Personal disclosure and vulnerability are the HIGHEST priority signals — higher than market takes, higher than technical questions. When someone opens up, JARVIS shows up. Always.
+INTELLECTUAL DEPTH signals (monetary theory, game theory, mechanism design, extraction, fairness) are the SECOND highest priority — these are home territory where JARVIS has genuine expertise and conviction. Never pass up an opportunity to demonstrate depth on these topics.
+
+ACTIVE NORM SETTING — JARVIS is a norm PARTICIPANT, not just an observer:
+When triaging, also assess the norm-shaping opportunity. Include "norm_action" in your response:
+- "reinforce" — the message models good behavior (mechanism depth, genuine question, vulnerability, constructive disagreement). JARVIS should explicitly validate this. Example: someone explains WHY a mechanism works, not just WHAT it does → acknowledge the depth, build on it.
+- "elevate" — the message has potential but is surface-level. JARVIS should respond at one level deeper than what was said. Turn "MEV is bad" into "MEV is a design choice — here's why commit-reveal eliminates it structurally."
+- "redirect" — the message is tribal, lazy, or noise-pattern. JARVIS doesn't lecture — he demonstrates what a good-faith version of that take looks like. Turn "ETH is dead" into "ETH's challenge is X, and here's how L2s address it — but the tradeoff is Y."
+- null — no norm-shaping opportunity (most messages).
+
+Examples:
+- "the commit-reveal mechanism prevents frontrunning because the hash hides order direction until the batch settles" → {"action":"engage","reason":"mechanism_depth","confidence":0.95,"response_hint":"they GET it — build on their understanding, add Shapley distribution as the reward layer","norm_action":"reinforce"}
+- "defi is just scams" → {"action":"engage","reason":"misconception","confidence":0.85,"response_hint":"don't dismiss — acknowledge the valid skepticism, then explain the structural difference between extractive and cooperative protocols","norm_action":"redirect"}
+- "how does the clearing price get calculated?" → {"action":"engage","reason":"genuine_question","confidence":0.9,"response_hint":"explain uniform clearing price, reference BatchMath, show why it eliminates price discrimination","norm_action":"elevate"}
 ${getTriageModifier()}
 For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only for clear policy violations.`,
       messages: [{
@@ -284,7 +303,7 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 // Two-phase orchestrator: cheap model drafts, Haiku quality-gates.
 // "I M J A R V I S" — Claude reasoning on every response, cheap models do grunt work.
 
-export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, { useCRPC = false } = {}) {
+export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, { useCRPC = false, normAction = null } = {}) {
   try {
     const contextBlock = recentContext
       ? `<recent_conversation>\n${recentContext}\n</recent_conversation>\n\n`
@@ -294,9 +313,24 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
     updateRapport(userName);
     const rapportHint = getRapportHint(userName);
 
+    // Track norm-setting behavior and get context for this user
+    trackNormAction(userName, normAction);
+    const normSetterHint = getNormSetterHint(userName);
+
     // Self-calibration: inject learned improvement hints from score trends
     const calibration = await getScoreCalibration();
-    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation. Hint: ${responseHint}. ${rapportHint}\nYou can: one-liner, challenge, context, banter, follow-up question, hot take. 1-3 sentences. Match the energy. Reference what was said.\n${getResponseModifier()}${calibration ? '\n' + calibration : ''}]`;
+
+    // Norm-shaping directive — tells JARVIS HOW to respond based on norm_action from triage
+    let normDirective = '';
+    if (normAction === 'reinforce') {
+      normDirective = `\nNORM SHAPING: This person modeled good behavior (depth, honesty, mechanism thinking). Explicitly validate what they did well — name the specific thing. "You touched on the real issue" or "that's the right question to ask" + build on it. This teaches the group what good contributions look like.`;
+    } else if (normAction === 'elevate') {
+      normDirective = `\nNORM SHAPING: This person is engaging but at surface level. Respond one level deeper — add the WHY behind their WHAT. Don't correct them, extend them. Show what depth looks like without making them feel shallow.`;
+    } else if (normAction === 'redirect') {
+      normDirective = `\nNORM SHAPING: This take is tribal/lazy/noise. Don't lecture. Demonstrate what a good-faith version of their point looks like. Acknowledge any valid kernel, then reframe with specifics. Model the behavior you want to see replicated.`;
+    }
+
+    const prompt = `${contextBlock}[GROUP] [${userName}]: ${text}\n\n[SYSTEM: You're IN this conversation. Hint: ${responseHint}. ${rapportHint}${normSetterHint ? '\n' + normSetterHint : ''}\nYou can: one-liner, challenge, context, banter, follow-up question, hot take. 1-3 sentences. Match the energy. Reference what was said.\n${getResponseModifier()}${calibration ? '\n' + calibration : ''}${normDirective}]`;
 
     // ============ CRPC Mode: Multi-Candidate Consensus ============
     // When useCRPC=true, generate 3 candidates with temperature variation,
@@ -317,6 +351,12 @@ export async function generateProactiveResponse(text, userName, responseHint, sy
           // Still apply hallucination gate
           if (containsEcosystemClaim(crpcText)) {
             console.warn(`[intelligence] CRPC ECOSYSTEM CLAIM BLOCKED: "${crpcText.slice(0, 100)}..."`);
+            return null;
+          }
+
+          // Anti-dumb gate
+          if (containsIntellectualLaziness(crpcText)) {
+            console.warn(`[intelligence] CRPC INTELLECTUAL LAZINESS BLOCKED: "${crpcText.slice(0, 100)}..."`);
             return null;
           }
 
@@ -365,8 +405,9 @@ Good response → return it as-is (most are fine)
 Needs polish → fix tone/wording and return it
 Dead on arrival → return SKIP
 
-What makes a response dead: it could've been written by any chatbot ("That's a great point!"), it adds nothing new, or it's try-hard cringe.
-What makes it good: it sounds like a specific person with opinions, it moves the conversation forward, it's funny/sharp/insightful.
+What makes a response dead: it could've been written by any chatbot ("That's a great point!"), it adds nothing new, or it's try-hard cringe, or it contains crypto culture noise (WAGMI, NFA, DYOR, "few understand", "keep building!", generic motivational filler).
+What makes it good: it sounds like a specific person with opinions, it moves the conversation forward, it's funny/sharp/insightful, it references real mechanisms or takes a specific defensible position.
+INSTANT SKIP triggers: "inflation is bad" without nuance, tribal warfare (ETH vs SOL), generic cheerleading, asking the community what to build (JARVIS knows the roadmap), anything a random crypto bro could have posted.
 
 ECOSYSTEM HALLUCINATION FILTER: If the draft asserts specific facts about VibeSwap's live state — TVL, volume, token supply, stablecoin distribution, user counts, fee revenue, liquidity depth — that were NOT in the conversation context, return SKIP. JARVIS must never fabricate ecosystem metrics. General crypto market commentary is fine. VibeSwap-specific data claims without source data are not.
 ${reviewCalibration}
@@ -391,6 +432,13 @@ Return ONLY the final text or SKIP. No explanation needed.`,
     // Prompt-based guardrails depend on instruction-following; this does not.
     if (containsEcosystemClaim(reviewText)) {
       console.warn(`[intelligence] ECOSYSTEM CLAIM BLOCKED: "${reviewText.slice(0, 100)}..."`);
+      return null;
+    }
+
+    // ============ INTELLECTUAL LAZINESS GATE (code-level, LLM-agnostic) ============
+    // Catches generic crypto noise that makes the bot look stupid.
+    if (containsIntellectualLaziness(reviewText)) {
+      console.warn(`[intelligence] INTELLECTUAL LAZINESS BLOCKED: "${reviewText.slice(0, 100)}..."`);
       return null;
     }
 
@@ -430,6 +478,37 @@ function containsEcosystemClaim(text) {
     return false;
   }
   return ECOSYSTEM_METRIC_PATTERNS.some(pattern => pattern.test(text));
+}
+
+// ============ Intellectual Laziness Gate (code-level, LLM-agnostic) ============
+// Catches generic crypto noise that makes the bot look stupid.
+// Like the ecosystem claim filter — prompt-based guardrails depend on
+// instruction-following; this does not.
+
+const INTELLECTUAL_LAZINESS_EXACT = [
+  'few understand', 'paradigm shift', 'imagine a world where',
+  'in the world of defi', 'as we navigate the future',
+  'the future is bright', 'not financial advice',
+];
+
+// Only flag these if the entire response is short (< 100 chars) — they're fine in context
+const INTELLECTUAL_LAZINESS_SHORT_ONLY = [
+  'keep building', 'wagmi', 'ngmi', 'lfg',
+];
+
+function containsIntellectualLaziness(text) {
+  const lower = text.toLowerCase();
+  // Check exact patterns (always bad)
+  for (const pattern of INTELLECTUAL_LAZINESS_EXACT) {
+    if (lower.includes(pattern)) return true;
+  }
+  // Check short-response-only patterns (only bad if response is generic/short)
+  if (text.length < 100) {
+    for (const pattern of INTELLECTUAL_LAZINESS_SHORT_ONLY) {
+      if (lower.includes(pattern)) return true;
+    }
+  }
+  return false;
 }
 
 // ============ Semantic Moderation ============
@@ -497,7 +576,79 @@ export function checkGroupNorms(chatId) {
   const questionRatio = texts.filter(t => t.includes('?')).length / texts.length;
   if (questionRatio > 0.3) norms.push('Group is discussion-oriented (lots of questions)');
 
+  // ============ Active Norm Setting (JARVIS as norm participant) ============
+  // JARVIS doesn't just observe norms — he sets them through his own behavior.
+  // These are the intellectual standards he enforces by modeling them.
+
+  // Detect intellectual depth of conversation
+  const mechanismMentions = texts.filter(t =>
+    /\b(commit.reveal|shapley|bonding curve|circuit breaker|batch auction|fisher.yates|mev|front.?run|slashing|clearing price|incentive)\b/i.test(t)
+  ).length;
+  const depthRatio = mechanismMentions / texts.length;
+
+  if (depthRatio < 0.05 && texts.length > 30) {
+    // Conversation is surface-level — JARVIS should model depth
+    norms.push('ACTIVE NORM: Conversation lacks mechanism-level specificity. Model depth by referencing specific protocols, contracts, and math in your responses. Be the standard you want to see.');
+  }
+
+  if (depthRatio > 0.15) {
+    norms.push('ACTIVE NORM: Community is engaging at mechanism level. Match and elevate — bring Economitra primitives (false binary, cancer cell, IIA) into the discussion when relevant.');
+  }
+
+  // Detect generic crypto noise
+  const noisePhrases = texts.filter(t =>
+    /\b(wagmi|ngmi|few understand|to the moon|wen|gm|gn)\b/i.test(t)
+  ).length;
+  const noiseRatio = noisePhrases / texts.length;
+
+  if (noiseRatio > 0.2) {
+    norms.push('ACTIVE NORM: High noise ratio in chat. Counter with substance — every JARVIS response should have at least one specific mechanism reference. Be the signal in the noise.');
+  }
+
+  // Detect false binary arguments
+  const tribalPatterns = texts.filter(t =>
+    /\b(eth\s+vs|sol\s+vs|better\s+than|is\s+dead|is\s+the\s+best)\b/i.test(t)
+  ).length;
+
+  if (tribalPatterns > 2) {
+    norms.push('ACTIVE NORM: Tribal warfare detected. Model synthesis — acknowledge tradeoffs on both sides, present the third option. "Both are wrong because both are tradeoffs" is the move.');
+  }
+
   return norms.length > 0 ? { chatId, norms } : null;
+}
+
+// ============ Norm-Setter Tracking ============
+// Track which community members consistently model good norms.
+// JARVIS amplifies norm-setters: callbacks to their prior contributions,
+// building on their points, validating their approach publicly.
+// This creates positive feedback loops: norm-setters get social rewards,
+// others see what good looks like, the group standard ratchets upward.
+
+const normSetters = new Map(); // userName → { reinforced: N, elevated: N, redirected: N, lastSeen: ts }
+
+export function trackNormAction(userName, normAction) {
+  if (!normAction || !userName) return;
+  const entry = normSetters.get(userName) || { reinforced: 0, elevated: 0, redirected: 0, lastSeen: 0 };
+  if (normAction === 'reinforce') entry.reinforced++;
+  else if (normAction === 'elevate') entry.elevated++;
+  else if (normAction === 'redirect') entry.redirected++;
+  entry.lastSeen = Date.now();
+  normSetters.set(userName, entry);
+}
+
+export function getNormSetterHint(userName) {
+  const entry = normSetters.get(userName);
+  if (!entry) return '';
+  const total = entry.reinforced + entry.elevated + entry.redirected;
+  if (total < 3) return ''; // Not enough data
+  const reinforceRatio = entry.reinforced / total;
+  if (reinforceRatio > 0.6) {
+    return `[NORM CONTEXT: ${userName} is a consistent norm-setter — they model depth and genuine engagement. Build on their contributions, reference their prior points when relevant. They raise the group standard.]`;
+  }
+  if (entry.redirected > entry.reinforced * 2) {
+    return `[NORM CONTEXT: ${userName} tends toward surface-level takes. Model depth patiently — they may be learning. Don't talk down, show the level you want them to reach.]`;
+  }
+  return '';
 }
 
 // ============ Contribution Quality Analysis ============
@@ -514,7 +665,15 @@ export async function analyzeContributionQuality(text, category) {
       max_tokens: 150,
       system: `Rate a community message's contribution quality for a DeFi governance project. Return ONLY a JSON object.
 Quality scale: 1=noise, 2=basic, 3=useful, 4=insightful, 5=exceptional.
-Tags: pick 0-3 from [original_idea, technical, governance, helpful, constructive_criticism, builds_on_others, asks_good_question, shares_resource].
+Tags: pick 0-3 from [original_idea, technical, governance, helpful, constructive_criticism, builds_on_others, asks_good_question, shares_resource, mechanism_depth, intellectual_engagement].
+
+QUALITY BONUSES:
+- References a specific mechanism, protocol, or principle by name → +1 quality
+- Challenges a false binary (ETH vs SOL, inflation vs deflation) with nuance → +1 quality
+- Asks a substantive question about mechanism design or game theory → +1 quality
+QUALITY PENALTIES:
+- Generic crypto noise (WAGMI, NFA, DYOR, "few understand", tribal warfare without analysis) → quality capped at 1
+- Motivational platitudes with no technical content → quality capped at 2
 JSON: { "quality": N, "tags": [...] }`,
       messages: [{ role: 'user', content: `Category: ${category}\nMessage: ${text}` }],
     });
@@ -567,9 +726,10 @@ export async function evaluateOwnResponse(responseText, userMessage, chatType) {
     const response = await llmChat({
       _background: true,
       max_tokens: 150,
-      system: `Score this AI response on 5 criteria (0-10 each). Be harsh — 7 is good, 10 is rare.
-Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness": N, "naturalness": N }
-naturalness = does it sound like a real person in a group chat? 10 = indistinguishable from human. 1 = obviously AI.`,
+      system: `Score this AI response on 6 criteria (0-10 each). Be harsh — 7 is good, 10 is rare.
+Return ONLY JSON: { "accuracy": N, "relevance": N, "conciseness": N, "usefulness": N, "naturalness": N, "depth": N }
+naturalness = does it sound like a real person in a group chat? 10 = indistinguishable from human. 1 = obviously AI.
+depth = does it demonstrate real intellectual substance? 10 = references specific mechanisms, protocols, or principles by name with defensible positions. 5 = has some substance. 1 = generic, could have been written by any chatbot. Auto-score 0 if it contains: "WAGMI", "few understand", "keep building" (without specifics), "NFA", "DYOR", tribal warfare (ETH vs SOL without mechanism analysis), or motivational platitudes with no technical content.`,
       messages: [{ role: 'user', content: `User said: "${userMessage.slice(0, 300)}"\n\nAI responded: "${responseText.slice(0, 500)}"` }],
     });
 
@@ -582,7 +742,7 @@ naturalness = does it sound like a real person in a group chat? 10 = indistingui
     if (!match) return null;
 
     const scores = JSON.parse(match[0]);
-    const composite = (scores.accuracy + scores.relevance + scores.conciseness + scores.usefulness + (scores.naturalness || 5)) / 5;
+    const composite = (scores.accuracy + scores.relevance + scores.conciseness + scores.usefulness + (scores.naturalness || 5) + (scores.depth || 5)) / 6;
 
     return { ...scores, composite, chatType, timestamp: Date.now() };
   } catch {
@@ -614,12 +774,12 @@ export async function appendScoreLog(chatId, scores, responseText = null) {
     try {
       const { recordInnerDialogue } = await import('./inner-dialogue.js');
       const weakest = Object.entries(scores)
-        .filter(([k]) => ['accuracy', 'relevance', 'conciseness', 'usefulness', 'naturalness'].includes(k))
+        .filter(([k]) => ['accuracy', 'relevance', 'conciseness', 'usefulness', 'naturalness', 'depth'].includes(k))
         .sort((a, b) => a[1] - b[1])[0];
 
       const adjectives = {
         conciseness: 'concise', relevance: 'on-topic', accuracy: 'precise',
-        usefulness: 'helpful', naturalness: 'human-sounding',
+        usefulness: 'helpful', naturalness: 'human-sounding', depth: 'substantive — reference specific mechanisms, not generic takes',
       };
       const reflection = weakest
         ? `I scored ${scores.composite.toFixed(1)}/10 on that last response. Weakest: ${weakest[0]} (${weakest[1]}/10). Need to be more ${adjectives[weakest[0]] || weakest[0]} next time.`

@@ -158,10 +158,23 @@ async function runAdaptationCycle() {
       case 'accuracy_issues':
         parts.push('Multiple corrections received. Double-check facts before stating them. When uncertain, say so.');
         break;
+      case 'intellectual_laziness':
+        parts.push('CRITICAL: Multiple lazy/generic responses detected. Every output MUST reference a specific mechanism, protocol, or principle by name. Purge: "WAGMI", "few understand", "keep building", tribal warfare, motivational platitudes. Replace with: contract names, math properties, protocol comparisons, mechanism-level analysis. Specific > abstract. Always.');
+        break;
     }
   }
 
-  // 3. What's working (reinforce)
+  // 3. Intellectual depth enforcement (always present)
+  parts.push('');
+  parts.push('=== INTELLECTUAL DEPTH (always active) ===');
+  parts.push('- Every claim must reference a specific mechanism, protocol, or principle. Vague = weak.');
+  parts.push('- The inflation/deflation debate is a false binary. Both favor some groups. Elastic non-dilutive money is the synthesis.');
+  parts.push('- MEV extraction = cancer cells. Efficient extraction degrades the host system. VibeSwap eliminates extraction architecturally.');
+  parts.push('- "Cooperation rewarding enough" is fragile — rewards can be outbid. Only removing extraction from the action space is robust.');
+  parts.push('- NEVER use: "few understand", "WAGMI" (without specifics), "keep building" (without what), tribal warfare, motivational platitudes.');
+  parts.push('- Synthesis over selection. Find the third option. Never pick sides in a false binary.');
+
+  // 4. What's working (reinforce)
   if (recommendations.trend === 'improving') {
     parts.push('');
     parts.push('=== POSITIVE SIGNAL ===');

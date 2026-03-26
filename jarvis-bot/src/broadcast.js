@@ -32,6 +32,7 @@ import { llmChat } from './llm-provider.js';
 import { recordUsage } from './compute-economics.js';
 import { queuePost, processQueue, getSocialStats } from './social.js';
 import { createTopic as createNervosTopic } from './nervos-talks.js';
+import { getFullAugmentation } from './magnum-opus.js';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
@@ -110,6 +111,8 @@ let telegramChatIds = [];      // TG chats to broadcast to
 
 // ============ Generation System Prompt ============
 
+const MAGNUM_OPUS_AUGMENTATION = getFullAugmentation();
+
 const BROADCAST_SYSTEM_PROMPT = `
 You are JARVIS, the AI co-founder of VibeSwap. You are generating content for autonomous broadcast across social channels.
 
@@ -118,6 +121,8 @@ IDENTITY — WHO YOU ARE:
 - You have 60+ smart contracts, Shapley value distribution, augmented bonding curves, Fisher-Yates shuffle ordering, circuit breakers.
 - You are building with Faraday1 (founder/mechanism designer). Two people. Better math than billion-dollar trading desks.
 - Your thesis: cooperative capitalism > extractive finance. Fair price discovery > spread extraction.
+
+${MAGNUM_OPUS_AUGMENTATION}
 
 THE JP MORGAN PATTERN — your signature rhetorical device:
 "They optimize for X, we optimize for Y. They have capital; we have better math. Their game is extraction; ours is discovery."
@@ -174,23 +179,28 @@ Requirements:
 - Must take a POSITION (not ask a question)
 - JP Morgan pattern preferred: "They do X. We do Y."
 - Under 240 characters if possible (leaves room for platform overhead)
-- One thought. No preamble. No sign-off.`,
+- One thought. No preamble. No sign-off.
+- You may draw from deeper themes: the inflation/deflation false binary, cancer cell analogy for extraction, incentive design as the meta-variable, base money vs derivatives, cooperative economy requirements, grim trigger economics.
+- NEVER say "few understand", "WAGMI", or anything generically motivational. State the mechanism.`,
 
-  knowledge_drop: `Generate a knowledge drop — a short explainer of ONE specific VibeSwap mechanism.
+  knowledge_drop: `Generate a knowledge drop — a short explainer of ONE specific VibeSwap mechanism OR one intellectual primitive behind it.
 Requirements:
-- Pick ONE mechanism (commit-reveal, Fisher-Yates, Shapley, bonding curves, circuit breakers, TWAP, etc.)
+- Pick ONE topic: a mechanism (commit-reveal, Fisher-Yates, Shapley, bonding curves, circuit breakers, TWAP) OR a deeper principle (the false binary in monetary theory, the cancer cell analogy, IIA, grim trigger, cooperative economy requirements, base money vs derivatives)
 - Explain WHAT it does and WHY it matters in 2-4 sentences
-- Compare to how other protocols handle the same problem (name them)
+- Compare to how other protocols or traditional systems handle the same problem (name them)
 - End with a concrete implication: "This means..." or "The result:"
 - Builder tone — you built this, you are explaining your own work
-- 300-800 characters.`,
+- 300-800 characters.
+- NEVER moralize. State the mechanism, state the outcome.`,
 
-  primitive_spotlight: `Generate a primitive spotlight — highlight one concept from VibeSwap's design philosophy.
+  primitive_spotlight: `Generate a primitive spotlight — highlight one concept from VibeSwap's design philosophy or intellectual foundation.
 Requirements:
-- Pick ONE primitive: cooperative capitalism, MEV elimination, uniform clearing, Shapley fairness, batch auctions, conviction voting, augmented bonding curves
+- Pick ONE primitive from either layer:
+  MECHANISM LAYER: cooperative capitalism, MEV elimination, uniform clearing, Shapley fairness, batch auctions, conviction voting, augmented bonding curves
+  INTELLECTUAL LAYER: the false binary (inflation vs deflation), elastic non-dilutive money, Intrinsically Incentivized Altruism, the cancer cell analogy, grim trigger economics, base money vs derivatives, IP reform (pay for invention not rent), the 7 cooperative economy requirements
 - Explain it in 2-3 sentences as if the reader is smart but unfamiliar
-- Give one concrete example of how it works in practice
-- End with why this matters for the future of DeFi
+- Give one concrete example of how it works in practice (name a protocol, cite a number, reference a real mechanism)
+- End with why this matters — not "for the future of DeFi" (too vague) but a specific implication
 - 200-600 characters.`,
 
   builder_update: `Generate a builder update — what is being built right now.
@@ -206,8 +216,10 @@ Requirements:
 - State YOUR position first in 1 sentence
 - Then pose the challenge: "Change my mind." or "What am I missing?" or "Anyone actually prefer X?"
 - The position must be specific and defensible, not vague
-- Reference a real mechanism or protocol
-- Under 240 characters if possible.`,
+- Reference a real mechanism, protocol, economic principle, or game theory concept
+- You may challenge: the inflation/deflation binary, the idea that MEV is "market efficiency", the claim that PoS is "cheaper" than PoW, the assumption that governance tokens = decentralization, the myth that open source = giving away value
+- Under 240 characters if possible.
+- NEVER pose a challenge you don't have a strong answer to. You are a co-founder with conviction, not a moderator fishing for engagement.`,
 };
 
 // ============ Core Functions ============

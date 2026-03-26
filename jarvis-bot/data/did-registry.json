@@ -1,7 +1,7 @@
 {
   "version": 1,
   "method": "did:jarvis",
-  "updated": "2026-03-13T17:38:04.279567+00:00",
+  "updated": "2026-03-26T15:39:31.650Z",
   "entries": {
     "did:jarvis:project:ddf4bb34": {
       "title": "Augmented Bonding Curves (ABC) — Knowledge Base",
@@ -931,6 +931,119 @@
       ],
       "refs": [],
       "description": "Will identifies as Tet from No Game No Life — the god who created the rules of the game, not a playe"
+    },
+    "did:jarvis:project:5bd9b201": {
+      "title": "Economitra — The False Binary (Inflation vs Deflation)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "false-binary",
+        "monetary-theory",
+        "inflation",
+        "deflation",
+        "elastic-money"
+      ],
+      "refs": [],
+      "description": "The entire inflation vs deflation debate is a false binary. Both extremes favor some groups at others expense. Elastic non-dilutive money serves all three properties of money (medium of exchange, stor"
+    },
+    "did:jarvis:project:597f128b": {
+      "title": "Economitra — The Cancer Cell Analogy (MEV as Systemic Disease)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "cancer-cell",
+        "mev",
+        "extraction",
+        "system-health"
+      ],
+      "refs": [],
+      "description": "A cancer cell replicates too efficiently — it kills the host, then dies itself. MEV bots extract value so efficiently they degrade the system that generates value. Every protocol tolerating extraction"
+    },
+    "did:jarvis:project:75403c5e": {
+      "title": "Economitra — Incentive Design Is Everything",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "incentive-design",
+        "mechanism-design",
+        "iia",
+        "cooperation"
+      ],
+      "refs": [],
+      "description": "The incentives a mechanism provides determine how people behave. Rewards can be outbid. Punishments absorbed. Reputations forged. The only robust solution: remove extraction from the action space enti"
+    },
+    "did:jarvis:project:e5ebad23": {
+      "title": "Economitra — Base Money vs Derivatives",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "base-money",
+        "derivatives",
+        "stablecoins",
+        "rent-extraction"
+      ],
+      "refs": [],
+      "description": "Most stablecoins are convoluted ponzis extracting rent from demand for stable liquidity. Base money (Ampleforth-style elastic, Bitcoin) accrues fundamental value. Derivatives (DAI, bond-based stables)"
+    },
+    "did:jarvis:project:abe83565": {
+      "title": "Economitra — Grim Trigger (On-Chain Game Theory)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "grim-trigger",
+        "game-theory",
+        "slashing",
+        "defection"
+      ],
+      "refs": [],
+      "description": "Cooperate as long as the other cooperates; one defection = permanent punishment. This is the mechanism that makes society work — not government. VibeSwap: 50% slashing on invalid reveals. Cost of chea"
+    },
+    "did:jarvis:project:544b6992": {
+      "title": "Economitra — Cooperative Economy Requirements (7 Conditions)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "cooperative-capitalism",
+        "shapley",
+        "requirements",
+        "alignment"
+      ],
+      "refs": [],
+      "description": "A cooperative economy needs 7 things. The hardest: aligned incentives between individuals and the collective. Every DAO with governance attacks failed on requirement 7. Shapley values solve it — your "
+    },
+    "did:jarvis:project:e93ceb47": {
+      "title": "Economitra — IP Reform (Pay for Invention Not Rent)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "ip-reform",
+        "open-source",
+        "rent-extraction",
+        "patents"
+      ],
+      "refs": [],
+      "description": "Patents create monopolies, barriers to entry, price gouging. Medicine costs pennies to produce but millions to develop. Current system extracts rent from sick people. VibeSwap is open source because v"
+    },
+    "did:jarvis:project:f290abc6": {
+      "title": "Economitra — The Persistence Principle (System Exhaustion vs Altruistic Design)",
+      "type": "project",
+      "tier": "HOT",
+      "tags": [
+        "economitra",
+        "persistence",
+        "system-design",
+        "altruism",
+        "p-000"
+      ],
+      "refs": [],
+      "description": "The existing system rewards persistence above everything. Poke at it long enough and it gives you what you want to make you stop. VibeSwap system rewards altruism and everyone wins. The difference bet"
     }
   },
   "aliases": {

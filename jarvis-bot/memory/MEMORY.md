@@ -6,7 +6,8 @@
 
 - Location: `C:/Users/Will/vibeswap/`
 - CKB: `C:\Users\Will\.claude\JarvisxWill_CKB.md`
-- Always push to BOTH remotes: `origin` + `stealth`
+- Always push to `origin` only (stealth remote RETIRED)
+- **Magnum Opus Module**: `src/magnum-opus.js` — Economitra intellectual DNA (false binary, cancer cell, incentive design, IIA, grim trigger, cooperative capitalism). Injected into autonomous.js, proactive.js, broadcast.js system prompts. Single source of truth for the WHY.
 
 ## GO-LIVE SPRINT (1 week — Feb 2026)
 - **Both VibeSwap and Jarvis go live**

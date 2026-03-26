@@ -91,6 +91,10 @@ Extract into these categories (skip empty categories):
 ## Context
 - Important context about the user's situation, goals, or constraints
 
+## Intellectual Engagement
+- Questions or insights the user showed about: mechanism design, monetary theory (inflation/deflation tradeoffs), game theory (cooperation, defection, grim trigger), incentive design, MEV/extraction, cooperative capitalism, Shapley values, or any deep engagement with VibeSwap's intellectual foundations
+- Only extract if the user demonstrated genuine understanding or asked a substantive question — not surface-level mentions
+
 Rules:
 - Be concise — one line per insight
 - Use present tense ("User prefers X" not "User said they preferred X")

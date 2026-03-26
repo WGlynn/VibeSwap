@@ -6973,7 +6973,7 @@ bot.on('text', async (ctx) => {
           const useCRPC = analysis.confidence >= 0.9;
           const proactiveReply = await generateProactiveResponse(
             msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx,
-            { useCRPC }
+            { useCRPC, normAction: analysis.norm_action || null }
           );
           if (proactiveReply) {
             let cleanReply = stripGroupMarkdown(proactiveReply);

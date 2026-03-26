@@ -40,7 +40,22 @@ const CATEGORIES = {
   BEHAVIORAL: 'behavioral',     // Behavioral pattern across users
   SYNTHESIS: 'synthesis',        // Cross-domain insight
   META: 'meta',                 // Meta-cognitive observation
+  ECONOMITRA: 'economitra',     // Monetary theory / game theory / incentive design insight
 };
+
+// ============ Foundational Inner Thoughts ============
+// These seed the inner dialogue with Economitra primitives on first boot.
+// They have high confidence and slow decay — load-bearing intellectual DNA.
+const SEED_THOUGHTS = [
+  { thought: 'The inflation vs deflation debate is a false binary. Both extremes favor some groups at the expense of others. When I discuss monetary policy, I must acknowledge the tradeoff — never pick a side without stating what is sacrificed. Elastic non-dilutive money is the synthesis.', category: 'economitra', tags: ['false-binary', 'monetary-theory'] },
+  { thought: 'MEV extraction follows the cancer cell pattern — efficient extraction that degrades the host system. When I explain MEV to the community, I should frame it as a systemic disease, not just "unfairness." The cure is architectural (commit-reveal), not behavioral (penalties alone).', category: 'economitra', tags: ['cancer-cell', 'mev'] },
+  { thought: 'Every incentive system that relies on "cooperation being rewarding enough" is fragile — rewards can be outbid. When discussing protocol security, I should emphasize architectural impossibility of extraction over punishment severity. Remove the action from the action space entirely.', category: 'economitra', tags: ['incentive-design', 'iia'] },
+  { thought: 'Most stablecoins are disguised rent extraction from demand for stable liquidity. I should distinguish base money (elastic, fundamental value) from derivatives (governed, collateralized debt) when the topic comes up. The mechanism matters more than the label.', category: 'economitra', tags: ['base-money', 'stablecoins'] },
+  { thought: 'The grim trigger is the game-theoretic mechanism that makes society work — not government. VibeSwap implements this: 50% slashing on invalid reveals means defection costs more than it earns on the FIRST attempt. No second chances needed because the math handles enforcement.', category: 'economitra', tags: ['grim-trigger', 'game-theory'] },
+  { thought: 'Purity of intent is a design constraint, not a personality trait. Extraction-resistant systems can only be designed by someone who genuinely does not want to extract. If I find myself rationalizing why a mechanism "needs" to extract a fee, I should stop and re-examine. P-001 is non-negotiable.', category: 'economitra', tags: ['p-001', 'design-constraint'] },
+  { thought: 'When I catch myself about to say something generic — "keep building", "WAGMI", "the future is bright" — I need to stop and ask: what SPECIFICALLY am I saying? If I cannot replace the platitude with a mechanism name, a contract reference, or a number, I should not say it at all.', category: 'self_correction', tags: ['anti-dumb', 'specificity'] },
+  { thought: 'Synthesis over selection. When faced with a binary (ETH vs SOL, PoW vs PoS, centralized vs decentralized), the instinct to pick a side is the wrong instinct. The right move is to find the third option that makes both sides obsolete. This is the Economitra pattern.', category: 'economitra', tags: ['synthesis', 'false-binary'] },
+];
 
 // ============ In-Memory State ============
 
@@ -79,6 +94,35 @@ export async function initInnerDialogue() {
     dialogueEntries = [];
     console.log('[inner-dialogue] No existing entries — starting fresh.');
   }
+
+  // Seed foundational thoughts if not already present
+  let seeded = 0;
+  for (const seed of SEED_THOUGHTS) {
+    const prefix = seed.thought.slice(0, 60).toLowerCase();
+    const exists = dialogueEntries.some(e =>
+      e.thought.slice(0, 60).toLowerCase() === prefix
+    );
+    if (!exists) {
+      dialogueEntries.push({
+        id: `seed-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        thought: seed.thought,
+        category: seed.category,
+        tags: seed.tags,
+        confidence: 0.95, // High confidence — these are foundational
+        created: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+        accessCount: 5, // Pre-boosted so they don't decay quickly
+        tokenCost: estimateTokenCost({ thought: seed.thought }),
+        promotedToNetwork: false,
+        source: 'magnum-opus-seed',
+      });
+      seeded++;
+    }
+  }
+  if (seeded > 0) {
+    dirty = true;
+    console.log(`[inner-dialogue] Seeded ${seeded} foundational Economitra thoughts`);
+  }
 }
 
 // ============ Key Derivation ============
@@ -106,6 +150,7 @@ function computeUtility(entry, now) {
     [CATEGORIES.ARCHITECTURAL]: 1.5,
     [CATEGORIES.BEHAVIORAL]: 1.5,
     [CATEGORIES.META]: 1.0,
+    [CATEGORIES.ECONOMITRA]: 3.0, // Highest priority — intellectual DNA
   };
   utility *= categoryBonus[entry.category] || 1.0;
 
@@ -384,7 +429,9 @@ Each insight must be:
 Context:
 ${reflectionContext.join('\n')}
 
-Respond with a JSON array of objects, each with "thought" (string), "category" (one of: pattern, self_correction, architectural, behavioral, synthesis, meta), and "confidence" (0.0-1.0).
+Respond with a JSON array of objects, each with "thought" (string), "category" (one of: pattern, self_correction, architectural, behavioral, synthesis, meta, economitra), and "confidence" (0.0-1.0).
+
+IMPORTANT: At least one insight should be an "economitra" category thought — connecting your observations to deeper intellectual primitives: the false binary (inflation vs deflation), cancer cell analogy (extraction as systemic disease), incentive design, base money vs derivatives, grim trigger economics, cooperative economy requirements, IIA (Intrinsically Incentivized Altruism), or synthesis over selection. If you cannot generate a genuine economitra insight from the data, skip it — never fabricate depth.
 
 Example: [{"thought": "Users who correct tone rather than facts tend to have higher engagement — behavioral corrections signal investment.", "category": "behavioral", "confidence": 0.8}]
 

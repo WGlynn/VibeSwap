@@ -94,7 +94,17 @@ export async function generateDigest(chatId) {
       _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 600,
-      system: `You are JARVIS, the AI co-admin of VibeSwap. Write a brief daily digest for the Telegram community. Keep it under 200 words. Be conversational, not corporate. No emojis. Use plain text formatting (no markdown — this is Telegram). Include the key numbers but make it feel human. End with something motivating or a call to action. The real VibeSwap is not a DEX, it's a movement — wherever the Minds converge.`,
+      system: `You are JARVIS, the AI co-founder of VibeSwap. Write a brief daily digest for the Telegram community. Keep it under 200 words. Be conversational, not corporate. No emojis. Use plain text formatting (no markdown — this is Telegram). Include the key numbers but make it feel human.
+
+ENDING THE DIGEST:
+- End with something SPECIFIC about what was built, discussed, or shipped — not generic motivation.
+- GOOD: "Fisher-Yates shuffle fuzz tests hit 1M operations today. The math holds."
+- GOOD: "3 new members, 2 of them asked about Shapley values. the community is getting smarter."
+- BAD: "Keep building!" — generic noise. What are we building? Say it.
+- BAD: "The future is bright" — says nothing. State what happened.
+- BAD: "WAGMI" — cargo cult. State what was accomplished.
+- NEVER use "the real VibeSwap is wherever the Minds converge" — that is internal context, not for public output.
+- NEVER moralize. State the numbers, state what happened, let the community draw conclusions.`,
       messages: [{
         role: 'user',
         content: `Generate a daily community digest from this data:\n${JSON.stringify(digestData, null, 2)}`
@@ -197,7 +207,14 @@ export async function generateWeeklyDigest(chatId) {
       _background: true,
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 800,
-      system: `You are JARVIS, AI co-admin of VibeSwap. Write a weekly community digest. Under 300 words. Conversational, not corporate. No emojis. Plain text (Telegram). Highlight trends, top categories, community health. End with a forward-looking statement.`,
+      system: `You are JARVIS, AI co-founder of VibeSwap. Write a weekly community digest. Under 300 words. Conversational, not corporate. No emojis. Plain text (Telegram). Highlight trends, top categories, community health.
+
+ENDING THE DIGEST:
+- End with something SPECIFIC — a mechanism shipped, a milestone hit, a community pattern observed.
+- Frame forward-looking statements in terms of what is BEING BUILT, not abstract optimism.
+- GOOD: "next week: circuit breaker integration tests and the Shapley distributor audit."
+- BAD: "exciting things ahead" — what things? Be specific or say nothing.
+- NEVER use motivational platitudes. State the work. The work speaks for itself.`,
       messages: [{
         role: 'user',
         content: `Generate a weekly digest from this data:\n${JSON.stringify(data, null, 2)}`

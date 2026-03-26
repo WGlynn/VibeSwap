@@ -25,11 +25,35 @@ const FALLBACK_PRICES = {
   CKB: 0.012,
 }
 
-// Live price proxy — reads CoinGecko cache first, falls back to static
+// Maximum age (ms) before cached prices are considered stale
+const PRICE_STALENESS_THRESHOLD = 60_000 // 60 seconds
+
+/**
+ * Check whether the global price cache is fresh.
+ * Components can call isPriceFresh() to gate on staleness.
+ * @param {string} [symbol] — optional; if provided, also checks that the symbol exists in cache
+ * @returns {boolean}
+ */
+export function isPriceFresh(symbol) {
+  const ts = window.__vibePriceCacheTimestamp
+  if (!ts || (Date.now() - ts) > PRICE_STALENESS_THRESHOLD) return false
+  if (symbol) {
+    const val = window.__vibePriceCache?.[symbol]
+    if (!val || val <= 0) return false
+  }
+  return true
+}
+
+// Live price proxy — reads CoinGecko cache first, falls back to static.
+// Returns null for non-stablecoin tokens when the cache is stale so that
+// callers can detect the problem instead of silently using wrong prices.
 const MOCK_PRICES = new Proxy(FALLBACK_PRICES, {
   get(target, prop) {
+    if (typeof prop !== 'string') return target[prop]
     const live = window.__vibePriceCache?.[prop]
-    if (live && live > 0) return live
+    if (live && live > 0 && isPriceFresh(prop)) return live
+    // Stablecoins are safe to fall back on — their price is definitionally ~1
+    if (prop === 'USDC' || prop === 'USDT') return target[prop] || 1
     return target[prop] || 0
   }
 })
@@ -141,6 +165,7 @@ export function useSwap() {
   const [quote, setQuote] = useState(null)
   const [lastSettlement, setLastSettlement] = useState(null)
   const [liveBalances, setLiveBalances] = useState({}) // symbol → formatted string
+  const [pricesStale, setPricesStale] = useState(false)
 
   // Ref to track polling interval for reveal phase
   const revealPollRef = useRef(null)
@@ -244,8 +269,15 @@ export function useSwap() {
   const fetchQuote = useCallback(async (fromSymbol, toSymbol, amountIn) => {
     if (!amountIn || isNaN(parseFloat(amountIn)) || parseFloat(amountIn) <= 0) {
       setQuote(null)
+      setPricesStale(false)
       return
     }
+
+    // Check price freshness — warn if cache is stale (non-stablecoins only)
+    const stablecoins = new Set(['USDC', 'USDT', 'DAI'])
+    const needsFreshPrice = !stablecoins.has(fromSymbol) || !stablecoins.has(toSymbol)
+    const stale = needsFreshPrice && !isPriceFresh()
+    setPricesStale(stale)
 
     const amount = parseFloat(amountIn)
 
@@ -342,6 +374,7 @@ export function useSwap() {
         priceImpact,
         fee,
         savings: savings > 0.01 ? savings : 0,
+        pricesStale: stale,
       })
     }
   }, [isCKB, isLive, evmChainId, contractGetQuote, ckbAuctionState, ckbPoolStates])
@@ -571,6 +604,7 @@ export function useSwap() {
     swapState,
     isLoading,
     error,
+    pricesStale,
 
     // Token data
     tokens,

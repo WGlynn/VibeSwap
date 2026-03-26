@@ -260,9 +260,10 @@ contract VibeAMMLite is
         bool isT0 = order.tokenIn == pool.token0;
         ai = order.amountIn;
         ao = isT0 ? (ai * cp) / 1e18 : (cp > 0 ? (ai * 1e18) / cp : 0);
-        uint256 tf = (ao * pool.feeRate) / 10000;
+        uint256 netAo = (ao * (10000 - pool.feeRate)) / 10000;
+        uint256 tf = ao - netAo;
         (pf, ) = BatchMath.calculateFees(ao, pool.feeRate, 0);
-        ao -= tf;
+        ao = netAo;
         uint256 rOut = isT0 ? pool.reserve1 : pool.reserve0;
         uint256 reserveDeduction = ao + tf - pf;
         if (ao < order.minAmountOut || reserveDeduction > rOut) {

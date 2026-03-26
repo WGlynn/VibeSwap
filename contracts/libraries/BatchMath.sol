@@ -326,7 +326,10 @@ library BatchMath {
         uint256 protocolShare
     ) internal pure returns (uint256 protocolFee, uint256 lpFee) {
         uint256 totalFee = (amount * feeRate) / 10000;
-        protocolFee = (totalFee * protocolShare) / 10000;
+        // Combine multiplications before dividing to reduce precision loss:
+        // protocolFee = amount * feeRate * protocolShare / (10000 * 10000)
+        // Safe: amount ~1e27 * feeRate ~1e3 * protocolShare ~1e4 = ~1e34 << uint256 max
+        protocolFee = (amount * feeRate * protocolShare) / (10000 * 10000);
         lpFee = totalFee - protocolFee;
     }
 

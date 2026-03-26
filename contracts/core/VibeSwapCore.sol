@@ -81,6 +81,31 @@ contract VibeSwapCore is
         uint256 feeRate;
     }
 
+    struct CrossChainOrder {
+        uint256 commitTimestamp;
+        uint32 destinationChain;
+        bytes32 commitHash;
+        uint256 depositAmount;
+        address tokenIn;
+        address trader;
+        bool settled;
+    }
+
+    /// @notice Queued failed execution for retry (incentive tracking failures)
+    struct FailedExecution {
+        bytes32 poolId;
+        address trader;
+        uint256 amountIn;
+        uint256 estimatedOut;
+        bytes reason;
+        uint256 timestamp;
+    }
+
+    // ============ Constants ============
+
+    /// @notice Maximum number of failed executions to queue (don't block settlement)
+    uint256 public constant MAX_FAILED_QUEUE = 1000;
+
     // ============ State ============
 
     /// @notice CommitRevealAuction contract
@@ -103,6 +128,9 @@ contract VibeSwapCore is
 
     /// @notice Commit ID to swap params (for execution)
     mapping(bytes32 => SwapParams) public pendingSwaps;
+
+    /// @notice Cross-chain order tracking (commitHash => CrossChainOrder)
+    mapping(bytes32 => CrossChainOrder) public crossChainOrders;
 
     /// @notice Paused state
     bool public paused;
@@ -148,9 +176,14 @@ contract VibeSwapCore is
     /// @notice Temporary cumulative validated amounts per trader-token pair (cleared after each batch)
     mapping(bytes32 => uint256) private _cumulativeValidated;
 
+    /// @notice TimelockController for governance-gated admin functions (Phase 2 disintermediation)
+    address public timelockController;
+
+    /// @notice Queue of failed incentive/compliance executions for retry
+    FailedExecution[] public failedExecutions;
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -198,6 +231,7 @@ contract VibeSwapCore is
     event RequireEOAUpdated(bool required);
     event CommitCooldownUpdated(uint256 cooldown);
     event ClawbackRegistryUpdated(address indexed registry);
+    event TimelockControllerUpdated(address indexed oldTimelock, address indexed newTimelock);
 
     // FIX #5: Events for order failures (no more silent failures)
     event OrderFailed(
@@ -213,6 +247,10 @@ contract VibeSwapCore is
     event ExecutionTrackingFailed(bytes32 indexed poolId, address indexed trader, bytes reason);
     event ComplianceCheckFailed(bytes32 indexed poolId, address indexed trader, bytes reason);
 
+    // FIX #6b: Failed execution queue events (retry mechanism)
+    event FailedExecutionQueued(uint256 indexed index, bytes32 indexed poolId, address indexed trader);
+    event FailedExecutionRetried(uint256 indexed index, bool success);
+
     // SEC-1: Event for refunded orders in partial batch failures
     event OrderRefunded(
         uint64 indexed batchId,
@@ -221,6 +259,22 @@ contract VibeSwapCore is
         uint256 amountIn,
         string reason
     );
+
+    // Cross-chain order lifecycle events
+    event CrossChainOrderCreated(
+        bytes32 indexed commitHash,
+        address indexed trader,
+        uint32 destinationChain,
+        address tokenIn,
+        uint256 depositAmount
+    );
+    event CrossChainOrderRefunded(
+        bytes32 indexed commitHash,
+        address indexed trader,
+        address tokenIn,
+        uint256 depositAmount
+    );
+    event CrossChainOrderSettled(bytes32 indexed commitHash);
 
     // ============ Errors ============
 
@@ -235,6 +289,10 @@ contract VibeSwapCore is
     error CommitCooldownActive();
     error NotGuardian();
     error WalletTainted();
+    error NotGovernance();
+    error CrossChainOrderNotExpired();
+    error CrossChainOrderAlreadySettled();
+    error CrossChainOrderNotFound();
 
     // ============ Modifiers ============
 
@@ -260,6 +318,15 @@ contract VibeSwapCore is
                 revert NotEOA();
             }
         }
+        _;
+    }
+
+    /// @notice Governance gate: allows timelock OR owner (migration period)
+    modifier onlyGovernance() {
+        require(
+            msg.sender == owner() || (timelockController != address(0) && msg.sender == timelockController),
+            "Not governance"
+        );
         _;
     }
 
@@ -546,8 +613,65 @@ contract VibeSwapCore is
             secret
         ));
 
+        // Track cross-chain order for timeout refunds
+        crossChainOrders[commitHash] = CrossChainOrder({
+            commitTimestamp: block.timestamp,
+            destinationChain: dstChainId,
+            commitHash: commitHash,
+            depositAmount: amountIn,
+            tokenIn: tokenIn,
+            trader: msg.sender,
+            settled: false
+        });
+
         // Send via router
         router.sendCommit{value: msg.value}(dstChainId, commitHash, options);
+
+        emit CrossChainOrderCreated(commitHash, msg.sender, dstChainId, tokenIn, amountIn);
+    }
+
+    /**
+     * @notice Refund a cross-chain order that has expired (LayerZero message failed or timed out)
+     * @param commitHash The commitment hash of the cross-chain order
+     * @dev Anyone can call this after the 2-hour timeout, but funds go to the original trader.
+     *      The 2-hour window gives LayerZero sufficient time for message delivery + retries.
+     *
+     * DISINTERMEDIATION: Grade A (DISSOLVED). Permissionless after timeout — no trust required.
+     */
+    function refundExpiredCrossChain(bytes32 commitHash) external nonReentrant {
+        CrossChainOrder storage order = crossChainOrders[commitHash];
+        if (order.trader == address(0)) revert CrossChainOrderNotFound();
+        if (order.settled) revert CrossChainOrderAlreadySettled();
+        if (block.timestamp <= order.commitTimestamp + 2 hours) revert CrossChainOrderNotExpired();
+
+        order.settled = true;
+
+        // Release deposit back to original trader
+        deposits[order.trader][order.tokenIn] -= order.depositAmount;
+        IERC20(order.tokenIn).safeTransfer(order.trader, order.depositAmount);
+
+        emit CrossChainOrderRefunded(commitHash, order.trader, order.tokenIn, order.depositAmount);
+    }
+
+    /**
+     * @notice Mark a cross-chain order as settled (prevents refund after successful delivery)
+     * @param commitHash The commitment hash of the cross-chain order
+     * @dev Called by owner or router after confirming the destination chain processed the order.
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade B. Owner/router marks settlement.
+     * Target: router auto-marks on lzReceive callback; owner as fallback.
+     */
+    function markCrossChainSettled(bytes32 commitHash) external {
+        require(
+            msg.sender == owner() || msg.sender == address(router),
+            "Only owner or router"
+        );
+        CrossChainOrder storage order = crossChainOrders[commitHash];
+        if (order.trader == address(0)) revert CrossChainOrderNotFound();
+        if (order.settled) revert CrossChainOrderAlreadySettled();
+
+        order.settled = true;
+        emit CrossChainOrderSettled(commitHash);
     }
 
     // ============ View Functions ============
@@ -683,7 +807,7 @@ contract VibeSwapCore is
         address _amm,
         address _treasury,
         address _router
-    ) external onlyOwner {
+    ) external onlyGovernance {
         if (_auction != address(0)) auction = ICommitRevealAuction(_auction);
         if (_amm != address(0)) amm = IVibeAMM(_amm);
         if (_treasury != address(0)) treasury = IDAOTreasury(_treasury);
@@ -981,7 +1105,7 @@ contract VibeSwapCore is
                 // Use pool base fee rate as conservative lower bound. If actual fee is higher
                 // (True Price surcharge), netOut is even lower — so this check is conservative:
                 // it correctly identifies all slippage failures, and may also catch surcharge failures.
-                uint256 netOut = grossOut - (grossOut * pool.feeRate) / 10000;
+                uint256 netOut = (grossOut * (10000 - pool.feeRate)) / 10000;
 
                 if (netOut < order.minAmountOut) {
                     // This order failed in the AMM — tokens already returned to VibeSwapCore
@@ -1025,6 +1149,8 @@ contract VibeSwapCore is
 
     /**
      * @notice Record execution in incentive controller and compliance registry
+     * @dev Failed incentive recordings are queued for retry instead of silently swallowed.
+     *      Compliance failures are still event-only (non-retryable side effect).
      */
     function _recordExecution(
         bytes32 poolId,
@@ -1036,6 +1162,7 @@ contract VibeSwapCore is
                 poolId, order.trader, order.amountIn, estimatedOut, order.minAmountOut
             ) {} catch (bytes memory reason) {
                 emit ExecutionTrackingFailed(poolId, order.trader, reason);
+                _queueFailedExecution(poolId, order.trader, order.amountIn, estimatedOut, reason);
             }
         }
 
@@ -1046,6 +1173,31 @@ contract VibeSwapCore is
                 emit ComplianceCheckFailed(poolId, order.trader, reason);
             }
         }
+    }
+
+    /**
+     * @notice Queue a failed incentive execution for later retry
+     * @dev Silently skips if queue is full to avoid blocking settlement
+     */
+    function _queueFailedExecution(
+        bytes32 poolId,
+        address trader,
+        uint256 amountIn,
+        uint256 estimatedOut,
+        bytes memory reason
+    ) internal {
+        if (failedExecutions.length >= MAX_FAILED_QUEUE) return;
+
+        failedExecutions.push(FailedExecution({
+            poolId: poolId,
+            trader: trader,
+            amountIn: amountIn,
+            estimatedOut: estimatedOut,
+            reason: reason,
+            timestamp: block.timestamp
+        }));
+
+        emit FailedExecutionQueued(failedExecutions.length - 1, poolId, trader);
     }
 
     /**
@@ -1072,6 +1224,42 @@ contract VibeSwapCore is
         if (batch.totalPriorityBids > 0 && address(this).balance >= batch.totalPriorityBids) {
             treasury.receiveAuctionProceeds{value: batch.totalPriorityBids}(batchId);
         }
+    }
+
+    // ============ Failed Execution Recovery ============
+
+    /**
+     * @notice Retry a failed incentive controller execution
+     * @param index Index into the failedExecutions array
+     *
+     * DISINTERMEDIATION: Grade C -> Target Grade B. Admin recovery for failed reward distributions.
+     */
+    function retryFailedExecution(uint256 index) external onlyOwner {
+        require(index < failedExecutions.length, "Index out of bounds");
+        FailedExecution memory failed = failedExecutions[index];
+        require(failed.trader != address(0), "Already retried");
+        require(address(incentiveController) != address(0), "No incentive controller");
+
+        // Clear before retry to prevent reentrancy
+        delete failedExecutions[index];
+
+        try incentiveController.recordExecution(
+            failed.poolId, failed.trader, failed.amountIn, failed.estimatedOut, 0
+        ) {
+            emit FailedExecutionRetried(index, true);
+        } catch {
+            // Re-queue if still failing
+            failedExecutions[index] = failed;
+            emit FailedExecutionRetried(index, false);
+        }
+    }
+
+    /**
+     * @notice Get the number of queued failed executions
+     * @return count Total entries (includes cleared slots from successful retries)
+     */
+    function getFailedExecutionCount() external view returns (uint256 count) {
+        return failedExecutions.length;
     }
 
     /**
@@ -1113,18 +1301,18 @@ contract VibeSwapCore is
             revert RateLimitExceededError();
         }
 
-        // Update state
+        // Update state — atomic window reset to prevent same-block bypass
         if (block.timestamp >= limit.windowStart + limit.windowDuration) {
-            // New window
+            // New window — set usedAmount to THIS tx's amount and return early
             userRateLimits[user] = SecurityLib.RateLimit({
                 windowStart: block.timestamp,
                 windowDuration: 1 hours,
                 maxAmount: maxSwapPerHour,
                 usedAmount: amount
             });
-        } else {
-            userRateLimits[user].usedAmount = newUsedAmount;
+            return;
         }
+        userRateLimits[user].usedAmount = newUsedAmount;
     }
 
     // ============ Security Admin Functions ============
@@ -1146,7 +1334,8 @@ contract VibeSwapCore is
      *
      * DISINTERMEDIATION: KEEP — same as setBlacklist. Security enforcement.
      */
-    function batchBlacklist(address[] calldata users, bool status) external onlyOwner {
+    function batchBlacklist(address[] calldata users, bool status) external onlyGovernance {
+        require(users.length <= 200, "Batch too large");
         for (uint256 i = 0; i < users.length; i++) {
             blacklisted[users[i]] = status;
             emit UserBlacklisted(users[i], status);
@@ -1210,10 +1399,15 @@ contract VibeSwapCore is
      * DISINTERMEDIATION: KEEP — guardian is part of the security architecture.
      * Target Grade B: governance sets guardian via TimelockController.
      */
-    function setGuardian(address newGuardian) external onlyOwner {
+    function setGuardian(address newGuardian) external onlyGovernance {
         require(newGuardian != address(0), "Invalid guardian");
         emit GuardianUpdated(guardian, newGuardian);
         guardian = newGuardian;
+    }
+
+    /// @notice Set the TimelockController for governance-gated functions
+    function setTimelockController(address _timelock) external onlyOwner {
+        timelockController = _timelock;
     }
 
     /**

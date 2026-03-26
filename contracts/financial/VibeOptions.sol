@@ -252,7 +252,9 @@ contract VibeOptions is ERC721, Ownable, ReentrancyGuard, IVibeOptions {
         uint256 vol = volatilityOracle.calculateRealizedVolatility(poolId, VOL_PERIOD);
         if (vol < MIN_VOLATILITY) vol = MIN_VOLATILITY;
 
-        uint256 timeValue = ((amount * spot) / 1e18) * ((vol * sqrtT) / 10000) / 1e18;
+        // Combine multiplications before dividing to minimize precision loss
+        // Safe: amount ~1e27 * spot ~1e18 * vol ~1e4 * sqrtT ~1e4 = ~1e53 << uint256 max
+        uint256 timeValue = (amount * spot * vol * sqrtT) / (1e18 * 10000 * 1e18);
 
         return intrinsic + timeValue;
     }

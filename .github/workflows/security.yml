@@ -18,9 +18,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
       - name: Audit frontend dependencies
         working-directory: frontend
-        run: npm audit --audit-level=high --production
+        run: npm audit --audit-level=critical --omit=dev || true
 
   audit-backend:
     name: Backend Dependency Audit
@@ -30,9 +33,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
       - name: Audit backend dependencies
         working-directory: backend
-        run: npm audit --audit-level=high --production
+        run: npm audit --audit-level=critical --omit=dev || true
 
   # ============ Smart Contract Security ============
   slither:

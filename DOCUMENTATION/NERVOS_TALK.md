@@ -146,9 +146,9 @@ The patterns we develop for managing constraints today become the foundations of
 
 ## Q&A
 
-Contact: [your contact]
-GitHub: [repo link]
-Docs: [docs link]
+GitHub: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
+X: [@viaborz](https://x.com/viaborz)
+Docs: [DOCUMENTATION/](https://github.com/WGlynn/VibeSwap/tree/master/DOCUMENTATION)
 
 ---
 

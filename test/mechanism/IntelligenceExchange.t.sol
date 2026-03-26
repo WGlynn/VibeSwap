@@ -24,7 +24,7 @@ contract IntelligenceExchangeTest is Test {
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
     address public carol = address(0xCA201);
-    address public shard1 = address(0x5BARD1);
+    address public shard1 = address(uint160(0x58A6D1));
 
     bytes32 constant CONTENT_HASH_1 = keccak256("research-paper-1");
     bytes32 constant CONTENT_HASH_2 = keccak256("research-paper-2");

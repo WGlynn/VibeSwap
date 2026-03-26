@@ -29,9 +29,9 @@ describe('GitHubRelayerService', () => {
       assert.ok(!relayer.verifyWebhookSignature('payload', 'sha256=invalid'));
     });
 
-    it('should skip verification if no secret configured', () => {
+    it('should reject if no secret configured', () => {
       relayer.webhookSecret = null;
-      assert.ok(relayer.verifyWebhookSignature('anything', null));
+      assert.ok(!relayer.verifyWebhookSignature('anything', null));
     });
   });
 

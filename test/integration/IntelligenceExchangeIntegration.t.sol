@@ -25,7 +25,7 @@ contract IntelligenceExchangeIntegrationTest is Test {
     MockVIBEIntegration public vibe;
 
     address public owner = address(this);
-    address public shard = address(0x5BARD);
+    address public shard = address(uint160(0x58A6D0));
 
     // Simulated researchers
     address public satoshi = address(0x5A70);   // Foundational

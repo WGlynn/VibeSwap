@@ -807,9 +807,9 @@ You can fight it with clever engineering. Or you can choose a model where fairne
 
 ## Q&A
 
-Contact: [your contact]
-GitHub: [repo link]
-CKB Docs: [nervos docs]
+GitHub: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
+X: [@viaborz](https://x.com/viaborz)
+CKB Docs: [docs.nervos.org](https://docs.nervos.org)
 
 ---
 

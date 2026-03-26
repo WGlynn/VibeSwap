@@ -1,48 +1,66 @@
-# Session Tip — 2026-03-25
+# Session Tip — 2026-03-26
 
 ## Block Header
-- **Session**: IT LOOP + ECONOMÍTRA — test blitz then magnum opus
-- **Parent**: `06b03c2`
-- **Branch**: `master` @ `28c2020`
-- **Status**: 11 atomic commits. 136 Python tests green. 9 Solidity test suites. Economítra v1 drafted.
+- **Session**: Magnum Opus 4.8 — SIE architecture + frontend sprint + yield promise sweep
+- **Parent**: `28c2020`
+- **Branch**: `master` @ `33cf4f1`
+- **Status**: 11 atomic commits. SIE Phase 0 MVP 80% complete. APY/APR eliminated (70→0). Real data pipeline live.
 
 ## What Happened This Session
 
-### Fixes (Python — 136/136 passing now)
-- Windows PermissionError: NamedTemporaryFile close-before-read pattern
-- Env var isolation: ACTIVE_CHAIN=base was overriding test defaults
-- Chains merge bug: env overrides created partial chains, now merges with defaults
-- StablecoinFlowData: added 5 missing USDC fields to test constructor
+### Sovereign Intelligence Exchange (SIE)
+- `contracts/mechanism/IntelligenceExchange.sol` — orchestrator contract (350 lines)
+  - Submit intelligence, citation-based bonding curve, Shapley attribution
+  - 70/30 revenue split (contributor/cited works), 0% protocol fee (P-001)
+- `test/mechanism/IntelligenceExchange.t.sol` — 20 tests + 3 fuzz tests
+- `jarvis-bot/src/knowledge-bridge.js` — off-chain knowledge chain → on-chain Merkle checkpoints
+  - Bridges to IntelligenceExchange.anchorKnowledgeEpoch() or VibeCheckpointRegistry.submit()
+- `docs/SIE-001-PROTOCOL-SPEC.md` — formal protocol specification
 
-### Bug Fix (Solidity)
-- AMMFormalSpecs: `executeSwap` → `swap` with correct 5-param signature
+### Frontend Sprint
+- Real data pipeline: useTokenPrice → CoinGecko cache → fallback (was 100% hardcoded)
+- tokens.js MOCK_PRICES is now a Proxy reading window.__vibePriceCache
+- Gas price from Base L2 RPC (was Math.random)
+- Pool TVL scales with real token prices
+- DemoBanner: "Connect a wallet to see real data"
+- MobileNav: added "minds" tab → /infofi
+- SwapCore: rabbit hole links to /docs not GitHub
 
-### New Solidity Test Suites (9 files, ~3000 lines)
-1. `test/mechanism/ITMetaPattern.t.sol` — all 4 IT primitives (AdversarialSymbiosis, TemporalCollateral, EpistemicStaking, MemorylessFairness)
-2. `test/core/ProofOfMind.t.sol` — PoW/PoS/PoM hybrid consensus (16 tests)
-3. `test/core/OmniscientAdversaryDefense.t.sol` — temporal anchoring, causality proofs (12 tests)
-4. `test/core/HoneypotDefense.t.sol` — Siren Protocol (15 tests)
-5. `test/monetary/VIBEToken.t.sol` — 21M cap, zero pre-mine, burn permanence (18 tests + fuzz)
-6. `test/mechanism/TrinityGuardian.t.sol` — guardian consensus (28 tests + fuzz)
-7. `test/identity/SoulboundSybilGuard.t.sol` — sybil resistance (16 tests + fuzz)
-8. `test/convergence/AttributionBridge.t.sol` — Jarvis → Shapley (24 tests)
-9. Joule (JUL) test — IN PROGRESS (was writing when stopped)
+### APY/APR Elimination (P-001 enforcement)
+- 70 → 0 APY/APR references across entire frontend
+- PoolPage: APR → 7d Fee Yield
+- VaultPage: APY → 30d Fees, strategy names describe mechanics
+- AutomationPage: estimated returns → strategy descriptions
+- DerivativesPage: APY → 30d Fees
+- usePool hook: apr → feeRate7d, 365d annualization → 7d historical
+- 20 component files updated
 
-### Protocol Changes
-- `stealth` remote RETIRED — single source of truth (origin only)
-- 50% context reboot protocol saved
-- Instant autopilot ("Run IT" = one prompt to full speed) saved
+### CI/CD
+- .github/workflows/ci.yml: triggers on all branches (was master/main only)
+- Contract tests use `fast` profile (no via_ir, 2-5x faster)
 
-## Next Session — PRIORITIES
-1. **Economítra revision**: More philosophical voice, less tables/formulas, math as backbone not skeleton. GED readability. Philosophy backed by math, not math decorated with philosophy. NO cult language.
-2. Finish Joule (JUL) test suite
-3. Run `forge test` to verify all 9 new Solidity test suites compile+pass
-4. Continue coverage blitz
-5. LAUNCH VIBE emissions on Base (deploy script ready)
+### Economítra Polish
+- Removed "schizo" self-deprecation → confident framing
+- "This sounds like madness" → "This is a large claim"
+- "income depends on your confusion" → softer institutional critique
+- Added personal closing paragraph
+- Last line: "The math is the same for everyone. That's the point."
 
-## Key Corrections This Session
-- `stealth` remote RETIRED (inflated commit numbers)
-- JUL ≠ CKB-native token (CRITICAL — see `memory/feedback_tokenomics-zero-tolerance.md`)
-- 50% context reboot protocol (see `memory/feedback_50pct-context-reboot.md`)
-- Instant autopilot: "Run IT" = one prompt to full speed (see `memory/feedback_instant-autopilot.md`)
-- CKB IS the operating system, not a checklist — Tier 0 epistemological framework catches B_j(X) vs C(X) errors
+### Magnum Opus 4.8 (Meta)
+- New development model: write code, push, CI validates. No local builds.
+- LinkedIn post concept: "We upgraded Claude before Anthropic did"
+- Saved feedback memory: no-promises-no-predictions.md
+
+## Key Decisions
+- APY/APR = promises = soft extraction = P-001 violation. Show historical data only.
+- SIE composes existing contracts (DataMarketplace + CognitiveConsensusMarket + ShapleyVerifier)
+- knowledge-bridge.js: 190 lines connecting two existing interfaces
+- MOCK_PRICES Proxy pattern: all components get real prices automatically
+
+## Next Session
+1. Deploy frontend to Vercel
+2. SIE Phase 1: CognitiveConsensusMarket integration for CRPC evaluation
+3. SIE Phase 2: agent-gateway.js for external AI agents
+4. Finish JUL test compilation verification (CI should handle)
+5. Conference applications when ready
+6. Economítra: send to companion when polished

@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "constellation": "jarvis-mind-mesh",
+  "target_shards": 64,
+  "primary": {
+    "id": "shard-0",
+    "app": "jarvis-vibeswap",
+    "region": "iad",
+    "role": "primary",
+    "specialization": "router"
+  },
+  "tiers": {
+    "core": {
+      "description": "Always-on foundation shards. Handle routing, consensus, and fallback.",
+      "count": 4,
+      "shards": [
+        { "id": "shard-0", "role": "primary", "region": "iad", "spec": "router + community" },
+        { "id": "shard-1", "role": "consensus", "region": "lax", "spec": "CRPC validator + West Coast" },
+        { "id": "shard-2", "role": "consensus", "region": "lhr", "spec": "CRPC validator + Europe" },
+        { "id": "shard-3", "role": "consensus", "region": "nrt", "spec": "CRPC validator + Asia-Pacific" }
+      ]
+    },
+    "domain": {
+      "description": "Specialized knowledge shards. Each owns a vertical.",
+      "count": 12,
+      "shards": [
+        { "id": "shard-4", "spec": "trading-alpha", "desc": "Memecoin hunter, portfolio alerts, market analysis" },
+        { "id": "shard-5", "spec": "trading-defi", "desc": "DeFi yield strategies, LP optimization, protocol analysis" },
+        { "id": "shard-6", "spec": "osint", "desc": "News feeds, social sentiment, alpha discovery" },
+        { "id": "shard-7", "spec": "security", "desc": "Contract auditing, rug detection, threat monitoring" },
+        { "id": "shard-8", "spec": "mechanism-design", "desc": "Shapley math, game theory, protocol research" },
+        { "id": "shard-9", "spec": "governance", "desc": "DAO proposals, voting analysis, treasury monitoring" },
+        { "id": "shard-10", "spec": "onboarding", "desc": "New user education, FAQ, wallet setup assistance" },
+        { "id": "shard-11", "spec": "payments", "desc": "Agentic payments, invoicing, x402 protocol" },
+        { "id": "shard-12", "spec": "sports-prediction", "desc": "Prediction markets, hedging strategies, odds analysis" },
+        { "id": "shard-13", "spec": "developer-tools", "desc": "API docs, SDK help, integration support" },
+        { "id": "shard-14", "spec": "legal-compliance", "desc": "Regulatory monitoring, SEC updates, compliance checks" },
+        { "id": "shard-15", "spec": "content-creation", "desc": "Twitter drafts, Medium articles, community posts" }
+      ]
+    },
+    "community": {
+      "description": "Per-group conversation shards. Scale with active communities.",
+      "count": 16,
+      "shards": [
+        { "id": "shard-16", "spec": "tg-main", "desc": "Main VibeSwap Telegram group" },
+        { "id": "shard-17", "spec": "tg-dev", "desc": "Developer discussion group" },
+        { "id": "shard-18", "spec": "tg-trading", "desc": "Trading signals group" },
+        { "id": "shard-19", "spec": "tg-governance", "desc": "Governance discussion group" },
+        { "id": "shard-20", "spec": "tg-memes", "desc": "Memes and community vibes" },
+        { "id": "shard-21", "spec": "discord-general", "desc": "Discord general channel" },
+        { "id": "shard-22", "spec": "discord-dev", "desc": "Discord dev channel" },
+        { "id": "shard-23", "spec": "discord-support", "desc": "Discord support channel" },
+        { "id": "shard-24", "spec": "reddit", "desc": "Reddit engagement and monitoring" },
+        { "id": "shard-25", "spec": "twitter", "desc": "Twitter/X engagement and replies" },
+        { "id": "shard-26", "spec": "dm-vip", "desc": "VIP DM conversations (partners, advisors)" },
+        { "id": "shard-27", "spec": "dm-general", "desc": "General DM handling" },
+        { "id": "shard-28", "spec": "forum-nervos", "desc": "Nervos community forum" },
+        { "id": "shard-29", "spec": "forum-eth", "desc": "ethresear.ch / Ethereum forums" },
+        { "id": "shard-30", "spec": "mirror-medium", "desc": "Mirror/Medium publishing" },
+        { "id": "shard-31", "spec": "github", "desc": "GitHub issues, PRs, discussions" }
+      ]
+    },
+    "agent-economy": {
+      "description": "Autonomous agent shards. Operate without human prompting.",
+      "count": 16,
+      "shards": [
+        { "id": "shard-32", "spec": "oracle-price", "desc": "Kalman filter price feeds, manipulation detection" },
+        { "id": "shard-33", "spec": "oracle-sentiment", "desc": "Social sentiment aggregation, fear/greed index" },
+        { "id": "shard-34", "spec": "liquidation-hunter", "desc": "Monitor liquidation levels, rubber-band signals" },
+        { "id": "shard-35", "spec": "arb-monitor", "desc": "Cross-chain arb opportunity detection" },
+        { "id": "shard-36", "spec": "gas-optimizer", "desc": "Batch transaction timing, gas price prediction" },
+        { "id": "shard-37", "spec": "treasury-manager", "desc": "DAO treasury monitoring, deployment recommendations" },
+        { "id": "shard-38", "spec": "insurance-adjuster", "desc": "IL protection claims, insurance pool health" },
+        { "id": "shard-39", "spec": "reputation-oracle", "desc": "Trust score computation, pairwise comparison orchestration" },
+        { "id": "shard-40", "spec": "circuit-breaker-monitor", "desc": "Volatility monitoring, breaker state tracking" },
+        { "id": "shard-41", "spec": "shapley-compute", "desc": "Shapley value computation for active games" },
+        { "id": "shard-42", "spec": "compliance-scanner", "desc": "Wallet taint analysis, sanctions screening" },
+        { "id": "shard-43", "spec": "bridge-monitor", "desc": "LayerZero message tracking, cross-chain health" },
+        { "id": "shard-44", "spec": "contract-deployer", "desc": "Automated contract deployment and verification" },
+        { "id": "shard-45", "spec": "test-runner", "desc": "Continuous test execution, regression detection" },
+        { "id": "shard-46", "spec": "doc-generator", "desc": "Auto-generate docs from code changes" },
+        { "id": "shard-47", "spec": "metrics-collector", "desc": "Protocol metrics, dashboard data, analytics" }
+      ]
+    },
+    "frontier": {
+      "description": "Experimental and future capability shards.",
+      "count": 16,
+      "shards": [
+        { "id": "shard-48", "spec": "adversarial-search", "desc": "TRP Loop 1: find exploits before attackers do" },
+        { "id": "shard-49", "spec": "knowledge-refiner", "desc": "TRP Loop 2: compress and cross-reference knowledge base" },
+        { "id": "shard-50", "spec": "tool-builder", "desc": "TRP Loop 3: auto-generate tools from patterns" },
+        { "id": "shard-51", "spec": "context-optimizer", "desc": "TRP Loop 0: maximize information density per token" },
+        { "id": "shard-52", "spec": "pantheon-nyx", "desc": "Nyx agent: constitutional kernel enforcement" },
+        { "id": "shard-53", "spec": "pantheon-poseidon", "desc": "Poseidon agent: liquidity management" },
+        { "id": "shard-54", "spec": "pantheon-athena", "desc": "Athena agent: strategy and optimization" },
+        { "id": "shard-55", "spec": "pantheon-hermes", "desc": "Hermes agent: cross-chain messaging" },
+        { "id": "shard-56", "spec": "pantheon-hephaestus", "desc": "Hephaestus agent: smart contract forge" },
+        { "id": "shard-57", "spec": "pantheon-apollo", "desc": "Apollo agent: price oracle and prediction" },
+        { "id": "shard-58", "spec": "pantheon-artemis", "desc": "Artemis agent: security hunting" },
+        { "id": "shard-59", "spec": "pantheon-ares", "desc": "Ares agent: adversarial testing" },
+        { "id": "shard-60", "spec": "multimodal-vision", "desc": "Chart analysis, screenshot understanding" },
+        { "id": "shard-61", "spec": "voice-interface", "desc": "Voice-to-text TG integration" },
+        { "id": "shard-62", "spec": "mobile-agent", "desc": "Mobile-first lightweight shard" },
+        { "id": "shard-63", "spec": "singularity-monitor", "desc": "Meta-shard: monitors all 63 others, health dashboard" }
+      ]
+    }
+  },
+  "regions": {
+    "primary": ["iad", "lax", "lhr", "nrt"],
+    "secondary": ["fra", "sin", "syd", "gru", "ord", "sea"],
+    "assignment": "domain shards in iad, community shards in nearest region to user base, agent-economy in iad/lax, frontier spread globally"
+  },
+  "scaling_policy": {
+    "min_shards": 4,
+    "phase_1_target": 8,
+    "phase_2_target": 16,
+    "phase_3_target": 32,
+    "phase_4_target": 64,
+    "auto_scale_trigger": "learning_bus_latency > 500ms OR message_queue_depth > 100"
+  },
+  "cost_estimate": {
+    "per_shard_monthly": "$3.58",
+    "phase_1_monthly": "$28.64",
+    "phase_2_monthly": "$57.28",
+    "phase_3_monthly": "$114.56",
+    "phase_4_monthly": "$229.12",
+    "note": "shared-cpu-1x @ 512MB on Fly.io. Can reduce with auto-stop on low-activity shards."
+  }
+}

@@ -323,7 +323,7 @@ contract VibeStakingFuzzTest is Test {
     function testFuzz_poolFundingAccuracy(uint256 fundAmount) public {
         fundAmount = bound(fundAmount, 0.01 ether, 10_000 ether);
 
-        (,,,,) = staking.getPoolInfo(poolId);
+        staking.getPoolInfo(poolId); // verify no revert before funding
 
         // Fund additional amount
         staking.fundPool{value: fundAmount}(poolId);

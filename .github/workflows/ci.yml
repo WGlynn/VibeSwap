@@ -74,6 +74,7 @@ jobs:
   jarvis:
     name: Jarvis Bot Import Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     defaults:
       run:
         working-directory: jarvis-bot
@@ -92,12 +93,12 @@ jobs:
 
       - name: Validate all tool module imports
         run: |
-          node -e "await import('./src/tools-vibeswap.js'); console.log('tools-vibeswap OK')"
-          node -e "await import('./src/tools-portfolio.js'); console.log('tools-portfolio OK')"
-          node -e "await import('./src/tools-research.js'); console.log('tools-research OK')"
-          node -e "await import('./src/tools-dev.js'); console.log('tools-dev OK')"
-          node -e "await import('./src/tools-education.js'); console.log('tools-education OK')"
-          node -e "await import('./src/web-api.js'); console.log('web-api OK')"
+          node -e "await import('./src/tools-vibeswap.js'); console.log('tools-vibeswap OK'); process.exit(0)"
+          node -e "await import('./src/tools-portfolio.js'); console.log('tools-portfolio OK'); process.exit(0)"
+          node -e "await import('./src/tools-research.js'); console.log('tools-research OK'); process.exit(0)"
+          node -e "await import('./src/tools-dev.js'); console.log('tools-dev OK'); process.exit(0)"
+          node -e "await import('./src/tools-education.js'); console.log('tools-education OK'); process.exit(0)"
+          node -e "await import('./src/web-api.js'); console.log('web-api OK'); process.exit(0)"
           echo "All modules validated"
 
   # ============ Primitive Gate (Soft) ============

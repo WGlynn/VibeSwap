@@ -1756,15 +1756,16 @@ function MyLexiconPanel({ userId, isConnected, onImported }) {
         {myLexicon && myLexicon.terms && myLexicon.terms.length > 0 && (
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all hover:opacity-80"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
             style={{
               backgroundColor: `${USER_LEXICON_COLOR}15`,
               border: `1px solid ${USER_LEXICON_COLOR}40`,
               color: USER_LEXICON_COLOR,
             }}
             title="Download your lexicon as a JSON file to share with others"
+            aria-label="Export my lexicon as a JSON file"
           >
-            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Export My Lexicon
@@ -1774,15 +1775,16 @@ function MyLexiconPanel({ userId, isConnected, onImported }) {
         {/* Import */}
         <button
           onClick={() => importInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all hover:opacity-80"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-slate-400"
           style={{
             backgroundColor: 'rgba(255,255,255,0.04)',
             border: '1px solid rgba(255,255,255,0.10)',
             color: '#94a3b8',
           }}
           title="Upload a shared lexicon JSON file"
+          aria-label="Import a lexicon JSON file"
         >
-          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" />
           </svg>
           Import Lexicon
@@ -1794,6 +1796,7 @@ function MyLexiconPanel({ userId, isConnected, onImported }) {
           type="file"
           accept=".json,application/json"
           className="hidden"
+          aria-label="Choose lexicon JSON file to import"
           onChange={handleImportFile}
         />
       </div>
@@ -1945,7 +1948,8 @@ function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
           <button
             onClick={handleRegister}
             disabled={!domain.trim()}
-            className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
+            aria-label={domain.trim() ? `Register domain: ${domain}` : 'Register domain — enter a domain name first'}
+            className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
               domain.trim()
                 ? 'hover:opacity-90 active:scale-[0.99] text-black-900'
                 : 'bg-black-800 text-black-600 cursor-not-allowed'
@@ -2010,7 +2014,8 @@ function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
           <button
             onClick={handleAddTerm}
             disabled={!newTerm.term.trim() || !newTerm.universal.trim()}
-            className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
+            aria-label={newTerm.term.trim() && newTerm.universal.trim() ? `Add term: ${newTerm.term}` : 'Add term — enter a term and universal concept first'}
+            className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
               newTerm.term.trim() && newTerm.universal.trim()
                 ? 'hover:opacity-90 active:scale-[0.99] text-black-900'
                 : 'bg-black-800 text-black-600 cursor-not-allowed'
@@ -2026,7 +2031,8 @@ function RegisterLexiconForm({ userId, isConnected, onRegistered }) {
 
           <button
             onClick={() => { setPhase('register'); setDomain(''); setStatus(null) }}
-            className="w-full py-1.5 rounded-lg font-mono text-xs text-black-500 hover:text-black-400 transition-colors border border-black-800 hover:border-black-700"
+            aria-label="Register another domain"
+            className="w-full py-1.5 rounded-lg font-mono text-xs text-black-500 hover:text-black-400 transition-colors border border-black-800 hover:border-black-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
           >
             Register another domain
           </button>
@@ -2197,6 +2203,7 @@ function SentenceTranslator({ userLexicons = [] }) {
   const [result, setResult]         = useState(null)
   const [activeTermIdx, setActiveTermIdx] = useState(null)
   const [copied, setCopied]         = useState(false)
+  const [isTranslatingSentence, setIsTranslatingSentence] = useState(false)
 
   const handleStFromChange = useCallback((id) => {
     setStFromId(id)
@@ -2214,9 +2221,15 @@ function SentenceTranslator({ userLexicons = [] }) {
 
   const handleTranslate = useCallback(() => {
     if (!stFromId || !stToId || !sourceText.trim()) return
-    const r = translateSentence(stFromId, sourceText.trim(), stToId)
-    setResult(r)
+    setIsTranslatingSentence(true)
+    setResult(null)
     setActiveTermIdx(null)
+    // Defer one tick so spinner renders before synchronous engine work
+    setTimeout(() => {
+      const r = translateSentence(stFromId, sourceText.trim(), stToId)
+      setResult(r)
+      setIsTranslatingSentence(false)
+    }, 0)
   }, [stFromId, stToId, sourceText])
 
   const handleTermClick = useCallback((idx) => {
@@ -2328,14 +2341,24 @@ function SentenceTranslator({ userLexicons = [] }) {
           </div>
           <button
             onClick={handleTranslate}
-            disabled={!canTranslate}
-            className={'w-full mt-2 py-2.5 rounded-lg font-mono text-sm font-bold transition-all ' + (
-              canTranslate
+            disabled={!canTranslate || isTranslatingSentence}
+            className={'w-full mt-2 py-2.5 rounded-lg font-mono text-sm font-bold transition-all flex items-center justify-center gap-2 ' + (
+              canTranslate && !isTranslatingSentence
                 ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]'
                 : 'bg-black-800 text-black-600 cursor-not-allowed'
             )}
           >
-            Translate Paragraph
+            {isTranslatingSentence ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Translating…
+              </>
+            ) : (
+              'Translate Paragraph'
+            )}
           </button>
         </div>
 
@@ -4320,6 +4343,9 @@ export default function RosettaPage() {
       {/* ============ Did You Know? ============ */}
       <DidYouKnow />
 
+      {/* ============ Surprise Me ============ */}
+      <SurpriseMe />
+
       {/* ============ Popular Translations — first-time onboarding ============ */}
       <PopularTranslations onTryPair={handleTryPair} />
 
@@ -4644,6 +4670,10 @@ export default function RosettaPage() {
               className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
             >
               <div
+                id="rosetta-kb-help-panel"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Keyboard shortcuts"
                 className="pointer-events-auto w-full max-w-sm mx-4 rounded-2xl border overflow-hidden"
                 style={{
                   background: 'rgba(5,10,8,0.97)',
@@ -4662,6 +4692,7 @@ export default function RosettaPage() {
                       style={{ backgroundColor: '#00ff41' }}
                       animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 10px #00ff41cc', '0 0 4px #00ff4166'] }}
                       transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                      aria-hidden="true"
                     />
                     <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-matrix-400">
                       Keyboard Shortcuts
@@ -4669,9 +4700,10 @@ export default function RosettaPage() {
                   </div>
                   <button
                     onClick={() => setShowHelp(false)}
-                    className="text-black-600 hover:text-black-400 transition-colors"
+                    aria-label="Close keyboard shortcuts"
+                    className="text-black-600 hover:text-black-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>

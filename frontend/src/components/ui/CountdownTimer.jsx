@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { COMMIT_DURATION, REVEAL_DURATION, SETTLE_DURATION } from '../../utils/protocol-constants'
 
 // ============ Constants ============
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
 const AMBER = '#f59e0b'
 const GREEN = '#22c55e'
-const COMMIT_DURATION = 8
-const REVEAL_DURATION = 2
-const SETTLE_DURATION = 1
 const CYCLE_DURATION = COMMIT_DURATION + REVEAL_DURATION + SETTLE_DURATION
 
 const PHASES = {

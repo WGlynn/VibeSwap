@@ -1,3 +1,5 @@
+import { BPS_DENOMINATOR, DEFAULT_SWAP_FEE_BPS, SLASH_RATE_BPS } from './protocol-constants'
+
 // ============================================
 // NERVOS CKB CONFIGURATION
 // ============================================
@@ -144,9 +146,9 @@ export const CKB_ORDER_TYPES = {
 // PRECISION & DEFAULTS
 // ============================================
 export const CKB_PRECISION = BigInt('1000000000000000000') // 1e18
-export const CKB_BPS_DENOMINATOR = BigInt(10000)
-export const CKB_DEFAULT_FEE_BPS = 5           // 0.05%
-export const CKB_DEFAULT_SLASH_BPS = 5000      // 50%
+export const CKB_BPS_DENOMINATOR = BigInt(BPS_DENOMINATOR)
+export const CKB_DEFAULT_FEE_BPS = DEFAULT_SWAP_FEE_BPS   // 0.05%
+export const CKB_DEFAULT_SLASH_BPS = SLASH_RATE_BPS        // 50%
 export const CKB_MIN_DEPOSIT_CKB = 100_000_000_000 // 1000 CKB in shannons
 export const CKB_SHANNON_PER_CKB = 100_000_000
 

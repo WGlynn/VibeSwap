@@ -157,7 +157,7 @@ A sophisticated attacker thinks: "I know about the Siren. I will avoid the detec
 
 Knowledge of the trap does not help you escape it. It helps you comply with it. The Siren's existence changes the dominant strategy even if it never activates. This is game-theoretic deterrence in its purest form: the threat is the mechanism, and the mechanism is indistinguishable from the threat.
 
-The paper puts it simply: *"He thought he was hacking God. God was hacking him."*
+The paper puts it simply: *"He thought he was hacking the system. The system was hacking him."*
 
 ---
 

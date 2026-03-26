@@ -182,4 +182,4 @@ Game over.
 
 ---
 
-*"Even God plays by the rules of game theory."*
+*"Even an omniscient adversary plays by the rules of game theory."*

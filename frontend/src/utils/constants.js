@@ -1,3 +1,5 @@
+import { COMMIT_DURATION, REVEAL_DURATION, BATCH_DURATION } from './protocol-constants'
+
 // ============================================
 // VIBESWAP MAINNET CONFIGURATION
 // ============================================
@@ -370,10 +372,11 @@ export const TOKENS = {
 // ============================================
 // BATCH TIMING CONSTANTS
 // ============================================
+// Re-exported from protocol-constants.js (single source of truth)
 export const BATCH_TIMING = {
-  COMMIT_DURATION: 8,  // seconds
-  REVEAL_DURATION: 2,  // seconds
-  TOTAL_DURATION: 10,  // seconds
+  COMMIT_DURATION,
+  REVEAL_DURATION,
+  TOTAL_DURATION: BATCH_DURATION,
 }
 
 // ============================================

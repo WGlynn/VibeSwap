@@ -1,4 +1,5 @@
 import { ethers } from 'ethers'
+import { BPS_DENOMINATOR } from './protocol-constants'
 
 /**
  * Format a number with commas and decimal places
@@ -150,7 +151,7 @@ export function calculateMinAmountOut(amountOut, slippagePercent) {
   if (!amountOut) return BigInt(0)
 
   const slippageBps = Math.floor(parseFloat(slippagePercent) * 100)
-  const slippageFactor = 10000 - slippageBps
+  const slippageFactor = BPS_DENOMINATOR - slippageBps
 
-  return (BigInt(amountOut) * BigInt(slippageFactor)) / BigInt(10000)
+  return (BigInt(amountOut) * BigInt(slippageFactor)) / BigInt(BPS_DENOMINATOR)
 }

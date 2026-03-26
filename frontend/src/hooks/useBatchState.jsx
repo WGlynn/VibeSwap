@@ -4,6 +4,7 @@ import useContracts from './useContracts'
 import { useCKBWallet } from './useCKBWallet'
 import { useCKBContracts } from './useCKBContracts'
 import { isCKBChain, CKB_PHASES, CKB_BATCH_TIMING } from '../utils/ckb-constants'
+import { COMMIT_DURATION, REVEAL_DURATION, SETTLE_DURATION } from '../utils/protocol-constants'
 import { getSharedWebSocket } from '../services/api'
 
 // Batch phases match the smart contract
@@ -29,9 +30,9 @@ const CKB_PHASE_MAP = {
 }
 
 const PHASE_DURATIONS = {
-  [PHASES.COMMIT]: 8,
-  [PHASES.REVEAL]: 2,
-  [PHASES.SETTLING]: 1,
+  [PHASES.COMMIT]: COMMIT_DURATION,
+  [PHASES.REVEAL]: REVEAL_DURATION,
+  [PHASES.SETTLING]: SETTLE_DURATION,
 }
 
 // Order status through the batch lifecycle

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { COMMIT_DURATION, REVEAL_DURATION, BATCH_DURATION } from '../../utils/protocol-constants'
 
 // ============================================================
 // Batch Countdown — 10-second cycle timer
@@ -9,9 +10,6 @@ import { motion } from 'framer-motion'
 
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
-const BATCH_DURATION = 10 // seconds
-const COMMIT_DURATION = 8
-const REVEAL_DURATION = 2
 
 function getPhase(elapsed) {
   if (elapsed < COMMIT_DURATION) return { name: 'COMMIT', color: '#06b6d4', remaining: COMMIT_DURATION - elapsed, progress: elapsed / COMMIT_DURATION }

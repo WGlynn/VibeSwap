@@ -5,6 +5,7 @@ import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
+import { COMMIT_DURATION, REVEAL_DURATION } from '../utils/protocol-constants'
 
 // ============ Constants ============
 
@@ -61,8 +62,8 @@ const CONTRACTS = [
       { name: 'getBatchPhase', params: [], returns: 'Phase', result: 'COMMIT' },
       { name: 'getCommitCount', params: ['uint256 batchId'], returns: 'uint256', result: '47' },
       { name: 'getRevealDeadline', params: ['uint256 batchId'], returns: 'uint256', result: '1710342800' },
-      { name: 'COMMIT_DURATION', params: [], returns: 'uint256', result: '8' },
-      { name: 'REVEAL_DURATION', params: [], returns: 'uint256', result: '2' },
+      { name: 'COMMIT_DURATION', params: [], returns: 'uint256', result: String(COMMIT_DURATION) },
+      { name: 'REVEAL_DURATION', params: [], returns: 'uint256', result: String(REVEAL_DURATION) },
     ],
     writeFunctions: [
       { name: 'commitOrder', params: ['bytes32 commitment'], description: 'Submit hashed order commitment with deposit' },

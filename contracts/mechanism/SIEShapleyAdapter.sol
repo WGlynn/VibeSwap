@@ -145,6 +145,13 @@ contract SIEShapleyAdapter is
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
+    /**
+     * @notice Initialize the SIEShapleyAdapter proxy.
+     * @param _intelligenceExchange Address of the IntelligenceExchange contract
+     * @param _shapleyDistributor Address of the ShapleyDistributor for game creation
+     * @param _shapleyVerifier Address of the ShapleyVerifier for proof validation
+     * @param _owner Initial owner address (admin control during bootstrap)
+     */
     function initialize(
         address _intelligenceExchange,
         address _shapleyDistributor,
@@ -484,24 +491,39 @@ contract SIEShapleyAdapter is
 
     // ============ View ============
 
+    /// @notice Retrieve a true-up round by its ID.
+    /// @param roundId Unique identifier of the round
+    /// @return The TrueUpRound struct
     function getRound(bytes32 roundId) external view returns (TrueUpRound memory) {
         return trueUpRounds[roundId];
     }
 
+    /// @notice Get the four Shapley weight factor percentages.
+    /// @return originality Weight for originality factor (BPS)
+    /// @return citation Weight for citation impact factor (BPS)
+    /// @return scarcity Weight for scarcity factor (BPS)
+    /// @return consistency Weight for consistency factor (BPS)
     function getWeightBreakdown() external pure returns (
         uint256 originality, uint256 citation, uint256 scarcity, uint256 consistency
     ) {
         return (WEIGHT_ORIGINALITY, WEIGHT_CITATION, WEIGHT_SCARCITY, WEIGHT_CONSISTENCY);
     }
 
+    /// @notice Get the number of settlements accumulated since the last true-up.
+    /// @return Number of pending settlement records
     function getPendingSettlementCount() external view returns (uint256) {
         return pendingSettlements.length;
     }
 
+    /// @notice Get the number of unique contributors in the current pending batch.
+    /// @return Number of unique pending contributors
     function getPendingContributorCount() external view returns (uint256) {
         return pendingContributors.length;
     }
 
+    /// @notice Retrieve a specific pending settlement record by index.
+    /// @param index Array index of the settlement record
+    /// @return The SettlementRecord struct
     function getPendingSettlement(uint256 index) external view returns (SettlementRecord memory) {
         return pendingSettlements[index];
     }

@@ -433,16 +433,25 @@ contract CognitiveConsensusMarket is Ownable, ReentrancyGuard {
 
     // ============ Admin ============
 
+    /// @notice Grant or revoke evaluator authorization for an address.
+    /// @param evaluator Address of the evaluator (AI agent or verified human)
+    /// @param authorized Whether to authorize (true) or revoke (false)
     function setAuthorizedEvaluator(address evaluator, bool authorized) external onlyOwner {
         authorizedEvaluators[evaluator] = authorized;
     }
 
     // ============ View ============
 
+    /// @notice Get the list of evaluator addresses for a claim.
+    /// @param claimId Claim ID to query
+    /// @return Array of evaluator addresses that committed to this claim
     function getClaimEvaluators(uint256 claimId) external view returns (address[] memory) {
         return claimEvaluators[claimId];
     }
 
+    /// @notice Get the reputation profile of an evaluator.
+    /// @param evaluator Address to query
+    /// @return The EvaluatorProfile struct with accuracy and earnings data
     function getProfile(address evaluator) external view returns (EvaluatorProfile memory) {
         return profiles[evaluator];
     }

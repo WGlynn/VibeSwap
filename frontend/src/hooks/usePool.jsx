@@ -35,7 +35,7 @@ const LAUNCH_POOLS = [
     tvl: 0,
     volume24h: 0,
     fees24h: 0,
-    apr: 0,
+    feeRate7d: 0,
     myLiquidity: 0,
     myShare: '0%',
   },
@@ -46,7 +46,7 @@ const LAUNCH_POOLS = [
     tvl: 0,
     volume24h: 0,
     fees24h: 0,
-    apr: 0,
+    feeRate7d: 0,
     myLiquidity: 0,
     myShare: '0%',
   },
@@ -140,7 +140,7 @@ const CKB_LAUNCH_POOLS = [
     tvl: 0,
     volume24h: 0,
     fees24h: 0,
-    apr: 0,
+    feeRate7d: 0,
     myLiquidity: 0,
     myShare: '0%',
   },
@@ -229,7 +229,7 @@ export function usePool() {
         // Use ~18% of TVL as a rough daily volume heuristic for now
         const volume24h = tvl * 0.18
         const fees24h = volume24h * (feeRateBps / 10000)
-        const apr = tvl > 0 ? (fees24h * 365 / tvl) * 100 : 0
+        const feeRate7d = tvl > 0 ? (fees24h * 7 / tvl) * 100 : 0
 
         // User LP position
         let myLiquidity = 0
@@ -264,7 +264,7 @@ export function usePool() {
           tvl,
           volume24h,
           fees24h,
-          apr: Math.round(apr * 10) / 10,
+          feeRate7d: Math.round(feeRate7d * 10) / 10,
           myLiquidity: Math.round(myLiquidity * 100) / 100,
           myShare,
         })
@@ -295,7 +295,7 @@ export function usePool() {
             tvl,
             volume24h: tvl * 0.18,
             fees24h: tvl * 0.18 * 0.0005,
-            apr: tvl > 0 ? ((tvl * 0.18 * 0.0005 * 365) / tvl * 100) : 0,
+            feeRate7d: tvl > 0 ? ((tvl * 0.18 * 0.0005 * 7) / tvl * 100) : 0,
             myLiquidity: 0,
             myShare: '0%',
           }

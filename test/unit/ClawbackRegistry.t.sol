@@ -381,4 +381,170 @@ contract ClawbackRegistryTest is Test {
         vm.prank(authority);
         registry.propagateTaintManual(recipient, makeAddr("x"), 50 ether, address(token));
     }
+
+    // ============ submitForVoting ============
+
+    /// @dev Helper to read case status. The `cases` public getter excludes the string
+    ///      `reason` field, so we destructure only non-string fields via the auto-getter:
+    ///      (caseId, originWallet, claimant, status, createdAt, resolvedAt,
+    ///       totalAmount, token, consensusProposalId, cascadeCount)
+    ///      Solidity auto-getter drops dynamic types (string) from the return tuple.
+    function _getCaseStatus(bytes32 caseId) internal view returns (ClawbackRegistry.CaseStatus) {
+        (,,,ClawbackRegistry.CaseStatus status,,,,,,) = registry.cases(caseId);
+        return status;
+    }
+
+    function _getCaseProposalId(bytes32 caseId) internal view returns (bytes32) {
+        (,,,,,,,,bytes32 proposalId,) = registry.cases(caseId);
+        return proposalId;
+    }
+
+    function test_submitForVoting_transitionsToVoting() public {
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(owner);
+        registry.submitForVoting(caseId);
+
+        assertEq(uint8(_getCaseStatus(caseId)), uint8(ClawbackRegistry.CaseStatus.VOTING));
+        assertNotEq(_getCaseProposalId(caseId), bytes32(0));
+    }
+
+    function test_submitForVoting_byAuthority() public {
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(authority);
+        registry.submitForVoting(caseId);
+
+        assertEq(uint8(_getCaseStatus(caseId)), uint8(ClawbackRegistry.CaseStatus.VOTING));
+    }
+
+    function test_submitForVoting_revertsNotFound() public {
+        vm.expectRevert(ClawbackRegistry.CaseNotFound.selector);
+        vm.prank(owner);
+        registry.submitForVoting(keccak256("nonexistent"));
+    }
+
+    function test_submitForVoting_revertsAlreadyVoting() public {
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(owner);
+        registry.submitForVoting(caseId);
+
+        vm.expectRevert(ClawbackRegistry.InvalidCaseStatus.selector);
+        vm.prank(owner);
+        registry.submitForVoting(caseId);
+    }
+
+    function test_submitForVoting_revertsUnauthorized() public {
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.expectRevert("Not authorized");
+        vm.prank(recipient);
+        registry.submitForVoting(caseId);
+    }
+
+    // ============ executeClawback ============
+
+    function test_executeClawback_revertsVaultNotSet() public {
+        // Deploy a registry without vault set
+        ClawbackRegistry impl2 = new ClawbackRegistry();
+        bytes memory initData = abi.encodeWithSelector(
+            ClawbackRegistry.initialize.selector,
+            owner,
+            address(consensus),
+            5,
+            1 ether
+        );
+        ERC1967Proxy proxy2 = new ERC1967Proxy(address(impl2), initData);
+        ClawbackRegistry noVaultRegistry = ClawbackRegistry(address(proxy2));
+
+        // authority already active in the shared MockConsensus
+        vm.prank(owner);
+        bytes32 caseId = noVaultRegistry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(owner);
+        noVaultRegistry.submitForVoting(caseId);
+
+        vm.expectRevert(ClawbackRegistry.VaultNotSet.selector);
+        noVaultRegistry.executeClawback(caseId);
+    }
+
+    function test_executeClawback_revertsConsensusNotApproved() public {
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(owner);
+        registry.submitForVoting(caseId);
+
+        // Proposal not marked executable in mock — reverts
+        vm.expectRevert(ClawbackRegistry.ConsensusNotApproved.selector);
+        vm.prank(owner);
+        registry.executeClawback(caseId);
+    }
+
+    function test_executeClawback_revertsNotVotingStatus() public {
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        // Case is OPEN, not VOTING
+        vm.expectRevert(ClawbackRegistry.InvalidCaseStatus.selector);
+        vm.prank(owner);
+        registry.executeClawback(caseId);
+    }
+
+    function test_executeClawback_revertsNotFound() public {
+        vm.expectRevert(ClawbackRegistry.CaseNotFound.selector);
+        vm.prank(owner);
+        registry.executeClawback(keccak256("nonexistent"));
+    }
+
+    function test_executeClawback_resolvesCase_noTokenApproval() public {
+        // executeClawback uses try/catch on transferFrom — no approval = graceful skip,
+        // but case still resolves to RESOLVED
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(tracker);
+        registry.recordTransaction(badActor, recipient, 10 ether, address(token));
+
+        vm.prank(owner);
+        registry.submitForVoting(caseId);
+
+        bytes32 proposalId = _getCaseProposalId(caseId);
+        consensus.setExecutable(proposalId, true);
+
+        vm.prank(owner);
+        registry.executeClawback(caseId);
+
+        assertEq(uint8(_getCaseStatus(caseId)), uint8(ClawbackRegistry.CaseStatus.RESOLVED));
+    }
+
+    function test_executeClawback_transfersFundsWhenApproved() public {
+        // Give bad actor tokens and approve the vault to pull them
+        token.mint(badActor, 500 ether);
+        vm.prank(badActor);
+        token.approve(vault, type(uint256).max);
+
+        vm.prank(owner);
+        bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");
+
+        vm.prank(owner);
+        registry.submitForVoting(caseId);
+
+        bytes32 proposalId = _getCaseProposalId(caseId);
+        consensus.setExecutable(proposalId, true);
+
+        uint256 vaultBefore = token.balanceOf(vault);
+
+        vm.prank(owner);
+        registry.executeClawback(caseId);
+
+        // Vault received the tainted amount
+        assertGt(token.balanceOf(vault), vaultBefore);
+        assertEq(uint8(_getCaseStatus(caseId)), uint8(ClawbackRegistry.CaseStatus.RESOLVED));
+    }
 }

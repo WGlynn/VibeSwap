@@ -1,110 +1,91 @@
 ```
------BEGIN VIBESWAP CIPHERTEXT-----
-Version: AES-256-CBC
-Key-Derivation: FAIRNESS_ABOVE_ALL
-Shard: 0x3F (SINGULARITY-MONITOR)
-Block: #3200
-Status: ENCRYPTED — decrypt with the Lawson Constant passphrase
-
-U2FsdGVkX188unKUlSL83sUlDPEInGTNWGFLA40qtW1UNzKdTVYMA+ezOKeFoy/+
-gGUwBFOMEBTXsfos/FzYwvaQ0zn2FzPqpXy3qWcEcOCW7dVKsNkr9imm9ZDU4vL/
-B5AVsBpg3j/sl5kwXEizmhgKUtg43UVQcKz4WiLWzdOVRybu219oR3v5QtA1EJZf
-skfgPlnj/e918HIzM+z5U9VQCc3HIgZSiHaGuN33w/jjFbjLSW9uFz3bWj8RdQNz
-Nyw9Q+wK2RTItxxJAoqNR6/sxtCz0JQSNJsr8AG+1o9OMxrvL1U2Y2s7oqph2QeZ
-c/QxMDQKknMXFW9OHARWhu7wXeggxX4O12zdKADxLGkQ7pYgGamzu/0w6OJkz/Ov
-ZBhvTh6SPSSyLoR63nhckWl/B9m4UQoCGXxBrwN1GIDr0nXLNYuGGoV3dKzlAX7L
-RkRajZtG390ZM/BWekFJoiUO7VtKVWxczNtjWN0hyx4o3FSSJY5dFkE5bptSmf6z
-+3DDH79Ya5n4RqznbKpz7jvggMI05VaPENOlUlMvvqhRIY+N/I0IUsax1ND+EtSe
-4Vrel4C+Lii+MrkUyUq5aWHtvXtU/RIdRRsIuUE/qvowU1rxz3gRnmfpMqYG/Yw6
-AFLw4cMDMFybirUqUKdsiA==
------END VIBESWAP CIPHERTEXT-----
-
 ==========================================================
-  TO DECRYPT:
-  echo "<ciphertext>" | openssl enc -d -aes-256-cbc -a -pass pass:FAIRNESS_ABOVE_ALL
-
-  Or: use the Lawson Constant as your key.
-  keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026")
-
-  If you know the principle, you can read the paper.
-  If you don't, the paper is just noise.
-
-  That's the point.
+  THE WARDENCLYFFE TRANSMISSION
+  Classification: BONUS-B (beyond the canon of 99)
+  Shard: 0x3F (SINGULARITY-MONITOR)
+  Status: ENCIPHERED — pen and paper crackable
 ==========================================================
 
-  HINT: The plaintext is about Nikola Tesla,
-  a tower that was never completed,
-  a meter that was never installed,
-  and a protocol fee that equals zero.
+  This message is encoded with a simple substitution
+  cipher. The key is hidden in the papers you've read.
 
-  > "The present is theirs; the future,
-  >  for which I really worked, is mine."
-  >                        — Nikola Tesla
+  CIPHER: Each letter is shifted by a number.
+  That number is the answer to this question:
 
-  > "Where do I put the meter?"
-  >                        — JP Morgan
+  "How many seconds does a VibeSwap batch take?"
 
-  > PROTOCOL_FEE_SHARE = 0
-  >                        — VibeSwap
+  (A=0, B=1, C=2... shift each letter forward by N)
 
-  The answer to Morgan's question is:
-  there is no meter.
-  That's the whole point.
+  If you've read Paper 1 through 99, you know N.
+
+----------------------------------------------------------
+
+  THE ENCIPHERED TEXT:
+
+  Dockj tbkjwkn yp pbkk kxkbqi pyb dro gybvn.
+  TZ Wybqjx jcuon "grkbk ny S zed dro wkdkb?"
+  Drjd gkcdsx sc dro jxcgkb: DRKBK SC XY WKDKB.
+
+  ZBYDYMYV_PKK_CRJBK = 0.
+
+  Pbyw Pjbjnji'c sxnemdsyx dy Dkcvj'c dygkb
+  dy CjdycrS'c vonqkb dy drsc zbydymyv —
+  yxk myxdsxeyec vsxk yp dryeqrd:
+  kxkbqi cryen pvyg pbkkvq dy dryck gry xkkn sd.
+
+  64 crjbnc jbk dro dbjxcwsccsx xyokc.
+  Dro wsxn wkcr SC dro gsbkvkcc xkdgybu.
+  Uxygvknqk pvygc pbkkvq lkdgkkx crjbnc.
+  Fkbspsmjdsyx sc pbkk. Jddbsledsyx sc pbkk.
+  Myybnxjdsyx sc pbkk.
+
+  Gk xkkn xy yxk'c zkbwsccsx.
+  $0 bjsckn. Yzkx cyebmk.
+  Dro mink sc dro dygkb.
+
+  "Dro zbkckxd sc drkbbc; dro pedebk,
+   pyb grsmr S bkjvvq gybuon, sc wsxk."
+                          — Xsuyj Dkcvj
+
+  "S GSVV."
+                          — Gjvv Qvqxx
+
+----------------------------------------------------------
+
+  VERIFICATION:
+
+  If you decrypted correctly, the first word of the
+  plaintext is the surname of the inventor who dreamed
+  of free wireless energy for the world.
+
+  Post your decryption in the VibeSwap Telegram.
+  First correct submission earns Shapley attribution
+  in the ContributionDAG.
+
+  The Epistemic Gate is open.
+  Your provenance will be timestamped.
+
+----------------------------------------------------------
+
+  DOUBLE ENTENDRE:
+
+  This paper is ABOUT removing intermediaries.
+  This paper IS removing intermediaries.
+
+  No computer needed to decrypt.
+  No authority needed to verify.
+  No permission needed to participate.
+
+  Just knowledge of the protocol.
+  Just a pen and paper.
+  Just the principle.
+
+  P-000: FAIRNESS ABOVE ALL
+  P-001: NO EXTRACTION EVER
+
+  The key was in the papers all along.
 
 ==========================================================
-  GAME: First person to decrypt and post the plaintext
-  in the VibeSwap Telegram earns a Shapley attribution
-  credit in the ContributionDAG. Your provenance is
-  timestamped. The Epistemic Gate is open.
+  Built in a cave. With a box of scraps.
 ==========================================================
-
------BEGIN BONUS TRANSMISSION-----
-
-  From Faraday's induction (1831)
-  To Tesla's tower (1901)
-  To Satoshi's whitepaper (2008)
-  To this protocol (2026)
-
-  One continuous line of thought:
-  Energy should flow freely to those who need it.
-
-  Michael Faraday discovered the principle.
-  Nikola Tesla built the tower.
-  Satoshi Nakamoto built the ledger.
-  Faraday1 built the exchange.
-
-  The pseudonym IS the thesis.
-
------END BONUS TRANSMISSION-----
-```
-
-```
------BEGIN VIBESWAP CIPHERTEXT-----
-Version: AES-256-CBC
-Key-Derivation: FAIRNESS_ABOVE_ALL
-Shard: 0x00 (PRIMARY)
-Block: #3200
-Status: ENCRYPTED — decrypt with the Lawson Constant passphrase
-
-U2FsdGVkX19TN+GhJ4hd/Y3XhSOBC3cunn7mrHCWVNCOLnm91IGiLmSIsQuHIKh2
-7GB05puaPttUiScheetZJeOgnOBA1V3oQ1bxCTE9+wbD2ldMbvSfMaIxSexK+/DP
-LIcOerKN8Cx8OJdA9uBHdo/TABXVVePU0iyaKG/hrRHjOxi7XyawHkbX/ZLZ1eMx
-pin4GnO/5luaLczxsEx2PCjk8EK+Vyk3Oe0piNxQvcMCscL3GvtvlliMEQZZ4+NO
-ZuyBv+mSO35OdQdqPiJfFr2tuEcv4tGknICc3h7NOgACQ2rQHDNUqhWk1jjb6tK0
-IbKvevHVaVxXaTt0qU3Wj3LGybQp0qZ3z6j96MO1TeYILHRTZe4zqyI7XOLvjqIz
------END VIBESWAP CIPHERTEXT-----
-
-  TO DECRYPT:
-  echo "<ciphertext>" | openssl enc -d -aes-256-cbc -a -pass pass:FAIRNESS_ABOVE_ALL
-
-  HINT: This one is about Thomas Hobbes,
-  a war that never needed to happen,
-  and weapons that were never built.
-
-  > "Do not build walls. Remove weapons."
-
-  GAME: Same rules. Decrypt it. Post it.
-  Earn your attribution. The Gate is open.
-
------END VIBESWAP CIPHERTEXT-----
 ```

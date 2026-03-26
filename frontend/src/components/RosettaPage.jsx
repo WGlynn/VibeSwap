@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
 import { useWallet } from '../hooks/useWallet'
@@ -9,6 +9,7 @@ import {
   COVENANT_HASH,
   translate,
   translateToAll,
+  translateSentence,
   discoverEquivalent,
   registerUserLexicon,
   addUserTerm,
@@ -88,6 +89,177 @@ const AGENT_MAP = LEXICON_MAP
 
 // User lexicons use a neutral slate color scheme
 const USER_LEXICON_COLOR = '#94a3b8'
+
+// ============ Animated Counter ============
+
+function AnimatedCounter({ target, duration = 1200, suffix = '' }) {
+  const [display, setDisplay] = useState(0)
+  const frameRef = useRef(null)
+
+  useEffect(() => {
+    if (typeof target !== 'number' || isNaN(target)) return
+    const start = performance.now()
+    const tick = (now) => {
+      const elapsed = now - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(eased * target))
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(tick)
+      }
+    }
+    frameRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frameRef.current)
+  }, [target, duration])
+
+  return <span>{display.toLocaleString()}{suffix}</span>
+}
+
+// ============ Did You Know? — hardcoded cross-domain surprises ============
+
+const DID_YOU_KNOW_FACTS = [
+  {
+    from: { domain: 'Cooking', term: 'mise en place', color: '#f59e0b' },
+    to:   { domain: 'Military', term: 'OPSEC brief', color: '#78716c' },
+    concept: 'preparation_readiness',
+    text: 'Both mean: arrange everything you need before the action starts — or the chaos wins.',
+  },
+  {
+    from: { domain: 'Trading', term: 'liquidity', color: '#eab308' },
+    to:   { domain: 'Agriculture', term: 'irrigation', color: '#84cc16' },
+    concept: 'resource_availability',
+    text: 'Moving resources to where they are needed — whether capital or water.',
+  },
+  {
+    from: { domain: 'Music', term: 'cadence', color: '#ec4899' },
+    to:   { domain: 'Sports', term: 'finishing move', color: '#14b8a6' },
+    concept: 'rhythmic_closure',
+    text: 'Both signal: the sequence is complete. The phrase resolves. The play ends.',
+  },
+  {
+    from: { domain: 'Medicine', term: 'triage', color: '#ef4444' },
+    to:   { domain: 'Trading', term: 'position sizing', color: '#eab308' },
+    concept: 'constraint_choice',
+    text: 'Limited capacity forces the same hard decision: what gets saved, what gets cut.',
+  },
+  {
+    from: { domain: 'Engineering', term: 'fault tolerance', color: '#f97316' },
+    to:   { domain: 'Military', term: 'reserve forces', color: '#78716c' },
+    concept: 'backup_capacity',
+    text: 'Keep something in reserve. The system that never fails has never been tested.',
+  },
+  {
+    from: { domain: 'Law', term: 'precedent', color: '#6b7280' },
+    to:   { domain: 'Music', term: 'motif', color: '#ec4899' },
+    concept: 'established_pattern',
+    text: 'A recurring figure both sides already recognize — it carries weight because of what came before.',
+  },
+  {
+    from: { domain: 'Psychology', term: 'cognitive load', color: '#8b5cf6' },
+    to:   { domain: 'Engineering', term: 'bandwidth', color: '#f97316' },
+    concept: 'capacity_rate',
+    text: 'Every channel — mental or physical — has a maximum throughput. Exceed it and quality degrades.',
+  },
+  {
+    from: { domain: 'Philosophy', term: 'axiom', color: '#06b6d4' },
+    to:   { domain: 'Engineering', term: 'spec', color: '#f97316' },
+    concept: 'foundational_axiom',
+    text: 'A truth so basic you cannot derive it from anything simpler — it is the ground the system stands on.',
+  },
+  {
+    from: { domain: 'Journalism', term: 'lede', color: '#0ea5e9' },
+    to:   { domain: 'Architecture', term: 'load-bearing wall', color: '#a3a3a3' },
+    concept: 'foundational_axiom',
+    text: 'Remove it and the whole structure collapses. Bury it and no one finds the building.',
+  },
+  {
+    from: { domain: 'Sports', term: 'flow state', color: '#14b8a6' },
+    to:   { domain: 'Psychology', term: 'hyperfocus', color: '#8b5cf6' },
+    concept: 'optimal_state',
+    text: 'When the challenge exactly matches capacity, time dissolves and output peaks.',
+  },
+]
+
+function DidYouKnow() {
+  const fact = useMemo(() => {
+    return DID_YOU_KNOW_FACTS[Math.floor(Math.random() * DID_YOU_KNOW_FACTS.length)]
+  }, [])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.4 }}
+      className="mb-6"
+    >
+      <div
+        className="relative rounded-xl border px-4 py-3 sm:px-5 sm:py-4 overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0,255,65,0.04) 0%, rgba(0,20,10,0.8) 100%)',
+          borderColor: 'rgba(0,255,65,0.18)',
+        }}
+      >
+        {/* Subtle glow pulse */}
+        <motion.div
+          className="absolute inset-0 pointer-events-none rounded-xl"
+          style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(0,255,65,0.06) 0%, transparent 70%)' }}
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-matrix-500">
+              Did you know?
+            </span>
+            <span className="text-[9px] font-mono text-black-600 uppercase tracking-wider">
+              — cross-domain connection
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            {/* From pill */}
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold"
+              style={{ backgroundColor: `${fact.from.color}18`, border: `1px solid ${fact.from.color}40`, color: fact.from.color }}
+            >
+              <span
+                className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: fact.from.color, boxShadow: `0 0 6px ${fact.from.color}80` }}
+              />
+              {fact.from.domain}: <em className="not-italic font-bold">&ldquo;{fact.from.term}&rdquo;</em>
+            </span>
+
+            {/* = Universal */}
+            <span className="text-[10px] font-mono text-black-600">=</span>
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-mono"
+              style={{ backgroundColor: 'rgba(0,255,65,0.08)', border: '1px solid rgba(0,255,65,0.2)', color: '#00ff41' }}
+            >
+              {fact.concept}
+            </span>
+            <span className="text-[10px] font-mono text-black-600">=</span>
+
+            {/* To pill */}
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold"
+              style={{ backgroundColor: `${fact.to.color}18`, border: `1px solid ${fact.to.color}40`, color: fact.to.color }}
+            >
+              <span
+                className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: fact.to.color, boxShadow: `0 0 6px ${fact.to.color}80` }}
+              />
+              {fact.to.domain}: <em className="not-italic font-bold">&ldquo;{fact.to.term}&rdquo;</em>
+            </span>
+          </div>
+
+          <p className="text-[11px] font-mono text-black-400 italic">{fact.text}</p>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
 
 // ============ Agent Dot ============
 
@@ -595,28 +767,32 @@ function ConceptExplorer({ userLexicons = [] }) {
                         )}
                       </div>
 
-                      {/* Domain color dots preview (up to 8) */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {uniqueLexicons.slice(0, 8).map((m) => {
+                      {/* Domain snippet preview — 3 pills collapsed, full list on expand */}
+                      <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end max-w-[180px] sm:max-w-none">
+                        {uniqueLexicons.slice(0, isExpanded ? 0 : 3).map((m) => {
                           const meta = getLexiconLabel(m.lexiconId, userLexicons)
                           if (!meta) return null
                           return (
                             <span
                               key={m.lexiconId}
-                              className="inline-block rounded-full flex-shrink-0"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono flex-shrink-0"
                               style={{
-                                width: 7,
-                                height: 7,
-                                backgroundColor: meta.color,
-                                boxShadow: `0 0 4px ${meta.color}60`,
+                                backgroundColor: `${meta.color}14`,
+                                border: `1px solid ${meta.color}2a`,
+                                color: meta.color,
                               }}
-                              title={meta.name}
-                            />
+                            >
+                              <span
+                                className="inline-block rounded-full flex-shrink-0"
+                                style={{ width: 5, height: 5, backgroundColor: meta.color }}
+                              />
+                              {m.term}
+                            </span>
                           )
                         })}
-                        {uniqueLexicons.length > 8 && (
+                        {!isExpanded && uniqueLexicons.length > 3 && (
                           <span className="text-[9px] font-mono text-black-600">
-                            +{uniqueLexicons.length - 8}
+                            +{uniqueLexicons.length - 3}
                           </span>
                         )}
                       </div>
@@ -700,57 +876,68 @@ function ConceptExplorer({ userLexicons = [] }) {
   )
 }
 
+// ============ Highlight matched text ============
+
+function HighlightMatch({ text, query }) {
+  if (!query || !text) return <span>{text}</span>
+  const idx = text.toLowerCase().indexOf(query.toLowerCase())
+  if (idx === -1) return <span>{text}</span>
+  return (
+    <span>
+      {text.slice(0, idx)}
+      <mark
+        className="rounded-sm"
+        style={{ backgroundColor: 'rgba(0,255,65,0.22)', color: '#00ff41', padding: '0 1px' }}
+      >
+        {text.slice(idx, idx + query.length)}
+      </mark>
+      {text.slice(idx + query.length)}
+    </span>
+  )
+}
+
 // ============ Discover Section ============
 
 function DiscoverSection() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeSearch, setActiveSearch] = useState('')
   const [results, setResults] = useState(null)
-  const debounceRef = useRef(null)
 
-  const handleSearch = useCallback((term) => {
-    if (!term.trim()) {
+  // Instant — engine is synchronous + in-memory, no debounce needed
+  const handleInputChange = useCallback((value) => {
+    setSearchTerm(value)
+    if (!value.trim()) {
       setResults(null)
-      setActiveSearch('')
       return
     }
-
-    const trimmed = term.trim()
-    setActiveSearch(trimmed)
-    const data = discoverEquivalent(trimmed)
+    const data = discoverEquivalent(value.trim())
     setResults(data)
   }, [])
 
-  const handleInputChange = useCallback((value) => {
-    setSearchTerm(value)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (!value.trim()) {
-      setResults(null)
-      setActiveSearch('')
-      return
-    }
-    debounceRef.current = setTimeout(() => handleSearch(value), 300)
-  }, [handleSearch])
+  const activeSearch = searchTerm.trim()
 
   return (
     <GlassCard glowColor="terminal" className="p-5 mb-6">
       <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">Discover</h2>
       <p className="text-black-500 text-[10px] font-mono mb-4">
-        Enter any word — see how every lexicon (agent + user) expresses the same concept.
+        Type any word — see how every domain expresses the same concept. Results appear instantly.
       </p>
 
       <div className="relative">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <svg className="w-4 h-4 text-black-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
         <input
           type="text"
           value={searchTerm}
           onChange={(e) => handleInputChange(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && searchTerm.trim()) handleSearch(searchTerm) }}
-          placeholder="Enter any word or concept..."
-          className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 pr-10 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
+          placeholder="Type to search instantly — try &quot;triage&quot;, &quot;liquidity&quot;, &quot;cadence&quot;..."
+          className="w-full bg-black-900/80 border border-black-700 rounded-lg pl-9 pr-10 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
         />
         {searchTerm && (
           <button
-            onClick={() => { setSearchTerm(''); setResults(null); setActiveSearch('') }}
+            onClick={() => { setSearchTerm(''); setResults(null) }}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -760,70 +947,66 @@ function DiscoverSection() {
         )}
       </div>
 
-      {/* Discover results */}
+      {/* Discover results — instant, no AnimatePresence key flicker */}
       {activeSearch && results && (
         <div className="mt-4">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeSearch}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.3 }}
-            >
-              {results.equivalents && results.equivalents.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
-                      {results.equivalents.length} equivalent{results.equivalents.length !== 1 ? 's' : ''} for
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-matrix-400">
-                      &quot;{activeSearch}&quot;
-                    </span>
-                  </div>
-                  {results.equivalents.map((eq, i) => {
-                    const isUser = eq.lexicon?.startsWith('user:')
-                    const agentMeta = !isUser ? AGENT_MAP[eq.lexicon] : null
-                    const color = agentMeta?.color || USER_LEXICON_COLOR
-                    const label = agentMeta?.name || (isUser ? (eq.domain || eq.lexicon?.slice(5)) : eq.lexicon)
-                    return (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, x: -6 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        className="flex items-center gap-3 p-3 bg-black-900/40 rounded-lg border border-black-800"
-                      >
-                        <AgentDot color={color} size={8} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] font-mono text-black-500">{label}</div>
-                          <div className="text-white text-sm font-mono font-medium">{eq.term}</div>
-                          {eq.description && (
-                            <div className="text-[10px] text-black-600 mt-0.5">{eq.description}</div>
-                          )}
+          {results.equivalents && results.equivalents.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-[10px] font-mono text-black-500 uppercase tracking-wider">
+                  {results.equivalents.length} equivalent{results.equivalents.length !== 1 ? 's' : ''} for
+                </span>
+                <span className="text-[10px] font-mono font-bold text-matrix-400">
+                  &quot;{activeSearch}&quot;
+                </span>
+              </div>
+              {results.equivalents.map((eq, i) => {
+                const isUser = eq.lexicon?.startsWith('user:')
+                const agentMeta = !isUser ? AGENT_MAP[eq.lexicon] : null
+                const color = agentMeta?.color || USER_LEXICON_COLOR
+                const label = agentMeta?.name || (isUser ? (eq.domain || eq.lexicon?.slice(5)) : eq.lexicon)
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: Math.min(i * 0.03, 0.25) }}
+                    className="flex items-center gap-3 p-3 bg-black-900/40 rounded-lg border border-black-800"
+                  >
+                    <AgentDot color={color} size={8} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-mono text-black-500">{label}</div>
+                      <div className="text-white text-sm font-mono font-medium">
+                        <HighlightMatch text={eq.term} query={activeSearch} />
+                      </div>
+                      {eq.description && (
+                        <div className="text-[10px] text-black-600 mt-0.5">
+                          <HighlightMatch text={eq.description} query={activeSearch} />
                         </div>
-                        {eq.universal && (
-                          <div className="flex-shrink-0 text-right">
-                            <div className="text-[9px] font-mono text-black-600 uppercase">Universal</div>
-                            <div className="text-[10px] font-mono text-matrix-400">{eq.universal}</div>
-                          </div>
-                        )}
-                      </motion.div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-6 border border-black-800 rounded-lg">
-                  <p className="text-black-500 text-xs font-mono">
-                    No equivalents found for &quot;{activeSearch}&quot;
-                  </p>
-                  <p className="text-black-700 text-[10px] font-mono mt-1">
-                    Try a different term or register it in your lexicon.
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+                      )}
+                    </div>
+                    {eq.universal && (
+                      <div className="flex-shrink-0 text-right min-w-0 max-w-[100px] sm:max-w-none">
+                        <div className="text-[9px] font-mono text-black-600 uppercase">Universal</div>
+                        <div className="text-[10px] font-mono text-matrix-400 truncate">
+                          <HighlightMatch text={eq.universal} query={activeSearch} />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-6 border border-black-800 rounded-lg">
+              <p className="text-black-500 text-xs font-mono">
+                No equivalents found for &quot;{activeSearch}&quot;
+              </p>
+              <p className="text-black-700 text-[10px] font-mono mt-1">
+                Try a different term or register it in your lexicon below.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </GlassCard>
@@ -1362,6 +1545,7 @@ export default function RosettaPage() {
   const [translateAll, setTranslateAll] = useState(false)
   const [translationResult, setTranslationResult] = useState(null)
   const [translateAllResults, setTranslateAllResults] = useState(null)
+  const translationResultRef = useRef(null)
 
   // ---- Protocol stats (computed client-side) ----
   const [protocolData] = useState(() => getProtocolStats())
@@ -1405,6 +1589,11 @@ export default function RosettaPage() {
       const result = translate(fromId, toId, concept.trim())
       setTranslationResult(result)
     }
+
+    // Smooth scroll to result after state update
+    setTimeout(() => {
+      translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 80)
   }, [fromId, toId, concept, translateAll])
 
   // ---- Derived ----
@@ -1421,29 +1610,82 @@ export default function RosettaPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
-      {/* ============ Header ============ */}
-      <div className="text-center mb-6">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white font-display text-5d">
-          ROSETTA STONE <span className="text-matrix-500">PROTOCOL</span>
-        </h1>
-        <p className="text-black-400 text-sm mt-2 max-w-lg mx-auto">
-          So everyone can finally understand everyone.
-        </p>
-        <p className="text-black-600 text-[10px] font-mono mt-1">
-          {ALL_LEXICONS.length} lexicons — AI Agents + Human Domains — universal translation layer
-        </p>
-      </div>
 
-      {/* ============ Protocol Stats ============ */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+      {/* ============ Hero Section ============ */}
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        className="relative text-center mb-6 overflow-visible"
+      >
+        {/* Glow halo behind title */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 -top-4 w-96 h-24 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(0,255,65,0.12) 0%, transparent 70%)',
+            filter: 'blur(20px)',
+          }}
+        />
+        <h1 className="relative text-3xl sm:text-5xl font-bold text-white font-display uppercase tracking-tight">
+          Rosetta Stone{' '}
+          <span
+            className="text-matrix-500"
+            style={{ textShadow: '0 0 30px rgba(0,255,65,0.4)' }}
+          >
+            Protocol
+          </span>
+        </h1>
+        <p className="text-black-300 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
+          24 lexicons. 510 terms. 242 universal concepts.{' '}
+          <span className="text-white font-semibold">Every domain speaks every other domain.</span>
+        </p>
+
+        {/* Animated stat counters */}
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mt-5">
+          {[
+            { label: 'Lexicons', value: ALL_LEXICONS.length, color: '#00ff41' },
+            { label: 'Terms', value: stats.terms, color: '#22d3ee' },
+            { label: 'Concepts', value: stats.universals, color: '#a855f7' },
+            { label: 'Covenants', value: 10, color: '#d4aa50' },
+          ].map((s) => (
+            <motion.div
+              key={s.label}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-center"
+            >
+              <div
+                className="text-2xl sm:text-3xl font-bold font-mono"
+                style={{ color: s.color, textShadow: `0 0 16px ${s.color}50` }}
+              >
+                <AnimatedCounter target={s.value} duration={1400} />
+              </div>
+              <div className="text-[10px] font-mono text-black-500 uppercase tracking-wider mt-0.5">
+                {s.label}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Subtitle line */}
+        <p className="text-black-600 text-[10px] font-mono mt-3">
+          Runs 100% client-side — AI Agents + Human Domains + User Lexicons
+        </p>
+      </motion.div>
+
+      {/* ============ Did You Know? ============ */}
+      <DidYouKnow />
+
+      {/* ============ Protocol Stats — compact ============ */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
         {[
-          { label: 'Agents', value: stats.agents },
-          { label: 'Total Terms', value: stats.terms },
-          { label: 'Universal Concepts', value: stats.universals },
+          { label: 'AI Agents', value: AGENT_LEXICONS.length },
+          { label: 'Human Domains', value: HUMAN_LEXICONS.length },
           {
             label: 'Covenant Hash',
             value: stats.covenantHash
-              ? `${stats.covenantHash.slice(0, 6)}...${stats.covenantHash.slice(-4)}`
+              ? `0x${stats.covenantHash.slice(0, 6)}…${stats.covenantHash.slice(-4)}`
               : '--',
             copyable: stats.covenantHash,
           },
@@ -1502,7 +1744,7 @@ export default function RosettaPage() {
         </div>
 
         {/* Lexicon Selects */}
-        <div className="flex gap-3 mb-3">
+        <div className="flex items-end gap-2 mb-3">
           <LexiconSelect
             label="From Lexicon"
             value={fromId}
@@ -1514,18 +1756,47 @@ export default function RosettaPage() {
             excludeId={toId}
             userLexicons={userLexicons}
           />
+
           {!translateAll && (
-            <LexiconSelect
-              label="To Lexicon"
-              value={toId}
-              onChange={(v) => {
-                setToId(v)
-                setTranslationResult(null)
-                setTranslateAllResults(null)
-              }}
-              excludeId={fromId}
-              userLexicons={userLexicons}
-            />
+            <>
+              {/* Swap button */}
+              <motion.button
+                onClick={() => {
+                  const prevFrom = fromId
+                  const prevTo = toId
+                  setFromId(prevTo)
+                  setToId(prevFrom)
+                  setTranslationResult(null)
+                  setTranslateAllResults(null)
+                }}
+                disabled={!fromId || !toId}
+                whileHover={{ scale: fromId && toId ? 1.1 : 1 }}
+                whileTap={{ scale: fromId && toId ? 0.92 : 1, rotate: fromId && toId ? 180 : 0 }}
+                className="flex-shrink-0 w-9 h-9 mb-0.5 rounded-full flex items-center justify-center border transition-all"
+                style={
+                  fromId && toId
+                    ? { backgroundColor: 'rgba(0,255,65,0.1)', borderColor: 'rgba(0,255,65,0.35)', color: '#00ff41' }
+                    : { backgroundColor: 'rgba(30,30,30,0.6)', borderColor: 'rgba(60,60,60,0.5)', color: '#374151' }
+                }
+                title="Swap lexicons"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </motion.button>
+
+              <LexiconSelect
+                label="To Lexicon"
+                value={toId}
+                onChange={(v) => {
+                  setToId(v)
+                  setTranslationResult(null)
+                  setTranslateAllResults(null)
+                }}
+                excludeId={fromId}
+                userLexicons={userLexicons}
+              />
+            </>
           )}
         </div>
 
@@ -1558,25 +1829,27 @@ export default function RosettaPage() {
         </button>
 
         {/* Results */}
-        <AnimatePresence mode="wait">
-          {translationResult && !translateAll && (
-            <TranslationResult
-              key="single"
-              result={translationResult}
-              fromId={fromId}
-              toId={toId}
-              userLexicons={userLexicons}
-            />
-          )}
-          {translateAllResults && translateAll && (
-            <TranslateAllResults
-              key="all"
-              results={translateAllResults}
-              fromId={fromId}
-              userLexicons={userLexicons}
-            />
-          )}
-        </AnimatePresence>
+        <div ref={translationResultRef}>
+          <AnimatePresence mode="wait">
+            {translationResult && !translateAll && (
+              <TranslationResult
+                key="single"
+                result={translationResult}
+                fromId={fromId}
+                toId={toId}
+                userLexicons={userLexicons}
+              />
+            )}
+            {translateAllResults && translateAll && (
+              <TranslateAllResults
+                key="all"
+                results={translateAllResults}
+                fromId={fromId}
+                userLexicons={userLexicons}
+              />
+            )}
+          </AnimatePresence>
+        </div>
       </GlassCard>
 
       {/* ============ Register + My Lexicon ============ */}

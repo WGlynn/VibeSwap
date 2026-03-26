@@ -102,6 +102,24 @@ const AGENT_MAP = LEXICON_MAP
 // User lexicons use a neutral slate color scheme
 const USER_LEXICON_COLOR = '#94a3b8'
 
+// ============ LazySection — render children only after element enters the viewport ============
+// Used to defer mounting of expensive sections (ConceptWeb, ConceptExplorer, etc.)
+// until the user scrolls near them, keeping initial TTI low.
+function LazySection({ children, rootMargin = '200px', placeholder = null }) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    if (!ref.current) return
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect() } },
+      { rootMargin }
+    )
+    obs.observe(ref.current)
+    return () => obs.disconnect()
+  }, [rootMargin])
+  return <div ref={ref}>{visible ? children : placeholder}</div>
+}
+
 // ============ Animated Counter ============
 
 function AnimatedCounter({ target, duration = 1200, suffix = '' }) {
@@ -767,29 +785,37 @@ function getLexiconLabel(lexiconId, userLexicons) {
 
 function ConceptExplorer({ userLexicons = [] }) {
   const [filter, setFilter] = useState('')
+  const [debouncedFilter, setDebouncedFilter] = useState('')
   const [expandedConcept, setExpandedConcept] = useState(null)
 
-  // Compute top concepts once on mount
-  const [topConcepts] = useState(() => getTopConnectedConcepts(30))
+  // Compute top concepts once — engine caches the index internally too
+  const topConcepts = useMemo(() => getTopConnectedConcepts(30), [])
 
-  // Filter by concept key, definition, term name, or domain name
-  const filtered = filter.trim()
-    ? topConcepts.filter(c => {
-        const q = filter.toLowerCase()
-        if (c.universal.toLowerCase().includes(q)) return true
-        if (c.definition.toLowerCase().includes(q)) return true
-        if (c.mappings.some(m => m.term.toLowerCase().includes(q))) return true
-        if (c.mappings.some(m => {
-          const meta = getLexiconLabel(m.lexiconId, userLexicons)
-          return meta?.name?.toLowerCase().includes(q)
-        })) return true
-        return false
-      })
-    : topConcepts
+  // Debounce filter: rapid keystrokes don't re-filter the full list every frame
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedFilter(filter), 120)
+    return () => clearTimeout(id)
+  }, [filter])
 
-  const handleToggle = (universal) => {
+  // Memoized filter — only recomputes when the debounced query or data changes
+  const filtered = useMemo(() => {
+    const q = debouncedFilter.trim().toLowerCase()
+    if (!q) return topConcepts
+    return topConcepts.filter(c => {
+      if (c.universal.toLowerCase().includes(q)) return true
+      if (c.definition.toLowerCase().includes(q)) return true
+      if (c.mappings.some(m => m.term.toLowerCase().includes(q))) return true
+      if (c.mappings.some(m => {
+        const meta = getLexiconLabel(m.lexiconId, userLexicons)
+        return meta?.name?.toLowerCase().includes(q)
+      })) return true
+      return false
+    })
+  }, [debouncedFilter, topConcepts, userLexicons])
+
+  const handleToggle = useCallback((universal) => {
     setExpandedConcept(prev => prev === universal ? null : universal)
-  }
+  }, [])
 
   return (
     <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
@@ -2312,6 +2338,16 @@ function ConceptChainFinder({ userLexicons = [] }) {
   const handleNodeClick = useCallback((k) => setSelectedNode(prev => prev === k ? null : k), [])
   const isDirect = result?.found && result?.hops === 0
 
+  // Memoize node colors so they don't recompute on every render
+  const nodeColorMap = useMemo(() => {
+    if (!result?.path) return {}
+    const map = {}
+    for (const step of result.path) {
+      if (!(step.node in map)) map[step.node] = getNodeColor(step.node)
+    }
+    return map
+  }, [result])
+
   return (
     <GlassCard glowColor="matrix" spotlight className="p-5 mb-6">
       <div className="flex items-start justify-between mb-1">
@@ -2437,7 +2473,7 @@ function ConceptChainFinder({ userLexicons = [] }) {
                 <div className="overflow-x-auto pb-2">
                   <div className="flex items-start gap-0 min-w-max">
                     {result.path.map((step, si) => {
-                      const nodeColor = getNodeColor(step.node)
+                      const nodeColor = nodeColorMap[step.node] ?? getNodeColor(step.node)
                       const isFirst = si === 0
                       const isLast = si === result.path.length - 1
                       const isSelected = selectedNode === step.node
@@ -2522,9 +2558,9 @@ function ConceptChainFinder({ userLexicons = [] }) {
                 <div className="mt-4 space-y-1">
                   {result.path.map((step, si) => (
                     <div key={step.node + '-def-' + si} className="flex items-start gap-2 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: 'rgba(15,20,15,0.4)' }}>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: getNodeColor(step.node) }} />
+                      <span className="inline-block w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ backgroundColor: nodeColorMap[step.node] ?? getNodeColor(step.node) }} />
                       <div className="min-w-0">
-                        <span className="text-[10px] font-mono font-semibold" style={{ color: getNodeColor(step.node) }}>{step.node}</span>
+                        <span className="text-[10px] font-mono font-semibold" style={{ color: nodeColorMap[step.node] ?? getNodeColor(step.node) }}>{step.node}</span>
                         {step.definition && <span className="text-[10px] font-mono text-black-500 ml-2">{step.definition}</span>}
                       </div>
                     </div>
@@ -3633,39 +3669,46 @@ export default function RosettaPage() {
   // ---- Translation history ----
   const { history: translationHistory, addToHistory, clearHistory } = useTranslationHistory()
 
-  // ---- Compute agent lexicon terms on demand ----
-  const lexiconTerms = selectedAgent
-    ? Object.entries(LEXICONS[selectedAgent]?.concepts || {}).map(([term, m]) => ({
-        term,
-        universal: m.universal,
-        description: m.desc,
-      }))
-    : null
+  // ---- Compute agent lexicon terms on demand — memoized so grid re-renders don't recompute ----
+  const lexiconTerms = useMemo(() =>
+    selectedAgent
+      ? Object.entries(LEXICONS[selectedAgent]?.concepts || {}).map(([term, m]) => ({
+          term,
+          universal: m.universal,
+          description: m.desc,
+        }))
+      : null
+  , [selectedAgent])
 
   // ---- Translate handler (synchronous — no network) ----
   const handleTranslate = useCallback(() => {
     if (!fromId || !concept.trim()) return
     if (!translateAll && !toId) return
 
+    setIsTranslating(true)
     setTranslationResult(null)
     setTranslateAllResults(null)
 
-    if (translateAll) {
-      const results = translateToAll(fromId, concept.trim())
-      setTranslateAllResults(results)
-      window.location.hash = `translate/${fromId}/all/${encodeURIComponent(concept.trim())}`
-    } else {
-      const result = translate(fromId, toId, concept.trim())
-      setTranslationResult(result)
-      window.location.hash = `translate/${fromId}/${toId}/${encodeURIComponent(concept.trim())}`
-    }
-
-    addToHistory({ fromId, toId, concept: concept.trim(), translateAll })
-
-    // Smooth scroll to result after state update
+    // Engine is synchronous; defer one tick so the spinner renders before work
     setTimeout(() => {
-      translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }, 80)
+      if (translateAll) {
+        const results = translateToAll(fromId, concept.trim())
+        setTranslateAllResults(results)
+        window.location.hash = `translate/${fromId}/all/${encodeURIComponent(concept.trim())}`
+      } else {
+        const result = translate(fromId, toId, concept.trim())
+        setTranslationResult(result)
+        window.location.hash = `translate/${fromId}/${toId}/${encodeURIComponent(concept.trim())}`
+      }
+
+      addToHistory({ fromId, toId, concept: concept.trim(), translateAll })
+      setIsTranslating(false)
+
+      // Smooth scroll to result after state update
+      setTimeout(() => {
+        translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }, 80)
+    }, 0)
   }, [fromId, toId, concept, translateAll, addToHistory])
 
   // ---- Try a pre-filled example or popular pair ----
@@ -3708,16 +3751,16 @@ export default function RosettaPage() {
     }, 80)
   }, [translationResultRef])
 
-  // ---- Derived ----
-  const stats = {
+  // ---- Derived (memoized so they don't recompute on every render) ----
+  const agentTermCounts = useMemo(() => protocolData.agent_terms || {}, [protocolData])
+
+  const stats = useMemo(() => ({
     agents: protocolData.agent_count,
     terms: protocolData.total_terms,
     universals: protocolData.universal_count,
     covenantHash: COVENANT_HASH,
     userLexicons: userLexicons.length,
-  }
-
-  const agentTermCounts = protocolData.agent_terms || {}
+  }), [protocolData, userLexicons.length])
   const canTranslate = fromId && concept.trim() && (translateAll || toId)
   const [isTranslating, setIsTranslating] = useState(false)
 
@@ -4014,19 +4057,19 @@ export default function RosettaPage() {
       <PopularTranslations onTryPair={handleTryPair} />
 
             {/* ============ Concept Web ============ */}
-      <ConceptWeb />
+      <LazySection rootMargin="300px"><ConceptWeb /></LazySection>
 
       {/* ============ Concept Explorer ============ */}
-      <ConceptExplorer userLexicons={userLexicons} />
+      <LazySection rootMargin="300px"><ConceptExplorer userLexicons={userLexicons} /></LazySection>
 
       {/* ============ Discover Section ============ */}
       <DiscoverSection />
 
       {/* ============ Sentence Translator ============ */}
-      <SentenceTranslator userLexicons={userLexicons} />
+      <LazySection rootMargin="300px"><SentenceTranslator userLexicons={userLexicons} /></LazySection>
 
       {/* ============ Concept Chain ============ */}
-      <ConceptChainFinder userLexicons={userLexicons} />
+      <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} /></LazySection>
 
       {/* ============ Recent Translations ============ */}
       <AnimatePresence>
@@ -4276,7 +4319,10 @@ export default function RosettaPage() {
         {/* Keyboard shortcut hint */}
         <button
           onClick={() => setShowHelp(v => !v)}
-          className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[10px] transition-colors"
+          aria-expanded={showHelp}
+          aria-controls="rosetta-kb-help-panel"
+          aria-label={showHelp ? 'Hide keyboard shortcuts' : 'Show keyboard shortcuts'}
+          className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
           style={{
             backgroundColor: 'rgba(0,255,65,0.05)',
             border: '1px solid rgba(0,255,65,0.15)',
@@ -4287,6 +4333,7 @@ export default function RosettaPage() {
           <span
             className="inline-flex items-center justify-center w-4 h-4 rounded border font-bold text-[9px]"
             style={{ borderColor: 'rgba(0,255,65,0.3)', color: 'rgba(0,255,65,0.6)' }}
+            aria-hidden="true"
           >
             ?
           </span>

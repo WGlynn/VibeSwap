@@ -169,7 +169,7 @@ import { initTrading, setupTrading, swap, getPortfolio as getTradingPortfolio, g
 import { initPantheon, getAllCosts, getInfraCosts, listAgents, pantheonChat, forkAgent, getArchetypes, consultAgent, pruneAll, clearConversation, getTheAIStatus, routeQuestion, addNyxMemory, getNyxMemory } from './pantheon.js';
 import { runPrimitiveGate, formatGateResult, getPrimitives, getPrimitiveManifest, getGateHistory } from './primitive-gate.js';
 import { initConstellation, handleConstellationRequest } from './constellation.js';
-import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, getLexicon, getCovenant, TEN_COVENANTS, COVENANT_HASH, issueChallenge, getChallenges, persistRosetta } from './rosetta.js';
+import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, getLexicon, getCovenant, TEN_COVENANTS, COVENANT_HASH, issueChallenge, getChallenges, persistRosetta, registerUserLexicon, addUserTerm, translateUser, discoverEquivalent, getUserLexicon } from './rosetta.js';
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
@@ -2862,47 +2862,141 @@ bot.command('gate', async (ctx) => {
 // ============ Rosetta Stone Protocol — Universal Translation ============
 
 bot.command('rosetta', async (ctx) => {
-  if (String(ctx.from.id) !== String(config.ownerUserId)) {
-    return ctx.reply('Owner only.');
-  }
+  const userId = String(ctx.from.id);
+  const isOwner = userId === String(config.ownerUserId);
 
   const args = ctx.message.text.split(/\s+/).slice(1);
   const sub = args[0]?.toLowerCase();
 
-  if (sub === 'translate') {
-    // /rosetta translate <from> <to> <concept>
-    const [, fromAgent, toAgent, ...conceptParts] = args;
-    const concept = conceptParts.join('_');
-    if (!fromAgent || !toAgent || !concept) {
-      return ctx.reply('Usage: /rosetta translate <from_agent> <to_agent> <concept>\nExample: /rosetta translate poseidon athena liquidity');
+  if (sub === 'register') {
+    // /rosetta register <domain> <term1>=<concept1> <term2>=<concept2>...
+    // Available to all users — registers their personal domain lexicon
+    const domain = args[1];
+    if (!domain || args.length < 3) {
+      return ctx.reply('Usage: /rosetta register <domain> <term>=<concept> ...\nExample: /rosetta register trading mooning=price_up rekt=loss_event aping=high_risk_buy');
     }
-    const result = translate(fromAgent, toAgent, concept);
+    const terms = {};
+    for (const pair of args.slice(2)) {
+      const eqIdx = pair.indexOf('=');
+      if (eqIdx === -1) continue;
+      const term = pair.slice(0, eqIdx).toLowerCase().trim();
+      const concept = pair.slice(eqIdx + 1).toLowerCase().trim().replace(/\s+/g, '_');
+      if (term && concept) terms[term] = concept;
+    }
+    if (Object.keys(terms).length === 0) {
+      return ctx.reply('No valid term=concept pairs found. Format: term=universal_concept');
+    }
+    const result = registerUserLexicon(userId, domain, terms);
+    if (result.error) return ctx.reply(`Error: ${result.error}`);
+    persistRosetta().catch(() => {});
+    let msg = `Lexicon Registered\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Domain: ${result.domain}\n`;
+    msg += `Terms: ${result.termCount}\n`;
+    msg += Object.entries(terms).map(([t, u]) => `• ${t} → ${u}`).join('\n');
+    ctx.reply(msg);
+
+  } else if (sub === 'add') {
+    // /rosetta add <term> <universalConcept>
+    // Adds a single term to the user's lexicon (creates one if needed)
+    const term = args[1]?.toLowerCase();
+    const concept = args.slice(2).join('_').toLowerCase();
+    if (!term || !concept) {
+      return ctx.reply('Usage: /rosetta add <term> <universalConcept>\nExample: /rosetta add mooning price_up');
+    }
+    const result = addUserTerm(userId, term, concept);
+    if (result.error) return ctx.reply(`Error: ${result.error}`);
+    persistRosetta().catch(() => {});
+    ctx.reply(`Added: ${result.term} → ${result.universal}`);
+
+  } else if (sub === 'discover') {
+    // /rosetta discover <term>
+    // Find all equivalents across every lexicon
+    const term = args.slice(1).join('_').toLowerCase();
+    if (!term) return ctx.reply('Usage: /rosetta discover <term>\nExample: /rosetta discover liquidity');
+    const result = discoverEquivalent(term);
+    if (!result.found) return ctx.reply(`"${term}" not found in any registered lexicon.`);
+    let msg = `Discover: "${result.term}"\n━━━━━━━━━━━━━━━━\n`;
+    msg += `Universal: ${result.universal}\n`;
+    msg += `Source: ${result.source.type === 'user' ? 'user:' : ''}${result.source.id} (${result.source.domain})\n\n`;
+    if (result.exactMatches.length > 0) {
+      msg += `Exact matches (${result.exactMatches.length}):\n`;
+      for (const m of result.exactMatches) {
+        msg += `• ${m.agent}: "${m.term}"\n`;
+      }
+    }
+    if (result.approximateMatches.length > 0) {
+      msg += `\nApprox matches:\n`;
+      for (const m of result.approximateMatches.slice(0, 5)) {
+        msg += `• ${m.agent}: "${m.term}" (${(m.confidence * 100).toFixed(0)}%)\n`;
+      }
+    }
+    ctx.reply(msg.trim());
+
+  } else if (sub === 'me') {
+    // /rosetta me — show your registered lexicon
+    const lex = getUserLexicon(userId);
+    if (!lex) return ctx.reply('You have no lexicon registered yet.\nUse /rosetta register <domain> <term>=<concept> ...');
+    let msg = `Your Lexicon — ${lex.domain}\n━━━━━━━━━━━━━━━━\n`;
+    for (const [term, mapping] of Object.entries(lex.concepts)) {
+      msg += `• ${term} → ${mapping.universal}${mapping.desc ? '\n  ' + mapping.desc : ''}\n`;
+    }
+    ctx.reply(msg.trim());
+
+  } else if (sub === 'translate') {
+    // /rosetta translate <from> <to> <concept>
+    // <from>/<to> can be agent names OR user IDs (numeric)
+    if (!isOwner) return ctx.reply('Owner only.');
+    const [, fromId, toId, ...conceptParts] = args;
+    const concept = conceptParts.join('_');
+    if (!fromId || !toId || !concept) {
+      return ctx.reply('Usage: /rosetta translate <from> <to> <concept>\nExample: /rosetta translate poseidon athena liquidity\nUser IDs also accepted for from/to.');
+    }
+    // Detect if from/to look like user IDs (all digits)
+    const fromIsUser = /^\d+$/.test(fromId);
+    const toIsUser = /^\d+$/.test(toId);
+    let result;
+    if (fromIsUser || toIsUser) {
+      result = translateUser(fromId, toId, concept);
+    } else {
+      result = translate(fromId, toId, concept);
+    }
     if (result.error) return ctx.reply(`Error: ${result.error}`);
     if (!result.translated) {
-      return ctx.reply(`${fromAgent}:${concept} → universal:"${result.universal}"\n${result.explanation || 'No equivalent found in ' + toAgent}`);
+      return ctx.reply(`${fromId}:${concept} → universal:"${result.universal || '?'}"\n${result.explanation || 'No equivalent found in ' + toId}`);
     }
+    const fromLabel = fromIsUser ? `user:${fromId}` : fromId;
+    const toLabel = toIsUser ? `user:${toId}` : toId;
     let msg = `Rosetta Translation\n━━━━━━━━━━━━━━━━\n`;
-    msg += `${result.from.agent}: "${result.from.term}" — ${result.from.desc}\n`;
+    msg += `${fromLabel}: "${result.from.term || result.from.agent}" — ${result.from.desc || ''}\n`;
     msg += `↓ universal: ${result.universal}\n`;
-    msg += `${result.to.agent}: "${result.to.term}" — ${result.to.desc}\n`;
+    msg += `${toLabel}: "${result.to.term}" — ${result.to.desc || ''}\n`;
     msg += `Confidence: ${(result.confidence * 100).toFixed(0)}%${result.approximate ? ' (approximate)' : ''}`;
     ctx.reply(msg);
 
   } else if (sub === 'all') {
-    // /rosetta all <agent> <concept>
+    // /rosetta all <agent_or_userid> <concept>
+    if (!isOwner) return ctx.reply('Owner only.');
     const [, fromAgent, ...conceptParts] = args;
     const concept = conceptParts.join('_');
     if (!fromAgent || !concept) return ctx.reply('Usage: /rosetta all <agent> <concept>');
     const result = translateToAll(fromAgent, concept);
     let msg = `Rosetta — "${concept}" from ${fromAgent}\n━━━━━━━━━━━━━━━━\n`;
     for (const [agent, t] of Object.entries(result.translations)) {
-      if (t.translated) msg += `${agent}: "${t.to.term}" (${(t.confidence * 100).toFixed(0)}%)\n`;
+      if (t.translated) msg += `${agent}: "${t.to.term}" (${(t.confidence * 100).toFixed(0)}%)${t.approximate ? ' ~' : ''}\n`;
       else msg += `${agent}: — (no equivalent)\n`;
     }
-    ctx.reply(msg);
+    // Also show any user lexicon matches
+    if (result.userTranslations && Object.keys(result.userTranslations).length > 0) {
+      msg += `\nUser lexicons:\n`;
+      for (const [uid, t] of Object.entries(result.userTranslations)) {
+        if (t.translated) msg += `user:${uid}: "${t.to.term}" (${(t.confidence * 100).toFixed(0)}%)\n`;
+      }
+    }
+    ctx.reply(msg.trim());
 
   } else if (sub === 'lexicon') {
     // /rosetta lexicon <agent>
+    if (!isOwner) return ctx.reply('Owner only.');
     const agentId = args[1]?.toLowerCase();
     if (!agentId) return ctx.reply('Usage: /rosetta lexicon <agent>');
     const lex = getLexicon(agentId);
@@ -2914,9 +3008,11 @@ bot.command('rosetta', async (ctx) => {
     ctx.reply(msg);
 
   } else if (sub === 'view') {
+    if (!isOwner) return ctx.reply('Owner only.');
     const view = getRosettaView();
     let msg = `Rosetta Stone Protocol\n━━━━━━━━━━━━━━━━\n`;
     msg += `Agents: ${Object.keys(view.agents).length}\n`;
+    msg += `Users: ${view.registeredUsers}\n`;
     msg += `Total Terms: ${view.totalTerms}\n`;
     msg += `Universal Concepts: ${view.universalConcepts}\n`;
     msg += `Covenant Hash: ${view.covenantHash.slice(0, 16)}...\n`;
@@ -2924,16 +3020,27 @@ bot.command('rosetta', async (ctx) => {
     for (const [id, a] of Object.entries(view.agents)) {
       msg += `${id}: ${a.domain} (${a.termCount} terms)\n`;
     }
-    ctx.reply(msg);
+    if (view.registeredUsers > 0) {
+      msg += `\nUser lexicons:\n`;
+      for (const [uid, u] of Object.entries(view.users)) {
+        msg += `user:${uid}: ${u.domain} (${u.termCount} terms)\n`;
+      }
+    }
+    ctx.reply(msg.trim());
 
   } else {
     let msg = `Rosetta Stone Protocol — Universal Understanding\n━━━━━━━━━━━━━━━━\n`;
     msg += `"So everyone can finally understand everyone."\n\n`;
-    msg += `Commands:\n`;
+    msg += `Your commands:\n`;
+    msg += `  /rosetta register <domain> <term>=<concept> ...\n`;
+    msg += `  /rosetta add <term> <concept>\n`;
+    msg += `  /rosetta discover <term>\n`;
+    msg += `  /rosetta me — your lexicon\n\n`;
+    msg += `Protocol commands (owner):\n`;
     msg += `  /rosetta translate <from> <to> <concept>\n`;
-    msg += `  /rosetta all <agent> <concept> — Translate to ALL agents\n`;
-    msg += `  /rosetta lexicon <agent> — Show agent vocabulary\n`;
-    msg += `  /rosetta view — Full protocol status\n`;
+    msg += `  /rosetta all <agent> <concept>\n`;
+    msg += `  /rosetta lexicon <agent>\n`;
+    msg += `  /rosetta view\n`;
     msg += `  /covenants — The Ten Covenants of Tet`;
     ctx.reply(msg);
   }

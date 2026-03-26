@@ -662,12 +662,311 @@ export default function RosettaPage() {
         </AnimatePresence>
       </div>
 
+      {/* ============ Discover Equivalents ============ */}
+      <DiscoverPanel apiBase={API_BASE} />
+
+      {/* ============ Register Your Lexicon ============ */}
+      <RegisterLexiconPanel apiBase={API_BASE} />
+
       {/* ============ Footer ============ */}
       <div className="mt-8 text-center">
         <p className="text-black-700 text-[10px] font-mono">
           Rosetta Stone Protocol v1.0 — Pantheon Cross-Domain Understanding Layer
         </p>
       </div>
+    </div>
+  )
+}
+
+// ============ Discover Equivalents Panel ============
+
+function DiscoverPanel({ apiBase }) {
+  const [term, setTerm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState(null)
+
+  const handleDiscover = useCallback(async () => {
+    const t = term.trim()
+    if (!t) return
+    setLoading(true)
+    setResult(null)
+    setError(null)
+    try {
+      const res = await fetch(`${apiBase}/web/rosetta/discover?term=${encodeURIComponent(t)}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setResult(data)
+    } catch (err) {
+      setError(err.message || 'Discovery failed')
+    } finally {
+      setLoading(false)
+    }
+  }, [term, apiBase])
+
+  return (
+    <div className="mt-6 mb-6">
+      <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Discover Equivalents</h2>
+      <GlassCard glowColor="terminal" className="p-5">
+        <p className="text-black-500 text-[10px] font-mono mb-3">
+          Enter any term to find which agents and users speak the same concept.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={term}
+            onChange={(e) => { setTerm(e.target.value); setResult(null); setError(null) }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && term.trim()) handleDiscover() }}
+            placeholder="e.g. liquidity, latency, trust..."
+            className="flex-1 bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
+          />
+          <button
+            onClick={handleDiscover}
+            disabled={!term.trim() || loading}
+            className={`px-4 py-2.5 rounded-lg font-mono text-sm font-bold transition-all flex-shrink-0 ${
+              term.trim() && !loading
+                ? 'bg-terminal-600 text-black-900 hover:bg-terminal-500'
+                : 'bg-black-800 text-black-600 cursor-not-allowed'
+            }`}
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-3.5 h-3.5 border-2 border-black-600 border-t-black-900 rounded-full animate-spin" />
+                Searching
+              </span>
+            ) : 'Discover'}
+          </button>
+        </div>
+
+        {error && (
+          <p className="mt-3 text-red-400 text-xs font-mono">{error}</p>
+        )}
+
+        <AnimatePresence>
+          {result && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="mt-4"
+            >
+              {!result.found ? (
+                <p className="text-black-500 text-xs font-mono">{result.error || `"${result.term}" not found in any registered lexicon.`}</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-mono font-bold text-sm">{result.term}</span>
+                    <span className="text-[10px] font-mono text-black-500">→</span>
+                    <span className="text-matrix-400 font-mono text-xs">{result.universal}</span>
+                  </div>
+
+                  {result.exactMatches && result.exactMatches.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-mono text-black-600 mb-1.5 uppercase tracking-wider">Exact Equivalents ({result.exactMatches.length})</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {result.exactMatches.map((m, i) => (
+                          <div key={i} className="flex items-center gap-2 p-2 bg-black-900/50 rounded-lg border border-black-800">
+                            <span className="text-black-400 text-[10px] font-mono flex-shrink-0">{m.agent}</span>
+                            <span className="text-white text-xs font-mono font-medium flex-1 truncate">{m.term}</span>
+                            <span className="text-matrix-500 text-[9px] font-mono flex-shrink-0">100%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {result.approximateMatches && result.approximateMatches.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-mono text-black-600 mb-1.5 uppercase tracking-wider">
+                        Approximate Equivalents ({result.approximateMatches.length})
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                        {result.approximateMatches.slice(0, 6).map((m, i) => (
+                          <div key={i} className="flex items-center gap-2 p-2 bg-black-900/30 rounded-lg border border-black-800/60">
+                            <span className="text-black-500 text-[10px] font-mono flex-shrink-0">{m.agent}</span>
+                            <span className="text-black-300 text-xs font-mono flex-1 truncate">{m.term}</span>
+                            <span
+                              className="text-[9px] font-mono flex-shrink-0"
+                              style={{ color: m.confidence >= 0.7 ? '#00ff41' : '#fbbf24' }}
+                            >
+                              {Math.round((m.confidence || 0) * 100)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlassCard>
+    </div>
+  )
+}
+
+// ============ Register Lexicon Panel ============
+
+function RegisterLexiconPanel({ apiBase }) {
+  const [open, setOpen] = useState(false)
+  const [userId, setUserId] = useState('')
+  const [domain, setDomain] = useState('')
+  const [termsRaw, setTermsRaw] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitResult, setSubmitResult] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
+
+  const handleRegister = useCallback(async () => {
+    setSubmitting(true)
+    setSubmitResult(null)
+    setSubmitError(null)
+
+    // Parse terms: one per line, format "term: universal_concept" or "term=universal_concept"
+    const lines = termsRaw.split('\n').map(l => l.trim()).filter(Boolean)
+    const terms = {}
+    for (const line of lines) {
+      const sep = line.includes(':') ? ':' : '='
+      const idx = line.indexOf(sep)
+      if (idx < 1) continue
+      const t = line.slice(0, idx).trim().toLowerCase().replace(/\s+/g, '_')
+      const u = line.slice(idx + 1).trim().toLowerCase().replace(/\s+/g, '_')
+      if (t && u) terms[t] = u
+    }
+
+    if (Object.keys(terms).length === 0) {
+      setSubmitError('No valid terms found. Use format "term: universal_concept", one per line.')
+      setSubmitting(false)
+      return
+    }
+
+    try {
+      const res = await fetch(`${apiBase}/web/rosetta/lexicon/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId.trim(), domain: domain.trim(), terms }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setSubmitResult(data)
+    } catch (err) {
+      setSubmitError(err.message || 'Registration failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }, [userId, domain, termsRaw, apiBase])
+
+  const canSubmit = userId.trim() && domain.trim() && termsRaw.trim() && !submitting
+
+  return (
+    <div className="mt-2 mb-6">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 text-sm font-bold text-white uppercase tracking-wider mb-3 hover:text-matrix-400 transition-colors"
+      >
+        <svg
+          className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        Register Your Lexicon
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <GlassCard className="p-5">
+              <p className="text-black-500 text-[10px] font-mono mb-4">
+                Teach the protocol your language. Register your domain vocabulary and the network can translate between you and every agent.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Your ID</label>
+                  <input
+                    type="text"
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    placeholder="your-username or address"
+                    className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">Domain</label>
+                  <input
+                    type="text"
+                    value={domain}
+                    onChange={(e) => setDomain(e.target.value)}
+                    placeholder="e.g. Cardiology, Jazz Theory, Game Development"
+                    className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-black-500 mb-1.5 uppercase tracking-wider">
+                    Terms (one per line: "my_term: universal_concept")
+                  </label>
+                  <textarea
+                    value={termsRaw}
+                    onChange={(e) => setTermsRaw(e.target.value)}
+                    placeholder={`arrhythmia: system_instability\nchord: harmonic_combination\nprescription: directive`}
+                    rows={5}
+                    className="w-full bg-black-900/80 border border-black-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-matrix-600 transition-colors resize-none"
+                  />
+                  <p className="text-black-700 text-[9px] font-mono mt-1">
+                    Use underscores for multi-word terms. Universal concept must match an existing concept key or describe a new one.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleRegister}
+                  disabled={!canSubmit}
+                  className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
+                    canSubmit
+                      ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]'
+                      : 'bg-black-800 text-black-600 cursor-not-allowed'
+                  }`}
+                >
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-black-600 border-t-black-900 rounded-full animate-spin" />
+                      Registering...
+                    </span>
+                  ) : 'Register Lexicon'}
+                </button>
+
+                {submitError && (
+                  <p className="text-red-400 text-xs font-mono">{submitError}</p>
+                )}
+
+                {submitResult && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-3 bg-matrix-600/10 border border-matrix-600/30 rounded-lg"
+                  >
+                    <p className="text-matrix-400 text-xs font-mono font-bold">Lexicon registered.</p>
+                    <p className="text-black-400 text-[10px] font-mono mt-1">
+                      {submitResult.termCount} terms indexed under "{submitResult.domain}"
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

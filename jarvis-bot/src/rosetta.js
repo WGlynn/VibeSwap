@@ -27,6 +27,43 @@ const DATA_DIR = process.env.DATA_DIR || './data'
 const ROSETTA_DIR = join(DATA_DIR, 'rosetta')
 const ROSETTA_FILE = join(ROSETTA_DIR, 'rosetta-state.json')
 
+// ============ Mutable State ============
+// Declared early so all functions below can reference without TDZ issues.
+
+/** Reverse map: universal concept → list of { agent, term, desc } entries */
+let universalIndex = null
+
+/** User-defined lexicons: userId → { domain, concepts } */
+const USER_LEXICONS = new Map()
+
+/**
+ * Build (or rebuild) the universal index from all agent + user lexicons.
+ * Called lazily on first access and after any lexicon mutation.
+ */
+function buildUniversalIndex() {
+  universalIndex = {}
+
+  // Index all agent lexicons
+  for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
+    for (const [term, mapping] of Object.entries(lexicon.concepts)) {
+      const u = mapping.universal
+      if (!universalIndex[u]) universalIndex[u] = []
+      universalIndex[u].push({ agent: agentId, term, desc: mapping.desc })
+    }
+  }
+
+  // Index all user lexicons
+  for (const [userId, lexicon] of USER_LEXICONS.entries()) {
+    for (const [term, mapping] of Object.entries(lexicon.concepts)) {
+      const u = mapping.universal
+      if (!universalIndex[u]) universalIndex[u] = []
+      universalIndex[u].push({ agent: `user:${userId}`, term, desc: mapping.desc })
+    }
+  }
+
+  return universalIndex
+}
+
 // ============ The Ten Covenants (Tet's Law) ============
 // Adapted from No Game No Life's Disboard rules.
 // These govern ALL inter-agent interaction in TheAI.
@@ -218,25 +255,438 @@ const LEXICONS = {
       'community':      { universal: 'aligned_group',         desc: 'People united by shared purpose' },
       'governance':     { universal: 'collective_decision',   desc: 'How groups make choices together' },
       'Shapley':        { universal: 'fair_attribution',      desc: 'Measuring each person\'s true contribution' },
+      'reputation':     { universal: 'trust_score',           desc: 'Accumulated credibility from past behavior' },
+      'onboarding':     { universal: 'initiation_path',       desc: 'The journey from stranger to participant' },
+    },
+  },
+  // jarvis: General-purpose reasoning — the universal translator agent
+  jarvis: {
+    domain: 'General Reasoning',
+    concepts: {
+      'context':        { universal: 'situational_state',     desc: 'Everything relevant to this moment\'s decision' },
+      'memory':         { universal: 'persistent_state',      desc: 'Information that outlives a single session' },
+      'inference':      { universal: 'derived_conclusion',    desc: 'What we can reasonably conclude from evidence' },
+      'abstraction':    { universal: 'pattern_generalization', desc: 'The common shape beneath specific instances' },
+      'compression':    { universal: 'compress_context',      desc: 'Keeping the signal, dropping the noise' },
+      'grounding':      { universal: 'reality_anchor',        desc: 'Connecting abstract ideas to observable facts' },
+      'synthesis':      { universal: 'knowledge_fusion',      desc: 'Merging distinct ideas into a coherent whole' },
+      'primitive':      { universal: 'foundational_axiom',    desc: 'A truth so basic it cannot be derived from simpler things' },
+      'invariant':      { universal: 'unchanging_constraint', desc: 'A rule that holds regardless of context' },
+      'coordination':   { universal: 'collective_action',     desc: 'Multiple agents acting toward a shared goal' },
     },
   },
 }
 
-// ============ Universal Concept Index ============
-// Reverse map: universal concept → which agents speak it
+// ============ Extended Universal Concept Registry ============
+// These are additional universal concepts that expand the hub for human domains.
+// Agent lexicons above already define ~50 universals; these add breadth for user registration.
+// Any string is a valid universal key — this list documents the well-known ones.
+//
+// Domains covered by extensions:
+//   Medicine, Music, Law, Education, Biology, Physics, Psychology, Philosophy,
+//   Sports, Architecture, Cooking, Military, Literature, Economics (macro)
+//
+// Format: universal_key → description
+// (Not a runtime object — documentation only. Runtime truth is universalIndex.)
+export const EXTENDED_UNIVERSAL_CONCEPTS = {
+  // ---- Human/Biological ----
+  'system_instability':    'A state oscillating dangerously around equilibrium',
+  'homeostasis':           'Self-regulating balance maintained against external pressure',
+  'feedback_loop':         'Output becomes input — amplifying or dampening change',
+  'threshold_crossing':    'The moment a gradual change becomes a qualitative shift',
+  'resource_depletion':    'Consuming a finite resource faster than it replenishes',
+  'information_gradient':  'Difference in knowledge between two parties',
+  'selection_pressure':    'Environmental force that favors certain traits over others',
+  'symbiosis':             'Two distinct entities gaining mutual benefit from proximity',
+  // ---- Time / Process ----
+  'initiation_path':       'The structured journey from outside to inside a system',
+  'phase_transition':      'A system-wide state change triggered by a parameter crossing',
+  'decay_rate':            'How quickly something loses value, potency, or relevance',
+  'latent_potential':      'Energy or capability present but not yet expressed',
+  'iteration_cycle':       'One full loop of try → measure → improve',
+  'convergence':           'Multiple independent paths meeting at the same destination',
+  // ---- Knowledge / Mind ----
+  'situational_state':     'Everything relevant to this moment\'s decision',
+  'persistent_state':      'Information that outlives a single session',
+  'derived_conclusion':    'What we can reasonably conclude from evidence',
+  'pattern_generalization':'The common shape beneath specific instances',
+  'reality_anchor':        'Connecting abstract ideas to observable facts',
+  'knowledge_fusion':      'Merging distinct ideas into a coherent whole',
+  'foundational_axiom':    'A truth so basic it cannot be derived from simpler things',
+  'unchanging_constraint': 'A rule that holds regardless of context',
+  // ---- Social / Power ----
+  'trust_score':           'Accumulated credibility from past behavior',
+  'collective_action':     'Multiple agents acting toward a shared goal',
+  'norm_enforcement':      'Social pressure keeping behavior within acceptable bounds',
+  'status_signal':         'A costly action whose only function is to demonstrate quality',
+  'coalition_formation':   'Smaller actors combining to match larger ones',
+  'legitimacy':            'Power acknowledged as rightful by those it governs',
+  // ---- Value / Exchange ----
+  'price_discovery':       'The process by which true value is revealed through exchange',
+  'externality':           'A cost or benefit falling on those not party to a transaction',
+  'scarcity_premium':      'Extra value attached to something simply because it is rare',
+  'coordination_cost':     'The overhead of getting multiple parties to act together',
+  'option_value':          'Value of having the ability to act — even without acting',
+}
 
-let universalIndex = null
+// ============ User-Defined Lexicons ============
+// Humans register their own domain vocabulary here.
+// Every user lexicon is a spoke to the same universal hub.
+// USER_LEXICONS and buildUniversalIndex are declared at the top of this file.
 
-function buildUniversalIndex() {
-  universalIndex = {}
-  for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
-    for (const [term, mapping] of Object.entries(lexicon.concepts)) {
-      const u = mapping.universal
-      if (!universalIndex[u]) universalIndex[u] = []
-      universalIndex[u].push({ agent: agentId, term, desc: mapping.desc })
+/**
+ * Register (or replace) a user's personal lexicon.
+ * @param {string} userId - Unique identifier for this user
+ * @param {string} domain - Human-readable domain label (e.g. "Cardiology", "Jazz Theory")
+ * @param {Object} terms - Map of their words → universal concept strings
+ *   e.g. { 'arrhythmia': 'system_instability', 'chord': 'harmonic_combination' }
+ */
+export function registerUserLexicon(userId, domain, terms) {
+  if (!userId || typeof userId !== 'string') return { error: 'userId required' }
+  if (!domain || typeof domain !== 'string') return { error: 'domain required' }
+  if (!terms || typeof terms !== 'object') return { error: 'terms must be an object' }
+
+  const concepts = {}
+  for (const [term, value] of Object.entries(terms)) {
+    if (typeof value === 'string') {
+      // shorthand: term → universal string
+      concepts[term] = { universal: value, desc: '' }
+    } else if (value && typeof value === 'object' && value.universal) {
+      // full form: term → { universal, desc }
+      concepts[term] = { universal: value.universal, desc: value.desc || '' }
     }
   }
-  return universalIndex
+
+  USER_LEXICONS.set(userId, { domain, concepts })
+
+  // Rebuild the universal index to include the new lexicon
+  universalIndex = null
+
+  return { registered: true, userId, domain, termCount: Object.keys(concepts).length }
+}
+
+/**
+ * Add a single term to an existing user lexicon.
+ * Creates the lexicon (with domain 'Custom') if it doesn't exist yet.
+ * @param {string} userId
+ * @param {string} term - The user's word
+ * @param {string|Object} universalConcept - The universal concept string, or { universal, desc }
+ */
+export function addUserTerm(userId, term, universalConcept) {
+  if (!userId || !term) return { error: 'userId and term required' }
+
+  if (!USER_LEXICONS.has(userId)) {
+    USER_LEXICONS.set(userId, { domain: 'Custom', concepts: {} })
+  }
+
+  const lexicon = USER_LEXICONS.get(userId)
+  if (typeof universalConcept === 'string') {
+    lexicon.concepts[term] = { universal: universalConcept, desc: '' }
+  } else if (universalConcept && typeof universalConcept === 'object') {
+    lexicon.concepts[term] = {
+      universal: universalConcept.universal || String(universalConcept),
+      desc: universalConcept.desc || '',
+    }
+  } else {
+    return { error: 'universalConcept must be a string or { universal, desc }' }
+  }
+
+  // Rebuild universal index
+  universalIndex = null
+
+  return { added: true, userId, term, universal: lexicon.concepts[term].universal }
+}
+
+/**
+ * Translate a concept between two users' lexicons via the universal hub.
+ * @param {string} fromUserId
+ * @param {string} toUserId
+ * @param {string} concept - Term from fromUser's lexicon
+ */
+export function translateUser(fromUserId, toUserId, concept) {
+  if (!universalIndex) buildUniversalIndex()
+
+  const fromLexicon = USER_LEXICONS.get(fromUserId)
+  const toLexicon = USER_LEXICONS.get(toUserId)
+
+  if (!fromLexicon) return { error: `No lexicon registered for user: ${fromUserId}`, translated: false }
+  if (!toLexicon) return { error: `No lexicon registered for user: ${toUserId}`, translated: false }
+
+  const mapping = fromLexicon.concepts[concept]
+  if (!mapping) {
+    return {
+      error: `'${concept}' not in ${fromUserId}'s lexicon`,
+      translated: false,
+      available: Object.keys(fromLexicon.concepts),
+    }
+  }
+
+  const universal = mapping.universal
+
+  // Exact match in target user's lexicon
+  for (const [term, tMapping] of Object.entries(toLexicon.concepts)) {
+    if (tMapping.universal === universal) {
+      return {
+        from: { userId: fromUserId, term: concept, desc: mapping.desc },
+        universal,
+        to: { userId: toUserId, term, desc: tMapping.desc },
+        confidence: 1.0,
+        translated: true,
+      }
+    }
+  }
+
+  // Approximate match
+  let bestMatch = null
+  let bestScore = 0
+  for (const [term, tMapping] of Object.entries(toLexicon.concepts)) {
+    const score = conceptSimilarity(universal, tMapping.universal)
+    if (score > bestScore) {
+      bestScore = score
+      bestMatch = { term, mapping: tMapping }
+    }
+  }
+
+  if (bestMatch && bestScore > 0.2) {
+    return {
+      from: { userId: fromUserId, term: concept, desc: mapping.desc },
+      universal,
+      to: { userId: toUserId, term: bestMatch.term, desc: bestMatch.mapping.desc },
+      confidence: bestScore,
+      translated: true,
+      approximate: true,
+    }
+  }
+
+  return {
+    from: { userId: fromUserId, term: concept, desc: mapping.desc },
+    universal,
+    to: null,
+    confidence: 0,
+    translated: false,
+    explanation: `${toUserId} has no equivalent concept. Universal form: "${universal}"`,
+  }
+}
+
+/**
+ * Show how a user's concept maps across ALL registered lexicons — agents and users.
+ * @param {string} userId
+ * @param {string} concept - Term from the user's lexicon
+ */
+export function translateUserToAll(userId, concept) {
+  if (!universalIndex) buildUniversalIndex()
+
+  const userLexicon = USER_LEXICONS.get(userId)
+  if (!userLexicon) return { error: `No lexicon registered for user: ${userId}` }
+
+  const mapping = userLexicon.concepts[concept]
+  if (!mapping) {
+    return {
+      error: `'${concept}' not in ${userId}'s lexicon`,
+      available: Object.keys(userLexicon.concepts),
+    }
+  }
+
+  const universal = mapping.universal
+  const results = {}
+
+  // Translate to all agent lexicons
+  for (const agentId of Object.keys(LEXICONS)) {
+    const agentLexicon = LEXICONS[agentId]
+    let bestTerm = null
+    let bestScore = 0
+
+    for (const [term, tMapping] of Object.entries(agentLexicon.concepts)) {
+      if (tMapping.universal === universal) {
+        results[agentId] = { type: 'agent', term, desc: tMapping.desc, confidence: 1.0, translated: true }
+        bestTerm = null // exact found, skip approximate
+        break
+      }
+      const score = conceptSimilarity(universal, tMapping.universal)
+      if (score > bestScore) {
+        bestScore = score
+        bestTerm = { term, mapping: tMapping }
+      }
+    }
+
+    if (!results[agentId]) {
+      if (bestTerm && bestScore > 0.2) {
+        results[agentId] = { type: 'agent', term: bestTerm.term, desc: bestTerm.mapping.desc, confidence: bestScore, translated: true, approximate: true }
+      } else {
+        results[agentId] = { type: 'agent', translated: false, explanation: `No equivalent in ${agentId}'s domain` }
+      }
+    }
+  }
+
+  // Translate to all other user lexicons
+  for (const [otherUserId, otherLexicon] of USER_LEXICONS.entries()) {
+    if (otherUserId === userId) continue
+    let bestTerm = null
+    let bestScore = 0
+
+    for (const [term, tMapping] of Object.entries(otherLexicon.concepts)) {
+      if (tMapping.universal === universal) {
+        results[`user:${otherUserId}`] = { type: 'user', term, desc: tMapping.desc, confidence: 1.0, translated: true }
+        bestTerm = null
+        break
+      }
+      const score = conceptSimilarity(universal, tMapping.universal)
+      if (score > bestScore) {
+        bestScore = score
+        bestTerm = { term, mapping: tMapping }
+      }
+    }
+
+    if (!results[`user:${otherUserId}`]) {
+      if (bestTerm && bestScore > 0.2) {
+        results[`user:${otherUserId}`] = { type: 'user', term: bestTerm.term, desc: bestTerm.mapping.desc, confidence: bestScore, translated: true, approximate: true }
+      } else {
+        results[`user:${otherUserId}`] = { type: 'user', translated: false, explanation: `No equivalent in ${otherUserId}'s vocabulary` }
+      }
+    }
+  }
+
+  return {
+    source: { userId, concept, domain: userLexicon.domain },
+    universal,
+    translations: results,
+  }
+}
+
+/**
+ * Given any term from any lexicon (agent or user), find all equivalent terms
+ * across every registered lexicon. Reverse lookup via universal hub.
+ * @param {string} term - The term to look up
+ * @returns {{ universal: string, matches: Array<{ source, term, desc, confidence }> }}
+ */
+export function discoverEquivalent(term) {
+  if (!universalIndex) buildUniversalIndex()
+
+  // Step 1: find this term's universal concept in any lexicon
+  let universal = null
+  let sourceInfo = null
+
+  // Search agent lexicons
+  for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
+    if (lexicon.concepts[term]) {
+      universal = lexicon.concepts[term].universal
+      sourceInfo = { type: 'agent', id: agentId, domain: lexicon.domain, desc: lexicon.concepts[term].desc }
+      break
+    }
+  }
+
+  // Search user lexicons if not found in agents
+  if (!universal) {
+    for (const [userId, lexicon] of USER_LEXICONS.entries()) {
+      if (lexicon.concepts[term]) {
+        universal = lexicon.concepts[term].universal
+        sourceInfo = { type: 'user', id: userId, domain: lexicon.domain, desc: lexicon.concepts[term].desc }
+        break
+      }
+    }
+  }
+
+  if (!universal) {
+    return {
+      term,
+      found: false,
+      error: `'${term}' not found in any registered lexicon`,
+    }
+  }
+
+  // Step 2: gather all equivalents from the universal index
+  const exactMatches = universalIndex[universal] || []
+
+  // Step 3: also collect approximate matches (similar universal concepts)
+  const approximateMatches = []
+  for (const [otherUniversal, entries] of Object.entries(universalIndex)) {
+    if (otherUniversal === universal) continue
+    const score = conceptSimilarity(universal, otherUniversal)
+    if (score > 0.3) {
+      for (const entry of entries) {
+        approximateMatches.push({ ...entry, confidence: score, approximate: true, theirUniversal: otherUniversal })
+      }
+    }
+  }
+
+  // Sort approximate matches by score descending
+  approximateMatches.sort((a, b) => b.confidence - a.confidence)
+
+  return {
+    term,
+    found: true,
+    source: sourceInfo,
+    universal,
+    exactMatches: exactMatches.map(e => ({ ...e, confidence: 1.0 })),
+    approximateMatches: approximateMatches.slice(0, 10),
+    totalEquivalents: exactMatches.length + approximateMatches.length,
+  }
+}
+
+/**
+ * Fuzzy matching: suggest which universal concept a new term might map to,
+ * based on word overlap with existing universal concepts and their descriptions.
+ * @param {string} term - A new word the user is trying to register
+ * @returns {{ suggestions: Array<{ universal, score, reason, examples }> }}
+ */
+export function getSuggestedMappings(term) {
+  if (!universalIndex) buildUniversalIndex()
+
+  const termWords = term.toLowerCase().replace(/_/g, ' ').split(/\s+/)
+
+  const scores = {}
+
+  // Score against every universal concept key
+  for (const universal of Object.keys(universalIndex)) {
+    const uWords = universal.split('_')
+    const overlap = termWords.filter(w => uWords.includes(w)).length
+    if (overlap > 0) {
+      scores[universal] = (scores[universal] || 0) + (overlap * 2) / (termWords.length + uWords.length)
+    }
+  }
+
+  // Score against descriptions of agent lexicon terms
+  for (const [agentId, lexicon] of Object.entries(LEXICONS)) {
+    for (const [agentTerm, mapping] of Object.entries(lexicon.concepts)) {
+      const descWords = mapping.desc.toLowerCase().split(/\s+/)
+      const overlap = termWords.filter(w => descWords.includes(w) && w.length > 3).length
+      if (overlap > 0) {
+        const boost = overlap / (termWords.length + descWords.length)
+        scores[mapping.universal] = (scores[mapping.universal] || 0) + boost
+      }
+
+      // Direct word match against agent term itself
+      const agentTermWords = agentTerm.toLowerCase().replace(/_/g, ' ').split(/\s+/)
+      const termOverlap = termWords.filter(w => agentTermWords.includes(w)).length
+      if (termOverlap > 0) {
+        const boost = (termOverlap * 1.5) / (termWords.length + agentTermWords.length)
+        scores[mapping.universal] = (scores[mapping.universal] || 0) + boost
+      }
+    }
+  }
+
+  // Rank and format
+  const ranked = Object.entries(scores)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([universal, score]) => {
+      const examples = (universalIndex[universal] || []).map(e => `${e.agent}:"${e.term}"`).join(', ')
+      return {
+        universal,
+        score: Math.min(score, 1.0),
+        reason: `Word overlap with existing concepts`,
+        examples: examples || 'none yet',
+        registeredBy: (universalIndex[universal] || []).map(e => e.agent),
+      }
+    })
+
+  return {
+    term,
+    suggestions: ranked,
+    tip: ranked.length > 0
+      ? `Top suggestion: use "${ranked[0].universal}" — already spoken by: ${ranked[0].registeredBy.join(', ')}`
+      : `No close matches found. "${term}" may be a genuinely new concept — register it with a new universal key.`,
+  }
 }
 
 // ============ Translation Engine ============
@@ -490,8 +940,10 @@ export function getRosettaView() {
 
   const view = {
     agents: {},
+    users: {},
     universalConcepts: Object.keys(universalIndex).length,
     totalTerms: 0,
+    registeredUsers: USER_LEXICONS.size,
     covenantHash: COVENANT_HASH,
     covenants: TEN_COVENANTS.length,
     activeChallenges: getChallenges({ status: 'pending' }).length + getChallenges({ status: 'accepted' }).length,
@@ -507,6 +959,16 @@ export function getRosettaView() {
     view.totalTerms += terms.length
   }
 
+  for (const [userId, lexicon] of USER_LEXICONS.entries()) {
+    const terms = Object.keys(lexicon.concepts)
+    view.users[userId] = {
+      domain: lexicon.domain,
+      termCount: terms.length,
+      terms,
+    }
+    view.totalTerms += terms.length
+  }
+
   return view
 }
 
@@ -515,9 +977,15 @@ export function getRosettaView() {
 export async function persistRosetta() {
   try {
     await mkdir(ROSETTA_DIR, { recursive: true })
+    // Serialize user lexicons: Map → plain object for JSON
+    const userLexiconsObj = {}
+    for (const [userId, lexicon] of USER_LEXICONS.entries()) {
+      userLexiconsObj[userId] = lexicon
+    }
     const state = {
       covenantHash: COVENANT_HASH,
       challenges: [...challenges.values()],
+      userLexicons: userLexiconsObj,
       timestamp: new Date().toISOString(),
     }
     await writeFile(ROSETTA_FILE, JSON.stringify(state, null, 2))
@@ -541,6 +1009,15 @@ export async function loadRosetta() {
       }
     }
 
+    // Restore user lexicons
+    if (state.userLexicons) {
+      for (const [userId, lexicon] of Object.entries(state.userLexicons)) {
+        USER_LEXICONS.set(userId, lexicon)
+      }
+      // Rebuild index to include restored user lexicons
+      universalIndex = null
+    }
+
     return state
   } catch {
     return null
@@ -552,9 +1029,14 @@ export async function loadRosetta() {
 export function initRosetta() {
   buildUniversalIndex()
   loadRosetta().catch(() => {})
-  const totalTerms = Object.values(LEXICONS).reduce((sum, l) => sum + Object.keys(l.concepts).length, 0)
-  console.log(`[rosetta] Protocol initialized. ${Object.keys(LEXICONS).length} lexicons, ${totalTerms} terms, ${Object.keys(universalIndex).length} universal concepts, ${TEN_COVENANTS.length} covenants (${COVENANT_HASH.slice(0, 16)}...)`)
-  return { totalTerms, universalConcepts: Object.keys(universalIndex).length, covenantHash: COVENANT_HASH }
+  const agentTerms = Object.values(LEXICONS).reduce((sum, l) => sum + Object.keys(l.concepts).length, 0)
+  console.log(`[rosetta] Protocol initialized. ${Object.keys(LEXICONS).length} agent lexicons, ${agentTerms} agent terms, ${Object.keys(universalIndex).length} universal concepts, ${TEN_COVENANTS.length} covenants (${COVENANT_HASH.slice(0, 16)}...) — ${USER_LEXICONS.size} user lexicons loaded`)
+  return {
+    agentTerms,
+    universalConcepts: Object.keys(universalIndex).length,
+    covenantHash: COVENANT_HASH,
+    userLexicons: USER_LEXICONS.size,
+  }
 }
 
 // ============ Exports for Tools ============
@@ -565,6 +1047,20 @@ export function getLexicon(agentId) {
 
 export function getAllLexicons() {
   return LEXICONS
+}
+
+/** Return a user's registered lexicon, or null if not registered. */
+export function getUserLexicon(userId) {
+  return USER_LEXICONS.get(userId) || null
+}
+
+/** Return all user lexicons as a plain object. */
+export function getAllUserLexicons() {
+  const result = {}
+  for (const [userId, lexicon] of USER_LEXICONS.entries()) {
+    result[userId] = lexicon
+  }
+  return result
 }
 
 export function getCovenant(number) {

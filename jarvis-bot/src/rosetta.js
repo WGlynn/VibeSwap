@@ -275,6 +275,130 @@ const LEXICONS = {
       'coordination':   { universal: 'collective_action',     desc: 'Multiple agents acting toward a shared goal' },
     },
   },
+
+  // ── Human Domain Lexicons ─────────────────────────────────────────────────
+  // Real-world professional vocabularies mapped to the same universal hub.
+  //
+  // The Rosetta insight: when professionals from different worlds look up their
+  // own native terms, they find each other's terms mapped to the same universal
+  // concept — and realize they've been solving the same class of problem with
+  // different words.
+  //
+  // Convergences this unlocks:
+  //   medicine:"diagnosis"  + artemis:"audit"     + law:"discovery"     → systematic_review
+  //   medicine:"triage"     + artemis:"triage"    + agriculture:"IPM"   → priority_under_constraint
+  //   poseidon:"yield"      + agriculture:"yield"                       → return_rate
+  //   law:"precedent"       + hermes:"protocol"                         → established_pattern
+  //   law:"injunction"      + artemis:"circuit_breaker"                 → emergency_stop
+  //   music:"harmony"       + nyx:"coherence"                           → consistency
+  //   engineering:"tolerance" + poseidon:"slippage"                     → acceptable_variance
+  //   engineering:"redundancy" + proteus:"resilience"                   → backup_capacity / recovery_ability
+  //   agriculture:"fallow"  + hephaestus:"tech_debt" resolution         → intentional_rest
+  //   education:"scaffolding"                                           → structured_support
+  //   education:"zone_of_proximal_development"                          → growth_edge
+  //   music:"dissonance"    + athena:"tradeoff"                         → productive_tension
+
+  medicine: {
+    domain: 'Medicine & Healthcare',
+    concepts: {
+      'diagnosis':         { universal: 'systematic_review',         desc: 'Identifying what is wrong through structured evidence gathering' },
+      'prognosis':         { universal: 'outcome_forecast',          desc: 'Predicting the likely course of a condition over time' },
+      'etiology':          { universal: 'root_cause',                desc: 'The origin or underlying cause of a condition' },
+      'comorbidity':       { universal: 'coupled_risk',              desc: 'Two problems that tend to co-occur and amplify each other' },
+      'contraindication':  { universal: 'known_incompatibility',     desc: 'A condition that makes a treatment harmful rather than helpful' },
+      'triage':            { universal: 'priority_under_constraint', desc: 'Sorting patients by urgency when resources are scarce' },
+      'prophylaxis':       { universal: 'preventive_action',         desc: 'Acting before harm occurs to prevent it' },
+      'remission':         { universal: 'temporary_recovery',        desc: 'Symptoms have retreated — not necessarily cured' },
+      'informed_consent':  { universal: 'voluntary_agreement',       desc: 'The person understands the stakes and freely says yes' },
+      'placebo':           { universal: 'expectation_effect',        desc: 'Improvement driven by belief rather than the treatment itself' },
+      'homeostasis':       { universal: 'stable_equilibrium',        desc: 'The body\'s drive to maintain internal balance' },
+      'pathogen':          { universal: 'threat_actor',              desc: 'An agent that causes harm by entering and disrupting the system' },
+    },
+  },
+
+  law: {
+    domain: 'Law & Legal Reasoning',
+    concepts: {
+      'precedent':         { universal: 'established_pattern',       desc: 'A prior decision that shapes how similar cases are decided' },
+      'jurisdiction':      { universal: 'authority_boundary',        desc: 'The domain within which a rule-maker\'s rules apply' },
+      'liability':         { universal: 'assigned_responsibility',   desc: 'Who bears the cost when something goes wrong' },
+      'tort':              { universal: 'civil_harm',                desc: 'A wrong that causes damage to another, outside of contract' },
+      'estoppel':          { universal: 'prior_commitment_lock',     desc: 'You cannot contradict your past position to harm someone who relied on it' },
+      'remedy':            { universal: 'corrective_action',         desc: 'What the wronged party receives to make them whole' },
+      'discovery':         { universal: 'systematic_review',         desc: 'Compelled disclosure of evidence before trial' },
+      'standing':          { universal: 'right_to_participate',      desc: 'The threshold showing you have enough at stake to bring a claim' },
+      'burden_of_proof':   { universal: 'evidence_threshold',        desc: 'How much evidence the claimant must produce to win' },
+      'injunction':        { universal: 'emergency_stop',            desc: 'A court order to halt an action immediately' },
+      'due_diligence':     { universal: 'pre_commitment_audit',      desc: 'Thorough investigation before entering an agreement' },
+      'fiduciary':         { universal: 'trust_obligation',          desc: 'A duty to act in another party\'s best interest above your own' },
+    },
+  },
+
+  engineering: {
+    domain: 'Structural & Mechanical Engineering',
+    concepts: {
+      'tolerance':         { universal: 'acceptable_variance',       desc: 'How much deviation from spec is allowed before failure' },
+      'load_bearing':      { universal: 'critical_dependency',       desc: 'A component whose failure brings down the whole structure' },
+      'shear_stress':      { universal: 'lateral_pressure',          desc: 'Force applied parallel to a surface — the sliding kind of failure' },
+      'fatigue':           { universal: 'accumulated_degradation',   desc: 'Failure from repeated stress below the single-event limit' },
+      'thermal_expansion': { universal: 'environment_induced_drift', desc: 'Change in dimensions caused by change in ambient conditions' },
+      'yield_strength':    { universal: 'elastic_limit',             desc: 'The point past which deformation becomes permanent' },
+      'redundancy':        { universal: 'backup_capacity',           desc: 'Parallel systems so one failure doesn\'t cause total collapse' },
+      'tensile_strength':  { universal: 'maximum_load',              desc: 'The most stress a material can take before breaking' },
+      'safety_factor':     { universal: 'margin_of_safety',          desc: 'Building to handle more stress than you expect to see' },
+      'resonance':         { universal: 'amplification_at_frequency', desc: 'When external rhythm matches internal rhythm and energy builds dangerously' },
+      'creep':             { universal: 'slow_permanent_drift',      desc: 'Gradual deformation under sustained load over time' },
+    },
+  },
+
+  education: {
+    domain: 'Education & Pedagogy',
+    concepts: {
+      'scaffolding':                  { universal: 'structured_support',      desc: 'Temporary structure enabling work the learner can\'t yet do alone' },
+      'rubric':                       { universal: 'evaluation_framework',    desc: 'Explicit criteria that make assessment transparent and consistent' },
+      'differentiation':              { universal: 'adaptive_delivery',       desc: 'Adjusting approach for different learners rather than one-size-fits-all' },
+      'formative_assessment':         { universal: 'in_progress_feedback',    desc: 'Checking understanding while learning is happening, not after' },
+      'bloom_taxonomy':               { universal: 'capability_hierarchy',    desc: 'The ladder from remembering facts to creating new knowledge' },
+      'pedagogy':                     { universal: 'transmission_method',     desc: 'The theory and practice of how knowledge is passed from one to another' },
+      'metacognition':                { universal: 'thinking_about_thinking', desc: 'Awareness of one\'s own reasoning process' },
+      'zone_of_proximal_development': { universal: 'growth_edge',             desc: 'What you can do with help but not yet alone — the sweet spot for learning' },
+      'mastery_learning':             { universal: 'threshold_gating',        desc: 'Requiring demonstrated competence before advancing to the next level' },
+      'transfer':                     { universal: 'concept_portability',     desc: 'Applying knowledge from one domain to solve problems in another' },
+    },
+  },
+
+  music: {
+    domain: 'Music & Sound',
+    concepts: {
+      'harmony':       { universal: 'consistency',                desc: 'Notes that support each other — frequencies that feel right together' },
+      'dissonance':    { universal: 'productive_tension',         desc: 'Friction that demands resolution — the useful kind of wrong' },
+      'resolution':    { universal: 'tension_release',            desc: 'The move from instability back to a stable state' },
+      'counterpoint':  { universal: 'independent_parallel_lines', desc: 'Two voices moving independently but creating something coherent together' },
+      'timbre':        { universal: 'identity_signature',         desc: 'The quality that makes a sound recognizable as itself — its fingerprint' },
+      'cadence':       { universal: 'rhythmic_closure',           desc: 'A sequence that signals an ending or resting point' },
+      'syncopation':   { universal: 'unexpected_emphasis',        desc: 'Placing stress where the pattern doesn\'t expect it' },
+      'motif':         { universal: 'recurring_unit',             desc: 'A small pattern that repeats and builds meaning through repetition' },
+      'dynamics':      { universal: 'intensity_modulation',       desc: 'Variation in force or volume to create expression' },
+      'tempo':         { universal: 'execution_rate',             desc: 'The speed at which events unfold' },
+      'key':           { universal: 'operating_context',          desc: 'The tonal home base that gives all other notes their meaning' },
+    },
+  },
+
+  agriculture: {
+    domain: 'Agriculture & Land Stewardship',
+    concepts: {
+      'yield':              { universal: 'return_rate',              desc: 'Output per unit of input — what the land gives back' },
+      'rotation':           { universal: 'cyclic_renewal',           desc: 'Changing what occupies a space to restore what the previous use depleted' },
+      'soil_health':        { universal: 'substrate_quality',        desc: 'The underlying conditions that determine what can grow on top' },
+      'grafting':           { universal: 'capability_merger',        desc: 'Joining two organisms so one provides roots, the other provides fruit' },
+      'vernalization':      { universal: 'prerequisite_condition',   desc: 'A cold period that must be experienced before flowering capability unlocks' },
+      'IPM':                { universal: 'priority_under_constraint', desc: 'Managing pests through least-invasive means first — escalating only as needed' },
+      'terroir':            { universal: 'context_fingerprint',      desc: 'How the specific place something comes from is inseparable from what it is' },
+      'fallow':             { universal: 'intentional_rest',         desc: 'Leaving a resource idle to let it recover and regenerate' },
+      'companion_planting': { universal: 'mutualistic_co_location',  desc: 'Placing complementary things together so each helps the other thrive' },
+      'hardening_off':      { universal: 'graduated_exposure',       desc: 'Slowly introducing stress to build tolerance before full deployment' },
+    },
+  },
 }
 
 // ============ Extended Universal Concept Registry ============

@@ -438,7 +438,7 @@ The mechanism directory is the largest -- containing protocol extensions, DeFi p
 | Contract | Purpose | Upgradeable | Key Functions |
 |----------|---------|-------------|---------------|
 | **VibeFlashLoanProvider** | Flash loans with safety rails | UUPS | `flashLoan`, `fundPool` |
-| **VibeLendingPool** | Aave-style lending with variable rates | UUPS | `deposit`, `withdraw`, `borrow`, `repay` |
+| **VibeLendingPool** | **DEPRECATED** — duplicate of `financial/VibeLendPool.sol`. See canonical version. | UUPS | `deposit`, `withdraw`, `borrow`, `repay` |
 | **VibeP2PLending** | Peer-to-peer lending with reputation | UUPS | `fundLoan`, `repay`, `markDefault`, `liquidate` |
 | **VibeInsurancePool** (mechanism) | FDIC-like deposit insurance | UUPS | `purchasePolicy`, `fileClaim`, `executePayout` |
 | **VibeLiquidStaking** (mechanism) | Liquid staking derivatives (vsETH) | UUPS | `stake`, `unstake`, `distributeRewards` |
@@ -493,7 +493,7 @@ The mechanism directory is the largest -- containing protocol extensions, DeFi p
 | **VibeCrossChainSwap** | Atomic cross-chain swaps (HTLC) | UUPS | `claim`, `refund` |
 | **VibeDNS** | Decentralized name service (ENS alternative) | UUPS | `renewName`, `resolve`, `resolveContent` |
 | **VibeFeeDistributor** (mechanism) | Non-swap protocol fee revenue sharing | UUPS | `depositFees`, `stake`, `claimFees` |
-| **VibeFeeRouter** (mechanism) | Protocol-wide fee aggregation and distribution | UUPS | `collectETH`, `distributeETH`, `distributeToken` |
+| **VibeFeeRouter** (mechanism) | **DEPRECATED** — duplicate of `core/FeeRouter.sol`. See canonical version. | UUPS | `collectETH`, `distributeETH`, `distributeToken` |
 | **VibeGasStation** | Gasless transaction relay network | UUPS | `registerRelayer`, `createSponsor`, `depositGas` |
 | **VibeHarbergerPublicGoods** | Universal Harberger taxation for semi-public goods | UUPS | `buyAsset`, `collectTax`, `foreclose` |
 | **VibeIdentityBridge** | Cross-chain identity portability | UUPS | `validateAttestation`, `isValidIdentity` |

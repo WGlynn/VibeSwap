@@ -247,9 +247,9 @@ Makes gaps visible. Gaps are bugs waiting to happen.
 
 These are mechanism/financial contracts with zero test coverage:
 
-1. **VibeFeeRouter** (`contracts/mechanism/VibeFeeRouter.sol`) -- distinct from `core/FeeRouter.sol`. May be duplicate; audit needed.
+1. ~~**VibeFeeRouter** (`contracts/mechanism/VibeFeeRouter.sol`)~~ -- RESOLVED: confirmed duplicate of `core/FeeRouter.sol`. Deprecated in place; canonical version has full test coverage. Unique features (UUPS, dynamic recipients, ETH collection) noted for potential forward-port.
 2. **VibeFlashLoanProvider** (`contracts/mechanism/VibeFlashLoanProvider.sol`) -- distinct from `financial/VibeFlashLoan.sol`.
-3. **VibeLendingPool** (`contracts/mechanism/VibeLendingPool.sol`) -- distinct from `financial/VibeLendPool.sol`. May be duplicate.
+3. ~~**VibeLendingPool** (`contracts/mechanism/VibeLendingPool.sol`)~~ -- RESOLVED: confirmed duplicate of `financial/VibeLendPool.sol`. Deprecated in place; canonical version has full test coverage + Shapley weighting + flash loans. Unique features (per-asset rate config, normalized shares) noted for potential forward-port.
 4. **SIEPermissionlessLaunch** -- SIE launch mechanism, no tests.
 5. **BatchPriceVerifier** (`contracts/settlement/BatchPriceVerifier.sol`) -- settlement-critical.
 6. **VerifiedCompute** (`contracts/settlement/VerifiedCompute.sol`) -- settlement-critical.

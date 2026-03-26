@@ -60,14 +60,14 @@ graph TD
     Gov --> Stabilizer[<b>Treasury<br/>Stabilizer</b>]
     XChain --> Verifiers[<b>Settlement<br/>Verifiers</b>]
 
-    style Core fill:#7c3aed,stroke:#5b21b6,color:#fff
-    style Auction fill:#2563eb,stroke:#1d4ed8,color:#fff
-    style AMM fill:#2563eb,stroke:#1d4ed8,color:#fff
-    style Gov fill:#2563eb,stroke:#1d4ed8,color:#fff
-    style XChain fill:#2563eb,stroke:#1d4ed8,color:#fff
-    style Shapley fill:#0891b2,stroke:#0e7490,color:#fff
-    style Stabilizer fill:#0891b2,stroke:#0e7490,color:#fff
-    style Verifiers fill:#0891b2,stroke:#0e7490,color:#fff
+    style Core fill:#da7756,stroke:#c4623f,color:#fff
+    style Auction fill:#0f0f0f,stroke:#2a2a2a,color:#00ff41
+    style AMM fill:#0f0f0f,stroke:#2a2a2a,color:#00ff41
+    style Gov fill:#0f0f0f,stroke:#2a2a2a,color:#00ff41
+    style XChain fill:#0f0f0f,stroke:#2a2a2a,color:#00ff41
+    style Shapley fill:#0a0a0a,stroke:#1a1a1a,color:#00ff41
+    style Stabilizer fill:#0a0a0a,stroke:#1a1a1a,color:#00ff41
+    style Verifiers fill:#0a0a0a,stroke:#1a1a1a,color:#00ff41
 ```
 
 | System | Key Contracts |

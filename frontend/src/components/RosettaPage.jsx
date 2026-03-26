@@ -628,13 +628,13 @@ function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [], s
             </optgroup>
           )}
         </select>
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-black-500">
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-black-500" aria-hidden="true">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
         {value && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
             <AgentDot color={selectedOption?.color || USER_LEXICON_COLOR} />
           </div>
         )}
@@ -932,6 +932,103 @@ function TranslateAllResults({ results, fromId, userLexicons = [] }) {
       </GlassCard>
     </motion.div>
   )
+}
+
+// ============ Print Lexicon ============
+// Opens a clean print-friendly window — designed for professor/classroom handouts.
+
+function printLexicon(lexiconId) {
+  const lexData = LEXICONS[lexiconId]
+  if (!lexData) return
+  const isAgent = AI_AGENT_IDS.includes(lexiconId)
+  const agentColor = AGENT_COLORS[lexiconId] || '#00ff41'
+  const humanColor = HUMAN_DOMAIN_COLORS[lexiconId] || '#94a3b8'
+  const color = isAgent ? agentColor : humanColor
+  const displayName = toDisplayName(lexiconId)
+  const domain = lexData.domain || ''
+  const terms = Object.entries(lexData.concepts || {})
+    .map(([term, m]) => ({ term, universal: m.universal || '', description: m.desc || '' }))
+    .sort((a, b) => a.term.localeCompare(b.term))
+  const printDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  const rows = terms.map((t, i) => {
+    const cls = i % 2 === 0 ? 'even' : 'odd'
+    const termCell = t.term.replace(/_/g, ' ')
+    const univCell = t.universal.replace(/_/g, ' ')
+    const descCell = t.description || '<span class="muted">—</span>'
+    return '<tr class="' + cls + '"><td class="term">' + termCell + '</td><td class="universal">' + univCell + '</td><td class="desc">' + descCell + '</td></tr>'
+  }).join('')
+
+  const css = [
+    '*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}',
+    'body{font-family:Georgia,serif;font-size:11pt;line-height:1.5;color:#1a1a1a;background:#fff}',
+    '.print-bar{background:#f5f5f5;border-bottom:1px solid #ddd;padding:10px 40px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}',
+    '.btn-print{background:' + color + ';color:#fff;border:none;padding:8px 20px;font-family:monospace;font-size:9pt;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;border-radius:6px;cursor:pointer}',
+    '.btn-print:hover{opacity:.85}',
+    '.btn-close{background:transparent;color:#555;border:1px solid #ccc;padding:8px 16px;font-family:monospace;font-size:9pt;border-radius:6px;cursor:pointer}',
+    '.btn-close:hover{background:#eee}',
+    '.print-hint{font-family:monospace;font-size:8pt;color:#999}',
+    '.page{max-width:900px;margin:0 auto;padding:36px 44px 56px}',
+    '.header{border-bottom:3px solid ' + color + ';padding-bottom:18px;margin-bottom:28px}',
+    '.badge{display:inline-block;font-family:monospace;font-size:8pt;font-weight:bold;text-transform:uppercase;letter-spacing:.12em;color:' + color + ';border:1.5px solid ' + color + ';border-radius:20px;padding:2px 10px;margin-bottom:10px}',
+    'h1{font-size:24pt;font-weight:bold;color:#111;margin-bottom:4px}',
+    '.domain-line{font-family:monospace;font-size:9.5pt;color:#555;margin-bottom:6px}',
+    '.meta-line{font-size:9pt;color:#888}',
+    '.intro-note{font-size:10pt;color:#555;font-style:italic;margin-bottom:20px;padding:12px 16px;background:#f9f9f9;border-left:3px solid ' + color + ';line-height:1.6}',
+    'table{width:100%;border-collapse:collapse;font-size:10.5pt}',
+    'thead tr{background:#f0f0f0;border-bottom:2px solid #bbb}',
+    'thead th{text-align:left;padding:9px 12px;font-family:monospace;font-size:8pt;font-weight:bold;text-transform:uppercase;letter-spacing:.08em;color:#444}',
+    'tbody tr.even{background:#fff}tbody tr.odd{background:#fafafa}',
+    'tbody tr{border-bottom:1px solid #e8e8e8}',
+    'td{padding:8px 12px;vertical-align:top}',
+    'td.term{font-family:monospace;font-size:10.5pt;font-weight:bold;color:#111;white-space:nowrap;width:22%}',
+    'td.universal{font-family:monospace;font-size:9.5pt;color:' + color + ';width:26%}',
+    'td.desc{font-size:10.5pt;color:#333;line-height:1.45}',
+    '.muted{color:#bbb}',
+    '.footer{margin-top:36px;padding-top:14px;border-top:1px solid #e0e0e0;font-family:monospace;font-size:8pt;color:#aaa;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}',
+    '@media print{.print-bar{display:none!important}.page{padding:18px 24px;max-width:100%}table{font-size:9.5pt}td{padding:5px 8px}tr{page-break-inside:avoid}thead{display:table-header-group}}',
+  ].join('')
+
+  const termCount = terms.length
+  const termWord = termCount !== 1 ? 'terms' : 'term'
+  const badgeLabel = isAgent ? 'AI Agent Lexicon' : 'Human Domain Lexicon'
+  const domainRow = domain ? '<p class="domain-line">' + domain + '</p>' : ''
+
+  const html = (
+    '<!DOCTYPE html><html lang="en"><head>'
+    + '<meta charset="UTF-8"/>'
+    + '<title>' + displayName + ' Lexicon — Rosetta Stone Protocol</title>'
+    + '<style>' + css + '</style></head><body>'
+    + '<div class="print-bar">'
+    + '<button class="btn-print" onclick="window.print()">Print / Save PDF</button>'
+    + '<button class="btn-close" onclick="window.close()">Close</button>'
+    + '<span class="print-hint">In the print dialog, choose &ldquo;Save as PDF&rdquo; to export a portable handout.</span>'
+    + '</div>'
+    + '<div class="page">'
+    + '<div class="header">'
+    + '<div class="badge">' + badgeLabel + '</div>'
+    + '<h1>' + displayName + ' Lexicon</h1>'
+    + domainRow
+    + '<p class="meta-line">' + termCount + ' ' + termWord + ' &middot; Rosetta Stone Protocol &middot; ' + printDate + '</p>'
+    + '</div>'
+    + '<p class="intro-note">Each term in the <strong>' + displayName + '</strong> domain maps to a <em>universal concept</em> &mdash; an underlying idea every other domain expresses in its own vocabulary. The &ldquo;Universal Concept&rdquo; column is the language-neutral key connecting this lexicon to medicine, engineering, law, music, and every other field in the Rosetta Stone Protocol.</p>'
+    + '<table>'
+    + '<thead><tr><th>' + displayName + ' Term</th><th>Universal Concept</th><th>Description</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + '<div class="footer"><span>Rosetta Stone Protocol &mdash; Universal Domain Translation</span><span>vibeswap.xyz/rosetta</span></div>'
+    + '</div></body></html>'
+  )
+
+  const win = window.open('', '_blank', 'width=960,height=760,scrollbars=yes,resizable=yes')
+  if (!win) {
+    // eslint-disable-next-line no-alert
+    alert('Pop-up blocked. Please allow pop-ups for this site to use Print Lexicon.')
+    return
+  }
+  win.document.open()
+  win.document.write(html)
+  win.document.close()
 }
 
 // ============ Lexicon Card (Agent Grid) ============
@@ -2625,11 +2722,17 @@ function ConceptChainFinder({ userLexicons = [] }) {
   const [termB, setTermB] = useState('')
   const [result, setResult] = useState(null)
   const [selectedNode, setSelectedNode] = useState(null)
+  const [isFinding, setIsFinding] = useState(false)
 
   const handleFind = useCallback(() => {
     if (!termA.trim() || !termB.trim()) return
+    setIsFinding(true)
     setSelectedNode(null)
-    setResult(getConceptChain(termA.trim().toLowerCase(), termB.trim().toLowerCase()))
+    setResult(null)
+    setTimeout(() => {
+      setResult(getConceptChain(termA.trim().toLowerCase(), termB.trim().toLowerCase()))
+      setIsFinding(false)
+    }, 0)
   }, [termA, termB])
 
   const handleKey = useCallback((e) => {
@@ -2689,11 +2792,19 @@ function ConceptChainFinder({ userLexicons = [] }) {
         <div className="flex items-end pb-0.5 flex-shrink-0">
           <button
             onClick={handleFind}
-            disabled={!termA.trim() || !termB.trim()}
+            disabled={!termA.trim() || !termB.trim() || isFinding}
             aria-label={`Find concept path between "${termA}" and "${termB}"`}
-            className={`px-5 h-9 rounded-lg font-mono text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 ${termA.trim() && termB.trim() ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]' : 'bg-black-800 text-black-600 cursor-not-allowed'}`}
+            className={`px-5 h-9 rounded-lg font-mono text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 flex items-center gap-2 ${termA.trim() && termB.trim() && !isFinding ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]' : 'bg-black-800 text-black-600 cursor-not-allowed'}`}
           >
-            Find Path
+            {isFinding ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Finding…
+              </>
+            ) : 'Find Path'}
           </button>
         </div>
       </div>
@@ -4364,16 +4475,24 @@ export default function RosettaPage() {
       <LazySection rootMargin="300px"><ConceptWeb /></LazySection>
 
       {/* ============ Concept Explorer ============ */}
-      <LazySection rootMargin="300px"><ConceptExplorer userLexicons={userLexicons} /></LazySection>
+      <div id="section-explorer">
+        <LazySection rootMargin="300px"><ConceptExplorer userLexicons={userLexicons} /></LazySection>
+      </div>
 
       {/* ============ Discover Section ============ */}
-      <DiscoverSection />
+      <div id="section-discover">
+        <DiscoverSection />
+      </div>
 
       {/* ============ Sentence Translator ============ */}
-      <LazySection rootMargin="300px"><SentenceTranslator userLexicons={userLexicons} /></LazySection>
+      <div id="section-sentence">
+        <LazySection rootMargin="300px"><SentenceTranslator userLexicons={userLexicons} /></LazySection>
+      </div>
 
       {/* ============ Concept Chain ============ */}
-      <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} /></LazySection>
+      <div id="section-chain">
+        <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} /></LazySection>
+      </div>
 
       {/* ============ Recent Translations ============ */}
       <AnimatePresence>
@@ -4387,6 +4506,7 @@ export default function RosettaPage() {
       </AnimatePresence>
 
       {/* ============ Translation Interface ============ */}
+      <div id="section-translate">
       <GlassCard glowColor="matrix" className="p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider">Translate</h2>
@@ -4540,6 +4660,7 @@ export default function RosettaPage() {
           </AnimatePresence>
         </div>
       </GlassCard>
+      </div>
 
       {/* ============ Register + My Lexicon ============ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

@@ -130,6 +130,10 @@ contract VibePointsSeason is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     mapping(address => uint256) public userPointsAllTime;
     mapping(address => uint256) public userActionsAllTime;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SeasonStarted(uint256 indexed seasonId, string name, uint256 startTime, uint256 endTime);

@@ -51,6 +51,10 @@ contract ClawbackVault is
     /// @notice Escrow counter
     uint256 public escrowCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FundsEscrowed(bytes32 indexed escrowId, bytes32 indexed caseId, address indexed from, address token, uint256 amount);

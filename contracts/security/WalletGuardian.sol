@@ -78,6 +78,10 @@ contract WalletGuardian is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public insurancePool;
     uint256 public constant INSURANCE_FEE_BPS = 10; // 0.1% of deposits
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event WalletCreated(address indexed owner, uint256 guardianCount, uint256 threshold);

@@ -99,6 +99,10 @@ contract PlaceholderEscrow is
         string evidence;        // IPFS hash or description of evidence
     }
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PlaceholderCreated(bytes32 indexed identityHash, string platform, string username);

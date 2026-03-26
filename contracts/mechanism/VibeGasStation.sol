@@ -78,6 +78,10 @@ contract VibeGasStation is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public totalGasRelayed;
     uint256 public totalTxRelayed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event RelayerRegistered(address indexed relayer, uint256 deposit);

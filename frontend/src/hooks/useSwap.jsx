@@ -65,26 +65,37 @@ const TOKEN_NAMES = {
 // Any state can transition to 'failed'
 
 // ============================================================
-// LOCALSTORAGE HELPERS for commit secrets
+// IN-MEMORY SECRET STORE for commit secrets
+// Secrets only need to persist during the active swap session.
+// Using a module-scoped Map instead of localStorage prevents
+// XSS attacks from reading commit-reveal secrets.
 // ============================================================
+const _secretStore = new Map()
+
 function storeSecret(commitId, secret, batchId) {
-  const key = `vibeswap_secret_${commitId}`
-  localStorage.setItem(key, JSON.stringify({ secret, batchId, timestamp: Date.now() }))
+  _secretStore.set(commitId, { secret, batchId, timestamp: Date.now() })
+  cleanupSecrets()
 }
 
 function retrieveSecret(commitId) {
-  const key = `vibeswap_secret_${commitId}`
-  const raw = localStorage.getItem(key)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  const entry = _secretStore.get(commitId)
+  if (!entry) return null
+  return entry
 }
 
 function clearSecret(commitId) {
-  localStorage.removeItem(`vibeswap_secret_${commitId}`)
+  _secretStore.delete(commitId)
+}
+
+// Remove secrets older than 5 minutes to prevent unbounded growth
+function cleanupSecrets() {
+  const MAX_AGE_MS = 5 * 60 * 1000
+  const now = Date.now()
+  for (const [id, entry] of _secretStore) {
+    if (now - entry.timestamp > MAX_AGE_MS) {
+      _secretStore.delete(id)
+    }
+  }
 }
 
 // ============================================================

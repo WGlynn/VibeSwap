@@ -91,6 +91,10 @@ contract VibeAgentAnalytics is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalRevenueTracked;
     uint256 public totalAnomalies;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ConversationRecorded(bytes32 indexed conversationId, bytes32 indexed agentId, uint256 qualityScore);

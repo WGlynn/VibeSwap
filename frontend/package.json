@@ -23,6 +23,7 @@
     "@reown/appkit": "^1.8.18",
     "@reown/appkit-adapter-ethers": "^1.8.18",
     "@simplewebauthn/browser": "^13.2.2",
+    "dompurify": "^3.3.3",
     "ethers": "^6.16.0",
     "framer-motion": "^10.16.0",
     "react": "^18.2.0",

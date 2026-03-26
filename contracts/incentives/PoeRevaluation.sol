@@ -129,6 +129,10 @@ contract PoeRevaluation is
     /// @notice Proposal expiry (90 days without reaching conviction = expired)
     uint256 public constant PROPOSAL_EXPIRY = 90 days;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PoeProposed(

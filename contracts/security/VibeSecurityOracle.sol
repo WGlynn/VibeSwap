@@ -59,6 +59,10 @@ contract VibeSecurityOracle is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public avgDailyApprovals;
     uint256 public lastMetricsUpdate;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SignalReported(uint256 indexed id, string source, ThreatLevel severity);

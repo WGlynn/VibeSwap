@@ -96,6 +96,10 @@ contract VibeSecurityOracle is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalBountyPaid;
     uint256 public totalVerifiedBugs;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AuditRequested(uint256 indexed auditId, address indexed requester, uint256 bountyPool);

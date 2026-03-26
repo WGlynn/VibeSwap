@@ -59,6 +59,10 @@ contract GovernanceGuard is
     address public emergencyGuardian;
     mapping(address => bool) public proposers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProposalCreated(

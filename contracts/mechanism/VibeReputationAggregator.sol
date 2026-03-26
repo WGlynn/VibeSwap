@@ -63,6 +63,10 @@ contract VibeReputationAggregator is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public constant DECAY_PERIOD = 30 days;
     uint256 public constant DECAY_RATE = 100;  // 1% per period
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ScoreUpdated(address indexed user, Dimension dimension, uint256 newScore, uint256 composite);

@@ -107,6 +107,10 @@ contract AutomatedRegulator is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Authorized monitors (can report activity)
     mapping(address => bool) public authorizedMonitors;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ViolationDetected(bytes32 indexed violationId, address indexed wallet, ViolationType violationType, SeverityLevel severity);

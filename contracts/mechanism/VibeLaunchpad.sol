@@ -73,6 +73,10 @@ contract VibeLaunchpad is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public totalLaunches;
     uint256 public totalRaised;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SaleCreated(uint256 indexed saleId, address indexed creator, address token, SaleType saleType);

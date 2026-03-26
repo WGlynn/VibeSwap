@@ -73,6 +73,10 @@ contract VibeReputationMarket is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     uint256 public totalRepStaked;
     uint256 public totalEthStaked;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MarketCreated(uint256 indexed marketId, MarketType marketType, uint256 resolveDeadline);

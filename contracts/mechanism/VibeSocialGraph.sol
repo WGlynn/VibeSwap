@@ -68,6 +68,10 @@ contract VibeSocialGraph is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalPosts;
     uint256 public totalFollows;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProfileCreated(address indexed owner, bytes32 handleHash);

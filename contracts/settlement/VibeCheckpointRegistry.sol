@@ -10,6 +10,10 @@ contract VibeCheckpointRegistry is OwnableUpgradeable, UUPSUpgradeable {
     mapping(uint256 => Checkpoint) public checkpoints;
     uint256 public checkpointCount;
     mapping(address => bool) public submitters;
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     event CheckpointSubmitted(uint256 indexed id, uint256 blockNumber, bytes32 stateRoot);
 
     function initialize() external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); }

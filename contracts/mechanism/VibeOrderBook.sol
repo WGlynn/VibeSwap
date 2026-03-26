@@ -81,6 +81,10 @@ contract VibeOrderBook is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public totalTrades;
     uint256 public protocolFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event OrderPlaced(uint256 indexed orderId, address indexed trader, Side side, OrderType orderType, uint256 price, uint256 amount);

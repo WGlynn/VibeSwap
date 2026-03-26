@@ -77,6 +77,10 @@ contract VibeLimitOrder is
     /// @notice Authorized batch settlers (CommitRevealAuction, VibeSwapCore, etc.)
     mapping(address => bool) public isSettler;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event OrderPlaced(

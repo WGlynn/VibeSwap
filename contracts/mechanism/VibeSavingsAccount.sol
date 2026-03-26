@@ -44,6 +44,10 @@ contract VibeSavingsAccount is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public constant SILVER_THRESHOLD = 10 ether;
     uint256 public constant GOLD_THRESHOLD = 100 ether;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Deposited(address indexed user, uint256 amount, uint256 newBalance);

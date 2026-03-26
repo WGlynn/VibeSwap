@@ -62,6 +62,10 @@ contract VibeTokenFactory is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     /// @notice Total fees collected
     uint256 public totalFeesCollected;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TokenCreated(bytes32 indexed tokenId, address indexed creator, string name, string symbol);

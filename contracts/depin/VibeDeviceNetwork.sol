@@ -88,6 +88,10 @@ contract VibeDeviceNetwork is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public totalActiveDevices;
     uint256 public totalDataPoints;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DeviceRegistered(bytes32 indexed deviceId, address indexed owner, DeviceType deviceType);

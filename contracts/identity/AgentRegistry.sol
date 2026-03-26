@@ -76,6 +76,10 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
     }
     mapping(uint256 => PendingTransfer) public pendingOperatorTransfers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     function initialize() external initializer {

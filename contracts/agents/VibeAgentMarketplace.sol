@@ -72,6 +72,10 @@ contract VibeAgentMarketplace is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     mapping(bytes32 => uint256[]) public agentReviewIds;
     mapping(bytes32 => bytes32[]) private _capabilityIndex;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
     event AgentRegistered(bytes32 indexed agentId, address indexed creator, string name);
     event AgentDeactivated(bytes32 indexed agentId);

@@ -43,6 +43,10 @@ contract VibePaymaster is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     mapping(address => bool) public whitelistedContracts;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event GasSponsored(address indexed user, uint256 amount, uint256 txNumber);

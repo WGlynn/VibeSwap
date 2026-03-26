@@ -92,6 +92,10 @@ contract DAOTreasury is
     mapping(uint256 => EmergencyRequest) public emergencyRequests;
     uint256 public nextEmergencyId;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Modifiers ============
 
     modifier onlyAuthorizedFeeSender() {

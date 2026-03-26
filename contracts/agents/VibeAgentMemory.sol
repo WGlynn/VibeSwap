@@ -83,6 +83,10 @@ contract VibeAgentMemory is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     uint256 public totalShared;
     uint256 private _nonce;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MemoryStored(bytes32 indexed entryId, bytes32 indexed agentId, MemoryType memoryType, uint16 importance);

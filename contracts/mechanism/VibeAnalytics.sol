@@ -52,6 +52,10 @@ contract VibeAnalytics is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public snapshotCount;
     uint256 public snapshotInterval;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MetricsUpdated(string module, uint256 tvl, uint256 volume, uint256 users);

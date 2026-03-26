@@ -41,6 +41,10 @@ contract VibeNameService is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalRegistered;
     uint256 public protocolFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event NameRegistered(bytes32 indexed nameHash, string name, address owner, uint256 expiresAt);

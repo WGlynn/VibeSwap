@@ -77,6 +77,10 @@ contract VibeNFTMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     mapping(address => uint256) public sellerSales;
     mapping(address => uint256) public sellerVolume;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Listed(uint256 indexed listingId, address indexed seller, address nftContract, uint256 tokenId, uint256 price);

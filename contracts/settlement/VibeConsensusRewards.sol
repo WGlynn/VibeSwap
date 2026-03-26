@@ -46,6 +46,10 @@ contract VibeConsensusRewards is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     uint256 public totalDistributed;
     uint256 public currentEpoch;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BlockRewarded(address indexed validator, uint256 reward, uint256 blockNumber);

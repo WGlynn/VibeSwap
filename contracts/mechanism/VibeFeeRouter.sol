@@ -64,6 +64,10 @@ contract VibeFeeRouter is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     /// @notice Distribution threshold (min amount before distributing)
     uint256 public distributionThreshold;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FeeCollected(address indexed source, address indexed token, uint256 amount);

@@ -94,6 +94,10 @@ contract VibeInfoFi is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
     uint256 public totalValueLocked;
     uint256 public totalAttributed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PrimitiveContributed(bytes32 indexed primitiveId, address indexed contributor, PrimitiveType pType);

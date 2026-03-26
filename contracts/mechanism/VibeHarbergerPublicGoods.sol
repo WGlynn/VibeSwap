@@ -70,6 +70,10 @@ contract VibeHarbergerPublicGoods is OwnableUpgradeable, UUPSUpgradeable, Reentr
     uint256 public totalForcedSales;
     uint256 public totalValueLocked;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AssetCreated(bytes32 indexed assetId, AssetCategory category, string name);

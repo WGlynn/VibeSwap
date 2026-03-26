@@ -147,6 +147,10 @@ contract DecentralizedTribunal is
     /// @notice Pending stake withdrawals (pull pattern for safe ETH returns)
     mapping(address => uint256) public pendingStakeWithdrawals;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TrialOpened(bytes32 indexed trialId, bytes32 indexed caseId, uint256 jurySize);

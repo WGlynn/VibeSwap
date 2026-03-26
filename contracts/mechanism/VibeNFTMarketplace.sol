@@ -65,6 +65,10 @@ contract VibeNFTMarketplace is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public constant PROTOCOL_FEE_BPS = 100; // 1%
     uint256 public protocolFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Listed(uint256 indexed id, address seller, address nftContract, uint256 tokenId, uint256 price);

@@ -78,6 +78,10 @@ contract VibeLendingPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     uint256 public totalDepositors;
     uint256 public totalBorrowers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Deposited(address indexed asset, address indexed user, uint256 amount);

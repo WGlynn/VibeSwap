@@ -80,6 +80,10 @@ contract VibePayPerCall is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public totalServiceCalls;
     uint256 public totalVolumeProcessed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ServiceRegistered(uint256 indexed serviceId, address indexed provider, ServiceType serviceType, uint256 pricePerCall);

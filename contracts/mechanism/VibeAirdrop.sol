@@ -41,6 +41,10 @@ contract VibeAirdrop is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
 
     uint256 public totalDistributed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event CampaignCreated(uint256 indexed campaignId, address indexed token, uint256 totalAmount);

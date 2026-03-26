@@ -141,6 +141,10 @@ contract VibeStateVM is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice cellId => number of pending PoW attempts
     mapping(uint256 => uint256) public cellContention;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ScriptRegistered(bytes32 indexed scriptHash, ScriptType scriptType, address indexed registrar);

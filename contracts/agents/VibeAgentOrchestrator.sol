@@ -77,6 +77,10 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
     /// @dev agentId => authorized operator address
     mapping(bytes32 => address) public agentOperators;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event WorkflowCreated(uint256 indexed workflowId, address indexed creator, string name, uint256 budget);

@@ -41,6 +41,10 @@ contract VibeFlashLoanProvider is OwnableUpgradeable, UUPSUpgradeable, Reentranc
     bool public whitelistEnabled;
     bool public paused;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FlashLoan(address indexed borrower, uint256 amount, uint256 fee);

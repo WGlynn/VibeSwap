@@ -65,6 +65,10 @@ contract VibeCrossChainReputation is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public totalImports;
     uint256 public totalExports;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ReputationExported(address indexed user, uint32 indexed destChain, uint256 score, bytes32 proofHash);

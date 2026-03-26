@@ -115,6 +115,10 @@ contract ClawbackRegistry is
     /// @notice ClawbackVault address
     address public vault;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event WalletFlagged(address indexed wallet, TaintLevel level, bytes32 indexed caseId);

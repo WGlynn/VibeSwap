@@ -81,6 +81,10 @@ contract VibeAppStore is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
     /// @notice Featured/curated apps
     uint256[] public featuredApps;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ModuleRegistered(bytes32 indexed moduleId, string name, address implementation);

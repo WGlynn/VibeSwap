@@ -123,6 +123,10 @@ contract EmissionController is
 
     mapping(address => bool) public authorizedDrainers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event Dripped(uint256 amount, uint256 shapleyShare, uint256 gaugeShare, uint256 stakingShare, uint256 era);

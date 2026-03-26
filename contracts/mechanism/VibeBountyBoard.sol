@@ -59,6 +59,10 @@ contract VibeBountyBoard is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     uint256 public constant PLATFORM_FEE_BPS = 250;    // 2.5%
     uint256 public platformFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BountyCreated(uint256 indexed id, address creator, BountyType bountyType, uint256 reward);

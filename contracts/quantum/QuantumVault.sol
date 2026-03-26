@@ -63,6 +63,10 @@ contract QuantumVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
     // Threshold above which quantum auth is required (in wei)
     uint256 public quantumThreshold;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event QuantumKeyRegistered(address indexed user, bytes32 merkleRoot, uint256 totalKeys);

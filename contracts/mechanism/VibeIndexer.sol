@@ -89,6 +89,10 @@ contract VibeIndexer is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Slash percentage for invalid query responses
     uint256 public slashPercentBps;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SubgraphCreated(uint256 indexed subgraphId, address indexed creator, string name);

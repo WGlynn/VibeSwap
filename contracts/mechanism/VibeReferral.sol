@@ -65,6 +65,10 @@ contract VibeReferral is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
     uint256 public totalRewardsDistributed;
     uint256 public totalReferrers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ReferrerRegistered(address indexed referrer, bytes32 code);

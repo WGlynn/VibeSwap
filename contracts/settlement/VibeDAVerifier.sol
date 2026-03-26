@@ -13,6 +13,10 @@ contract VibeDAVerifier is OwnableUpgradeable, UUPSUpgradeable {
     mapping(uint256 => mapping(address => bool)) public attestations;
     mapping(uint256 => uint256) public attestationCount;
     uint256 public quorum;
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     event DACommitted(uint256 indexed id, uint256 blockNumber, bytes32 dataRoot);
     event DAVerified(uint256 indexed id);
 

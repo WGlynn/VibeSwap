@@ -60,6 +60,10 @@ contract BiometricAuthBridge is OwnableUpgradeable, UUPSUpgradeable {
     // P-256 precompile address (EIP-7212)
     address public constant P256_VERIFIER = 0x0000000000000000000000000000000000000100;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event CredentialRegistered(address indexed user, uint256 index, bytes32 credentialIdHash);

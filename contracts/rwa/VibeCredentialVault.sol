@@ -65,6 +65,10 @@ contract VibeCredentialVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     uint256 public totalCredentials;
     uint256 public totalVerifications;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event CredentialIssued(bytes32 indexed credentialId, address indexed holder, address indexed issuer, CredentialType cType);

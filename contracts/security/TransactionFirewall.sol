@@ -57,6 +57,10 @@ contract TransactionFirewall is OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => address) public coSigner;
     mapping(bytes32 => bool) public coSignerApprovals;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event RulesUpdated(address indexed user);

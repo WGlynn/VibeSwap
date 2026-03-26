@@ -119,6 +119,10 @@ contract DisputeResolver is
     /// @notice Arbitrator assignment index (round-robin)
     uint256 public assignmentIndex;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DisputeFiled(bytes32 indexed disputeId, bytes32 indexed caseId, address indexed claimant, address respondent);

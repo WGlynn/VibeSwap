@@ -47,6 +47,10 @@ contract VibeNames is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
     /// @notice Protocol treasury that receives registration fees
     address public treasury;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event NameRegistered(string indexed nameHash, string name, address indexed owner, address resolvedAddress);

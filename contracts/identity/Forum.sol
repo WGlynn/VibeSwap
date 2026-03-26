@@ -70,6 +70,10 @@ contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeabl
     // Moderation
     mapping(address => bool) public moderators;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event CategoryCreated(uint256 indexed categoryId, string name);

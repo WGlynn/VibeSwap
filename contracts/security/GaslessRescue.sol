@@ -48,6 +48,10 @@ contract GaslessRescue is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public constant MAX_FEE_BPS = 200; // Max 2% relayer fee
     uint256 public constant MIN_RESCUE = 0.01 ether; // Min rescue value in token terms
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event SafeRegistered(address indexed user, address safeAddress);

@@ -85,6 +85,10 @@ contract VibePerpetual is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public totalVolume;
     uint256 public totalLiquidations;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MarketCreated(bytes32 indexed marketId, string symbol);

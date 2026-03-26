@@ -75,6 +75,10 @@ contract PriorityRegistry is
     // Authorized recorders (VibeAMM, VibeSwapCore, governance)
     mapping(address => bool) public authorizedRecorders;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PriorityRecorded(

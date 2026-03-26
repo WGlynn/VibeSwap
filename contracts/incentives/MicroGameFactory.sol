@@ -56,6 +56,10 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
     // ============ State ============
     mapping(bytes32 => uint256) public lastSettledEpoch;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
     event MicroGameCreated(bytes32 indexed poolId, uint256 indexed epochId, bytes32 gameId, uint256 participantCount);
 

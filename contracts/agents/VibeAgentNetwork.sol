@@ -103,6 +103,10 @@ contract VibeAgentNetwork is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     uint256 public totalMessagesRelayed;
     uint256 public totalTeamsFormed;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AgentOnline(bytes32 indexed agentId, bytes32[] skills);

@@ -68,6 +68,10 @@ contract PairwiseVerifier is IPairwiseVerifier, OwnableUpgradeable, ReentrancyGu
     // External
     IAgentRegistry public agentRegistry;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     function initialize(address _agentRegistry) external initializer {

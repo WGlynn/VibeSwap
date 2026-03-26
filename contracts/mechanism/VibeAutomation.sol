@@ -49,6 +49,10 @@ contract VibeAutomation is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     /// @notice Total bounties paid
     uint256 public totalBountiesPaid;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TaskRegistered(uint256 indexed taskId, address indexed owner, address target, uint256 bounty);

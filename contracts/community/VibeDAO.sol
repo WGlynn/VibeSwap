@@ -85,6 +85,10 @@ contract VibeDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     mapping(uint256 => SubDAO) public templates;
     uint256 public templateCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DAOCreated(uint256 indexed daoId, string name, address indexed creator, GovernanceType govType);

@@ -89,6 +89,10 @@ contract ForkRegistry is
     /// @notice Nonce for generating unique fork IDs
     uint256 private _nonce;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ForkRegistered(

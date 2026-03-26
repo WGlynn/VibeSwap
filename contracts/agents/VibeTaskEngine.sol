@@ -76,6 +76,10 @@ contract VibeTaskEngine is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     uint256 public totalTasksCompleted;
     uint256 public totalBudgetSpent;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event TaskCreated(uint256 indexed taskId, uint256 parentId, uint256 treeId, TaskPriority priority);

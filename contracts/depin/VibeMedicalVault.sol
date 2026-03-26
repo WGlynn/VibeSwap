@@ -102,6 +102,10 @@ contract VibeMedicalVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     /// @notice Total data access fees collected
     uint256 public totalAccessFees;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PatientRegistered(bytes32 indexed patientId, address indexed patient);

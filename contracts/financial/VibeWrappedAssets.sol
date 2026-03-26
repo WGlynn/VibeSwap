@@ -45,6 +45,10 @@ contract VibeWrappedAssets is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     /// @notice all registered asset IDs for enumeration
     bytes32[] private _assetIds;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event WrappedAssetCreated(

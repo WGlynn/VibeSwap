@@ -37,6 +37,10 @@ contract VibeIdentityBridge is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public requiredValidations;
     uint256 public attestationCount;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AttestationCreated(bytes32 indexed attestationId, address indexed account, uint256 sourceChain);

@@ -18,6 +18,10 @@ contract VibeMultiSend is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     uint256 public totalRecipients;
     uint256 public totalVolume;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     event MultiSendETH(address indexed sender, uint256 recipientCount, uint256 totalAmount);
     event MultiSendToken(address indexed sender, address token, uint256 recipientCount, uint256 totalAmount);
 

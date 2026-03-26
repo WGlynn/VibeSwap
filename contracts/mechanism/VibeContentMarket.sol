@@ -80,6 +80,10 @@ contract VibeContentMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public protocolRevenue;
     uint256 public totalContentRevenue;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PublicationCreated(uint256 indexed pubId, address indexed creator, bytes32 nameHash);

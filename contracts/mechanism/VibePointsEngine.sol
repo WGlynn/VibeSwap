@@ -63,6 +63,10 @@ contract VibePointsEngine is OwnableUpgradeable, UUPSUpgradeable {
     uint256 public constant STREAK_BONUS_PER_DAY = 100; // +1% per day, max 30%
     uint256 public constant MAX_STREAK_BONUS = 3000;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PointsAwarded(address indexed user, uint256 amount, string reason);

@@ -83,6 +83,10 @@ contract TruePriceOracle is
         "StablecoinUpdate(uint256 usdtUsdcRatio,bool usdtDominant,bool usdcDominant,uint256 volatilityMultiplier,uint256 nonce,uint256 deadline)"
     );
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error UnauthorizedSigner();

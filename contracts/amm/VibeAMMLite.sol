@@ -61,6 +61,10 @@ contract VibeAMMLite is
     uint8 private constant FLAG_FLASH_LOAN = 1 << 0;
     uint8 private constant FLAG_TWAP = 1 << 1;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event FeesCollected(address indexed token, uint256 amount);

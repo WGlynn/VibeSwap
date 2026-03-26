@@ -62,6 +62,10 @@ contract VibeLimitOrders is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     /// @notice Minimum keeper bounty
     uint256 public minKeeperBounty;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event OrderPlaced(uint256 indexed orderId, address indexed maker, OrderType orderType, uint256 amountIn, uint256 targetPrice);

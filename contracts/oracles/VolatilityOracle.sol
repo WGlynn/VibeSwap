@@ -67,6 +67,10 @@ contract VolatilityOracle is
     // Cache validity period
     uint64 public cacheValidityPeriod;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Errors ============
 
     error InvalidPool();

@@ -86,6 +86,10 @@ contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     mapping(uint256 => mapping(address => bool)) public auditorVotes;
     mapping(uint256 => mapping(address => bool)) public auditorDenials;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event PolicyCreated(address indexed user, Tier tier, uint256 coveredAmount, uint256 premium);

@@ -69,6 +69,10 @@ contract VibeSupplyChain is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     uint256 public totalCheckpoints;
     uint256 public totalManufacturers;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event ProductCreated(bytes32 indexed productId, address indexed manufacturer, bytes32 rfidTag);

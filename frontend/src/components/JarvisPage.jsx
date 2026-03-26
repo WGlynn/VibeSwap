@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import DOMPurify from 'dompurify'
 import { useJarvis } from '../hooks/useJarvis'
 import { useMindMesh } from '../hooks/useMindMesh'
 
@@ -455,7 +456,7 @@ function ChatPanel({ messages, isLoading, onSend, voiceMode, toggleVoice, isSpea
                   <span className="text-matrix-400 font-bold">JARVIS</span>
                   <div
                     className="md-rendered text-matrix-300 mt-0.5 leading-relaxed whitespace-pre-wrap break-words"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.text)) }}
                   />
                 </div>
               </div>

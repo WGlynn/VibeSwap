@@ -179,6 +179,10 @@ contract VibePredictionEngine is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     uint256 public totalInsurancePaid;
     uint256 public protocolRevenue;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event MarketCreated(uint256 indexed marketId, address indexed creator, bytes32 agentId, MarketType mType, bytes32 questionHash);

@@ -75,6 +75,10 @@ contract VibeLiquidityGauge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     /// @notice Total emission rate (rewards per second across all gauges)
     uint256 public totalEmissionRate;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event GaugeCreated(uint256 indexed gaugeId, address indexed pool, string name);

@@ -102,6 +102,10 @@ contract VibePrivateCompute is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalDataPointsProcessed;
     uint256 public totalFeesCollected;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event DatasetRegistered(bytes32 indexed datasetId, address indexed owner, string category);

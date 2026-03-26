@@ -65,6 +65,10 @@ contract VibeDNS is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     /// @notice Revenue collected
     uint256 public totalRevenue;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event NameRegistered(bytes32 indexed nameHash, address indexed owner, uint256 expiresAt);

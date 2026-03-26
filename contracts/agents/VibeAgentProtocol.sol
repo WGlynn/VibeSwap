@@ -115,6 +115,10 @@ contract VibeAgentProtocol is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public totalMessages;
     uint256 public totalEarnings;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event AgentRegistered(bytes32 indexed agentId, address indexed operator, AgentFramework framework, string name);

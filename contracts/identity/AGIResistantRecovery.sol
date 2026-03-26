@@ -106,6 +106,10 @@ contract AGIResistantRecovery is UUPSUpgradeable, OwnableUpgradeable {
     mapping(address => uint256) public recoveryAttempts;
     mapping(address => uint256) public lastAttemptTime;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Events ============
 
     event BehavioralFingerprintUpdated(address indexed account);

@@ -75,6 +75,10 @@ contract ComputeSubsidyManager is
     /// @notice Job nonce per agent (for unique job IDs)
     mapping(address => uint256) public jobNonces;
 
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[50] private __gap;
+
     // ============ Initializer ============
 
     /// @custom:oz-upgrades-unsafe-allow constructor

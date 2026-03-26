@@ -12,7 +12,7 @@ You asked about governance, and this is where VibeSwap breaks from every other p
 
 The blockchain ethos has always been: "Not your keys, not your crypto." Immutability is sacred. Code is law.
 
-But people make mistakes. You know this firsthand — sending USDC to a wrong address and being told it's "gone" is not a feature. It's a failure of imagination.
+But people make mistakes. Anyone who's been in crypto long enough has seen funds lost to a wrong address — and been told it's "gone." That's not a feature. It's a failure of imagination.
 
 VibeSwap builds a **forgiveness layer** on top of immutability. We don't break immutability — we add structured, governed exceptions for when humans are human.
 

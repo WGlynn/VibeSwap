@@ -9,6 +9,7 @@ contract SIEShapleyAdapterTest is Test {
     // Mirror events from SIEShapleyAdapter for vm.expectEmit
     event TrueUpInitiated(bytes32 indexed roundId, uint256 totalPool, uint256 participantCount);
     event TrueUpFinalized(bytes32 indexed roundId, uint256 distributed);
+    event SettlementAccumulated(bytes32 indexed assetId, address indexed contributor, bool verified, uint256 bondingPrice);
 
     SIEShapleyAdapter public adapter;
 
@@ -70,9 +71,6 @@ contract SIEShapleyAdapterTest is Test {
     // ============ computeWeight ============
 
     function test_computeWeight_allMax() public view {
-        // All factors at 10000 BPS (100%)
-        // (10000*4000 + 10000*3000 + 10000*2000 + 10000*1000) / 10000
-        // = (40M + 30M + 20M + 10M) / 10000 = 100M / 10000 = 10000
         uint256 weight = adapter.computeWeight(10000, 10000, 10000, 10000);
         assertEq(weight, 10000, "All-max inputs should yield 10000 BPS total weight");
     }
@@ -83,81 +81,111 @@ contract SIEShapleyAdapterTest is Test {
     }
 
     function test_computeWeight_onlyOriginality() public view {
-        // originality=10000, rest=0
-        // (10000 * 4000 + 0 + 0 + 0) / 10000 = 4000
         uint256 weight = adapter.computeWeight(10000, 0, 0, 0);
         assertEq(weight, 4000, "Max originality alone should yield 4000 (40%)");
     }
 
     function test_computeWeight_onlyCitation() public view {
-        // citationImpact=10000, rest=0
-        // (0 + 10000 * 3000 + 0 + 0) / 10000 = 3000
         uint256 weight = adapter.computeWeight(0, 10000, 0, 0);
         assertEq(weight, 3000, "Max citation alone should yield 3000 (30%)");
     }
 
     function test_computeWeight_onlyScarcity() public view {
-        // scarcity=10000, rest=0
-        // (0 + 0 + 10000 * 2000 + 0) / 10000 = 2000
         uint256 weight = adapter.computeWeight(0, 0, 10000, 0);
         assertEq(weight, 2000, "Max scarcity alone should yield 2000 (20%)");
     }
 
     function test_computeWeight_onlyConsistency() public view {
-        // consistency=10000, rest=0
-        // (0 + 0 + 0 + 10000 * 1000) / 10000 = 1000
         uint256 weight = adapter.computeWeight(0, 0, 0, 10000);
         assertEq(weight, 1000, "Max consistency alone should yield 1000 (10%)");
     }
 
     function test_computeWeight_mixedValues() public view {
-        // originality=5000, citationImpact=8000, scarcity=3000, consistency=7000
-        // (5000*4000 + 8000*3000 + 3000*2000 + 7000*1000) / 10000
-        // = (20M + 24M + 6M + 7M) / 10000 = 57M / 10000 = 5700
         uint256 weight = adapter.computeWeight(5000, 8000, 3000, 7000);
         assertEq(weight, 5700, "Mixed inputs should yield correct weighted sum");
     }
 
     function test_computeWeight_halfValues() public view {
-        // All factors at 5000 BPS (50%)
-        // (5000*4000 + 5000*3000 + 5000*2000 + 5000*1000) / 10000
-        // = (20M + 15M + 10M + 5M) / 10000 = 50M / 10000 = 5000
         uint256 weight = adapter.computeWeight(5000, 5000, 5000, 5000);
         assertEq(weight, 5000, "All-half inputs should yield 5000 (50%)");
     }
 
     function test_computeWeight_clampsAboveBPS() public view {
-        // Values above 10000 should be clamped to 10000
         uint256 weight = adapter.computeWeight(20000, 20000, 20000, 20000);
         uint256 maxWeight = adapter.computeWeight(10000, 10000, 10000, 10000);
         assertEq(weight, maxWeight, "Inputs above BPS should be clamped to BPS");
     }
 
     function test_computeWeight_singleFactorDominant_originality() public view {
-        // Extremely high originality, very low everything else
-        // originality=10000, citation=100, scarcity=100, consistency=100
-        // (10000*4000 + 100*3000 + 100*2000 + 100*1000) / 10000
-        // = (40M + 300K + 200K + 100K) / 10000 = 40600000 / 10000 = 4060
         uint256 weight = adapter.computeWeight(10000, 100, 100, 100);
         assertEq(weight, 4060, "Originality-dominant case");
     }
 
     function test_computeWeight_singleFactorDominant_citation() public view {
-        // citation=10000, originality=100, scarcity=100, consistency=100
-        // (100*4000 + 10000*3000 + 100*2000 + 100*1000) / 10000
-        // = (400K + 30M + 200K + 100K) / 10000 = 30700000 / 10000 = 3070
         uint256 weight = adapter.computeWeight(100, 10000, 100, 100);
         assertEq(weight, 3070, "Citation-dominant case");
     }
 
     function test_computeWeight_isPure() public view {
-        // Same inputs must always return the same output
         uint256 w1 = adapter.computeWeight(1234, 5678, 9012, 3456);
         uint256 w2 = adapter.computeWeight(1234, 5678, 9012, 3456);
         assertEq(w1, w2, "computeWeight must be deterministic");
     }
 
-    // ============ initiateTrueUp ============
+    // ============ onSettlement ============
+
+    function test_onSettlement_accumulates() public {
+        bytes32 assetId = keccak256("test-asset");
+
+        vm.prank(mockSIE);
+        adapter.onSettlement(assetId, alice, true, 1 ether, 3);
+
+        assertEq(adapter.getPendingSettlementCount(), 1);
+        assertEq(adapter.getPendingContributorCount(), 1);
+        assertEq(adapter.pendingTotalValue(), 1 ether);
+    }
+
+    function test_onSettlement_multipleFromSameContributor() public {
+        bytes32 asset1 = keccak256("asset-1");
+        bytes32 asset2 = keccak256("asset-2");
+
+        vm.startPrank(mockSIE);
+        adapter.onSettlement(asset1, alice, true, 1 ether, 2);
+        adapter.onSettlement(asset2, alice, true, 2 ether, 5);
+        vm.stopPrank();
+
+        assertEq(adapter.getPendingSettlementCount(), 2);
+        assertEq(adapter.getPendingContributorCount(), 1, "Same contributor counted once");
+        assertEq(adapter.pendingTotalValue(), 3 ether);
+    }
+
+    function test_onSettlement_disputedNotAddedToValue() public {
+        bytes32 assetId = keccak256("disputed-asset");
+
+        vm.prank(mockSIE);
+        adapter.onSettlement(assetId, alice, false, 1 ether, 3);
+
+        assertEq(adapter.getPendingSettlementCount(), 1);
+        assertEq(adapter.pendingTotalValue(), 0, "Disputed settlements don't add to value");
+    }
+
+    function test_onSettlement_emitsEvent() public {
+        bytes32 assetId = keccak256("event-asset");
+
+        vm.expectEmit(true, true, false, true);
+        emit SettlementAccumulated(assetId, alice, true, 1 ether);
+
+        vm.prank(mockSIE);
+        adapter.onSettlement(assetId, alice, true, 1 ether, 3);
+    }
+
+    function test_onSettlement_revert_notSIE() public {
+        vm.prank(alice);
+        vm.expectRevert(SIEShapleyAdapter.NotIntelligenceExchange.selector);
+        adapter.onSettlement(keccak256("x"), alice, true, 1 ether, 1);
+    }
+
+    // ============ initiateTrueUp (legacy) ============
 
     function test_initiateTrueUp_createsRound() public {
         uint256 totalPool = 1000 ether;
@@ -173,7 +201,6 @@ contract SIEShapleyAdapterTest is Test {
         uint256 totalPool = 500 ether;
         uint256 participantCount = 10;
 
-        // Record the expected roundId
         uint256 expectedRoundCount = 1;
         bytes32 expectedRoundId = keccak256(
             abi.encodePacked(expectedRoundCount, block.timestamp)
@@ -186,6 +213,7 @@ contract SIEShapleyAdapterTest is Test {
         assertEq(round.totalPool, totalPool);
         assertEq(round.participantCount, participantCount);
         assertEq(round.shapleyRoot, bytes32(0));
+        assertEq(round.shapleyGameId, bytes32(0));
         assertEq(round.timestamp, block.timestamp);
         assertFalse(round.finalized);
     }
@@ -259,7 +287,6 @@ contract SIEShapleyAdapterTest is Test {
 
         adapter.finalizeTrueUp(roundId, shapleyRoot);
 
-        // Attempting to finalize again should revert
         vm.expectRevert(SIEShapleyAdapter.RoundAlreadyFinalized.selector);
         adapter.finalizeTrueUp(roundId, keccak256("different-root"));
     }
@@ -288,11 +315,9 @@ contract SIEShapleyAdapterTest is Test {
     // ============ Access Control ============
 
     function test_onlyOwner_initiateTrueUp() public {
-        // Owner (this contract) succeeds
         adapter.initiateTrueUp(100 ether, 5);
         assertEq(adapter.roundCount(), 1);
 
-        // Non-owner reverts
         vm.prank(bob);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -307,7 +332,6 @@ contract SIEShapleyAdapterTest is Test {
         adapter.initiateTrueUp(100 ether, 5);
         bytes32 roundId = keccak256(abi.encodePacked(uint256(1), block.timestamp));
 
-        // Non-owner reverts
         vm.prank(bob);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -317,7 +341,6 @@ contract SIEShapleyAdapterTest is Test {
         );
         adapter.finalizeTrueUp(roundId, keccak256("root"));
 
-        // Owner succeeds
         adapter.finalizeTrueUp(roundId, keccak256("root"));
         assertTrue(adapter.getRound(roundId).finalized);
     }
@@ -325,23 +348,19 @@ contract SIEShapleyAdapterTest is Test {
     // ============ Full Flow Integration ============
 
     function test_fullFlow_initiateThenFinalize() public {
-        // 1. Initiate true-up round
         uint256 totalPool = 5000 ether;
         uint256 participantCount = 100;
         adapter.initiateTrueUp(totalPool, participantCount);
 
         bytes32 roundId = keccak256(abi.encodePacked(uint256(1), block.timestamp));
 
-        // 2. Verify round is pending
         SIEShapleyAdapter.TrueUpRound memory pending = adapter.getRound(roundId);
         assertFalse(pending.finalized);
         assertEq(pending.shapleyRoot, bytes32(0));
 
-        // 3. Finalize with Shapley root
         bytes32 shapleyRoot = keccak256("full-shapley-computation-result");
         adapter.finalizeTrueUp(roundId, shapleyRoot);
 
-        // 4. Verify round is finalized
         SIEShapleyAdapter.TrueUpRound memory finalized = adapter.getRound(roundId);
         assertTrue(finalized.finalized);
         assertEq(finalized.shapleyRoot, shapleyRoot);
@@ -358,7 +377,6 @@ contract SIEShapleyAdapterTest is Test {
         uint256 consistency
     ) public view {
         uint256 weight = adapter.computeWeight(originality, citationImpact, scarcity, consistency);
-        // Max possible weight is 10000 (all inputs at or above BPS)
         assertLe(weight, 10000, "Weight must never exceed 10000 BPS");
     }
 
@@ -368,7 +386,6 @@ contract SIEShapleyAdapterTest is Test {
         uint256 scarcity,
         uint256 consistency
     ) public view {
-        // Clamp inputs as the contract does
         originality = originality > 10000 ? 10000 : originality;
         citationImpact = citationImpact > 10000 ? 10000 : citationImpact;
         scarcity = scarcity > 10000 ? 10000 : scarcity;

@@ -1,100 +1,66 @@
 # Session Tip — 2026-03-26
 
 ## Block Header
-- **Session**: Anti-Amnesia Protocol + Autopilot Test Explosion
+- **Session**: Anti-Amnesia Protocol + Mitosis Constant + Test Coverage Explosion
 - **Parent**: `9e943aa`
-- **Branch**: `master` @ `8152756` (+ in-flight agent commits)
-- **Status**: 27/34 tasks done. Anti-Amnesia Protocol created. Mitosis Constant formalized. Massive test coverage expansion.
+- **Branch**: `master` @ `6f9334f` (+ in-flight sonnet agent commits)
+- **Status**: 46/49 tasks. ~3,000+ new tests. SIE Phase 2. Gas optimized. 2 ethresear.ch posts. 2 LinkedIn posts. Credits proposal written.
 
 ## What Exists Now
 
-### Anti-Amnesia Protocol (NEW — the final piece of the mind)
-- `docs/ANTI_AMNESIA_PROTOCOL.md` — full spec: three-layer persistence (CKB/MEMORY + SESSION_STATE + WAL)
-- `.claude/WAL.md` — write-ahead log for crash recovery
-- Session Start Protocol updated: Step 0 checks WAL before everything
-- Any unclean exit (crash, closed terminal, ctrl+C) triggers recovery
-
-### Mitosis Constant (NEW)
-- k=1.3 agent spawn rate. Superlinear with cap=5 governor.
-- Formalized in memory + AAP spec. Logistic growth, not exponential.
+### New Protocols (invented this session)
+- **Anti-Amnesia Protocol**: `docs/ANTI_AMNESIA_PROTOCOL.md` + `.claude/WAL.md` — three-layer persistence. Crash recovery. Session start Step 0.
+- **Mitosis Constant (k=1.3)**: Agent pool self-replication rate. Bounded superlinear growth. In AAP spec + memory.
+- **Agent Efficiency Tiers**: `.claude/AGENT_CONTEXT.md` — haiku/sonnet/opus model selection. 3-4x cost reduction.
 
 ### SIE Phase 2 Complete
-- `contracts/mechanism/ISIEShapleyAdapter.sol` — interface
-- `contracts/mechanism/IntelligenceExchange.sol` — settlement hook wiring
-- `contracts/mechanism/SIEShapleyAdapter.sol` — full implementation (4-factor weights)
-- `test/integration/SIEShapleyIntegration.t.sol` — 9 end-to-end tests
-- Best-effort notification (adapter failure never blocks SIE)
+- ISIEShapleyAdapter interface + IntelligenceExchange wiring + SIEShapleyAdapter implementation + tests
 
-### Ethresear.ch Posts 9 + 10
-- `docs/ethresearch/citation-weighted-bonding-curves.md` — Post 9
-- `docs/ethresearch/proof-of-mind-consensus.md` — Post 10
+### Test Coverage Explosion (~3,000+ new tests)
+- Every contract directory now has coverage: core, amm, mechanism, financial, governance, incentives, agents, identity, settlement, security, quantum, community, depin, rwa, naming, libraries, oracles, cross-chain, compliance
+- Agent subsystem: 0 → 230+ tests
+- Mechanism directory: dozens of previously untested contracts now covered
 
-### Test Coverage Explosion (~1500+ new tests this session)
-- Orphaned tests recovered: BuybackEngine, FeeRouter, ProtocolFeeAdapter, VibeFlashLoan (139)
-- Invariant: VibeRouter, VibeLendPool, VibeStaking fuzz+invariant
-- Settlement: BatchPriceVerifier, VerifiedCompute, VerifierCheckpointBridge (93)
-- Quantum: PostQuantumShield, QuantumVault, QuantumGuard (105)
-- Agent subsystem: 6 core contracts, 230 tests (from 0)
-- Identity: ContributionAttestor, VibeCode, AgentRegistry (178)
-- Governance: GovernanceGuard, VibeGovernanceHub, VibeProtocolTreasury (132)
-- Incentives: UtilizationAccumulator, MicroGameFactory, PlaceholderEscrow (151)
-- AMM: VibeLimitOrder, VibeAMMLite, VibeRouter unit (130)
+### Gas Optimization
+- ~3-5K gas saved per swap lifecycle on hot path (CommitRevealAuction, VibeAMM, VibeSwapCore)
 
 ### Deploy Scripts
-- `script/DeploySIE.s.sol` — updated with SIEShapleyAdapter + SIEPermissionlessLaunch
-- `script/DeployFinancialV2.s.sol` — NEW (LendPool, FeeDistributor, FlashLoan, Insurance, Credit, Vault)
-- `script/DeployCoreSecurity.s.sol` — NEW (TrinityGuardian, ProofOfMind, Honeypot, Adversary)
-- `script/ConfigurePeers.s.sol` — BSC mainnet + Base Sepolia added
+- DeploySIE.s.sol updated (Phase 2)
+- DeployFinancialV2.s.sol (NEW)
+- DeployCoreSecurity.s.sol (NEW)
+- DeployAgents.s.sol (NEW — 15 contracts)
+- ConfigurePeers.s.sol updated (BSC + Base Sepolia)
 
-### CI/CD Fixes
-- VibeStakingFuzz.t.sol syntax fix (was breaking forge build)
-- Dockerfiles Node 20→22, npm ci→npm install
-- Jarvis bot import validation: was hanging 6h, now 15s
-- deploy-jarvis.yml Node 20→22
+### CI/CD
+- 5 bugs fixed. Jarvis bot 6h hang → 15s. Node 22 everywhere. Docker fixed.
 
 ### Documentation
-- `docs/CONTRACTS_CATALOGUE.md` — 290 contracts, 80 interfaces, 31 directories
-- Coverage matrix updated: 7194+ test functions
-- Duplicate contracts resolved: VibeFeeRouter + VibeLendingPool deprecated
-- NatSpec added: IntelligenceExchange, SIEShapleyAdapter, CognitiveConsensusMarket
-- Stealth remote refs removed from 12 files
-- Contract names fixed: ILProtection→ILProtectionVault, LoyaltyRewards→LoyaltyRewardsManager
+- Contracts catalogue: 290 contracts documented
+- Coverage matrix updated
+- Duplicate contracts resolved (2 pairs deprecated)
+- Stealth remote refs purged (12 files)
 
-### Frontend
-- Console.log removed from production code
-- "Connect Wallet" → "Sign In" across 104 files
-- Accessibility: aria-labels + dialog roles
-
-### Security Review
-- All 7 audit commits verified CLEAN
-- Fruit of the Poisoned Tree sweep: no missed siblings
-- 190/190 UUPS contracts have storage gaps
-
-### LinkedIn
-- Post 1: Citation-Weighted Bonding Curves (posted)
-- Post 2: Proof of Mind consensus (posted)
+### Content
+- ethresear.ch Post 9: Citation-Weighted Bonding Curves
+- ethresear.ch Post 10: Proof of Mind
+- LinkedIn x2: bonding curves + PoM (both posted)
+- Credits proposal: `docs/claude-credits-proposal.md` + Desktop docx
 
 ### Economitra
-- Final read-through complete. 1 bib fix. 7 substantive issues flagged for Will.
+- Read-through complete. 7 substantive issues flagged for Will's review.
 
 ## Key Changes This Session
-- `.claude/WAL.md` added to git (force-added, like SESSION_STATE.md)
+- `.claude/WAL.md` — new file (Anti-Amnesia Protocol)
+- `.claude/AGENT_CONTEXT.md` — new file (agent efficiency)
 - Session Start Protocol: Step 0 = check WAL
-- CLAUDE.md: stealth remote refs removed, session state section updated
-- Mitosis Constant (k=1.3) in AAP spec + memory
-
-## In-Flight When Session Ended (check git log)
-- T17: Gas optimization
-- T23: DeployAgents.s.sol
-- T29: Community/DePIN tests
-- T30: Financial contract tests
-- T31: Naming/RWA contract tests
+- CLAUDE.md: stealth refs removed, session state section updated, push to origin only
+- Mitosis Constant in AAP spec
 
 ## Next Session
-1. Check WAL — recover any in-flight agents that landed
-2. Complete T17, T23, T29-T31 if they didn't land
-3. Review Economitra substantive issues (7 flagged)
-4. Deploy frontend to Vercel
-5. Conference applications (Consensus Miami)
-6. Continue test coverage push toward 60%+ (currently ~47%)
-7. Smart contract CI job will pass once commit storm settles
+1. Check WAL — recover any in-flight sonnet agents (T47, T48, T49)
+2. Review Economitra substantive issues (7 flagged)
+3. Deploy frontend to Vercel
+4. Conference applications (Consensus Miami, EthDC)
+5. Continue test coverage push (aim for 60%+)
+6. Smart contract CI job will pass once commit storm settles
+7. Credits proposal — follow up with dad

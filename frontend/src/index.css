@@ -751,6 +751,74 @@ input[type="number"] {
 }
 
 /* ============================================
+   ROSETTA PAGE — LIGHT THEME OVERRIDES
+   ============================================ */
+
+.rosetta-light {
+  --rosetta-bg: #f8fafc;
+  --rosetta-surface: rgba(255, 255, 255, 0.85);
+  --rosetta-surface-deep: rgba(241, 245, 249, 0.9);
+  --rosetta-border: rgba(0, 0, 0, 0.10);
+  --rosetta-border-hover: rgba(0, 0, 0, 0.18);
+  --rosetta-text-primary: #0f172a;
+  --rosetta-text-secondary: #475569;
+  --rosetta-text-muted: #94a3b8;
+  --rosetta-matrix: #059669;
+  --rosetta-input-bg: rgba(255, 255, 255, 0.95);
+  --rosetta-toggle-bg: #ffffff;
+  --rosetta-toggle-shadow: 0 1px 8px rgba(0,0,0,0.12);
+}
+
+/* Light theme: page background */
+.rosetta-light {
+  background-color: var(--rosetta-bg);
+  color: var(--rosetta-text-primary);
+}
+
+/* Light theme: GlassCards */
+.rosetta-light .glass-card {
+  background: var(--rosetta-surface) !important;
+  border-color: var(--rosetta-border) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 12px rgba(0,0,0,0.04) !important;
+}
+
+.rosetta-light .glass-card:hover {
+  border-color: var(--rosetta-border-hover) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+}
+
+/* Light theme: text overrides */
+.rosetta-light .text-white,
+.rosetta-light .text-white\/90 {
+  color: var(--rosetta-text-primary) !important;
+}
+
+/* Inputs */
+.rosetta-light input,
+.rosetta-light textarea,
+.rosetta-light select {
+  background: var(--rosetta-input-bg) !important;
+  color: var(--rosetta-text-primary) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.rosetta-light input::placeholder,
+.rosetta-light textarea::placeholder {
+  color: var(--rosetta-text-muted) !important;
+}
+
+.rosetta-light input:focus,
+.rosetta-light textarea:focus {
+  border-color: var(--rosetta-matrix) !important;
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.15) !important;
+}
+
+/* Stat tiles background (the compact grid) */
+.rosetta-light .bg-black-800\/40 {
+  background: rgba(241, 245, 249, 0.8) !important;
+}
+
+/* ============================================
    GLASS CARD SYSTEM
    ============================================ */
 .glass-card {

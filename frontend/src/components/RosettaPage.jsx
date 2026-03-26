@@ -1069,7 +1069,25 @@ function LexiconCard({ agent, termCount, onSelect, isSelected }) {
         <div className="text-[10px] font-mono text-black-400 mb-1.5">{agent.domain}</div>
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-mono text-black-600">{termCount} terms</span>
-          <svg
+          {/* Print Lexicon button */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); printLexicon(agent.id) }}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-matrix-500"
+              style={{
+                backgroundColor: `${agent.color}14`,
+                border: `1px solid ${agent.color}30`,
+                color: agent.color,
+              }}
+              title={`Print ${agent.name} lexicon`}
+              aria-label={`Print ${agent.name} lexicon handout`}
+            >
+              <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print
+            </button>
+            <svg
             className={`w-3.5 h-3.5 text-black-600 transition-transform ${isSelected ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
@@ -1078,6 +1096,7 @@ function LexiconCard({ agent, termCount, onSelect, isSelected }) {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
+          </div>
         </div>
       </GlassCard>
     </motion.div>
@@ -1101,7 +1120,24 @@ function LexiconPanel({ agent, terms }) {
         <div className="flex items-center gap-2 mb-3">
           <AgentDot color={agent.color} size={8} />
           <span className="text-white font-bold text-sm">{agent.name} Lexicon</span>
-          <span className="text-[10px] font-mono text-black-500 ml-auto">{agent.domain}</span>
+          <span className="text-[10px] font-mono text-black-500 flex-1 min-w-0 truncate">{agent.domain}</span>
+          {/* Print Lexicon handout */}
+          <button
+            onClick={() => printLexicon(agent.id)}
+            className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider transition-all hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
+            style={{
+              backgroundColor: `${agent.color}14`,
+              border: `1px solid ${agent.color}35`,
+              color: agent.color,
+            }}
+            title={`Open print-ready ${agent.name} lexicon handout`}
+            aria-label={`Print ${agent.name} lexicon as a handout`}
+          >
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print Lexicon
+          </button>
         </div>
 
         {terms && terms.length > 0 && (
@@ -3902,6 +3938,151 @@ function RecentTranslations({ history, onReplay, onClear }) {
   )
 }
 
+// ============ Mobile Bottom Nav ============
+// Sticky bottom navigation bar — visible on mobile only (hidden on md+).
+// Highlights the active section based on IntersectionObserver scroll-spy.
+
+const MOBILE_NAV_ITEMS = [
+  {
+    id: 'section-translate',
+    label: 'Translate',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <path d="M3 5h12M9 3v2M5 9l4 4-4 4M13 9l4 4-4 4" />
+        <path d="M15 5l6 14M18 13h-6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'section-sentence',
+    label: 'Sentence',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <path d="M4 6h16M4 10h10M4 14h12M4 18h8" />
+      </svg>
+    ),
+  },
+  {
+    id: 'section-discover',
+    label: 'Discover',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4.35-4.35" />
+      </svg>
+    ),
+  },
+  {
+    id: 'section-explorer',
+    label: 'Explorer',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.64 5.64l2.83 2.83M15.54 15.54l2.83 2.83M5.64 18.36l2.83-2.83M15.54 8.46l2.83-2.83" />
+      </svg>
+    ),
+  },
+  {
+    id: 'section-chain',
+    label: 'Chain',
+    icon: (active) => (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+      </svg>
+    ),
+  },
+]
+
+function MobileBottomNav() {
+  const [activeId, setActiveId] = useState(null)
+
+  useEffect(() => {
+    const sectionIds = MOBILE_NAV_ITEMS.map(item => item.id)
+    const intersecting = {}
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          intersecting[entry.target.id] = entry.isIntersecting
+        })
+        // Pick the first section (in DOM order) that is intersecting
+        const first = sectionIds.find(id => intersecting[id])
+        setActiveId(first || null)
+      },
+      {
+        rootMargin: '-20% 0px -60% 0px',
+        threshold: 0,
+      }
+    )
+
+    sectionIds.forEach(id => {
+      const el = document.getElementById(id)
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
+      style={{
+        background: 'rgba(5,10,8,0.96)',
+        borderTop: '1px solid rgba(0,255,65,0.18)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      <nav className="flex items-stretch justify-around" aria-label="Section navigation">
+        {MOBILE_NAV_ITEMS.map(({ id, label, icon }) => {
+          const active = activeId === id
+          return (
+            <button
+              key={id}
+              onClick={() => scrollToSection(id)}
+              aria-label={`Jump to ${label} section`}
+              aria-current={active ? 'location' : undefined}
+              className="relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-matrix-500"
+              style={{ color: active ? '#00ff41' : 'rgba(148,163,184,0.6)' }}
+            >
+              <span
+                className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full transition-all duration-200"
+                style={{
+                  width: active ? '2rem' : '0px',
+                  backgroundColor: '#00ff41',
+                  boxShadow: active ? '0 0 8px rgba(0,255,65,0.6)' : 'none',
+                }}
+                aria-hidden="true"
+              />
+              <span
+                className="transition-transform duration-200"
+                style={{ transform: active ? 'scale(1.1)' : 'scale(1)' }}
+                aria-hidden="true"
+              >
+                {icon(active)}
+              </span>
+              <span
+                className="text-[9px] font-mono uppercase tracking-wide leading-none"
+                style={{ fontWeight: active ? 700 : 400 }}
+              >
+                {label}
+              </span>
+            </button>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
@@ -4255,7 +4436,7 @@ export default function RosettaPage() {
   }, [showHelp, handleEscapeReset])
 
   return (
-    <div className={`max-w-5xl mx-auto px-4 py-6${isDark ? '' : ' rosetta-light'}`}>
+    <div className={`max-w-5xl mx-auto px-4 py-6 pb-20 md:pb-6${isDark ? '' : ' rosetta-light'}`}>
 
       {/* ============ Hero Section ============ */}
       <motion.div
@@ -4883,6 +5064,9 @@ export default function RosettaPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* ============ Mobile Bottom Nav — mobile only ============ */}
+      <MobileBottomNav />
     </div>
   )
 }

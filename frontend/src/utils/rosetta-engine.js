@@ -2150,3 +2150,162 @@ export function getProtocolStats() {
     agent_terms: agentTermCounts,
   }
 }
+
+// ============ Detailed Stats ============
+
+/**
+ * Returns extended protocol statistics for the live stats dashboard.
+ *
+ * @returns {{
+ *   totalLexicons: number,
+ *   totalTerms: number,
+ *   totalUniversalConcepts: number,
+ *   mostConnected: { name: string, count: number },
+ *   avgTermsPerLexicon: number,
+ *   crossDomainBridges: number
+ * }}
+ */
+export function getDetailedStats() {
+  const idx = getIndex()
+
+  // Total lexicons (static + user)
+  const totalLexicons = Object.keys(LEXICONS).length + _userLexicons.size
+
+  // Total terms across all lexicons
+  let totalTerms = 0
+  for (const lexicon of Object.values(LEXICONS)) {
+    totalTerms += Object.keys(lexicon.concepts).length
+  }
+  for (const lexicon of _userLexicons.values()) {
+    totalTerms += Object.keys(lexicon.concepts).length
+  }
+
+  // Total unique universal concepts
+  const totalUniversalConcepts = Object.keys(idx).length
+
+  // Most connected concept: universal key that maps to the most distinct lexicons
+  let mostConnectedName = ''
+  let mostConnectedCount = 0
+  for (const [universal, entries] of Object.entries(idx)) {
+    const distinctLexicons = new Set(entries.map(e => e.agent)).size
+    if (distinctLexicons > mostConnectedCount) {
+      mostConnectedCount = distinctLexicons
+      mostConnectedName = universal
+    }
+  }
+
+  // Average terms per lexicon (static lexicons only for stability)
+  const staticLexiconCount = Object.keys(LEXICONS).length
+  let staticTermTotal = 0
+  for (const lexicon of Object.values(LEXICONS)) {
+    staticTermTotal += Object.keys(lexicon.concepts).length
+  }
+  const avgTermsPerLexicon = staticLexiconCount > 0
+    ? Math.round((staticTermTotal / staticLexiconCount) * 10) / 10
+    : 0
+
+  // Cross-domain bridges: universal concepts that appear in 3+ distinct lexicons
+  let crossDomainBridges = 0
+  for (const entries of Object.values(idx)) {
+    const distinctLexicons = new Set(entries.map(e => e.agent)).size
+    if (distinctLexicons >= 3) crossDomainBridges++
+  }
+
+  return {
+    totalLexicons,
+    totalTerms,
+    totalUniversalConcepts,
+    mostConnected: { name: mostConnectedName, count: mostConnectedCount },
+    avgTermsPerLexicon,
+    crossDomainBridges,
+  }
+}
+
+// ============ Autocomplete ============
+
+/**
+ * Return up to `limit` matching term suggestions across all lexicons.
+ * Each suggestion has: { term, lexiconId, domain, description, score }
+ *
+ * Scoring tiers:
+ *   100 — exact term match
+ *    90 — term starts with query
+ *    80 — term contains query as substring
+ *    65 — description starts-with match
+ *    55 — description contains query
+ *
+ * Results are deduped by (lexiconId, term), sorted descending by score,
+ * then capped at `limit`.
+ *
+ * @param {string} query
+ * @param {number} [limit=8]
+ * @returns {{ term: string, lexiconId: string, domain: string, description: string, score: number }[]}
+ */
+export function autocomplete(query, limit = 8) {
+  const q = (query || '').toLowerCase().trim().replace(/_/g, ' ')
+  if (!q) return []
+
+  const hits = []
+
+  for (const [lexiconId, lexicon] of Object.entries(LEXICONS)) {
+    const domain = lexicon.domain || lexiconId
+    for (const [termKey, termData] of Object.entries(lexicon.concepts)) {
+      const termLower = termKey.toLowerCase().replace(/_/g, ' ')
+      const descLower = (termData.desc || '').toLowerCase()
+
+      let score = 0
+      if (termLower === q)              score = 100
+      else if (termLower.startsWith(q)) score = 90
+      else if (termLower.includes(q))   score = 80
+      else if (descLower.startsWith(q)) score = 65
+      else if (descLower.includes(q))   score = 55
+
+      if (score > 0) {
+        hits.push({
+          term: termKey,
+          lexiconId,
+          domain,
+          description: termData.desc || '',
+          score,
+        })
+      }
+    }
+  }
+
+  // Include user lexicons so custom terms surface too
+  for (const [userId, lexicon] of _userLexicons.entries()) {
+    const domain = lexicon.domain || userId
+    for (const [termKey, termData] of Object.entries(lexicon.concepts || {})) {
+      const termLower = termKey.toLowerCase().replace(/_/g, ' ')
+      const descLower = (termData.desc || '').toLowerCase()
+
+      let score = 0
+      if (termLower === q)              score = 100
+      else if (termLower.startsWith(q)) score = 90
+      else if (termLower.includes(q))   score = 80
+      else if (descLower.startsWith(q)) score = 65
+      else if (descLower.includes(q))   score = 55
+
+      if (score > 0) {
+        hits.push({
+          term: termKey,
+          lexiconId: `user:${userId}`,
+          domain,
+          description: termData.desc || '',
+          score,
+        })
+      }
+    }
+  }
+
+  // Dedupe by (lexiconId, term), keeping highest score
+  const seen = new Map()
+  for (const h of hits) {
+    const k = `${h.lexiconId}:${h.term}`
+    if (!seen.has(k) || seen.get(k).score < h.score) seen.set(k, h)
+  }
+
+  return Array.from(seen.values())
+    .sort((a, b) => b.score - a.score || a.term.localeCompare(b.term))
+    .slice(0, limit)
+}

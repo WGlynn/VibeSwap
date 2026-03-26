@@ -16,6 +16,8 @@ import {
   addUserTerm,
   getUserLexicon,
   getAllUserLexicons,
+  exportLexicon,
+  importLexicon,
   getProtocolStats,
   getTopConnectedConcepts,
   getDetailedStats,
@@ -1241,8 +1243,10 @@ function DiscoverSection({ onSuggestionClick }) {
 }
 // ============ My Lexicon Panel ============
 
-function MyLexiconPanel({ userId, isConnected }) {
+function MyLexiconPanel({ userId, isConnected, onImported }) {
   const [myLexicon, setMyLexicon] = useState(null)
+  const [importStatus, setImportStatus] = useState(null) // { type: 'success'|'error', message }
+  const importInputRef = useRef(null)
 
   // Reload whenever userId changes or a term is added (parent refreshes via key)
   useEffect(() => {
@@ -1252,6 +1256,43 @@ function MyLexiconPanel({ userId, isConnected }) {
     }
     setMyLexicon(getUserLexicon(userId))
   }, [isConnected, userId])
+
+  // ---- Export ----
+  const handleExport = useCallback(() => {
+    if (!userId) return
+    const json = exportLexicon(userId)
+    if (!json) return
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const safeDomain = (myLexicon?.domain || 'lexicon').replace(/\s+/g, '-').toLowerCase()
+    a.href = url
+    a.download = `rosetta-${safeDomain}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [userId, myLexicon])
+
+  // ---- Import ----
+  const handleImportFile = useCallback((e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportStatus(null)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const result = importLexicon(ev.target.result)
+      if (result.error) {
+        setImportStatus({ type: 'error', message: result.error })
+      } else {
+        setImportStatus({
+          type: 'success',
+          message: `Imported ${result.termCount} term${result.termCount !== 1 ? 's' : ''} into "${result.domain}"`,
+        })
+        onImported?.()
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }, [onImported])
 
   if (!isConnected) {
     return (
@@ -1329,6 +1370,73 @@ function MyLexiconPanel({ userId, isConnected }) {
           </p>
         </div>
       )}
+
+      {/* ---- Export / Import buttons ---- */}
+      <div className="mt-3 pt-3 border-t border-black-800 flex items-center gap-2 flex-wrap">
+        {/* Export — only shown when there are terms */}
+        {myLexicon && myLexicon.terms && myLexicon.terms.length > 0 && (
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all hover:opacity-80"
+            style={{
+              backgroundColor: `${USER_LEXICON_COLOR}15`,
+              border: `1px solid ${USER_LEXICON_COLOR}40`,
+              color: USER_LEXICON_COLOR,
+            }}
+            title="Download your lexicon as a JSON file to share with others"
+          >
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export My Lexicon
+          </button>
+        )}
+
+        {/* Import */}
+        <button
+          onClick={() => importInputRef.current?.click()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all hover:opacity-80"
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            color: '#94a3b8',
+          }}
+          title="Upload a shared lexicon JSON file"
+        >
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" />
+          </svg>
+          Import Lexicon
+        </button>
+
+        {/* Hidden file input */}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+      </div>
+
+      {/* Import status feedback */}
+      <AnimatePresence>
+        {importStatus && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-2 px-3 py-2 rounded-lg text-[11px] font-mono"
+            style={{
+              backgroundColor: importStatus.type === 'success' ? '#16a34a18' : '#dc262618',
+              border: `1px solid ${importStatus.type === 'success' ? '#16a34a40' : '#dc262640'}`,
+              color: importStatus.type === 'success' ? '#4ade80' : '#f87171',
+            }}
+          >
+            {importStatus.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </GlassCard>
   )
 }
@@ -2476,189 +2584,126 @@ function TenCovenantsSection() {
             className="text-[11px] font-mono font-bold tracking-wider"
             style={{ color: "#d4aa50" }}
           >
-        <p className="text-black-300 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
-          Every domain speaks every other domain.{' '}
-          <span className="text-white font-semibold">Live. Client-side. Zero backend.</span>
-        </p>
-
-        {/* One-sentence intro for first-time visitors */}
-        <p className="text-black-400 text-xs sm:text-sm font-mono mt-4 max-w-2xl mx-auto leading-relaxed px-2">
-          Pick any term from your field and instantly see what every other domain calls the same idea &mdash; medicine, engineering, law, music, trading, and more share a hidden universal language.
-        </p>
-
-        {/* Subtitle line */}
-        <p className="text-black-600 text-[10px] font-mono mt-2">
-          AI Agents + Human Domains + User Lexicons — 100% client-side
-        </p>
-      </motion.div>
-
-      {/* ============ Live Stats Dashboard ============ */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
-        className="mb-6"
-      >
-        {/* Dashboard header bar */}
-        <div className="flex items-center gap-2 mb-3">
-          <motion.span
-            className="inline-block w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: '#00ff41' }}
-            animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 10px #00ff41cc', '0 0 4px #00ff4166'] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-matrix-500">
-            Live Protocol Stats
+            0x{COVENANT_HASH}
           </span>
-          <span className="flex-1 h-px" style={{ background: 'rgba(0,255,65,0.12)' }} />
+          <button
+            onClick={handleCopyHash}
+            className="transition-colors"
+            title="Copy full hash"
+            style={{ color: hashCopied ? "#10b981" : "rgba(140,110,50,0.7)" }}
+          >
+            {hashCopied ? (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
         </div>
 
-        {/* Primary stat tiles — 4-col grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          {[
-            {
-              label: 'Lexicons',
-              value: detailedStats.totalLexicons,
-              color: '#00ff41',
-              glow: 'rgba(0,255,65,0.18)',
-              border: 'rgba(0,255,65,0.22)',
-              bg: 'rgba(0,255,65,0.05)',
-              delay: 0.20,
-            },
-            {
-              label: 'Terms',
-              value: detailedStats.totalTerms,
-              color: '#22d3ee',
-              glow: 'rgba(34,211,238,0.18)',
-              border: 'rgba(34,211,238,0.22)',
-              bg: 'rgba(34,211,238,0.05)',
-              delay: 0.28,
-            },
-            {
-              label: 'Concepts',
-              value: detailedStats.totalUniversalConcepts,
-              color: '#a855f7',
-              glow: 'rgba(168,85,247,0.18)',
-              border: 'rgba(168,85,247,0.22)',
-              bg: 'rgba(168,85,247,0.05)',
-              delay: 0.36,
-            },
-            {
-              label: 'Cross-Domain Bridges',
-              value: detailedStats.crossDomainBridges,
-              color: '#f59e0b',
-              glow: 'rgba(245,158,11,0.18)',
-              border: 'rgba(245,158,11,0.22)',
-              bg: 'rgba(245,158,11,0.05)',
-              delay: 0.44,
-            },
-          ].map((tile) => (
-            <motion.div
-              key={tile.label}
-              initial={{ opacity: 0, scale: 0.88 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.45, delay: tile.delay, ease: 'easeOut' }}
-              className="relative rounded-xl p-4 text-center overflow-hidden"
-              style={{
-                background: tile.bg,
-                border: `1px solid ${tile.border}`,
-              }}
-            >
-              {/* Subtle inner glow pulse */}
-              <motion.div
-                className="absolute inset-0 pointer-events-none rounded-xl"
-                style={{
-                  background: `radial-gradient(ellipse at 50% 0%, ${tile.glow} 0%, transparent 65%)`,
-                }}
-                animate={{ opacity: [0.6, 1, 0.6] }}
-                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: tile.delay }}
-              />
-              <div className="relative z-10">
-                <div
-                  className="text-2xl sm:text-3xl font-bold font-mono leading-none"
-                  style={{ color: tile.color, textShadow: `0 0 18px ${tile.color}55` }}
-                >
-                  <AnimatedCounter target={tile.value} duration={1400} />
-                </div>
-                <div className="text-[10px] font-mono text-black-400 uppercase tracking-wider mt-1.5 leading-tight">
-                  {tile.label}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Most-connected banner + secondary metrics */}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.52, ease: 'easeOut' }}
-          className="rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
-          style={{
-            background: 'linear-gradient(135deg, rgba(0,255,65,0.04) 0%, rgba(0,10,5,0.7) 100%)',
-            border: '1px solid rgba(0,255,65,0.14)',
-          }}
-        >
-          {/* Most connected concept */}
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider whitespace-nowrap">
-              Most connected
-            </span>
+        {/* Enforcement legend */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+          {Object.entries(ENFORCEMENT_META).map(([key, m]) => (
             <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold truncate max-w-[200px]"
-              style={{
-                backgroundColor: 'rgba(0,255,65,0.10)',
-                border: '1px solid rgba(0,255,65,0.25)',
-                color: '#00ff41',
-              }}
-              title={detailedStats.mostConnected.name}
+              key={key}
+              className="text-[9px] font-mono font-bold px-2.5 py-1 rounded-full tracking-widest uppercase"
+              style={{ background: m.bg, border: `1px solid ${m.border}`, color: m.text }}
             >
-              {detailedStats.mostConnected.name}
+              {m.label}
             </span>
-            <span className="text-[9px] font-mono text-black-400 whitespace-nowrap">
-              {' — bridges '}
-              <span className="text-white font-bold">
-                {detailedStats.mostConnected.count}
-              </span>
-              {' domains'}
-            </span>
-          </div>
+          ))}
+          <span className="text-[9px] font-mono" style={{ color: "rgba(80,65,35,0.8)" }}>
+            — enforcement types
+          </span>
+        </div>
+      </div>
 
-          {/* Secondary metrics */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {[
-              { label: 'AI Agents', value: AGENT_LEXICONS.length, color: '#22d3ee' },
-              { label: 'Human Domains', value: HUMAN_LEXICONS.length, color: '#10b981' },
-              { label: 'Avg Terms', value: detailedStats.avgTermsPerLexicon, color: '#a855f7' },
-              {
-                label: 'Covenant Hash',
-                value: stats.covenantHash
-                  ? `0x${stats.covenantHash.slice(0, 6)}…`
-                  : '--',
-                color: '#d4aa50',
-                copyable: stats.covenantHash,
-              },
-            ].map((m) => (
-              <div key={m.label} className="text-center">
-                <div className="flex items-center justify-center gap-1">
-                  <span className="font-mono font-bold text-xs" style={{ color: m.color }}>
-                    {m.value}
-                  </span>
-                  {m.copyable && <CopyButton text={m.copyable} />}
-                </div>
-                <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider whitespace-nowrap">
-                  {m.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
+      {/* Covenant cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {TEN_COVENANTS.map((covenant, i) => (
+          <CovenantCard key={covenant.number} covenant={covenant} index={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
 
-      {/* ============ Did You Know? ============ */}
-      <DidYouKnow />
+// ============ Popular Translations ============
 
-      
+const POPULAR_PAIRS = [
+  {
+    fromId: 'medicine',
+    toId: 'engineering',
+    term: 'diagnosis',
+    fromColor: '#ef4444',
+    toColor: '#f97316',
+    insight: 'Root-cause analysis — isolate the fault before you fix anything.',
+  },
+  {
+    fromId: 'trading',
+    toId: 'medicine',
+    term: 'liquidity',
+    fromColor: '#eab308',
+    toColor: '#ef4444',
+    insight: 'Perfusion — resources must flow to where they are needed or the system fails.',
+  },
+  {
+    fromId: 'cooking',
+    toId: 'military',
+    term: 'mise en place',
+    fromColor: '#f59e0b',
+    toColor: '#78716c',
+    insight: 'OPSEC brief — arrange everything before the chaos starts, or it wins.',
+  },
+  {
+    fromId: 'music',
+    toId: 'psychology',
+    term: 'cadence',
+    fromColor: '#ec4899',
+    toColor: '#8b5cf6',
+    insight: 'Closure — the sequence resolves, the phrase ends, the mind can rest.',
+  },
+  {
+    fromId: 'philosophy',
+    toId: 'engineering',
+    term: 'axiom',
+    fromColor: '#06b6d4',
+    toColor: '#f97316',
+    insight: 'Spec — ground truth so basic it cannot be derived from anything simpler.',
+  },
+  {
+    fromId: 'law',
+    toId: 'trading',
+    term: 'precedent',
+    fromColor: '#6b7280',
+    toColor: '#eab308',
+    insight: 'Support level — a price the market tested and respected; it carries weight.',
+  },
+]
+    fromColor: '#eab308',
+    toColor: '#ef4444',
+    insight: 'Perfusion — resources must flow to where they are needed or the system fails.',
+  },
+  {
+    fromId: 'cooking',
+    toId: 'military',
+    term: 'mise en place',
+    fromColor: '#f59e0b',
+    toColor: '#78716c',
+    insight: 'OPSEC brief — arrange everything before the chaos starts, or it wins.',
+  },
+  {
+    fromId: 'music',
+    toId: 'psychology',
+    term: 'cadence',
+    fromColor: '#ec4899',
+    toColor: '#8b5cf6',
+    insight: 'Closure — the sequence resolves, the phrase ends, the mind can rest.',
+  },
+  {
     fromId: 'philosophy',
     toId: 'engineering',
     term: 'axiom',
@@ -2800,9 +2845,55 @@ function ExampleTranslationCards({ onTry }) {
   )
 }
 
+// ============ Theme Toggle Button ============
+
+function ThemeToggle({ isDark, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="absolute top-0 right-0 z-20 flex items-center justify-center w-9 h-9 rounded-full border transition-all duration-200 hover:scale-110 active:scale-95"
+      style={{
+        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+        color: isDark ? '#e2e8f0' : '#334155',
+      }}
+    >
+      {isDark ? (
+        /* Sun icon */
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <circle cx="12" cy="12" r="5" />
+          <path strokeLinecap="round" d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </svg>
+      ) : (
+        /* Moon icon */
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
+  // ---- Theme toggle (dark/light) — persisted to localStorage ----
+  const [isDark, setIsDark] = useState(() => {
+    try {
+      const saved = localStorage.getItem('rosetta-theme')
+      return saved ? saved === 'dark' : true
+    } catch { return true }
+  })
+
+  const toggleTheme = useCallback(() => {
+    setIsDark(prev => {
+      const next = !prev
+      try { localStorage.setItem('rosetta-theme', next ? 'dark' : 'light') } catch {}
+      return next
+    })
+  }, [])
+
   // ---- Dual wallet pattern ----
   const { isConnected: isExternalConnected, address: externalAddress } = useWallet()
   const { isConnected: isDeviceConnected, address: deviceAddress } = useDeviceWallet()
@@ -2896,8 +2987,85 @@ export default function RosettaPage() {
   const agentTermCounts = protocolData.agent_terms || {}
   const canTranslate = fromId && concept.trim() && (translateAll || toId)
 
+  // ---- Keyboard shortcuts ----
+  const [showHelp, setShowHelp] = useState(false)
+
+  // Reset parent-owned state. Sub-component inputs keep their local state;
+  // the user can clear those by pressing Escape again while focused in them.
+  const handleEscapeReset = useCallback(() => {
+    setTranslationResult(null)
+    setTranslateAllResults(null)
+    setConcept('')
+    setFromId('')
+    setToId('')
+    setTranslateAll(false)
+    setShowHelp(false)
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+  }, [])
+
+  useEffect(() => {
+    const FOCUSABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
+    function isInputFocused() {
+      const el = document.activeElement
+      return el && (FOCUSABLE_TAGS.has(el.tagName) || el.isContentEditable)
+    }
+    function onKeyDown(e) {
+      // Never intercept when modifiers are held (except Escape)
+      if (e.key !== 'Escape' && (e.ctrlKey || e.metaKey || e.altKey)) return
+
+      if (e.key === 'Escape') {
+        if (showHelp) { setShowHelp(false); return }
+        handleEscapeReset()
+        return
+      }
+
+      // Remaining shortcuts: only fire when no input is focused
+      if (isInputFocused()) return
+
+      switch (e.key) {
+        case '/': {
+          e.preventDefault()
+          document.getElementById('rosetta-discover-input')?.focus()
+          break
+        }
+        case 't': {
+          e.preventDefault()
+          const el = document.getElementById('rosetta-translate-from')
+          el?.focus()
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          break
+        }
+        case 's': {
+          e.preventDefault()
+          const el = document.getElementById('rosetta-sentence-textarea')
+          el?.focus()
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          break
+        }
+        case 'c': {
+          e.preventDefault()
+          const el = document.getElementById('rosetta-chain-term-a')
+          el?.focus()
+          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          break
+        }
+        case '?': {
+          e.preventDefault()
+          setShowHelp(v => !v)
+          break
+        }
+        default:
+          break
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [showHelp, handleEscapeReset])
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
+    <div className={`max-w-5xl mx-auto px-4 py-6${isDark ? '' : ' rosetta-light'}`}>
 
       {/* ============ Hero Section ============ */}
       <motion.div
@@ -2906,6 +3074,9 @@ export default function RosettaPage() {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="relative text-center mb-6 overflow-visible"
       >
+        {/* Theme toggle — top right */}
+        <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+
         {/* Glow halo behind title */}
         <div
           className="absolute left-1/2 -translate-x-1/2 -top-4 w-96 h-24 pointer-events-none"
@@ -3170,6 +3341,7 @@ export default function RosettaPage() {
           key={`${userId}-${lexiconRevision}`}
           userId={userId}
           isConnected={isConnected}
+          onImported={refreshUserLexicons}
         />
       </div>
 
@@ -3247,7 +3419,127 @@ export default function RosettaPage() {
         <p className="text-black-800 text-[9px] font-mono mt-0.5">
           Runs client-side — no backend required
         </p>
+        {/* Keyboard shortcut hint */}
+        <button
+          onClick={() => setShowHelp(v => !v)}
+          className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[10px] transition-colors"
+          style={{
+            backgroundColor: 'rgba(0,255,65,0.05)',
+            border: '1px solid rgba(0,255,65,0.15)',
+            color: 'rgba(0,255,65,0.5)',
+          }}
+          title="Keyboard shortcuts"
+        >
+          <span
+            className="inline-flex items-center justify-center w-4 h-4 rounded border font-bold text-[9px]"
+            style={{ borderColor: 'rgba(0,255,65,0.3)', color: 'rgba(0,255,65,0.6)' }}
+          >
+            ?
+          </span>
+          shortcuts
+        </button>
       </div>
+
+      {/* ============ Keyboard Shortcut Help Overlay ============ */}
+      <AnimatePresence>
+        {showHelp && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="kb-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setShowHelp(false)}
+            />
+
+            {/* Panel */}
+            <motion.div
+              key="kb-panel"
+              initial={{ opacity: 0, scale: 0.94, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            >
+              <div
+                className="pointer-events-auto w-full max-w-sm mx-4 rounded-2xl border overflow-hidden"
+                style={{
+                  background: 'rgba(5,10,8,0.97)',
+                  borderColor: 'rgba(0,255,65,0.28)',
+                  boxShadow: '0 0 48px rgba(0,255,65,0.12), 0 24px 64px rgba(0,0,0,0.7)',
+                }}
+              >
+                {/* Header */}
+                <div
+                  className="flex items-center justify-between px-5 py-4 border-b"
+                  style={{ borderColor: 'rgba(0,255,65,0.14)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <motion.span
+                      className="inline-block w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: '#00ff41' }}
+                      animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 10px #00ff41cc', '0 0 4px #00ff4166'] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-matrix-400">
+                      Keyboard Shortcuts
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowHelp(false)}
+                    className="text-black-600 hover:text-black-400 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Shortcut rows */}
+                <div className="px-5 py-4 space-y-2.5">
+                  {[
+                    { key: '/',   desc: 'Focus Discover search' },
+                    { key: 't',   desc: 'Focus Translate — From dropdown' },
+                    { key: 's',   desc: 'Focus Sentence Translator' },
+                    { key: 'c',   desc: 'Focus Concept Chain — Term A' },
+                    { key: 'Esc', desc: 'Clear all results and reset' },
+                    { key: '?',   desc: 'Toggle this help panel' },
+                  ].map(({ key, desc }) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <kbd
+                        className="inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg font-mono text-xs font-bold flex-shrink-0"
+                        style={{
+                          backgroundColor: 'rgba(0,255,65,0.08)',
+                          border: '1px solid rgba(0,255,65,0.28)',
+                          color: '#00ff41',
+                          boxShadow: '0 1px 0 rgba(0,255,65,0.2)',
+                        }}
+                      >
+                        {key}
+                      </kbd>
+                      <span className="text-[12px] font-mono text-black-300">{desc}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer note */}
+                <div
+                  className="px-5 py-3 border-t"
+                  style={{ borderColor: 'rgba(0,255,65,0.10)' }}
+                >
+                  <p className="text-[10px] font-mono text-black-600">
+                    Shortcuts are inactive while any input is focused.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

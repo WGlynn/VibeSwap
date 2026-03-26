@@ -9,11 +9,13 @@
 //   GET  /web/mind         → Knowledge chain, shards, learning, inner dialogue
 //   GET  /web/health       → Status + uptime
 //   POST /web/shadow/verify → Validate shadow invite token
-//   GET  /web/rosetta/view      → Full Rosetta Protocol state
-//   GET  /web/rosetta/translate  → Translate concept between agents
-//   GET  /web/rosetta/all        → Translate concept to ALL agents
-//   GET  /web/rosetta/lexicon    → Get agent vocabulary
-//   GET  /web/covenants          → Ten Covenants + hash
+//   GET  /web/rosetta/view              → Full Rosetta Protocol state (normalised for frontend)
+//   GET  /web/rosetta/translate          → Translate concept between agents (normalised)
+//   GET  /web/rosetta/all                → Translate concept to ALL agents (array response)
+//   GET  /web/rosetta/lexicon            → Get agent vocabulary (term array)
+//   POST /web/rosetta/lexicon/register   → Register user's personal domain lexicon
+//   GET  /web/rosetta/discover           → Discover equivalent terms by concept
+//   GET  /web/covenants                  → Ten Covenants + hash
 // ============
 
 import { config } from './config.js';
@@ -33,7 +35,7 @@ import { getPendingCommands, acknowledgeCommand, acknowledgeAll } from './relay.
 import { getGraphStats, getAuthorAttribution } from './passive-attribution.js';
 import { createPrediction, placeBet, resolveMarket, listMarkets, listMarketsStructured, getMyBets, getPredictorLeaderboard, getLeaderboardStructured } from './tools-predictions.js';
 import { createHmac } from 'crypto';
-import { getRosettaView, translate, translateToAll, getLexicon, TEN_COVENANTS, COVENANT_HASH } from './rosetta.js';
+import { getRosettaView, translate, translateToAll, getLexicon, registerUserLexicon, discoverEquivalent, TEN_COVENANTS, COVENANT_HASH } from './rosetta.js';
 import { createPrimitive, getPrimitive, listPrimitives, citePrimitive, viewPrimitive, getInfoFiStats, getAuthorStats, searchPrimitives } from './infofi.js';
 import { x402Gate, getX402Stats, getPricingSchedule, initX402, handleSIWXNonce, handleSIWXVerify } from './x402.js';
 
@@ -1270,10 +1272,30 @@ export async function handleWebRequest(req, res, pathname) {
 
   // ============ GET /web/rosetta/view ============
   // Full Rosetta Protocol state: all lexicons, universal concepts, covenant hash, active challenges
+  // Normalised to the shape RosettaPage.jsx expects:
+  //   { agent_count, total_terms, universal_count, covenant_hash, agent_terms: { agentId: count } }
   if (pathname === '/web/rosetta/view' && req.method === 'GET') {
     try {
       const view = getRosettaView();
-      jsonResponse(res, 200, view);
+      // Build agent_terms map: { agentId → termCount }
+      const agent_terms = {};
+      let total_terms = 0;
+      for (const [agentId, info] of Object.entries(view.agents || {})) {
+        agent_terms[agentId] = info.termCount || 0;
+        total_terms += info.termCount || 0;
+      }
+      jsonResponse(res, 200, {
+        // Frontend-expected keys
+        agent_count: Object.keys(view.agents || {}).length,
+        total_terms,
+        universal_count: view.universalConcepts || 0,
+        covenant_hash: view.covenantHash || COVENANT_HASH,
+        agent_terms,
+        // Pass-through for consumers that use the raw view
+        agents: view.agents,
+        covenants: view.covenants,
+        active_challenges: view.activeChallenges,
+      });
     } catch (err) {
       console.error('[web-api] Rosetta view error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch Rosetta state' });
@@ -1284,6 +1306,7 @@ export async function handleWebRequest(req, res, pathname) {
   // ============ GET /web/rosetta/translate ============
   // Translate a concept between two agents
   // ?from=poseidon&to=athena&concept=liquidity
+  // Normalised to: { from_term, to_term, universal, confidence (0–100), from_agent, to_agent }
   if (pathname === '/web/rosetta/translate' && req.method === 'GET') {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
@@ -1294,8 +1317,23 @@ export async function handleWebRequest(req, res, pathname) {
         jsonResponse(res, 400, { error: 'Missing required params: from, to, concept' });
         return true;
       }
-      const result = translate(from, to, concept);
-      jsonResponse(res, 200, result);
+      const raw = translate(from, to, concept);
+      // Normalise to frontend shape
+      const confidence = raw.confidence != null ? Math.round(raw.confidence * 100) : 0;
+      jsonResponse(res, 200, {
+        from_term: raw.from?.term ?? concept,
+        to_term: raw.to?.term ?? raw.universal ?? concept,
+        universal: raw.universal ?? null,
+        confidence,
+        approximate: raw.approximate ?? false,
+        translated: raw.translated ?? false,
+        from_agent: from,
+        to_agent: to,
+        error: raw.error ?? null,
+        // Raw fields for advanced consumers
+        from: raw.from,
+        to: raw.to,
+      });
     } catch (err) {
       console.error('[web-api] Rosetta translate error:', err.message);
       jsonResponse(res, 500, { error: 'Translation failed' });
@@ -1306,6 +1344,7 @@ export async function handleWebRequest(req, res, pathname) {
   // ============ GET /web/rosetta/all ============
   // Translate a concept from one agent to ALL other agents
   // ?from=poseidon&concept=liquidity
+  // Normalised to array: [{ agent, term, confidence (0–100), universal, approximate }]
   if (pathname === '/web/rosetta/all' && req.method === 'GET') {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
@@ -1315,8 +1354,20 @@ export async function handleWebRequest(req, res, pathname) {
         jsonResponse(res, 400, { error: 'Missing required params: from, concept' });
         return true;
       }
-      const result = translateToAll(from, concept);
-      jsonResponse(res, 200, result);
+      const raw = translateToAll(from, concept);
+      // Normalise translations map → array for frontend grid
+      const translations = Object.entries(raw.translations || {}).map(([agentId, r]) => ({
+        agent: agentId,
+        term: r.to?.term ?? r.universal ?? concept,
+        confidence: r.confidence != null ? Math.round(r.confidence * 100) : 0,
+        universal: r.universal ?? null,
+        approximate: r.approximate ?? false,
+        translated: r.translated ?? false,
+      }));
+      jsonResponse(res, 200, {
+        translations,
+        source: raw.source,
+      });
     } catch (err) {
       console.error('[web-api] Rosetta translate-all error:', err.message);
       jsonResponse(res, 500, { error: 'Translation failed' });
@@ -1327,6 +1378,7 @@ export async function handleWebRequest(req, res, pathname) {
   // ============ GET /web/rosetta/lexicon ============
   // Get an agent's vocabulary
   // ?agent=poseidon
+  // Normalised to: { domain, terms: [{ term, description, universal }] }
   if (pathname === '/web/rosetta/lexicon' && req.method === 'GET') {
     try {
       const url = new URL(req.url, `http://${req.headers.host}`);
@@ -1335,11 +1387,72 @@ export async function handleWebRequest(req, res, pathname) {
         jsonResponse(res, 400, { error: 'Missing required param: agent' });
         return true;
       }
-      const lexicon = getLexicon(agent);
-      jsonResponse(res, 200, lexicon);
+      const raw = getLexicon(agent);
+      if (!raw) {
+        jsonResponse(res, 404, { error: `No lexicon found for agent: ${agent}` });
+        return true;
+      }
+      // Normalise concepts map → array for frontend list rendering
+      const terms = Object.entries(raw.concepts || {}).map(([term, info]) => ({
+        term,
+        description: info.desc || '',
+        universal: info.universal || '',
+      }));
+      jsonResponse(res, 200, {
+        agent,
+        domain: raw.domain || '',
+        terms,
+      });
     } catch (err) {
       console.error('[web-api] Rosetta lexicon error:', err.message);
       jsonResponse(res, 500, { error: 'Could not fetch lexicon' });
+    }
+    return true;
+  }
+
+  // ============ POST /web/rosetta/lexicon/register ============
+  // Register a user's personal domain lexicon.
+  // Body: { userId, domain, terms: { word: universalConcept | { universal, desc } } }
+  // Returns: { registered, userId, domain, termCount }
+  if (pathname === '/web/rosetta/lexicon/register' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const { userId, domain, terms } = body;
+      if (!userId || !domain || !terms) {
+        jsonResponse(res, 400, { error: 'Missing required fields: userId, domain, terms' });
+        return true;
+      }
+      const result = registerUserLexicon(userId, domain, terms);
+      if (result.error) {
+        jsonResponse(res, 400, { error: result.error });
+        return true;
+      }
+      console.log(`[web-api] Rosetta: user "${userId}" registered lexicon "${domain}" (${result.termCount} terms)`);
+      jsonResponse(res, 201, result);
+    } catch (err) {
+      console.error('[web-api] Rosetta register error:', err.message);
+      jsonResponse(res, 400, { error: err.message || 'Registration failed' });
+    }
+    return true;
+  }
+
+  // ============ GET /web/rosetta/discover ============
+  // Discover all agents/users that have an equivalent for a given term.
+  // ?term=liquidity
+  // Returns: { term, found, universal, exactMatches, approximateMatches, totalEquivalents }
+  if (pathname === '/web/rosetta/discover' && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const term = url.searchParams.get('term');
+      if (!term) {
+        jsonResponse(res, 400, { error: 'Missing required param: term' });
+        return true;
+      }
+      const result = discoverEquivalent(term.trim().toLowerCase());
+      jsonResponse(res, 200, result);
+    } catch (err) {
+      console.error('[web-api] Rosetta discover error:', err.message);
+      jsonResponse(res, 500, { error: 'Discovery failed' });
     }
     return true;
   }

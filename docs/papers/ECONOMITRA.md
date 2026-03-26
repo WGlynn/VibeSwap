@@ -288,15 +288,7 @@ This requires justification. The mathematics is unambiguous. Every interaction i
 
 Let me show you what I mean.
 
-## 6.2 Physics Is a Game
-
-In quantum mechanics, particles don't have definite states until they interact. An electron exists in a superposition of all possible states. When it interacts with another particle — a "measurement" — it collapses into a definite state. The probability of each outcome depends on the configuration of the system.
-
-This is a game. The particles are players. The possible states are strategies. The interaction is a play. The outcome is a payoff. John von Neumann — the father of game theory — was also one of the architects of quantum mechanics. This is not a coincidence. He saw the same mathematical structure in both domains because it is the same structure.
-
-The Nash equilibrium — the state where no player can improve their outcome by unilaterally changing strategy — is the same concept as thermodynamic equilibrium, where no molecule can reduce the system's free energy by changing state. Equilibrium is equilibrium. The math doesn't care whether the players are humans, molecules, or algorithms.
-
-## 6.3 Evolution Is a Game
+## 6.2 Evolution Is a Game
 
 Darwin described natural selection as "survival of the fittest." What he was actually describing — in pre-mathematical language — is a Nash equilibrium in an iterated game with reproduction.
 
@@ -308,7 +300,7 @@ And here's the result that matters for economics: **cooperation is an ESS.** Rob
 
 Cooperation is not a human invention. It is not a moral choice. It is a mathematical inevitability in any system where interactions are repeated and agents have memory. Which is to say: every system that matters.
 
-## 6.4 Markets Are a Game (And We're Playing the Wrong One)
+## 6.3 Markets Are a Game (And We're Playing the Wrong One)
 
 Every market is a game. Traders are players. Orders are strategies. Profits are payoffs. The market mechanism — order book, auction, batch, whatever — defines the rules.
 
@@ -322,7 +314,7 @@ The traders didn't change. The game changed.
 
 This is mechanism design — the field that earned Leonid Hurwicz, Roger Myerson, and Eric Maskin the 2007 Nobel Prize. The insight is that you can engineer the rules of a game to produce any equilibrium you want, as long as the math checks out. You don't need to change human nature. You need to change the payoff matrix.
 
-## 6.5 Consciousness Is a Game
+## 6.4 Consciousness Is a Game
 
 This is the most ambitious claim in this paper. It's backed by mathematics.
 
@@ -338,7 +330,7 @@ When we eliminate extraction from a market, we are not just redistributing wealt
 
 This is what Economítra measures: the degree to which the economic mind is thinking clearly.
 
-## 6.6 Axelrod's Tournament: The Simplest Strategy That Wins
+## 6.5 Axelrod's Tournament: The Simplest Strategy That Wins
 
 In 1980, political scientist Robert Axelrod invited game theorists to submit strategies for an iterated Prisoner's Dilemma tournament. Professors, mathematicians, and computer scientists submitted complex strategies with sophisticated logic trees. The winner was the simplest strategy in the tournament: **Tit for Tat**, submitted by Anatol Rapoport.
 

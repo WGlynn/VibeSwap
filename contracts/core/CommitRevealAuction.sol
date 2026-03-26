@@ -309,8 +309,9 @@ contract CommitRevealAuction is
         config.poolType = poolType;
         config.initialized = true;
 
-        for (uint256 i = 0; i < blockedJurisdictions.length; i++) {
+        for (uint256 i = 0; i < blockedJurisdictions.length;) {
             config.blockedJurisdictions.push(blockedJurisdictions[i]);
+            unchecked { ++i; }
         }
 
         emit PoolComplianceConfig.PoolAccessConfigCreated(
@@ -369,12 +370,15 @@ contract CommitRevealAuction is
         uint256 requiredDeposit = collateralRequired > MIN_DEPOSIT ? collateralRequired : MIN_DEPOSIT;
         if (msg.value < requiredDeposit) revert InsufficientDeposit();
 
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+
         // Generate unique commit ID
         commitId = keccak256(abi.encodePacked(
             msg.sender,
             commitHash,
             poolId,
-            currentBatchId,
+            _currentBatchId,
             block.timestamp
         ));
 
@@ -383,15 +387,15 @@ contract CommitRevealAuction is
         commitments[commitId] = OrderCommitment({
             commitHash: commitHash,
             poolId: poolId,
-            batchId: currentBatchId,
+            batchId: _currentBatchId,
             depositAmount: msg.value,
             depositor: msg.sender,
             status: CommitStatus.COMMITTED
         });
 
-        batches[currentBatchId].orderCount++;
+        batches[_currentBatchId].orderCount++;
 
-        emit OrderCommitted(commitId, msg.sender, currentBatchId, msg.value);
+        emit OrderCommitted(commitId, msg.sender, _currentBatchId, msg.value);
     }
 
     /**
@@ -417,8 +421,11 @@ contract CommitRevealAuction is
     ) external payable nonReentrant inPhase(BatchPhase.REVEAL) {
         OrderCommitment storage commitment = commitments[commitId];
 
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+
         if (commitment.status != CommitStatus.COMMITTED) revert InvalidCommitment();
-        if (commitment.batchId != currentBatchId) revert WrongBatch();
+        if (commitment.batchId != _currentBatchId) revert WrongBatch();
         if (commitment.depositor != msg.sender) revert NotOwner();
 
         // Verify commitment hash
@@ -445,9 +452,9 @@ contract CommitRevealAuction is
         commitment.status = CommitStatus.REVEALED;
 
         // Store revealed order
-        uint256 orderIndex = revealedOrders[currentBatchId].length;
+        uint256 orderIndex = revealedOrders[_currentBatchId].length;
 
-        revealedOrders[currentBatchId].push(RevealedOrder({
+        revealedOrders[_currentBatchId].push(RevealedOrder({
             trader: msg.sender,
             tokenIn: tokenIn,
             tokenOut: tokenOut,
@@ -460,12 +467,12 @@ contract CommitRevealAuction is
 
         // Track priority orders
         if (priorityBid > 0) {
-            priorityOrderIndices[currentBatchId].push(orderIndex);
-            batches[currentBatchId].totalPriorityBids += priorityBid;
+            priorityOrderIndices[_currentBatchId].push(orderIndex);
+            batches[_currentBatchId].totalPriorityBids += priorityBid;
         }
 
         // Store secret for shuffle seed
-        batchSecrets[currentBatchId].push(secret);
+        batchSecrets[_currentBatchId].push(secret);
 
         // H-04 DISSOLVED: Pull pattern replaces inline ETH refund.
         // No external call during reveal = no reentrancy surface to attack.
@@ -477,7 +484,7 @@ contract CommitRevealAuction is
         emit OrderRevealed(
             commitId,
             msg.sender,
-            currentBatchId,
+            _currentBatchId,
             tokenIn,
             tokenOut,
             amountIn,
@@ -513,8 +520,11 @@ contract CommitRevealAuction is
     ) external payable nonReentrant inPhase(BatchPhase.REVEAL) {
         OrderCommitment storage commitment = commitments[commitId];
 
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+
         if (commitment.status != CommitStatus.COMMITTED) revert InvalidCommitment();
-        if (commitment.batchId != currentBatchId) revert WrongBatch();
+        if (commitment.batchId != _currentBatchId) revert WrongBatch();
         if (commitment.depositor != msg.sender) revert NotOwner();
 
         // Verify commitment hash
@@ -544,7 +554,7 @@ contract CommitRevealAuction is
             // Generate challenge unique to this trader and batch
             bytes32 challenge = ProofOfWorkLib.generateChallenge(
                 msg.sender,
-                currentBatchId,
+                _currentBatchId,
                 bytes32(0) // No pool ID for priority
             );
 
@@ -572,9 +582,9 @@ contract CommitRevealAuction is
         commitment.status = CommitStatus.REVEALED;
 
         // Store revealed order
-        uint256 orderIndex = revealedOrders[currentBatchId].length;
+        uint256 orderIndex = revealedOrders[_currentBatchId].length;
 
-        revealedOrders[currentBatchId].push(RevealedOrder({
+        revealedOrders[_currentBatchId].push(RevealedOrder({
             trader: msg.sender,
             tokenIn: tokenIn,
             tokenOut: tokenOut,
@@ -588,17 +598,17 @@ contract CommitRevealAuction is
         // Track priority orders (if any priority from ETH or PoW)
         uint256 effectivePriority = priorityBid + powValue;
         if (effectivePriority > 0) {
-            priorityOrderIndices[currentBatchId].push(orderIndex);
-            batches[currentBatchId].totalPriorityBids += effectivePriority;
+            priorityOrderIndices[_currentBatchId].push(orderIndex);
+            batches[_currentBatchId].totalPriorityBids += effectivePriority;
         }
 
         // Store secret for shuffle seed
-        batchSecrets[currentBatchId].push(secret);
+        batchSecrets[_currentBatchId].push(secret);
 
         emit OrderRevealed(
             commitId,
             msg.sender,
-            currentBatchId,
+            _currentBatchId,
             tokenIn,
             tokenOut,
             amountIn,
@@ -642,7 +652,9 @@ contract CommitRevealAuction is
      * isSettled guard prevents double-settlement.
      */
     function settleBatch() external nonReentrant {
-        Batch storage batch = batches[currentBatchId];
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+        Batch storage batch = batches[_currentBatchId];
 
         BatchPhase phase = getCurrentPhase();
         if (phase != BatchPhase.SETTLING && phase != BatchPhase.SETTLED) revert BatchNotReady();
@@ -651,7 +663,7 @@ contract CommitRevealAuction is
         // FIX #3: Generate shuffle seed with unpredictable block entropy
         // This prevents last revealer from computing favorable shuffle position
         if (batch.shuffleSeed == bytes32(0)) {
-            uint256 revealEndBlock = batchRevealEndBlock[currentBatchId];
+            uint256 revealEndBlock = batchRevealEndBlock[_currentBatchId];
 
             // Get block entropy from after reveal phase ended
             // If we're in the same block, use previous block hash
@@ -668,9 +680,9 @@ contract CommitRevealAuction is
                 ));
             }
 
-            batch.shuffleSeed = batchSecrets[currentBatchId].generateSeedSecure(
+            batch.shuffleSeed = batchSecrets[_currentBatchId].generateSeedSecure(
                 blockEntropy,
-                currentBatchId
+                _currentBatchId
             );
         }
 
@@ -678,8 +690,8 @@ contract CommitRevealAuction is
         batch.isSettled = true;
 
         emit BatchSettled(
-            currentBatchId,
-            revealedOrders[currentBatchId].length,
+            _currentBatchId,
+            revealedOrders[_currentBatchId].length,
             batch.totalPriorityBids,
             batch.shuffleSeed
         );
@@ -710,10 +722,11 @@ contract CommitRevealAuction is
         // Previous O(n^2) could exceed block gas limit with 200+ orders.
         // Bitmap: priorityBitmap[i] = true means index i is a priority order.
         bool[] memory priorityBitmap = new bool[](totalOrders);
-        for (uint256 j = 0; j < sortedPriority.length; j++) {
+        for (uint256 j = 0; j < sortedPriority.length;) {
             if (sortedPriority[j] < totalOrders) {
                 priorityBitmap[sortedPriority[j]] = true;
             }
+            unchecked { ++j; }
         }
 
         // Get non-priority indices in O(n)
@@ -721,10 +734,11 @@ contract CommitRevealAuction is
         uint256[] memory regularIndices = new uint256[](regularCount);
         uint256 regularIdx = 0;
 
-        for (uint256 i = 0; i < totalOrders; i++) {
+        for (uint256 i = 0; i < totalOrders;) {
             if (!priorityBitmap[i]) {
                 regularIndices[regularIdx++] = i;
             }
+            unchecked { ++i; }
         }
 
         // Shuffle regular orders
@@ -736,12 +750,14 @@ contract CommitRevealAuction is
         // Combine: priority first, then shuffled regular
         indices = new uint256[](totalOrders);
 
-        for (uint256 i = 0; i < sortedPriority.length; i++) {
+        for (uint256 i = 0; i < sortedPriority.length;) {
             indices[i] = sortedPriority[i];
+            unchecked { ++i; }
         }
 
-        for (uint256 i = 0; i < regularCount; i++) {
+        for (uint256 i = 0; i < regularCount;) {
             indices[sortedPriority.length + i] = regularIndices[shuffledRegular[i]];
+            unchecked { ++i; }
         }
     }
 
@@ -796,8 +812,11 @@ contract CommitRevealAuction is
     ) external payable nonReentrant onlyAuthorizedSettler inPhase(BatchPhase.REVEAL) {
         OrderCommitment storage commitment = commitments[commitId];
 
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+
         if (commitment.status != CommitStatus.COMMITTED) revert InvalidCommitment();
-        if (commitment.batchId != currentBatchId) revert WrongBatch();
+        if (commitment.batchId != _currentBatchId) revert WrongBatch();
 
         // Verify commitment hash (using original depositor, not msg.sender)
         bytes32 expectedHash = keccak256(abi.encodePacked(
@@ -816,9 +835,9 @@ contract CommitRevealAuction is
 
         commitment.status = CommitStatus.REVEALED;
 
-        uint256 orderIndex = revealedOrders[currentBatchId].length;
+        uint256 orderIndex = revealedOrders[_currentBatchId].length;
 
-        revealedOrders[currentBatchId].push(RevealedOrder({
+        revealedOrders[_currentBatchId].push(RevealedOrder({
             trader: originalDepositor,
             tokenIn: tokenIn,
             tokenOut: tokenOut,
@@ -830,16 +849,16 @@ contract CommitRevealAuction is
         }));
 
         if (priorityBid > 0) {
-            priorityOrderIndices[currentBatchId].push(orderIndex);
-            batches[currentBatchId].totalPriorityBids += priorityBid;
+            priorityOrderIndices[_currentBatchId].push(orderIndex);
+            batches[_currentBatchId].totalPriorityBids += priorityBid;
         }
 
-        batchSecrets[currentBatchId].push(secret);
+        batchSecrets[_currentBatchId].push(secret);
 
         emit OrderRevealed(
             commitId,
             originalDepositor,
-            currentBatchId,
+            _currentBatchId,
             tokenIn,
             tokenOut,
             amountIn,
@@ -1097,8 +1116,9 @@ contract CommitRevealAuction is
         stored.initialized = true;
 
         // Copy blocked jurisdictions
-        for (uint256 i = 0; i < config.blockedJurisdictions.length; i++) {
+        for (uint256 i = 0; i < config.blockedJurisdictions.length;) {
             stored.blockedJurisdictions.push(config.blockedJurisdictions[i]);
+            unchecked { ++i; }
         }
     }
 
@@ -1330,16 +1350,19 @@ contract CommitRevealAuction is
         if (len <= 1) return indices;
 
         sorted = new uint256[](len);
-        for (uint256 i = 0; i < len; i++) {
+        for (uint256 i = 0; i < len;) {
             sorted[i] = indices[i];
+            unchecked { ++i; }
         }
 
         // Simple bubble sort (fine for small arrays)
         // Sort by bid descending, with index ascending as tiebreaker
-        for (uint256 i = 0; i < len - 1; i++) {
-            for (uint256 j = 0; j < len - i - 1; j++) {
-                uint256 bidA = revealedOrders[batchId][sorted[j]].priorityBid;
-                uint256 bidB = revealedOrders[batchId][sorted[j + 1]].priorityBid;
+        // Gas: cache revealedOrders[batchId] reference to avoid repeated mapping lookup
+        RevealedOrder[] storage batchOrders = revealedOrders[batchId];
+        for (uint256 i = 0; i < len - 1;) {
+            for (uint256 j = 0; j < len - i - 1;) {
+                uint256 bidA = batchOrders[sorted[j]].priorityBid;
+                uint256 bidB = batchOrders[sorted[j + 1]].priorityBid;
 
                 bool shouldSwap = false;
                 if (bidA < bidB) {
@@ -1353,7 +1376,9 @@ contract CommitRevealAuction is
                 if (shouldSwap) {
                     (sorted[j], sorted[j + 1]) = (sorted[j + 1], sorted[j]);
                 }
+                unchecked { ++j; }
             }
+            unchecked { ++i; }
         }
     }
 

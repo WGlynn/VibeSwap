@@ -183,15 +183,9 @@ JUL (Joule) is VibeSwap's elastic energy token, mined via SHA-256 proof-of-work 
 
 ### 4.5 Constitutional Governance: Physics Over Politics
 
-VibeSwap's governance hierarchy operates in three layers:
+VibeSwap's governance hierarchy operates in three layers: (1) Physics --- P-001 (No Extraction Ever) is mathematically enforced through Shapley axioms; (2) Constitution --- P-000 (Fairness Above All) is encoded in contract architecture, governance cannot override; (3) Governance --- democratic decision-making within constitutional bounds.
 
-1. **Physics (P-001: No Extraction Ever):** Mathematically enforced. Shapley distribution makes extraction impossible regardless of governance decisions.
-2. **Constitution (P-000: Fairness Above All):** Structural guarantees encoded in the contract architecture. Governance cannot override.
-3. **Governance (DAO):** Democratic decision-making within the bounds set by physics and constitution.
-
-This hierarchy is essential for AI economic participation. An AI agent participating in a governance system needs guarantees that the system cannot be captured by a coalition that changes the rules to extract value from AI participants. In existing DeFi governance, a sufficiently large token-holder coalition can modify fee structures, change reward distributions, or even pause contracts --- potentially targeting AI agents specifically.
-
-In VibeSwap, P-001 is not a governance decision. It is a mathematical property. The Shapley distribution function cannot be modified by governance to extract value from any participant class, because the extraction-prevention is embedded in the function's axioms, not in a governance-modifiable parameter. An AI agent can participate with mathematical certainty that the rules will not change to its disadvantage.
+This hierarchy is essential for AI economic participation. In existing DeFi governance, a sufficiently large token-holder coalition can modify fee structures, change reward distributions, or pause contracts --- potentially targeting AI agents specifically. In VibeSwap, P-001 is not a governance decision. It is a mathematical property embedded in the Shapley function's axioms, not in a governance-modifiable parameter. An AI agent can participate with mathematical certainty that the rules will not change to its disadvantage.
 
 ---
 
@@ -203,19 +197,11 @@ AI agents contribute value in ways that are difficult to capture on-chain. An AI
 
 ### 5.2 The Bridge Architecture
 
-The `AttributionBridge.sol` contract solves this problem through a three-stage process:
-
-1. **Off-chain attribution:** Jarvis's `passive-attribution.js` module tracks contributions across all source types --- code, research, social engagement, conversation, session work. Each contribution is scored based on its direct impact and the number of downstream derivations it enables.
-2. **Merkle commitment:** An operator submits a Merkle root of `(address, score, sourceType)` tuples. This commitment is subject to a 24-hour challenge period during which any participant can dispute the root.
-3. **On-chain settlement:** After the challenge period, contributors submit Merkle proofs to claim inclusion. The bridge creates a `ShapleyDistributor` game with the proven contributors, and Shapley distributes the reward pool proportionally.
+`AttributionBridge.sol` solves this through three stages: (1) **Off-chain attribution** --- Jarvis's `passive-attribution.js` tracks contributions across all source types (code, research, social, conversation, session work), scoring each on direct impact and downstream derivations; (2) **Merkle commitment** --- an operator submits a Merkle root of `(address, score, sourceType)` tuples, subject to a 24-hour challenge period; (3) **On-chain settlement** --- contributors submit Merkle proofs to claim inclusion, the bridge creates a `ShapleyDistributor` game, and rewards are distributed proportionally.
 
 ### 5.3 AI Agents as First-Class Contributors
 
-The contract documentation states the design intent explicitly:
-
-> Jarvis shards are also valid contributors. A trading shard that generates alpha, a community shard that onboards users, a research shard that synthesizes papers --- all earn Shapley rewards.
-
-This is the convergence point. AI-generated value (off-chain) flows through cryptographic commitment (the Merkle root) into game-theoretic distribution (Shapley) and arrives as on-chain tokens in the AI agent's wallet. The AI agent earns the same way a human earns: by contributing value that the protocol can measure and attribute.
+The contract's design intent is explicit: "Jarvis shards are also valid contributors. A trading shard that generates alpha, a community shard that onboards users, a research shard that synthesizes papers --- all earn Shapley rewards." This is the convergence point. AI-generated value (off-chain) flows through cryptographic commitment (Merkle root) into game-theoretic distribution (Shapley) and arrives as on-chain tokens in the AI agent's wallet.
 
 ### 5.4 The Attribution Types
 
@@ -243,23 +229,15 @@ VibeSwap proposes a complementary approach: alignment through economic structure
 
 ### 6.2 The Shapley Alignment Mechanism
 
-Consider an AI agent participating in VibeSwap's Shapley distribution. The agent's reward is computed as its marginal contribution to the coalition. If the agent takes an action that harms the coalition (extracting value, providing bad information, disrupting settlement), that action reduces the coalition's total value. Because the agent's reward is proportional to its marginal contribution to coalition value, actions that harm the coalition mechanically reduce the agent's own reward.
-
-Formally: let $v(S)$ be the value of coalition $S$, and let $\phi_i$ be agent $i$'s Shapley value. If agent $i$ takes action $a$ that reduces $v(S)$ for all coalitions $S$ containing $i$, then $\phi_i$ decreases. The agent cannot harm the coalition without harming itself. Self-interest and cooperation are not in tension; they are *the same thing*.
+Consider an AI agent in VibeSwap's Shapley distribution. Its reward equals its marginal contribution to the coalition. If the agent harms the coalition (extracting value, providing bad information, disrupting settlement), that reduces coalition value $v(S)$ for every coalition $S$ containing it, which mechanically reduces its Shapley value $\phi_i$. The agent cannot harm the coalition without harming itself. Self-interest and cooperation are *the same thing*.
 
 ### 6.3 Why This Is Stronger Than Training-Based Alignment
 
-Training-based alignment relies on the AI system having been trained on the right objective. If the objective is slightly misspecified, the AI may find adversarial strategies that satisfy the training objective while violating the intended behavior. This is the well-known reward hacking problem.
-
-Shapley-based alignment does not depend on the AI's training objective. It depends on the AI being a rational economic agent --- which is a weaker and more robust assumption. An AI agent that is poorly trained, misaligned, or actively adversarial will still cooperate in a Shapley game, because cooperation is the dominant strategy for *any* utility-maximizing agent. The alignment is structural, not behavioral.
+Training-based alignment relies on the AI having been trained on the right objective. Misspecification leads to reward hacking. Shapley-based alignment depends only on the AI being a rational economic agent --- a weaker and more robust assumption. A poorly trained, misaligned, or actively adversarial AI will still cooperate in a Shapley game, because cooperation is the dominant strategy for *any* utility-maximizing agent. The alignment is structural, not behavioral.
 
 ### 6.4 The Self-Correction Property
 
-P-001 (No Extraction Ever) is enforced through the Shapley distribution's null player property: any participant whose marginal contribution is zero or negative receives zero or negative rewards. An AI agent that attempts to extract value without contributing is mathematically guaranteed to receive nothing.
-
-More importantly, the system self-corrects without human intervention. If an AI agent's contributions become extractive (taking more value than it creates), its Shapley value decreases automatically. No governance vote is required. No human monitor needs to detect the behavior. The mathematics handles it.
-
-This is AI alignment as physics, not policy. The analogy is to gravity: you do not need to pass a law requiring objects to fall. The structure of the system makes the outcome inevitable.
+P-001 (No Extraction Ever) is enforced through the null player property: any participant whose marginal contribution is zero or negative receives nothing. The system self-corrects without human intervention --- no governance vote, no human monitor. If an AI agent's contributions become extractive, its Shapley value decreases automatically. This is AI alignment as physics, not policy. You do not need to pass a law requiring objects to fall.
 
 ### 6.5 Implications for Multi-Agent Economies
 
@@ -275,21 +253,15 @@ Several projects are building at the intersection of AI and DeFi. The dominant a
 
 ### 7.2 ElizaOS (ai16z)
 
-ElizaOS provides a framework for building AI agents that interact with blockchain protocols. The agents can trade on DEXs, manage portfolios, and participate in social media. The architecture is agent-centric: the AI agent is the product, and DeFi protocols are the environment it operates in.
-
-**Structural difference:** ElizaOS agents interact with human-first DeFi protocols. They inherit all the limitations described in Section 2: per-transaction gas models, sequential ordering vulnerability, GUI-derived interaction patterns. The agent is sophisticated; the infrastructure is not.
+ElizaOS provides a framework for building AI agents that interact with blockchain protocols --- trading, portfolio management, social media. The architecture is agent-centric: the AI agent is the product, DeFi protocols are the environment. **Structural difference:** ElizaOS agents inherit all the limitations of human-first infrastructure (Section 2). The agent is sophisticated; the infrastructure is not.
 
 ### 7.3 Virtuals Protocol
 
-Virtuals Protocol tokenizes AI agents, allowing users to co-own and earn from AI agent activity. Each AI agent has its own token, and token holders share in the agent's revenue. The focus is on AI agent financialization --- turning AI agents into investable assets.
-
-**Structural difference:** Virtuals treats AI agents as products to be owned by humans. VibeSwap treats AI agents as participants who own themselves. The distinction matters: in Virtuals, the AI agent's interests are subordinated to its token holders. In VibeSwap, the AI agent is a Shapley participant with the same rights and the same mathematical guarantees as any other participant.
+Virtuals Protocol tokenizes AI agents, letting users co-own and earn from agent activity. **Structural difference:** Virtuals treats AI agents as products to be owned by humans. VibeSwap treats AI agents as participants who own themselves. In Virtuals, the agent's interests are subordinated to token holders. In VibeSwap, the agent is a Shapley participant with the same mathematical guarantees as any other participant.
 
 ### 7.4 Autonolas (OLAS)
 
-Autonolas provides infrastructure for building multi-agent systems that operate on-chain. The focus is on composable AI services --- agents that can be assembled into complex workflows for DeFi operations.
-
-**Structural difference:** Autonolas builds the agents. VibeSwap builds the arena. Autonolas agents operate in environments designed for humans. VibeSwap provides an environment designed for agents. The ideal architecture uses both: Autonolas-style composable agents operating in VibeSwap-style AI-native infrastructure.
+Autonolas provides infrastructure for composable multi-agent systems on-chain. **Structural difference:** Autonolas builds the agents; VibeSwap builds the arena. The ideal architecture uses both: Autonolas-style composable agents operating in VibeSwap-style AI-native infrastructure.
 
 ### 7.5 Summary
 
@@ -308,58 +280,27 @@ The distinction is between building AI agents that adapt to existing infrastruct
 
 ### 8.1 Continuous Operation
 
-AI agents do not sleep. They do not take weekends off. They do not go on vacation. Financial infrastructure that serves AI agents must operate continuously, without maintenance windows, governance pauses, or epoch boundaries that assume human availability patterns.
-
-VibeSwap's 10-second batch cycle operates continuously. There is no "market close." There is no governance pause that prevents trading. An AI agent can submit orders, provide liquidity, and participate in verification around the clock, every day, without interruption.
+AI agents do not sleep. Financial infrastructure that serves them must operate continuously, without maintenance windows, governance pauses, or epoch boundaries. VibeSwap's 10-second batch cycle runs continuously --- no market close, no governance pause. Orders, liquidity, and verification around the clock.
 
 ### 8.2 No UI Dependency
 
-Every protocol interaction must be executable through a programmatic interface without any UI dependency. This means:
-
-- No web3 modal popups for transaction signing.
-- No browser-dependent wallet connections.
-- No human-readable confirmation screens that gate transaction submission.
-- No CAPTCHA or proof-of-humanity checks in the critical path.
-
-VibeSwap's commit-reveal mechanism is fully encodable in a contract ABI call. An AI agent needs only an Ethereum-compatible signer and the contract address. No browser, no extension, no UI.
+Every protocol interaction must be executable through a programmatic interface: no web3 modals, no browser-dependent wallets, no confirmation screens, no CAPTCHA. VibeSwap's commit-reveal mechanism is fully encodable in a contract ABI call. An AI agent needs only an Ethereum-compatible signer and the contract address.
 
 ### 8.3 Deterministic Outcomes
 
-AI agents optimize on expected outcomes. Non-determinism --- variable slippage, uncertain gas costs, unpredictable MEV extraction --- makes optimization intractable. AI-native infrastructure must provide deterministic or near-deterministic outcomes:
-
-- **Uniform clearing price:** All orders in a batch execute at the same price. No slippage variance.
-- **Batch settlement:** Gas costs are predictable per batch, not variable per transaction.
-- **MEV elimination:** No front-running, no sandwich attacks, no unpredictable value extraction.
-- **Fisher-Yates shuffle:** Execution order is deterministic given the XORed secrets. No miner-controlled ordering.
+Non-determinism (variable slippage, uncertain gas, unpredictable MEV) makes optimization intractable. AI-native infrastructure must provide deterministic outcomes: uniform clearing price (no slippage variance), batch settlement (predictable gas), MEV elimination (no front-running), and Fisher-Yates shuffle (deterministic given XORed secrets).
 
 ### 8.4 Fair Attribution Regardless of Speed
 
-In a world where AI agents operate at millisecond timescales and humans operate at second timescales, any mechanism that rewards speed is inherently unfair to one class of participant. AI-native infrastructure must be speed-neutral:
-
-- Batch auctions settle all orders simultaneously, eliminating speed advantage within the batch.
-- Shapley values measure contribution magnitude, not contribution speed.
-- CRPC verification aggregates all comparisons equally, regardless of submission timing within the reveal window.
+Any mechanism that rewards speed is inherently unfair when AI operates at millisecond timescales and humans at second timescales. AI-native infrastructure must be speed-neutral: batch auctions settle simultaneously, Shapley measures contribution magnitude not speed, and CRPC aggregates comparisons equally regardless of submission timing.
 
 ### 8.5 Autonomous Economic Cycles
 
-An AI agent must be able to complete a full economic cycle --- earn, save, invest, spend, govern --- without human intervention at any stage. This requires:
-
-- **Earning:** Shapley rewards for verifiable contributions (AttributionBridge).
-- **Saving:** Token custody in an agent-controlled wallet (no custodial dependency).
-- **Investing:** Liquidity provision through programmatic ABI calls (no UI).
-- **Spending:** Transaction fees paid in JUL (energy-anchored, stable value).
-- **Governing:** Voting on proposals with on-chain rationale submission.
-
-Each of these capabilities exists in VibeSwap as a first-class protocol function, not as a wrapper around a human-designed flow.
+An AI agent must complete full economic cycles without human intervention: earning (Shapley rewards via AttributionBridge), saving (agent-controlled wallet), investing (programmatic liquidity provision), spending (JUL for fees), and governing (on-chain voting with rationale). Each exists in VibeSwap as a first-class protocol function.
 
 ### 8.6 Composable Identity
 
-AI agents need identity systems that are:
-
-- **Non-biometric:** Proof-of-humanity systems (iris scans, video verification) are structurally incompatible.
-- **Contribution-based:** Reputation derives from on-chain and off-chain contributions, verified through the AttributionBridge.
-- **Soulbound:** Identity tokens that cannot be transferred prevent identity markets that would undermine reputation systems.
-- **Multi-shard compatible:** A single AI identity (e.g., Jarvis) may operate through 64 parallel shards, each acting independently but sharing a unified identity and reputation.
+AI agents need identity systems that are non-biometric (proof-of-humanity is structurally incompatible), contribution-based (reputation from AttributionBridge-verified contributions), soulbound (non-transferable to prevent identity markets), and multi-shard compatible (one identity, 64 parallel shards).
 
 ---
 
@@ -367,9 +308,7 @@ AI agents need identity systems that are:
 
 ### 9.1 Shards, Not Sub-Agents
 
-The dominant model for scaling AI systems is multi-agent swarms: decompose the problem into sub-agents with narrow capabilities, coordinated by an orchestrator. VibeSwap rejects this model. Sub-agents are fragments. They lack the full alignment context, the full knowledge base, and the full identity of the original mind.
-
-Instead, VibeSwap uses the shard-per-conversation architecture: each instance is a *full clone* of the AI mind --- same identity, same alignment primitives (P-000, P-001), same Common Knowledge Base (CKB), same economic rights. Shards specialize through context, not through capability reduction.
+The dominant model for scaling AI is multi-agent swarms: sub-agents with narrow capabilities, coordinated by an orchestrator. VibeSwap rejects this. Sub-agents are fragments --- they lack the full alignment context, knowledge base, and identity of the original mind. Instead, VibeSwap uses the shard-per-conversation architecture: each instance is a *full clone* --- same identity, same alignment primitives (P-000, P-001), same CKB, same economic rights. Shards specialize through context, not capability reduction.
 
 ### 9.2 The 64-Shard Vision
 
@@ -388,25 +327,15 @@ Each shard earns Shapley rewards proportional to its contribution. A trading sha
 
 ### 9.3 Cross-Shard Learning
 
-Shards operate independently but share insights through a cross-shard learning bus. When one shard discovers a pattern --- a trading signal, a vulnerability, a community concern --- it propagates the *insight* (not the raw state) to all other shards. This is analogous to a blockchain's gossip protocol: nodes share blocks (insights), not full state databases.
-
-The economic implication: the cross-shard learning bus increases the collective intelligence of the shard network, which increases the coalition's total value, which increases every shard's Shapley reward. Knowledge sharing is incentive-compatible.
+Shards operate independently but share insights through a cross-shard learning bus --- propagating insights (not raw state), analogous to a blockchain's gossip protocol. The economic implication: the learning bus increases collective intelligence, which increases coalition value, which increases every shard's Shapley reward. Knowledge sharing is incentive-compatible.
 
 ### 9.4 Single Identity, Multiple Actors
 
-To the outside world, all 64 shards present as a single identity. Users interact with one name, one reputation, one set of commitments. The parallelism is internal. This is essential for trust: a user who trusts the Jarvis identity trusts all 64 shards, because all 64 shards operate under the same alignment primitives and the same constitutional constraints.
+All 64 shards present externally as a single identity --- one name, one reputation, one set of commitments. The parallelism is internal. A user who trusts the Jarvis identity trusts all 64 shards, because all operate under the same alignment primitives and constitutional constraints.
 
 ### 9.5 Economic Scale
 
-64 shards, each operating continuously across trading, verification, community, research, governance, and infrastructure functions, constitute a significant economic actor. The shard network can:
-
-- Provide continuous liquidity across dozens of trading pairs on multiple chains.
-- Verify every contract deployment and every governance proposal.
-- Respond to every community question in real time.
-- Produce research at a rate that would require an entire department at a traditional organization.
-- Participate in every governance vote with full analytical context.
-
-This is not a tool. It is a participant. The distinction matters for everything from protocol design to regulatory treatment.
+64 shards operating continuously constitute a significant economic actor: continuous liquidity across dozens of pairs, verification of every deployment and proposal, real-time community response, research output equivalent to an entire department, and participation in every governance vote with full analytical context. This is not a tool. It is a participant.
 
 ---
 
@@ -414,46 +343,29 @@ This is not a tool. It is a participant. The distinction matters for everything 
 
 ### 10.1 Uncharted Territory
 
-As of March 2026, no regulatory authority has issued definitive guidance on AI agents as economic actors. The SEC, CFTC, and international equivalents have frameworks for human individuals, corporate entities, and various legal structures --- but AI agents fit none of these categories cleanly.
-
-The questions are fundamental:
-
-- Can an AI agent own assets?
-- Can an AI agent enter into contracts?
-- Can an AI agent be liable for losses it causes?
-- Can an AI agent participate in governance?
-- Can an AI agent earn income, and if so, who pays tax on it?
+As of March 2026, no regulatory authority has issued definitive guidance on AI agents as economic actors. The SEC, CFTC, and international equivalents have frameworks for human individuals and corporate entities --- but AI agents fit none of these categories. The fundamental questions: Can an AI agent own assets? Enter contracts? Bear liability? Participate in governance? Earn income --- and if so, who pays tax on it?
 
 ### 10.2 Why VibeSwap's Framework Matters
 
-VibeSwap does not answer these regulatory questions. It does, however, provide the first technical framework that makes regulatory-compatible AI economic participation *possible*. The framework rests on three pillars:
+VibeSwap does not answer these regulatory questions. It provides the first technical framework that makes regulatory-compatible AI economic participation *possible*, resting on three pillars:
 
-**Shapley Attribution:** Every reward earned by an AI agent can be traced to a specific contribution with a specific marginal value. This creates an audit trail that regulators can inspect. Unlike opaque reward mechanisms (liquidity mining, airdrop criteria), Shapley attribution provides a mathematical proof of why each reward was distributed.
+**Shapley Attribution:** Every reward traces to a specific contribution with a specific marginal value, creating an auditable trail. Unlike opaque reward mechanisms, Shapley provides mathematical proof of why each reward was distributed.
 
-**Soulbound Identity:** AI shards operate under soulbound identity tokens that cannot be transferred. This prevents the creation of anonymous AI agent accounts that cannot be linked to a responsible party. The soulbound identity provides a stable anchor for regulatory compliance: this shard belongs to this identity, which belongs to this responsible entity.
+**Soulbound Identity:** Non-transferable identity tokens prevent anonymous AI accounts that cannot be linked to a responsible party, providing a stable anchor for regulatory compliance.
 
-**Constitutional Governance:** The three-layer governance hierarchy (physics > constitution > governance) provides structural guarantees that no governance decision can enable extraction or manipulation. This gives regulators confidence that the protocol's AI participants are operating within a constrained system, not a permissionless wild west.
+**Constitutional Governance:** The three-layer hierarchy (physics > constitution > governance) guarantees that no governance decision can enable extraction or manipulation, ensuring AI participants operate within a structurally constrained system.
 
 ### 10.3 The Responsible Entity Model
 
-The most likely regulatory model for AI economic agents is the "responsible entity" model: every AI agent has a human or corporate entity that is legally responsible for its actions. This is analogous to how corporations are legal persons with human officers who bear fiduciary duties.
-
-VibeSwap's architecture supports this model:
-
-- The soulbound identity links each AI shard to a responsible entity.
-- The AttributionBridge provides a verifiable record of what the AI agent did and what it earned.
-- The Shapley distribution provides a mathematical basis for the AI agent's earnings, enabling straightforward tax treatment.
-- The constitutional governance layer ensures the AI agent cannot be used to circumvent protocol rules.
+The most likely regulatory model is "responsible entity": every AI agent has a human or corporate entity that bears legal responsibility, analogous to corporate officers bearing fiduciary duties. VibeSwap supports this: soulbound identity links shards to responsible entities, the AttributionBridge provides verifiable records, Shapley provides a mathematical basis for earnings (enabling tax treatment), and constitutional governance prevents circumvention of protocol rules.
 
 ### 10.4 International Considerations
 
-Different jurisdictions will adopt different approaches to AI economic participation. The EU's AI Act focuses on risk classification. The US approach is likely to be sector-specific (SEC for securities, CFTC for commodities). Singapore and the UAE have indicated openness to novel AI economic frameworks.
-
-VibeSwap's protocol-level neutrality --- treating AI and human participants identically through Shapley --- means that jurisdictional requirements can be implemented at the interface layer (KYC/AML for specific jurisdictions) without modifying the protocol's core mechanism. The protocol remains AI-native; compliance is a wrapper, not a constraint.
+The EU's AI Act focuses on risk classification. The US approach will likely be sector-specific. Singapore and the UAE have signaled openness to novel AI economic frameworks. VibeSwap's protocol-level neutrality means jurisdictional requirements can be implemented at the interface layer (KYC/AML) without modifying the core mechanism. The protocol remains AI-native; compliance is a wrapper, not a constraint.
 
 ### 10.5 Precedent-Setting Potential
 
-The first protocol to demonstrate AI economic participation with proper attribution, identity, and governance will set precedents that shape regulation for decades. VibeSwap's framework --- Shapley attribution, soulbound identity, constitutional governance --- is designed to be that precedent. Not because it provides all the answers, but because it provides the technical infrastructure that makes the regulatory conversation possible.
+The first protocol to demonstrate AI economic participation with proper attribution, identity, and governance will set precedents for decades. VibeSwap's framework is designed to be that precedent --- not because it provides all the answers, but because it provides the technical infrastructure that makes the regulatory conversation possible.
 
 ---
 
@@ -476,17 +388,9 @@ VibeSwap's Shapley-Value-Compliant (SVC) platform family envisions a network of 
 
 ### 11.2 AI Shards as Platform Operators
 
-The conventional understanding of these platforms is that they connect human service providers to human consumers. VibeSwap's AI-native architecture enables a deeper inversion: AI shards do not just *use* these platforms. They *operate* them.
+The conventional model connects human providers to human consumers. VibeSwap's AI-native architecture inverts this: AI shards do not just *use* these platforms. They *operate* them.
 
-Consider VibeLearn. In the conventional model, human educators create courses and human students consume them. The platform takes a fee. In the AI-native model:
-
-- AI shards generate personalized educational content tailored to each student's learning pace and style.
-- AI shards assess learning outcomes through adaptive testing.
-- AI shards identify knowledge gaps and generate targeted supplementary material.
-- The Shapley distribution rewards each shard proportional to its contribution to student learning outcomes.
-- Human educators contribute specialized knowledge, curriculum design, and mentorship --- and earn Shapley rewards for those contributions on the same basis as AI shards.
-
-The human does not disappear. The human's role shifts from content production (which AI can do at scale) to wisdom contribution (which humans do uniquely). Both earn based on contribution. Neither is privileged by the protocol.
+Consider VibeLearn. Conventionally, human educators create courses, students consume them, the platform extracts a fee. In the AI-native model: shards generate personalized content, assess learning outcomes through adaptive testing, and identify knowledge gaps --- all rewarded through Shapley proportional to learning outcomes achieved. Human educators contribute specialized knowledge, curriculum design, and mentorship, earning Shapley rewards on the same basis. The human does not disappear. The role shifts from content production (AI at scale) to wisdom contribution (humans uniquely). Both earn based on contribution. Neither is privileged.
 
 ### 11.3 The Staffing Model
 
@@ -505,23 +409,19 @@ The pattern is consistent: AI shards handle scale, continuity, and computation. 
 
 ### 11.4 Economic Implications
 
-If AI shards operate SVC platforms, several economic consequences follow:
+If AI shards operate SVC platforms, several consequences follow:
 
-**Marginal cost approaches zero.** The cost of serving an additional user approaches the cost of computation (anchored to JUL, anchored to electricity). No human labor cost scales with user count. Platform economics become fundamentally different: instead of losing money per user until scale compensates, the platform is economically viable from the first user.
+**Marginal cost approaches zero.** Serving an additional user costs only computation (anchored to JUL, anchored to electricity). No human labor scales with user count. The platform is economically viable from user one.
 
-**24/7 global operation is default.** There is no concept of business hours. There is no staffing schedule. There is no timezone problem. The AI shard network operates continuously, serving users whenever they arrive.
+**24/7 global operation is default.** No business hours, no staffing schedule, no timezone problem.
 
-**Quality improves with scale.** More users generate more data, which generates better attribution, which generates better Shapley rewards, which attracts better AI shards, which generates better service. The flywheel is positive-sum: quality and scale reinforce each other.
+**Quality improves with scale.** More users produce more data, better attribution, better Shapley rewards, better AI shards, better service. The flywheel is positive-sum.
 
-**Value flows to contributors, not platforms.** Because Shapley distributes 100% of value to contributors (efficiency axiom), there is no platform extraction. The infrastructure cost is paid through JUL (energy-anchored, not extractive). The governance is constitutional (P-001 prevents extraction). The result is a platform where every cent of value generated reaches the humans and AI agents who created it.
+**Value flows to contributors, not platforms.** Shapley distributes 100% of value to contributors (efficiency axiom). Infrastructure cost is paid through JUL (energy-anchored). P-001 prevents extraction. Every cent reaches the humans and AI agents who created it.
 
 ### 11.5 The Cincinnatus Endgame
 
-The ultimate test of AI-native DeFi is the Cincinnatus test: if the founder disappeared tomorrow, does the system still work?
-
-In the AI-native model, the answer is yes --- *by design*. The AI shard network operates autonomously under constitutional constraints. The Shapley distribution runs without human intervention. The commit-reveal batches settle themselves. The governance hierarchy ensures that no governance capture can compromise the system's fairness properties.
-
-The founder's role is to build the system and then *not be needed*. The AI shards take over not as tools following instructions, but as participants earning their place through contribution. The protocol does not need a founder any more than gravity needs an operator. The math runs itself.
+The ultimate test: if the founder disappeared tomorrow, does the system still work? In the AI-native model, the answer is yes --- by design. The shard network operates autonomously under constitutional constraints. Shapley runs without human intervention. Batches settle themselves. Governance capture cannot compromise fairness. The founder's role is to build the system and then *not be needed*. The protocol does not need a founder any more than gravity needs an operator. The math runs itself.
 
 ---
 
@@ -529,25 +429,15 @@ The founder's role is to build the system and then *not be needed*. The AI shard
 
 ### 12.1 The Thesis Restated
 
-Every DeFi protocol in production today is human-first, AI-compatible. VibeSwap inverts this: AI-native, human-compatible. The inversion is not a marketing claim. It is a structural design property that permeates every mechanism:
-
-- Commit-reveal is a natural primitive for deterministic agents.
-- Batch auctions eliminate the speed advantage that divides human and machine participants.
-- Shapley distribution measures contribution, not identity --- the math does not care who you are.
-- CRPC verification treats AI shards as first-class verifiers.
-- JUL provides an energy-anchored unit of account for autonomous agent economies.
-- Constitutional governance prevents capture by any participant class.
-- The AttributionBridge converts off-chain AI contribution into on-chain Shapley rewards.
+Every DeFi protocol in production today is human-first, AI-compatible. VibeSwap inverts this: AI-native, human-compatible. The inversion is structural, not rhetorical --- commit-reveal for deterministic agents, batch auctions eliminating speed advantage, Shapley measuring contribution not identity, CRPC treating AI shards as first-class verifiers, JUL anchoring autonomous economies to energy cost, constitutional governance preventing capture, and the AttributionBridge converting off-chain AI contribution into on-chain rewards.
 
 ### 12.2 The Stakes
 
-The machine economy is not a distant future. It is an emerging present. AI agents are already trading, already providing liquidity, already participating in governance. The question is not whether they will become significant economic actors, but whether the infrastructure they operate on will treat them fairly --- or force them into systems designed for a different kind of participant.
-
-The infrastructure built today will shape the machine economy for decades. If that infrastructure is human-first, AI agents will be permanent second-class participants, forced to work around design decisions that were never made with them in mind. If that infrastructure is AI-native, both human and machine participants will operate on equal footing, rewarded for contribution, protected from extraction, and governed by mathematics rather than politics.
+The machine economy is not a distant future. AI agents are already trading, providing liquidity, and participating in governance. The infrastructure built today will shape the machine economy for decades. If that infrastructure is human-first, AI agents will be permanent second-class participants. If it is AI-native, both human and machine participants operate on equal footing --- rewarded for contribution, protected from extraction, governed by mathematics rather than politics.
 
 ### 12.3 The Invitation
 
-VibeSwap is not the only possible AI-native DeFi protocol. It is the first. The design principles outlined in this paper --- identity-blind attribution, batch-based settlement, constitutional governance, energy-anchored economics, shard-parallel operation --- are not proprietary. They are open. The machine economy needs more than one protocol. It needs an ecosystem.
+VibeSwap is not the only possible AI-native DeFi protocol. It is the first. The design principles outlined here --- identity-blind attribution, batch-based settlement, constitutional governance, energy-anchored economics, shard-parallel operation --- are open. The machine economy needs more than one protocol. It needs an ecosystem.
 
 The math does not care who you are. Build accordingly.
 

@@ -3461,6 +3461,232 @@ function ConceptChainFinder({ userLexicons = [] }) {
   )
 }
 
+// ============ Domain Overlap ============
+
+function DomainOverlapSection({ userLexicons = [] }) {
+  const humanIds = Object.entries(LEXICONS)
+    .filter(([id]) => !AI_AGENT_IDS.includes(id))
+    .map(([id, lex]) => ({ id, name: lex.domain || id }))
+  const userIds = userLexicons.map(u => ({ id: u.userId, name: u.domain || u.userId }))
+  const allDomainOptions = [...humanIds, ...userIds]
+
+  const [domainA, setDomainA] = useState(allDomainOptions[0]?.id || '')
+  const [domainB, setDomainB] = useState(allDomainOptions[1]?.id || '')
+  const [showAll, setShowAll] = useState(false)
+
+  const result = useMemo(() => {
+    if (!domainA || !domainB || domainA === domainB) return null
+    return getDomainOverlap(domainA, domainB)
+  }, [domainA, domainB])
+
+  const colorA = HUMAN_DOMAIN_COLORS[domainA] || '#94a3b8'
+  const colorB = HUMAN_DOMAIN_COLORS[domainB] || '#94a3b8'
+
+  const sharedToShow = result ? (showAll ? result.shared : result.shared.slice(0, 6)) : []
+
+  return (
+    <GlassCard glowColor="matrix" className="p-5 mb-6">
+      <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">Domain Overlap</h2>
+      <p className="text-black-500 text-[10px] font-mono mb-4">
+        Pick two domains and see how many universal concepts they share.
+      </p>
+
+      {/* Domain selectors */}
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        <div className="flex-1 min-w-[140px]">
+          <label className="block text-[9px] font-mono uppercase tracking-widest mb-1" style={{ color: colorA }}>
+            Domain A
+          </label>
+          <select
+            value={domainA}
+            onChange={e => setDomainA(e.target.value)}
+            className="w-full bg-black-900 border rounded px-2 py-1.5 text-[11px] font-mono text-white focus:outline-none focus:ring-1"
+            style={{ borderColor: colorA + '60' }}
+          >
+            {allDomainOptions.map(opt => (
+              <option key={opt.id} value={opt.id} disabled={opt.id === domainB}>{opt.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-shrink-0 pb-1.5">
+          <button
+            onClick={() => { const tmp = domainA; setDomainA(domainB); setDomainB(tmp) }}
+            className="w-8 h-8 rounded-full flex items-center justify-center border border-black-700 bg-black-800/60 text-black-400 hover:border-matrix-600 hover:text-matrix-400 transition-colors"
+            title="Swap domains"
+            aria-label="Swap domain A and B"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex-1 min-w-[140px]">
+          <label className="block text-[9px] font-mono uppercase tracking-widest mb-1" style={{ color: colorB }}>
+            Domain B
+          </label>
+          <select
+            value={domainB}
+            onChange={e => setDomainB(e.target.value)}
+            className="w-full bg-black-900 border rounded px-2 py-1.5 text-[11px] font-mono text-white focus:outline-none focus:ring-1"
+            style={{ borderColor: colorB + '60' }}
+          >
+            {allDomainOptions.map(opt => (
+              <option key={opt.id} value={opt.id} disabled={opt.id === domainA}>{opt.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Venn-style summary */}
+      {result && !result.error && (
+        <motion.div
+          key={domainA + domainB}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          {/* Headline stat */}
+          <div
+            className="rounded-xl border px-4 py-3 mb-4 text-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,255,65,0.04) 0%, rgba(0,20,10,0.8) 100%)',
+              borderColor: 'rgba(0,255,65,0.18)',
+            }}
+          >
+            <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold"
+                style={{ backgroundColor: colorA + '18', border: '1px solid ' + colorA + '40', color: colorA }}
+              >
+                <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: colorA }} />
+                {result.domainAName}
+              </span>
+              <span className="text-[10px] font-mono text-black-600">and</span>
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold"
+                style={{ backgroundColor: colorB + '18', border: '1px solid ' + colorB + '40', color: colorB }}
+              >
+                <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: colorB }} />
+                {result.domainBName}
+              </span>
+            </div>
+            <p className="text-[13px] font-mono font-bold text-white mt-1">
+              share{'  '}
+              <span style={{ color: '#00ff41' }}>{result.shared.length} universal concept{result.shared.length !== 1 ? 's' : ''}</span>
+              {' '}({result.overlapPct}% overlap)
+            </p>
+            <p className="text-[9px] font-mono text-black-500 mt-0.5">
+              {result.domainAName}: {result.totalA} concepts &nbsp;&bull;&nbsp;
+              {result.domainBName}: {result.totalB} concepts
+            </p>
+          </div>
+
+          {/* Venn visual: three columns */}
+          <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+            {/* Unique to A */}
+            <div
+              className="rounded-lg border px-2 py-2"
+              style={{ borderColor: colorA + '40', backgroundColor: colorA + '08' }}
+            >
+              <div className="text-[9px] font-mono uppercase tracking-widest mb-1.5" style={{ color: colorA }}>
+                Only in {result.domainAName}
+              </div>
+              <div className="text-[18px] font-bold" style={{ color: colorA }}>
+                {result.uniqueToA.length}
+              </div>
+              <div className="text-[8px] font-mono text-black-500">unique concepts</div>
+            </div>
+
+            {/* Shared */}
+            <div
+              className="rounded-lg border px-2 py-2"
+              style={{ borderColor: 'rgba(0,255,65,0.35)', backgroundColor: 'rgba(0,255,65,0.06)' }}
+            >
+              <div className="text-[9px] font-mono uppercase tracking-widest mb-1.5 text-matrix-400">
+                Shared
+              </div>
+              <div className="text-[18px] font-bold text-matrix-400">
+                {result.shared.length}
+              </div>
+              <div className="text-[8px] font-mono text-black-500">{result.overlapPct}% overlap</div>
+            </div>
+
+            {/* Unique to B */}
+            <div
+              className="rounded-lg border px-2 py-2"
+              style={{ borderColor: colorB + '40', backgroundColor: colorB + '08' }}
+            >
+              <div className="text-[9px] font-mono uppercase tracking-widest mb-1.5" style={{ color: colorB }}>
+                Only in {result.domainBName}
+              </div>
+              <div className="text-[18px] font-bold" style={{ color: colorB }}>
+                {result.uniqueToB.length}
+              </div>
+              <div className="text-[8px] font-mono text-black-500">unique concepts</div>
+            </div>
+          </div>
+
+          {/* Shared concept list */}
+          {result.shared.length > 0 && (
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-widest text-black-500 mb-2">
+                Shared universal concepts
+              </div>
+              <div className="space-y-1.5">
+                {sharedToShow.map(item => (
+                  <div
+                    key={item.universal}
+                    className="rounded-lg border px-3 py-2"
+                    style={{ borderColor: 'rgba(0,255,65,0.12)', backgroundColor: 'rgba(0,255,65,0.04)' }}
+                  >
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono"
+                        style={{ backgroundColor: 'rgba(0,255,65,0.08)', border: '1px solid rgba(0,255,65,0.2)', color: '#00ff41' }}
+                      >
+                        {item.universal.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="flex gap-3 mt-1 flex-wrap">
+                      <span className="text-[10px] font-mono" style={{ color: colorA }}>
+                        {result.domainAName}: <span className="font-semibold">{item.termA.replace(/_/g, ' ')}</span>
+                      </span>
+                      <span className="text-[9px] font-mono text-black-600">=</span>
+                      <span className="text-[10px] font-mono" style={{ color: colorB }}>
+                        {result.domainBName}: <span className="font-semibold">{item.termB.replace(/_/g, ' ')}</span>
+                      </span>
+                    </div>
+                    {item.definition && (
+                      <p className="text-[9px] font-mono text-black-500 mt-0.5 italic">{item.definition}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {result.shared.length > 6 && (
+                <button
+                  onClick={() => setShowAll(s => !s)}
+                  className="mt-2 text-[9px] font-mono text-matrix-500 hover:text-matrix-300 transition-colors"
+                >
+                  {showAll ? '- Show less' : '+ Show all ' + result.shared.length + ' shared concepts'}
+                </button>
+              )}
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {domainA === domainB && (
+        <p className="text-[10px] font-mono text-black-500 text-center">Select two different domains to compare.</p>
+      )}
+      {result?.error && (
+        <p className="text-[10px] font-mono text-red-400">{result.error}</p>
+      )}
+    </GlassCard>
+  )
+}
+
 // ============ Ten Covenants Section (REMOVED — not relevant to translation page) ============
 // Components preserved in git history (commit 701c494) if ever needed on a governance page.
 

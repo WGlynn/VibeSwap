@@ -398,6 +398,44 @@ input[type="number"] {
   animation-play-state: paused;
 }
 
+/* ============ RSP Neon Rainbow Button ============ */
+
+@keyframes rsp-rainbow {
+  0%   { color: #ff0000; text-shadow: 0 0 12px #ff0000, 0 0 24px #ff000060; }
+  16%  { color: #ff8800; text-shadow: 0 0 12px #ff8800, 0 0 24px #ff880060; }
+  33%  { color: #ffff00; text-shadow: 0 0 12px #ffff00, 0 0 24px #ffff0060; }
+  50%  { color: #00ff41; text-shadow: 0 0 12px #00ff41, 0 0 24px #00ff4160; }
+  66%  { color: #0088ff; text-shadow: 0 0 12px #0088ff, 0 0 24px #0088ff60; }
+  83%  { color: #aa00ff; text-shadow: 0 0 12px #aa00ff, 0 0 24px #aa00ff60; }
+  100% { color: #ff0000; text-shadow: 0 0 12px #ff0000, 0 0 24px #ff000060; }
+}
+
+@keyframes rsp-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+
+@keyframes rsp-border-glow {
+  0%   { border-color: rgba(255,0,0,0.4); box-shadow: 0 0 8px rgba(255,0,0,0.2); }
+  16%  { border-color: rgba(255,136,0,0.4); box-shadow: 0 0 8px rgba(255,136,0,0.2); }
+  33%  { border-color: rgba(255,255,0,0.4); box-shadow: 0 0 8px rgba(255,255,0,0.2); }
+  50%  { border-color: rgba(0,255,65,0.4); box-shadow: 0 0 8px rgba(0,255,65,0.2); }
+  66%  { border-color: rgba(0,136,255,0.4); box-shadow: 0 0 8px rgba(0,136,255,0.2); }
+  83%  { border-color: rgba(170,0,255,0.4); box-shadow: 0 0 8px rgba(170,0,255,0.2); }
+  100% { border-color: rgba(255,0,0,0.4); box-shadow: 0 0 8px rgba(255,0,0,0.2); }
+}
+
+.rsp-button {
+  animation: rsp-border-glow 3s linear infinite, rsp-pulse 1.2s ease-in-out infinite;
+}
+
+.rsp-letter {
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  animation: rsp-rainbow 3s linear infinite;
+}
+
 /* Legacy classes for backwards compatibility */
 .animate-marquee {
   animation: marquee-scroll 30s linear infinite;

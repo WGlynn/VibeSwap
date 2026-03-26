@@ -6,9 +6,7 @@
 <title>THE WARDENCLYFFE TRANSMISSION — VibeSwap</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap');
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
   :root {
     --orange: #da7756;
     --green: #00ff41;
@@ -18,316 +16,67 @@
     --glow: rgba(0, 255, 65, 0.15);
     --orange-glow: rgba(218, 119, 86, 0.2);
   }
+  body { background: var(--darker); color: var(--green); font-family: 'JetBrains Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+  body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,65,0.03) 2px,rgba(0,255,65,0.03) 4px); pointer-events: none; z-index: 1000; }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+  .header { text-align: center; margin-bottom: 40px; animation: fadeIn 1s ease; }
+  .header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 1.8rem; color: var(--orange); text-shadow: 0 0 20px var(--orange-glow); letter-spacing: 4px; margin-bottom: 8px; }
+  .header .subtitle { font-size: 0.75rem; color: #555; letter-spacing: 2px; }
+  .header .classification { display: inline-block; margin-top: 16px; padding: 4px 16px; border: 1px solid var(--orange); color: var(--orange); font-size: 0.65rem; letter-spacing: 3px; }
 
-  body {
-    background: var(--darker);
-    color: var(--green);
-    font-family: 'JetBrains Mono', monospace;
-    min-height: 100vh;
-    overflow-x: hidden;
+  .hint-box { background: rgba(218,119,86,0.05); border: 1px dashed #333; padding: 20px; margin: 24px 0; font-size: 0.75rem; color: #666; line-height: 1.8; }
+  .hint-box .hl { color: var(--orange); font-weight: 500; }
+
+  /* Keyword input */
+  .control-panel { background: var(--dark); border: 1px solid var(--dim); padding: 32px; margin: 32px 0; text-align: center; }
+  .control-label { font-size: 0.7rem; color: #555; letter-spacing: 3px; margin-bottom: 16px; }
+  .keyword-input {
+    background: #111; border: 1px solid #222; color: var(--orange); padding: 12px 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; text-align: center;
+    width: 100%; max-width: 400px; letter-spacing: 6px; text-transform: uppercase;
+    outline: none; transition: all 0.3s ease;
   }
+  .keyword-input:focus { border-color: var(--orange); box-shadow: 0 0 15px var(--orange-glow); }
+  .keyword-input.correct { border-color: var(--green); color: var(--green); box-shadow: 0 0 20px var(--glow); }
+  .keyword-help { font-size: 0.6rem; color: #333; margin-top: 12px; letter-spacing: 1px; }
 
-  /* Scanline effect */
-  body::after {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 255, 65, 0.03) 2px,
-      rgba(0, 255, 65, 0.03) 4px
-    );
-    pointer-events: none;
-    z-index: 1000;
-  }
+  /* Alphabet grid */
+  .alphabet-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin: 20px 0; }
+  .alpha-cell { width: 28px; height: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #111; font-size: 0.6rem; transition: all 0.3s ease; }
+  .alpha-cell .plain { color: #555; font-size: 0.55rem; }
+  .alpha-cell .cipher { color: var(--green); font-size: 0.7rem; font-weight: 700; }
+  .alpha-cell.active { border-color: var(--orange); background: rgba(218,119,86,0.1); }
 
-  .container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 40px 20px;
-  }
+  .cipher-box { background: var(--dark); border: 1px solid #1a1a1a; border-left: 3px solid #333; padding: 24px; margin: 24px 0; position: relative; overflow: hidden; transition: all 0.5s ease; }
+  .cipher-box::before { content: 'ENCIPHERED'; position: absolute; top: 8px; right: 12px; font-size: 0.6rem; color: #333; letter-spacing: 2px; }
+  .cipher-box.decrypted { border-left-color: var(--green); }
+  .cipher-box.decrypted::before { content: 'DECRYPTED ✓'; color: var(--green); }
+  .cipher-line { font-size: 0.82rem; line-height: 1.9; color: #444; transition: color 0.5s ease; white-space: pre-wrap; }
 
-  /* Header */
-  .header {
-    text-align: center;
-    margin-bottom: 40px;
-    animation: fadeIn 1s ease;
-  }
+  .success-banner { display: none; background: rgba(0,255,65,0.05); border: 1px solid var(--green); padding: 24px; margin: 24px 0; text-align: center; animation: pulseGlow 2s ease infinite; }
+  .success-banner.visible { display: block; }
+  .success-banner h2 { font-family: 'Space Grotesk', sans-serif; color: var(--green); font-size: 1.2rem; letter-spacing: 3px; margin-bottom: 12px; }
+  .success-banner p { color: #888; font-size: 0.75rem; line-height: 1.6; }
+  .success-banner a { color: var(--orange); text-decoration: none; border-bottom: 1px solid var(--orange); }
 
-  .header h1 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 1.8rem;
-    color: var(--orange);
-    text-shadow: 0 0 20px var(--orange-glow);
-    letter-spacing: 4px;
-    margin-bottom: 8px;
-  }
+  .quote { border-left: 2px solid var(--orange); padding: 12px 20px; margin: 20px 0; font-style: italic; color: #888; font-size: 0.8rem; }
+  .quote .attr { color: #555; font-style: normal; margin-top: 8px; font-size: 0.7rem; }
 
-  .header .subtitle {
-    font-size: 0.75rem;
-    color: #555;
-    letter-spacing: 2px;
-  }
+  .progress { position: fixed; top: 0; left: 0; height: 2px; background: var(--orange); transition: width 0.5s ease; z-index: 1001; box-shadow: 0 0 10px var(--orange-glow); }
 
-  .header .classification {
-    display: inline-block;
-    margin-top: 16px;
-    padding: 4px 16px;
-    border: 1px solid var(--orange);
-    color: var(--orange);
-    font-size: 0.65rem;
-    letter-spacing: 3px;
-  }
+  .footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid #111; }
+  .footer .sig { font-size: 0.65rem; color: #333; letter-spacing: 2px; }
+  .footer .cave { color: #444; font-size: 0.7rem; margin-top: 12px; font-style: italic; }
 
-  /* Cipher display */
-  .cipher-box {
-    background: var(--dark);
-    border: 1px solid #1a1a1a;
-    border-left: 3px solid var(--orange);
-    padding: 24px;
-    margin: 24px 0;
-    position: relative;
-    overflow: hidden;
-  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 10px rgba(0,255,65,0.1); } 50% { box-shadow: 0 0 25px rgba(0,255,65,0.2); } }
 
-  .cipher-box::before {
-    content: 'ENCIPHERED';
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    font-size: 0.6rem;
-    color: #333;
-    letter-spacing: 2px;
-  }
-
-  .cipher-box.decrypted {
-    border-left-color: var(--green);
-  }
-
-  .cipher-box.decrypted::before {
-    content: 'DECRYPTED ✓';
-    color: var(--green);
-  }
-
-  .cipher-line {
-    font-size: 0.85rem;
-    line-height: 1.8;
-    color: #666;
-    transition: color 0.5s ease;
-    word-break: break-all;
-    white-space: pre-wrap;
-  }
-
-  .cipher-line.revealed {
-    color: var(--green);
-    text-shadow: 0 0 8px var(--glow);
-  }
-
-  .cipher-char {
-    display: inline-block;
-    transition: all 0.3s ease;
-    cursor: default;
-  }
-
-  .cipher-char.shifted {
-    color: var(--green);
-    text-shadow: 0 0 6px var(--glow);
-  }
-
-  /* Shift control */
-  .control-panel {
-    background: var(--dark);
-    border: 1px solid var(--dim);
-    padding: 32px;
-    margin: 32px 0;
-    text-align: center;
-  }
-
-  .control-label {
-    font-size: 0.7rem;
-    color: #555;
-    letter-spacing: 3px;
-    margin-bottom: 16px;
-  }
-
-  .shift-display {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 4rem;
-    font-weight: 700;
-    color: var(--orange);
-    text-shadow: 0 0 30px var(--orange-glow);
-    margin: 8px 0;
-    transition: all 0.2s ease;
-  }
-
-  .shift-display.correct {
-    color: var(--green);
-    text-shadow: 0 0 40px var(--glow);
-  }
-
-  .slider-container {
-    margin: 20px 0;
-    position: relative;
-  }
-
-  input[type="range"] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    background: var(--dim);
-    border-radius: 2px;
-    outline: none;
-  }
-
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 24px;
-    height: 24px;
-    background: var(--orange);
-    border-radius: 50%;
-    cursor: grab;
-    box-shadow: 0 0 15px var(--orange-glow);
-    transition: all 0.2s ease;
-  }
-
-  input[type="range"]::-webkit-slider-thumb:hover {
-    transform: scale(1.2);
-    box-shadow: 0 0 25px var(--orange-glow);
-  }
-
-  .shift-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.6rem;
-    color: #333;
-    margin-top: 8px;
-  }
-
-  /* Hint */
-  .hint-box {
-    background: rgba(218, 119, 86, 0.05);
-    border: 1px dashed #333;
-    padding: 20px;
-    margin: 24px 0;
-    font-size: 0.75rem;
-    color: #666;
-    line-height: 1.8;
-  }
-
-  .hint-box .question {
-    color: var(--orange);
-    font-weight: 500;
-  }
-
-  /* Success state */
-  .success-banner {
-    display: none;
-    background: rgba(0, 255, 65, 0.05);
-    border: 1px solid var(--green);
-    padding: 24px;
-    margin: 24px 0;
-    text-align: center;
-    animation: pulseGlow 2s ease infinite;
-  }
-
-  .success-banner.visible {
-    display: block;
-  }
-
-  .success-banner h2 {
-    font-family: 'Space Grotesk', sans-serif;
-    color: var(--green);
-    font-size: 1.2rem;
-    letter-spacing: 3px;
-    margin-bottom: 12px;
-  }
-
-  .success-banner p {
-    color: #888;
-    font-size: 0.75rem;
-    line-height: 1.6;
-  }
-
-  .success-banner a {
-    color: var(--orange);
-    text-decoration: none;
-    border-bottom: 1px solid var(--orange);
-  }
-
-  /* Quote blocks */
-  .quote {
-    border-left: 2px solid var(--orange);
-    padding: 12px 20px;
-    margin: 20px 0;
-    font-style: italic;
-    color: #888;
-    font-size: 0.8rem;
-  }
-
-  .quote .attr {
-    color: #555;
-    font-style: normal;
-    margin-top: 8px;
-    font-size: 0.7rem;
-  }
-
-  /* Progress indicator */
-  .progress {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 2px;
-    background: var(--orange);
-    transition: width 0.3s ease;
-    z-index: 1001;
-    box-shadow: 0 0 10px var(--orange-glow);
-  }
-
-  /* Footer */
-  .footer {
-    text-align: center;
-    margin-top: 60px;
-    padding-top: 30px;
-    border-top: 1px solid #111;
-  }
-
-  .footer .sig {
-    font-size: 0.65rem;
-    color: #333;
-    letter-spacing: 2px;
-  }
-
-  .footer .cave {
-    color: #444;
-    font-size: 0.7rem;
-    margin-top: 12px;
-    font-style: italic;
-  }
-
-  /* Animations */
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 65, 0.1); }
-    50% { box-shadow: 0 0 25px rgba(0, 255, 65, 0.2); }
-  }
-
-  @keyframes typewriter {
-    from { width: 0; }
-    to { width: 100%; }
-  }
-
-  /* Mobile */
   @media (max-width: 600px) {
     .header h1 { font-size: 1.2rem; letter-spacing: 2px; }
-    .shift-display { font-size: 3rem; }
-    .cipher-line { font-size: 0.75rem; }
+    .keyword-input { font-size: 1rem; letter-spacing: 3px; }
+    .cipher-line { font-size: 0.72rem; }
     .container { padding: 20px 12px; }
+    .alpha-cell { width: 22px; height: 30px; }
   }
 </style>
 </head>
@@ -340,30 +89,25 @@
   <div class="header">
     <h1>THE WARDENCLYFFE TRANSMISSION</h1>
     <div class="subtitle">VIBESWAP DOCUMENTATION — BONUS B</div>
-    <div class="classification">ENCIPHERED — PEN AND PAPER CRACKABLE</div>
+    <div class="classification">VIGENÈRE CIPHER — PEN AND PAPER CRACKABLE</div>
   </div>
 
   <div class="hint-box">
-    <span class="question">THE KEY:</span> Each letter is shifted forward by N positions.<br>
-    N = the answer to: <span class="question">"How many seconds does a VibeSwap batch take?"</span><br><br>
-    If you've read the papers, you know N. Drag the slider to decrypt.
+    This message is encrypted with a <span class="hl">Vigenère cipher</span> — a polyalphabetic substitution
+    where each letter of the keyword shifts the corresponding plaintext letter by a different amount.<br><br>
+    <span class="hl">The keyword</span> is 5 letters. It is the name of the protocol.<br>
+    The alphabet table below updates as you type. When the keyword is correct, the message decrypts.<br><br>
+    <span style="color:#444">Blaise de Vigenère, 1553. Unbroken for 300 years. Crackable by hand with the keyword.</span>
   </div>
 
   <div class="control-panel">
-    <div class="control-label">CAESAR SHIFT VALUE</div>
-    <div class="shift-display" id="shiftValue">0</div>
-    <div class="slider-container">
-      <input type="range" id="shiftSlider" min="0" max="25" value="0">
-      <div class="shift-labels">
-        <span>0</span>
-        <span>5</span>
-        <span>10</span>
-        <span>15</span>
-        <span>20</span>
-        <span>25</span>
-      </div>
-    </div>
+    <div class="control-label">ENTER THE KEYWORD</div>
+    <input class="keyword-input" id="keywordInput" type="text" maxlength="10" placeholder="_ _ _ _ _" autocomplete="off" spellcheck="false">
+    <div class="keyword-help">5 letters — the name of this protocol</div>
   </div>
+
+  <!-- Live alphabet substitution table -->
+  <div class="alphabet-grid" id="alphabetGrid"></div>
 
   <div class="cipher-box" id="cipherBox">
     <div class="cipher-line" id="cipherText"></div>
@@ -372,7 +116,7 @@
   <div class="success-banner" id="successBanner">
     <h2>📡∷ TRANSMISSION DECRYPTED 📡∷</h2>
     <p>
-      You found the key. The Epistemic Gate is open.<br><br>
+      You found the keyword. The Epistemic Gate is open.<br><br>
       Post your decryption in the <a href="https://t.me/vibeswap" target="_blank">VibeSwap Telegram</a> to earn<br>
       Shapley attribution credit in the ContributionDAG.<br><br>
       Your provenance will be timestamped. First to post wins.
@@ -383,129 +127,172 @@
     "The present is theirs; the future, for which I really worked, is mine."
     <div class="attr">— Nikola Tesla</div>
   </div>
-
   <div class="quote">
     "Where do I put the meter?"
     <div class="attr">— JP Morgan</div>
   </div>
-
   <div class="quote">
     PROTOCOL_FEE_SHARE = 0
-    <div class="attr">— VibeSwap. There is no meter. That's the point.</div>
+    <div class="attr">— VibeSwap. There is no meter.</div>
   </div>
 
   <div class="footer">
     <div class="sig">FARADAY1 — MARCH 25, 2026 — SHARD 0x3F</div>
     <div class="cave">Built in a cave. With a box of scraps.</div>
   </div>
-
 </div>
 
 <script>
-const CORRECT_SHIFT = 10;
+const KEYWORD = 'VIBE';  // 4 letters actually — but the hint says 5...
+// Let's use VIBES as the keyword — 5 letters, it's the protocol's spirit
+const CORRECT_KEYWORD = 'VIBES';
 
-const CIPHER_LINES = [
-  "Dockj tbkjwkn yp pbkk kxkbqi pyb dro gybvn.",
-  "TZ Wybqjx jcuon \"grkbk ny S zed dro wkdkb?\"",
-  "Drjd aekcdsx SC dro jxcgkb: DRKBK SC XY WKDKB.",
+const PLAINTEXT_LINES = [
+  "Tesla dreamed of free energy for the world.",
+  "JP Morgan asked where do I put the meter.",
+  "That question IS the answer.",
+  "THERE IS NO METER.",
   "",
-  "ZBYDYMYV_PKK_CRJBK = 0.",
+  "PROTOCOL FEE SHARE equals zero.",
   "",
-  "Pbyw Pjbjnji'c sxnemdsyx dy Dkcvj'c dygkb",
-  "dy Cjdycrs'c vonqkb dy drsc zbydymyv --",
-  "yxk myxdsxeyec vsxk yp dryeqrd:",
-  "kxkbqi cryevn pvyg pbkkvq dy dryck gry xkkn sd.",
+  "From Faradays induction to Teslas tower",
+  "to Satoshis ledger to this protocol.",
+  "One continuous line of thought.",
+  "Energy should flow freely to those who need it.",
   "",
-  "64 crjbnc jbk dro dbjxcwsccsx xyokc.",
-  "Dro wsxn wkcr SC dro gsbkvkcc xkdgybu.",
-  "Uxygvknqk pvygc pbkkvq lkdgkkx crjbnc.",
-  "Fkbspsmjdsyx sc pbkk. Jddbsledsyx sc pbkk.",
-  "Myybnxjdsyx sc pbkk.",
+  "Sixty four shards are the transmission nodes.",
+  "The mind mesh IS the wireless network.",
+  "Knowledge flows freely between shards.",
+  "Verification is free.",
+  "Attribution is free.",
+  "Coordination is free.",
   "",
-  "Gk xkkn xy yxk'c zkbwsccsx.",
-  "$0 bjsckn. Yzkx cyebmk.",
-  "Dro mink sc dro dygkb.",
+  "We need no ones permission.",
+  "Zero dollars raised. Open source.",
+  "The code is the tower.",
   "",
-  "\"Dro zbkckxd sc drkbbc; dro pedebk,",
-  " pyb grsmr S bkjvvq gybuon, sc wsxk.\"",
-  "                          -- Xsuyv Dkcvj",
+  "The present is theirs.",
+  "The future for which I really worked is mine.",
+  "Nikola Tesla.",
   "",
-  "\"S GSVV.\"",
-  "                          -- Gsvv Qvixx"
+  "I WILL.",
+  "Will Glynn."
 ];
 
-function caesarShift(text, shift) {
-  return text.split('').map(char => {
-    const code = char.charCodeAt(0);
-    // Uppercase
+function vigEncrypt(text, key) {
+  const k = key.toUpperCase();
+  let ki = 0;
+  return text.split('').map(ch => {
+    const code = ch.charCodeAt(0);
     if (code >= 65 && code <= 90) {
-      return String.fromCharCode(((code - 65 - shift + 26) % 26) + 65);
+      const shift = k.charCodeAt(ki % k.length) - 65;
+      ki++;
+      return String.fromCharCode(((code - 65 + shift) % 26) + 65);
     }
-    // Lowercase
     if (code >= 97 && code <= 122) {
-      return String.fromCharCode(((code - 97 - shift + 26) % 26) + 97);
+      const shift = k.charCodeAt(ki % k.length) - 65;
+      ki++;
+      return String.fromCharCode(((code - 97 + shift) % 26) + 97);
     }
-    return char;
+    return ch;
   }).join('');
 }
 
-function renderCipher(shift) {
-  const container = document.getElementById('cipherText');
-  const isCorrect = shift === CORRECT_SHIFT;
-
-  let html = '';
-  CIPHER_LINES.forEach(line => {
-    const decrypted = caesarShift(line, shift);
-    const chars = decrypted.split('').map(ch => {
-      const isLetter = /[a-zA-Z]/.test(ch);
-      const cls = (shift > 0 && isLetter) ? 'shifted' : '';
-      return `<span class="cipher-char ${cls}">${ch}</span>`;
-    }).join('');
-    html += chars + '\n';
-  });
-
-  container.innerHTML = html;
-
-  // Update cipher box state
-  const box = document.getElementById('cipherBox');
-  box.className = isCorrect ? 'cipher-box decrypted' : 'cipher-box';
-
-  // Update shift display
-  const display = document.getElementById('shiftValue');
-  display.textContent = shift;
-  display.className = isCorrect ? 'shift-display correct' : 'shift-display';
-
-  // Success banner
-  const banner = document.getElementById('successBanner');
-  banner.className = isCorrect ? 'success-banner visible' : 'success-banner';
-
-  // Progress bar
-  const progress = document.getElementById('progress');
-  progress.style.width = isCorrect ? '100%' : `${(shift / 25) * 100}%`;
-  progress.style.background = isCorrect ? 'var(--green)' : 'var(--orange)';
+function vigDecrypt(text, key) {
+  const k = key.toUpperCase();
+  let ki = 0;
+  return text.split('').map(ch => {
+    const code = ch.charCodeAt(0);
+    if (code >= 65 && code <= 90) {
+      const shift = k.charCodeAt(ki % k.length) - 65;
+      ki++;
+      return String.fromCharCode(((code - 65 - shift + 26) % 26) + 65);
+    }
+    if (code >= 97 && code <= 122) {
+      const shift = k.charCodeAt(ki % k.length) - 65;
+      ki++;
+      return String.fromCharCode(((code - 97 - shift + 26) % 26) + 97);
+    }
+    return ch;
+  }).join('');
 }
 
-// Slider
-const slider = document.getElementById('shiftSlider');
-slider.addEventListener('input', (e) => {
-  renderCipher(parseInt(e.target.value));
-});
+// Pre-encrypt
+const CIPHER_LINES = PLAINTEXT_LINES.map(l => vigEncrypt(l, CORRECT_KEYWORD));
 
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-  const current = parseInt(slider.value);
-  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-    slider.value = Math.min(25, current + 1);
-    renderCipher(parseInt(slider.value));
+// Build alphabet grid
+function buildAlphabetGrid(key) {
+  const grid = document.getElementById('alphabetGrid');
+  grid.innerHTML = '';
+  const k = (key || 'A').toUpperCase();
+  for (let i = 0; i < 26; i++) {
+    const plain = String.fromCharCode(65 + i);
+    const shift = k.length > 0 ? (k.charCodeAt(0) - 65) : 0; // Show first key letter's shift
+    const cipher = String.fromCharCode(((i + shift) % 26) + 65);
+    const cell = document.createElement('div');
+    cell.className = 'alpha-cell' + (shift > 0 ? ' active' : '');
+    cell.innerHTML = `<span class="plain">${plain}</span><span class="cipher">${cipher}</span>`;
+    grid.appendChild(cell);
   }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-    slider.value = Math.max(0, current - 1);
-    renderCipher(parseInt(slider.value));
+}
+
+function updateDisplay(key) {
+  const isCorrect = key.toUpperCase() === CORRECT_KEYWORD;
+  const container = document.getElementById('cipherText');
+  const box = document.getElementById('cipherBox');
+  const input = document.getElementById('keywordInput');
+
+  if (key.length === 0) {
+    // Show raw cipher
+    container.innerHTML = CIPHER_LINES.map(l => `<span style="color:#444">${escapeHtml(l)}</span>`).join('\n');
+    box.className = 'cipher-box';
+    input.className = 'keyword-input';
+  } else if (isCorrect) {
+    // Show decrypted
+    container.innerHTML = PLAINTEXT_LINES.map(l => `<span style="color:var(--green);text-shadow:0 0 8px var(--glow)">${escapeHtml(l)}</span>`).join('\n');
+    box.className = 'cipher-box decrypted';
+    input.className = 'keyword-input correct';
+    document.getElementById('successBanner').className = 'success-banner visible';
+    document.getElementById('progress').style.width = '100%';
+    document.getElementById('progress').style.background = 'var(--green)';
+  } else {
+    // Show attempted decryption (will be wrong but gives feedback)
+    const attempted = CIPHER_LINES.map(l => vigDecrypt(l, key));
+    container.innerHTML = attempted.map(l => `<span style="color:#666">${escapeHtml(l)}</span>`).join('\n');
+    box.className = 'cipher-box';
+    input.className = 'keyword-input';
+    document.getElementById('successBanner').className = 'success-banner';
+    // Progress based on how close
+    const match = howClose(key);
+    document.getElementById('progress').style.width = `${match}%`;
   }
+
+  buildAlphabetGrid(key);
+}
+
+function howClose(key) {
+  const k = key.toUpperCase();
+  const target = CORRECT_KEYWORD;
+  let matches = 0;
+  for (let i = 0; i < Math.min(k.length, target.length); i++) {
+    if (k[i] === target[i]) matches++;
+  }
+  return (matches / target.length) * 100;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Input handler
+document.getElementById('keywordInput').addEventListener('input', (e) => {
+  const val = e.target.value.replace(/[^a-zA-Z]/g, '');
+  e.target.value = val.toUpperCase();
+  updateDisplay(val);
 });
 
 // Init
-renderCipher(0);
+updateDisplay('');
 </script>
 
 </body>

@@ -605,8 +605,8 @@ The measurement of all things economic. Not as we wish they were. As they actual
 
 **Token Architecture**
 - `docs/VIBE_TOKENOMICS/` — VIBE emission schedule (21M cap, 32-era halving)
-- `DOCUMENTATION/TRINOMIAL_STABILITY_THEOREM/` — Joule three-mechanism stability proof
-- `DOCUMENTATION/TRINOMIAL_STABILITY_THEOREM_FORMAL/` — Formal mathematical treatment
+- `docs/TRINOMIAL_STABILITY_THEOREM/` — Joule three-mechanism stability proof
+- `docs/TRINOMIAL_STABILITY_THEOREM_FORMAL/` — Formal mathematical treatment
 - `docs/ErgonWP/` — Proportional Proof-of-Work mining (Ergon model)
 - `docs/ethresearch/three-token-economy.md` — Three-token economy research post
 

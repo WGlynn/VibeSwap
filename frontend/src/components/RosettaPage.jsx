@@ -5098,7 +5098,12 @@ export default function RosettaPage() {
 
       {/* ============ Concept Chain ============ */}
       <div id="section-chain">
-        <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} /></LazySection>
+        <LazySection rootMargin="300px"><ConceptChainFinder userLexicons={userLexicons} />
+
+      {/* ============ Compare Lexicons ============ */}
+      <div id="section-compare">
+        <LazySection rootMargin="300px"><CompareLexicons userLexicons={userLexicons} /></LazySection>
+      </div></LazySection>
       </div>
 
       {/* ============ Recent Translations ============ */}
@@ -5455,6 +5460,7 @@ export default function RosettaPage() {
                     { key: 't',   desc: 'Focus Translate — From dropdown' },
                     { key: 's',   desc: 'Focus Sentence Translator' },
                     { key: 'c',   desc: 'Focus Concept Chain — Term A' },
+                    { key: 'x',   desc: 'Focus Compare Lexicons search' },
                     { key: 'Esc', desc: 'Clear all results and reset' },
                     { key: '?',   desc: 'Toggle this help panel' },
                   ].map(({ key, desc }) => (

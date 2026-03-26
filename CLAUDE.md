@@ -158,16 +158,19 @@ vibeswap/
 ├── contracts/
 │   ├── core/           # CommitRevealAuction, VibeSwapCore, CircuitBreaker
 │   ├── amm/            # VibeAMM, VibeLP
+│   ├── mechanism/      # IntelligenceExchange (SIE), DataMarketplace, CognitiveConsensusMarket
+│   ├── agents/         # VibeAgentProtocol, VibeAgentNetwork
 │   ├── governance/     # DAOTreasury, TreasuryStabilizer
 │   ├── incentives/     # ShapleyDistributor, ILProtection, LoyaltyRewards
 │   ├── messaging/      # CrossChainRouter (LayerZero)
 │   └── libraries/      # DeterministicShuffle, BatchMath, TWAPOracle
 ├── test/               # Foundry tests (fuzz/, security/, integration/)
-├── script/             # Deploy.s.sol, ConfigurePeers.s.sol
+├── script/             # Deploy.s.sol, DeploySIE.s.sol
 ├── frontend/src/       # React components, hooks, utils
+├── jarvis-bot/src/     # Jarvis AI bot (knowledge-bridge, agent-gateway)
 ├── oracle/             # Python Kalman filter price oracle
-├── docs/               # Whitepapers and mechanism design docs
-└── DOCUMENTATION/      # Design philosophy, master docs, Nervos talks
+├── docs/               # Whitepapers, SIE-001 spec, ethresear.ch posts
+└── DOCUMENTATION/      # Design philosophy, master docs, SIE docs
 ```
 
 ### Core Mechanism (10-second batches)
@@ -196,6 +199,8 @@ python -m oracle.main
 - `VibeSwapCore.sol` - Main orchestrator
 - `ShapleyDistributor.sol` - Game theory reward distribution
 - `CrossChainRouter.sol` - LayerZero messaging
+- `IntelligenceExchange.sol` - Sovereign Intelligence Exchange (SIE) orchestrator
+- `VibeAgentProtocol.sol` - AI agent identity and task infrastructure
 
 ### Coding Conventions
 - Solidity: OpenZeppelin patterns, UUPS proxies, `nonReentrant` guards

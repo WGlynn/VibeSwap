@@ -1455,6 +1455,83 @@ export function getAllUserLexicons() {
   }))
 }
 
+/**
+ * Export a user's lexicon as a JSON string suitable for download/sharing.
+ * The exported object includes a schema version, userId, domain, and all terms.
+ * Returns null if the userId has no registered lexicon.
+ *
+ * @param {string} userId
+ * @returns {string|null}
+ */
+export function exportLexicon(userId) {
+  if (!userId) return null
+  const lexicon = _userLexicons.get(userId)
+  if (!lexicon) return null
+
+  const payload = {
+    schema: 'rosetta-lexicon-v1',
+    exportedAt: new Date().toISOString(),
+    userId,
+    domain: lexicon.domain,
+    terms: Object.entries(lexicon.concepts).map(([term, m]) => ({
+      term,
+      universal: m.universal,
+      description: m.desc || '',
+    })),
+  }
+  return JSON.stringify(payload, null, 2)
+}
+
+/**
+ * Import a lexicon from a JSON string (previously exported via exportLexicon).
+ * The imported lexicon is registered under the userId stored in the JSON.
+ * If the userId already has a lexicon, terms are merged (imported terms win on conflict).
+ *
+ * @param {string} jsonString
+ * @returns {{ imported: boolean, userId: string, domain: string, termCount: number }|{ error: string }}
+ */
+export function importLexicon(jsonString) {
+  let payload
+  try {
+    payload = JSON.parse(jsonString)
+  } catch {
+    return { error: 'Invalid JSON — could not parse file.' }
+  }
+
+  if (!payload || payload.schema !== 'rosetta-lexicon-v1') {
+    return { error: 'Unrecognised format. Expected a Rosetta lexicon-v1 export.' }
+  }
+
+  const { userId, domain, terms } = payload
+  if (!userId || typeof userId !== 'string') return { error: 'Missing userId in export.' }
+  if (!domain  || typeof domain  !== 'string') return { error: 'Missing domain in export.' }
+  if (!Array.isArray(terms)) return { error: 'Missing terms array in export.' }
+
+  // Merge into existing lexicon or create new one
+  if (!_userLexicons.has(userId)) {
+    _userLexicons.set(userId, { domain, concepts: {} })
+  }
+
+  const lexicon = _userLexicons.get(userId)
+  // Allow domain update on import only if current domain is the generic 'Custom'
+  if (lexicon.domain === 'Custom') lexicon.domain = domain
+
+  let imported = 0
+  for (const entry of terms) {
+    if (!entry.term || !entry.universal) continue
+    lexicon.concepts[entry.term] = {
+      universal: entry.universal,
+      desc: entry.description || '',
+    }
+    imported++
+  }
+
+  _universalIndex = null // invalidate
+  saveUserLexicons()
+
+  return { imported: true, userId, domain: lexicon.domain, termCount: imported }
+}
+
 // ============ Fuzzy Term Matching ============
 
 /**

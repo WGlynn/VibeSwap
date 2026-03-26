@@ -265,3 +265,50 @@ Bitcoin miners face a revenue cliff every four years. If all DeFi rewards halved
 **Question:** Has anyone analyzed the optimal halving period for DeFi emissions as a function of network growth rate?
 
 ---
+
+## Post 9: Citation-Weighted Bonding Curves for Knowledge Asset Pricing
+
+**Category**: Mechanism Design
+
+Information markets typically price assets by prediction accuracy (Augur, Polymarket) or by staking weight (Numerai). Neither captures the value that foundational work contributes to derivative work — the academic citation problem applied to on-chain knowledge.
+
+We present a citation-weighted bonding curve mechanism where the price of a knowledge asset is a function of how many subsequent assets cite it:
+
+```
+price(n) = BASE × (1 + n × 0.15)^1.5
+```
+
+Where `n` is the citation count and `BASE` is the minimum access price. The exponent 1.5 creates superlinear growth — highly-cited foundational work becomes exponentially more valuable, matching empirical citation distributions (Lotka's law).
+
+**Revenue attribution via Shapley values:**
+
+When asset A is accessed, revenue splits between A's contributor (70%) and all assets cited by A (30%, split proportionally). This creates a citation incentive that is:
+
+1. **Non-extractive**: citing prior work increases their revenue, not yours
+2. **Anti-sybil**: self-citation is prohibited; citation rings are detectable via graph analysis
+3. **Time-neutral**: foundational work earns revenue indefinitely as derivatives cite it
+
+**On-chain verification:**
+
+Full Shapley computation (O(2^n)) runs off-chain. The on-chain verifier checks four axioms:
+- Efficiency: Σφᵢ = V
+- Sanity: ∀i, φᵢ ≤ V
+- Lawson Floor: ∀i, φᵢ ≥ 0.01 × (V/n)
+- Merkle proof against expected root
+
+The simplified on-chain attribution (proportional split) operates within the Shapley Floor bounds and can be upgraded to full Shapley via the verifier without contract migration.
+
+**Knowledge epoch anchoring:**
+
+Off-chain knowledge consensus (Nakamoto-style, with value density replacing hash power for chain selection) produces Merkle roots every ~5 minutes. These are anchored on-chain as checkpoints, making the off-chain knowledge state verifiable without replicating it.
+
+This creates a market where:
+- Original research earns revenue from every derivative that builds on it
+- The pricing mechanism rewards depth of contribution, not speed of access
+- No central curator decides what knowledge is valuable — citations emerge from the network
+
+**Implementation**: 350 lines of Solidity (UUPS upgradeable), composing existing Shapley, commit-reveal, and checkpoint infrastructure.
+
+**Question:** What bonding curve exponent best matches empirical academic citation distributions? We used 1.5 based on Lotka's law, but the optimal value may depend on the knowledge domain.
+
+---

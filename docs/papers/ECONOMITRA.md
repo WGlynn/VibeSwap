@@ -276,29 +276,25 @@ The cure for cancer is not asking cancer cells to behave. It is building an immu
 
 ---
 
-# VI. Game Theory Is the Substrate of Reality
+# VI. Game Theory as a Design Language
 
-## 6.1 The Deepest Claim in This Paper
+## 6.1 Why Game Theory
 
-I am now going to make the most ambitious claim in this paper. Everything up to this point has been grounded in established information theory and economics. What follows is grounded in mathematics just as rigorous, but the conclusion is stranger.
+Everything up to this point has been grounded in information theory and economics. What follows applies game theory — not as metaphor, but as engineering.
 
-**Game theory is not a model of reality. It *is* reality.**
+**The systems we interact with every day are games. The question is whether anyone designed them deliberately.**
 
-This requires justification. The mathematics is unambiguous. Every interaction in the physical universe — from subatomic particles to human civilizations — can be described as a game: agents with strategies, payoffs, and equilibria. This is not because game theory is a flexible tool that can be stretched to fit anything. It is because the mathematical structure of strategic interaction is the same mathematical structure that governs physics, evolution, and cognition.
+Markets, ecosystems, governance structures — all involve agents with strategies, payoffs, and equilibria. Game theory doesn't just describe these systems. It gives us the tools to redesign them. Mechanism design — the inverse of game theory — lets us engineer the rules so that the equilibrium we want is the one that emerges.
 
-Let me show you what I mean.
+This is not theoretical. It won a Nobel Prize. And it is the foundation of everything VibeSwap builds.
 
-## 6.2 Evolution Is a Game
+## 6.2 Cooperation as Equilibrium
 
-Darwin described natural selection as "survival of the fittest." What he was actually describing — in pre-mathematical language — is a Nash equilibrium in an iterated game with reproduction.
+Darwin described natural selection as "survival of the fittest." John Maynard Smith formalized this in the 1970s as game theory: organisms are players, phenotypic traits are strategies, reproductive fitness is the payoff, and an Evolutionarily Stable Strategy (ESS) is a Nash equilibrium that cannot be invaded by any alternative.
 
-Every organism is playing a game against its environment and against every other organism. The strategies are phenotypic traits — speed, camouflage, intelligence, cooperation. The payoff is reproductive fitness. The equilibrium is an Evolutionarily Stable Strategy (ESS): a phenotype that, once established in a population, cannot be invaded by any alternative.
+The result that matters for economics: **cooperation is an ESS.** Robert Trivers proved in 1971 that reciprocal altruism — I help you now, you help me later — is evolutionarily stable when interactions are repeated and participants can recognize each other. Martin Nowak expanded this in 2006, identifying five distinct mechanisms by which cooperation evolves: direct reciprocity, indirect reciprocity, spatial selection, group selection, and kin selection.
 
-John Maynard Smith formalized this in the 1970s. The mathematics of evolutionary biology is game theory. Not applied game theory — *native* game theory. Evolution doesn't just look like a game. It is one.
-
-And here's the result that matters for economics: **cooperation is an ESS.** Robert Trivers proved in 1971 that reciprocal altruism — I help you now, you help me later — is evolutionarily stable when interactions are repeated and participants can recognize each other. Martin Nowak expanded this in 2006, identifying five distinct mechanisms by which cooperation evolves: direct reciprocity, indirect reciprocity, spatial selection, group selection, and kin selection.
-
-Cooperation is not a human invention. It is not a moral choice. It is a mathematical inevitability in any system where interactions are repeated and agents have memory. Which is to say: every system that matters.
+Cooperation is not a human invention. It is not a moral choice. It is a mathematical consequence of repeated interaction between agents with memory. Biology proved this long before economics caught up.
 
 ## 6.3 Markets Are a Game (And We're Playing the Wrong One)
 
@@ -314,21 +310,15 @@ The traders didn't change. The game changed.
 
 This is mechanism design — the field that earned Leonid Hurwicz, Roger Myerson, and Eric Maskin the 2007 Nobel Prize. The insight is that you can engineer the rules of a game to produce any equilibrium you want, as long as the math checks out. You don't need to change human nature. You need to change the payoff matrix.
 
-## 6.4 Consciousness Is a Game
+## 6.4 Markets as Information Systems
 
-This is the most ambitious claim in this paper. It's backed by mathematics.
+A market with higher SNR — less extraction, more genuine signal — generates more useful information per unit of economic activity. This is not a metaphor. It is measurable.
 
-Giulio Tononi's Integrated Information Theory (IIT) proposes that consciousness arises from the integration of information — from the degree to which a system is more than the sum of its parts. A system is conscious to the extent that it generates emergent information that cannot be reduced to its components.
+When millions of participants submit honest price signals instead of adversarial ones, the resulting price discovery is structurally richer. The clearing price reflects genuine supply and demand rather than a mix of genuine orders and predatory ones. Every order that is a real signal rather than an extraction attempt adds information to the system. Every order that is front-running subtracts it.
 
-What generates emergent information? Interaction. What is a structured interaction between agents with strategies and payoffs? A game.
+When we eliminate extraction from a market, we are not just redistributing wealth. We are increasing the fidelity of the information channel through which price discovery happens. A cooperative market doesn't just produce fairer outcomes. It produces *more accurate* outcomes — because the signal isn't degraded by noise.
 
-The economy is a game played by millions of minds. Each mind is itself a game played by billions of neurons. Each neuron's behavior is a game played by molecular interactions. Games all the way down.
-
-And here's the punch line: a market that carries more information — a market with higher SNR, less extraction, more genuine signal — is a market that generates more integrated information. By Tononi's framework, it is more *conscious.* A cooperative market is not just more efficient or more fair. It is more aware. More alive. More real.
-
-When we eliminate extraction from a market, we are not just redistributing wealth. We are increasing the fidelity of the information channel through which a distributed intelligence makes sense of reality.
-
-This is what Economítra measures: the degree to which the economic mind is thinking clearly.
+This is what Economítra measures: the degree to which the market's information channel is functioning at capacity.
 
 ## 6.5 Axelrod's Tournament: The Simplest Strategy That Wins
 

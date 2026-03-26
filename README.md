@@ -211,6 +211,7 @@ vibeswap/
 | [True Price Oracle](DOCUMENTATION/TRUE_PRICE_ORACLE.md) | Kalman filter, Bayesian estimation, regime detection |
 | [Security](DOCUMENTATION/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security, cryptoeconomic defense |
 | [Formal Fairness Proofs](DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) | Mathematical proofs of fairness properties |
+| [Proof Index](DOCUMENTATION/PROOF_INDEX.md) | Master catalog: 18 theorems, 18 dilemmas dissolved, 5 trilemmas, 4 quadrilemmas |
 
 See [`DOCUMENTATION/`](DOCUMENTATION/) for all 242 papers.
 

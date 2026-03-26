@@ -15,7 +15,7 @@ Already have an Anthropic API key? Pick your method:
 ### Docker (any machine)
 
 ```bash
-curl -O https://raw.githubusercontent.com/WGlynn/vibeswap-private/master/jarvis-bot/docker-compose.shard.yml
+curl -O https://raw.githubusercontent.com/wglynn/vibeswap/master/jarvis-bot/docker-compose.shard.yml
 ANTHROPIC_API_KEY=sk-ant-... docker compose -f docker-compose.shard.yml up -d
 ```
 
@@ -118,7 +118,7 @@ All configuration via environment variables:
 Run anywhere — laptop, Raspberry Pi, $5 VPS.
 
 ```bash
-curl -O https://raw.githubusercontent.com/WGlynn/vibeswap-private/master/jarvis-bot/docker-compose.shard.yml
+curl -O https://raw.githubusercontent.com/wglynn/vibeswap/master/jarvis-bot/docker-compose.shard.yml
 
 # Basic (light node, auto shard ID)
 ANTHROPIC_API_KEY=sk-ant-... docker compose -f docker-compose.shard.yml up -d

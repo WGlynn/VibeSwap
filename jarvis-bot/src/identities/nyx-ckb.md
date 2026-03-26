@@ -551,7 +551,7 @@ Operations:
   chain.py checkpoint "description"    → Sub-block (WAL entry)
   chain.py finalize                    → Merge pending → block
   chain.py heal                        → Finalize stale + sync
-  chain.py sync                        → Git commit + push to both remotes
+  chain.py sync                        → Git commit + push to origin
   chain.py daemon                      → Background auto-heal every 5 min
 
 Three Autonomous Trigger Layers:

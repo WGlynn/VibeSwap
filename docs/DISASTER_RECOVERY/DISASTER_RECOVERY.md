@@ -6,8 +6,8 @@
 - **Jarvis Telegram Bot** — runs on Fly.io (`jarvis-vibeswap.fly.dev`), has persistent volume
   - Can still respond in Telegram, analyze ideas, generate code drafts
   - `/idea` command creates branches and pushes code
-  - `/commit` pushes to both remotes
-  - Data backup every 30 minutes to private repo
+  - `/commit` pushes to origin
+  - Data backup every 30 minutes
 - **GitHub Actions CI** — runs on every push/PR automatically
   - Frontend build + validation
   - Backend tests (12 tests)
@@ -16,7 +16,7 @@
   - Docker build verification
   - Security checks (Slither, dependency audits)
 - **Frontend** — deployed on Vercel, auto-redeploys from master
-- **All code** — mirrored on two GitHub repos (origin + stealth)
+- **All code** — on GitHub (origin: https://github.com/wglynn/vibeswap.git)
 
 ### What Stops
 - **Claude Code sessions** — interactive development, debugging, architecture work
@@ -68,7 +68,7 @@
 - `VERCEL_TOKEN` — Frontend deployment
 - `DEPLOYER_PRIVATE_KEY` — Contract deployment (Base mainnet)
 - `WALLETCONNECT_PROJECT_ID` — Wallet connections
-- GitHub personal access tokens for both repos
+- GitHub personal access token for origin repo
 
 ### Backup Operator Protocol
 If Will is unreachable for 48+ hours:

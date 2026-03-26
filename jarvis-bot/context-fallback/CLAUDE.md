@@ -43,7 +43,7 @@ Then read `.claude/SESSION_STATE.md` for latest context.
 **At END of each response** (after completing the user's request):
 1. Update `.claude/SESSION_STATE.md` if anything meaningful changed
 2. Commit all changes with descriptive message
-3. Push to BOTH remotes: `git push origin master && git push stealth master`
+3. Push to origin: `git push origin master`
 
 **Pull first, push last = no conflicts ever.**
 
@@ -51,7 +51,7 @@ Example:
 1. User: "Fix the login bug"
 2. `git pull origin master` (get latest)
 3. Fix bug (multiple tool calls)
-4. Update SESSION_STATE.md, commit, push to both remotes
+4. Update SESSION_STATE.md, commit, push to origin
 5. Done
 
 This ensures real-time sync between all sessions (desktop, mobile, any device).
@@ -62,7 +62,7 @@ This ensures real-time sync between all sessions (desktop, mobile, any device).
 
 These axioms are derived from Will's 2018 paper on wallet security fundamentals. They are **non-negotiable** and must be heavily weighted in ALL design decisions, code implementations, and documentation.
 
-See full paper: `docs/wallet-security-fundamentals-2018.md`
+See full paper: `DOCUMENTATION/wallet-security-fundamentals-2018.md`
 
 ### Core Axioms
 
@@ -131,7 +131,7 @@ vibeswap/
 │   ├── core/           # CommitRevealAuction, VibeSwapCore, CircuitBreaker
 │   ├── amm/            # VibeAMM, VibeLP
 │   ├── governance/     # DAOTreasury, TreasuryStabilizer
-│   ├── incentives/     # ShapleyDistributor, ILProtection, LoyaltyRewards
+│   ├── incentives/     # ShapleyDistributor, ILProtectionVault, LoyaltyRewardsManager
 │   ├── messaging/      # CrossChainRouter (LayerZero)
 │   └── libraries/      # DeterministicShuffle, BatchMath, TWAPOracle
 ├── test/               # Foundry tests (fuzz/, security/, integration/)
@@ -214,6 +214,5 @@ const isConnected = isExternalConnected || isDeviceConnected
 
 ### Git Remotes
 - `origin`: https://github.com/wglynn/vibeswap.git (public)
-- `stealth`: https://github.com/WGlynn/vibeswap-private.git (private)
-- Both repos have identical content, push to both when committing
+- Push to origin only (stealth remote retired 2026-03-25)
 

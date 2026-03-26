@@ -138,12 +138,14 @@ This primitive extends beyond Web3Modal. Any application that integrates third-p
 
 ### 4.1 The Architecture
 
-VibeSwap maintains two complete mirrors of its repository:
+VibeSwap maintained two complete mirrors of its repository during early development:
 
 - `origin`: `https://github.com/wglynn/vibeswap.git` (public)
-- `stealth`: `https://github.com/WGlynn/vibeswap-private.git` (private)
+- A private mirror on a separate GitHub account
 
-Every commit is pushed to both remotes. The cost is one additional `git push` command per commit — approximately 3 seconds of wall time. The insurance is total redundancy.
+Every commit was pushed to both remotes. The cost was one additional `git push` command per commit — approximately 3 seconds of wall time. The insurance was total redundancy.
+
+> **Note (2026-03-25)**: The private mirror was retired after the project went fully public. The pattern remains valid as a general engineering primitive.
 
 ### 4.2 Threat Model
 
@@ -164,7 +166,7 @@ The dual-remote pattern protects against five failure scenarios:
 The push protocol is deliberately simple:
 
 ```bash
-git push origin master && git push stealth master
+git push origin master && git push backup master
 ```
 
 No custom scripts. No hooks. No automation that could silently fail. Two explicit commands that either succeed with visible output or fail with visible errors. The simplicity is the point — there is no mechanism to break, no configuration to drift, no service to maintain.

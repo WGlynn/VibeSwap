@@ -44,4 +44,4 @@ Saved to `memory/frontend-patterns.md`.
 ## Deployment
 
 - Vercel: https://frontend-jade-five-87.vercel.app
-- GitHub: origin + stealth both up to date
+- GitHub: origin up to date

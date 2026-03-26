@@ -2628,3 +2628,101 @@ export function autocomplete(query, limit = 8) {
     .sort((a, b) => b.score - a.score || a.term.localeCompare(b.term))
     .slice(0, limit)
 }
+
+// ============ Domain Overlap ============
+
+/**
+ * Compare two domain lexicons by their shared universal concepts.
+ *
+ * A "universal concept" is shared when both lexicons map at least one term
+ * to the same `.universal` key.
+ *
+ * @param {string} domainA - Lexicon id for domain A (e.g. 'medicine')
+ * @param {string} domainB - Lexicon id for domain B (e.g. 'engineering')
+ * @returns {{
+ *   domainA: string,
+ *   domainB: string,
+ *   domainAName: string,
+ *   domainBName: string,
+ *   shared: Array<{
+ *     universal: string,
+ *     definition: string,
+ *     termA: string,
+ *     descA: string,
+ *     termB: string,
+ *     descB: string
+ *   }>,
+ *   uniqueToA: Array<{ universal: string, term: string, desc: string }>,
+ *   uniqueToB: Array<{ universal: string, term: string, desc: string }>,
+ *   overlapPct: number,
+ *   totalA: number,
+ *   totalB: number,
+ *   error?: string
+ * }}
+ */
+export function getDomainOverlap(domainA, domainB) {
+  const lexA = LEXICONS[domainA] || _userLexicons.get(domainA)
+  const lexB = LEXICONS[domainB] || _userLexicons.get(domainB)
+
+  if (!lexA) return { error: `Unknown domain: ${domainA}`, shared: [], uniqueToA: [], uniqueToB: [], overlapPct: 0 }
+  if (!lexB) return { error: `Unknown domain: ${domainB}`, shared: [], uniqueToA: [], uniqueToB: [], overlapPct: 0 }
+
+  // Build universal → term maps for each lexicon
+  const mapA = new Map() // universal key → { term, desc }
+  for (const [term, mapping] of Object.entries(lexA.concepts)) {
+    mapA.set(mapping.universal, { term, desc: mapping.desc })
+  }
+
+  const mapB = new Map() // universal key → { term, desc }
+  for (const [term, mapping] of Object.entries(lexB.concepts)) {
+    mapB.set(mapping.universal, { term, desc: mapping.desc })
+  }
+
+  const shared = []
+  const uniqueToA = []
+  const uniqueToB = []
+
+  for (const [universal, entryA] of mapA.entries()) {
+    if (mapB.has(universal)) {
+      const entryB = mapB.get(universal)
+      shared.push({
+        universal,
+        definition: EXTENDED_UNIVERSAL_CONCEPTS[universal] || '',
+        termA: entryA.term,
+        descA: entryA.desc,
+        termB: entryB.term,
+        descB: entryB.desc,
+      })
+    } else {
+      uniqueToA.push({ universal, term: entryA.term, desc: entryA.desc })
+    }
+  }
+
+  for (const [universal, entryB] of mapB.entries()) {
+    if (!mapA.has(universal)) {
+      uniqueToB.push({ universal, term: entryB.term, desc: entryB.desc })
+    }
+  }
+
+  // Sort shared by universal key for deterministic output
+  shared.sort((a, b) => a.universal.localeCompare(b.universal))
+  uniqueToA.sort((a, b) => a.universal.localeCompare(b.universal))
+  uniqueToB.sort((a, b) => a.universal.localeCompare(b.universal))
+
+  // Overlap percentage = shared / union of all universal concepts touched by either domain
+  const totalUnion = mapA.size + mapB.size - shared.length
+  const overlapPct = totalUnion === 0 ? 0 : Math.round((shared.length / totalUnion) * 100)
+
+  return {
+    domainA,
+    domainB,
+    domainAName: lexA.domain || domainA,
+    domainBName: lexB.domain || domainB,
+    shared,
+    uniqueToA,
+    uniqueToB,
+    overlapPct,
+    totalA: mapA.size,
+    totalB: mapB.size,
+  }
+}

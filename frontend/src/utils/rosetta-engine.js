@@ -1403,6 +1403,51 @@ export function getAllUserLexicons() {
   }))
 }
 
+// ============ Concept Explorer ============
+
+/**
+ * Return the top N universal concepts ranked by how many distinct lexicons
+ * map at least one term to them.  Each entry includes every term that maps
+ * to that concept across all registered lexicons (agent + user).
+ *
+ * @param {number} n - How many concepts to return (default 30)
+ * @returns {Array<{
+ *   universal: string,
+ *   definition: string,
+ *   lexiconCount: number,
+ *   mappings: Array<{ lexiconId: string, term: string, desc: string }>
+ * }>}
+ */
+export function getTopConnectedConcepts(n = 30) {
+  const idx = getIndex()
+
+  const results = []
+
+  for (const [universal, entries] of Object.entries(idx)) {
+    // Deduplicate by lexicon — count distinct lexicons
+    const lexiconSet = new Set(entries.map(e => e.agent))
+
+    results.push({
+      universal,
+      definition: EXTENDED_UNIVERSAL_CONCEPTS[universal] || '',
+      lexiconCount: lexiconSet.size,
+      mappings: entries.map(e => ({
+        lexiconId: e.agent,
+        term: e.term,
+        desc: e.desc,
+      })),
+    })
+  }
+
+  // Sort by lexicon coverage desc, then alphabetically as tie-break
+  results.sort((a, b) => {
+    if (b.lexiconCount !== a.lexiconCount) return b.lexiconCount - a.lexiconCount
+    return a.universal.localeCompare(b.universal)
+  })
+
+  return results.slice(0, n)
+}
+
 // ============ Protocol Stats ============
 
 /**

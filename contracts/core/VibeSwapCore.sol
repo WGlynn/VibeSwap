@@ -1405,8 +1405,16 @@ contract VibeSwapCore is
         guardian = newGuardian;
     }
 
-    /// @notice Set the TimelockController for governance-gated functions
+    /**
+     * @notice Set the TimelockController address for governance-gated functions
+     * @param _timelock TimelockController address (address(0) to disable governance gate)
+     *
+     * DISINTERMEDIATION: Grade C (onlyOwner). This is the bootstrap function that
+     * enables Phase 2 — once set, onlyGovernance functions accept the timelock as caller.
+     * Only owner can set this (you can't use governance to set governance).
+     */
     function setTimelockController(address _timelock) external onlyOwner {
+        emit TimelockControllerUpdated(timelockController, _timelock);
         timelockController = _timelock;
     }
 

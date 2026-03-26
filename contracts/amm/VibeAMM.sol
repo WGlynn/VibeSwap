@@ -1326,9 +1326,10 @@ contract VibeAMM is
             protocolFeeShare
         );
 
-        // Reduce output by fee
-        uint256 totalFee = (amountOut * feeRate) / 10000;
-        amountOut = amountOut - totalFee;
+        // Reduce output by fee — multiply before dividing to minimize precision loss
+        uint256 netOut = (amountOut * (10000 - feeRate)) / 10000;
+        uint256 totalFee = amountOut - netOut;
+        amountOut = netOut;
 
         // Check minimum output after fees
         if (amountOut < order.minAmountOut) {

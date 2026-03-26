@@ -153,6 +153,7 @@ export function usePriceFeed(symbols = ['ETH', 'USDC', 'WBTC', 'ARB', 'OP']) {
         setIsStale(false)
         setSource(result.source)
         window.__vibePriceCache = { ...window.__vibePriceCache, ...result.prices }
+        window.__vibePriceCacheTimestamp = Date.now()
       }
     } catch (err) {
       console.error('[PriceFeed] Error:', err)
@@ -184,6 +185,7 @@ export function usePriceFeed(symbols = ['ETH', 'USDC', 'WBTC', 'ARB', 'OP']) {
         setIsStale(false)
         setSource('websocket')
         window.__vibePriceCache = { ...window.__vibePriceCache, ...newPrices }
+        window.__vibePriceCacheTimestamp = Date.now()
       }
     })
 

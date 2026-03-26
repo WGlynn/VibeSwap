@@ -856,6 +856,7 @@ function SwapCore() {
     swapState,
     isLoading: swapLoading,
     error: swapError,
+    pricesStale,
     tokens: swapTokens,
     getBalance,
     quote,
@@ -1334,6 +1335,13 @@ function SwapCore() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Stale price warning */}
+          {pricesStale && fromAmount && parseFloat(fromAmount) > 0 && (
+            <div className="mx-4 mb-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm text-center">
+              Prices may be outdated. Quotes are approximate until live prices refresh.
+            </div>
+          )}
 
           {/* Swap button — InteractiveButton */}
           <div className="p-4">

@@ -17,10 +17,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install --ignore-scripts
       - name: Audit frontend dependencies
         working-directory: frontend
         run: npm audit --audit-level=critical --omit=dev || true
@@ -32,10 +32,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install --ignore-scripts
       - name: Audit backend dependencies
         working-directory: backend
         run: npm audit --audit-level=critical --omit=dev || true

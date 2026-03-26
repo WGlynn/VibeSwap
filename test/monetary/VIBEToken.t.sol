@@ -29,7 +29,7 @@ contract VIBETokenTest is Test {
     // ============ Initialization ============
 
     function test_zeroInitialSupply() public view {
-        assertEq(vibe.totalSupply(), 0, "Must start at zero — no pre-mine");
+        assertEq(vibe.totalSupply(), 0, "Must start at zero - no pre-mine");
         assertEq(vibe.totalMinted(), 0);
     }
 

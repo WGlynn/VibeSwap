@@ -252,7 +252,7 @@ contract ProofOfMindTest is Test {
         vm.prank(metaNode);
         pom.registerMetaNode("http://localhost:8080", peers);
 
-        (address addr, , , , bool active, ) = pom.metaNodes(metaNode);
+        (address addr, , , , bool active) = pom.metaNodes(metaNode);
         assertEq(addr, metaNode);
         assertTrue(active);
     }
@@ -266,7 +266,7 @@ contract ProofOfMindTest is Test {
         vm.prank(metaNode);
         pom.reportSync(42);
 
-        (, , uint256 synced, , , ) = pom.metaNodes(metaNode);
+        (, , uint256 synced, , ) = pom.metaNodes(metaNode);
         assertEq(synced, 42);
     }
 
@@ -279,7 +279,7 @@ contract ProofOfMindTest is Test {
         vm.prank(metaNode);
         pom.deactivateMetaNode();
 
-        (, , , , bool active, ) = pom.metaNodes(metaNode);
+        (, , , , bool active) = pom.metaNodes(metaNode);
         assertFalse(active);
     }
 

@@ -198,7 +198,7 @@ contract SoulboundSybilGuardTest is Test {
 
     // ============ Interface Compliance ============
 
-    function test_implementsISybilGuard() public view {
+    function test_implementsISybilGuard() public {
         // Verify the guard can be cast to ISybilGuard (compile-time check
         // enforced by the contract, but we confirm runtime behavior)
         ISybilGuard sybilGuard = ISybilGuard(address(guard));

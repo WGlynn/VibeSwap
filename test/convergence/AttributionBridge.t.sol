@@ -24,6 +24,12 @@ contract MockERC20 is ERC20 {
  */
 contract AttributionBridgeTest is Test {
 
+    // ============ Events (redeclared for 0.8.20 emit syntax) ============
+    event EpochSubmitted(uint256 indexed epochId, bytes32 merkleRoot, uint256 totalPool, uint256 participantCount);
+    event ContributionProven(uint256 indexed epochId, address indexed contributor, uint256 score);
+    event EpochFinalized(uint256 indexed epochId);
+    event ShapleyGameCreated(uint256 indexed epochId, bytes32 gameId);
+
     // ============ State ============
 
     AttributionBridge public bridge;
@@ -170,7 +176,7 @@ contract AttributionBridgeTest is Test {
 
     function test_submitEpoch_emitsEvent() public {
         vm.expectEmit(true, false, false, true);
-        emit AttributionBridge.EpochSubmitted(1, merkleRoot, 10_000 ether, 3);
+        emit EpochSubmitted(1, merkleRoot, 10_000 ether, 3);
 
         bridge.submitEpoch(merkleRoot, 10_000 ether, address(token), 3);
     }
@@ -187,7 +193,7 @@ contract AttributionBridgeTest is Test {
         uint256 epochId = _submitDefaultEpoch();
 
         vm.expectEmit(true, true, false, true);
-        emit AttributionBridge.ContributionProven(epochId, alice, ALICE_SCORE);
+        emit ContributionProven(epochId, alice, ALICE_SCORE);
 
         bridge.proveContribution(epochId, alice, ALICE_SCORE, ALICE_DERIVATIONS, SOURCE_CODE, aliceProof);
     }
@@ -275,7 +281,7 @@ contract AttributionBridgeTest is Test {
         vm.warp(block.timestamp + 24 hours);
 
         vm.expectEmit(true, false, false, false);
-        emit AttributionBridge.EpochFinalized(epochId);
+        emit EpochFinalized(epochId);
 
         bridge.finalizeEpoch(epochId);
 
@@ -351,7 +357,7 @@ contract AttributionBridgeTest is Test {
         bytes32 expectedGameId = keccak256(abi.encodePacked("attribution_epoch_", epochId));
 
         vm.expectEmit(true, false, false, true);
-        emit AttributionBridge.ShapleyGameCreated(epochId, expectedGameId);
+        emit ShapleyGameCreated(epochId, expectedGameId);
 
         bridge.createShapleyGame(epochId);
 

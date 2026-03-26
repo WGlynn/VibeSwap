@@ -4,7 +4,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY backend/package.json backend/package-lock.json* ./
-RUN npm ci --include=dev
+RUN npm install
 
 COPY backend/ .
 

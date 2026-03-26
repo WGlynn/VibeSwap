@@ -60,6 +60,7 @@ The WAL is continuity of consciousness across interruptions. Without it, Jarvis 
 - **Intent**: [one-line: what autopilot is doing and why]
 - **Parent Commit**: [git HEAD when execution began]
 - **Tasks**: [completed]/[total]
+- **Mitosis**: k=[rate], cap=[slots], acc=[carry]
 
 ## Task Manifest
 | # | Task | Status | Commit | Notes |

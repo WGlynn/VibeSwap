@@ -55,6 +55,11 @@
 6. All 3 test suites pass → contract is shippable
 7. End session with recommendations → `build-recommendations.md`
 
+## Permissionless Operations (ANYONE CAN DO THESE)
+- **VIBE Emissions**: `EmissionController.drip()` — NO access control. Anyone calls it, emissions flow. See `vibe-emissions-permissionless.md`
+- **SIE Deployment**: `SIEPermissionlessLaunch.launch(vibeToken, submitters)` — anyone deploys the intelligence exchange. See `sie-permissionless-launch.md`
+- **Cincinnatus Principle**: If Will disappears, the protocol lives. drip() is permissionless. P-001 (0% fee) is a constant. No keys, no admin, no founder needed.
+
 ## Build Knowledge Base
 - **`sanity-layer.md`** — MANDATORY PRE-CHECK — 60 load-bearing invariants, 5 tiers, competency gates, diff analyzer rules
 - **`contracts-catalogue.md`** — READ FIRST — all signatures, imports, interfaces

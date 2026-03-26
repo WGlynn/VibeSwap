@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "../contracts/mechanism/IntelligenceExchange.sol";
+import "../contracts/mechanism/CognitiveConsensusMarket.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
@@ -57,17 +58,27 @@ contract DeploySIE is Script {
             console.log("Epoch submitter authorized:", jarvisShard);
         }
 
+        // Deploy CognitiveConsensusMarket (Phase 1)
+        CognitiveConsensusMarket ccm = new CognitiveConsensusMarket(vibeToken);
+        console.log("CognitiveConsensusMarket:", address(ccm));
+
+        // Wire SIE <-> CCM
+        sie.setCognitiveConsensusMarket(address(ccm));
+        console.log("SIE wired to CCM");
+
         // Verify deployment
         require(address(sie.vibeToken()) == vibeToken, "VIBE token mismatch");
         require(sie.assetCount() == 0, "Asset count should be 0");
         require(sie.epochCount() == 0, "Epoch count should be 0");
+        require(sie.cognitiveConsensusMarket() == address(ccm), "CCM not wired");
         console.log("Deployment verified");
 
         vm.stopBroadcast();
 
         console.log("");
-        console.log("=== SIE Deployed Successfully ===");
+        console.log("=== SIE + CCM Deployed Successfully ===");
         console.log("Set INTELLIGENCE_EXCHANGE=%s in Jarvis .env", address(proxy));
+        console.log("Set COGNITIVE_CONSENSUS_MARKET=%s in Jarvis .env", address(ccm));
         console.log("Nothing is promised. Everything is earned.");
     }
 }

@@ -124,7 +124,7 @@ contract VibePermissionlessLaunch {
         // ============ Configure ============
 
         // Grant EmissionController minting rights on VIBE
-        VIBEToken(d.vibeToken).grantMinterRole(d.emissionController);
+        VIBEToken(d.vibeToken).setMinter(d.emissionController, true);
 
         // Authorize epoch submitters on the SIE
         IntelligenceExchange sie = IntelligenceExchange(payable(d.intelligenceExchange));

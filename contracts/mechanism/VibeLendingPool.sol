@@ -9,11 +9,27 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VibeLendingPool — Decentralized Lending & Borrowing
- * @notice Aave-style lending pool with variable interest rates.
- *         Supply assets to earn interest, borrow against collateral.
  *
- * @dev Interest rate model:
- *      - Utilization-based: rate = base + (utilization × slope)
+ * @notice DEPRECATED — Use contracts/financial/VibeLendPool.sol instead.
+ *
+ *         This contract is a duplicate of the canonical VibeLendPool (contracts/financial/VibeLendPool.sol).
+ *         The canonical version implements IVibeLendPool, has full test coverage (unit, fuzz,
+ *         invariant), includes flash loans, Shapley-weighted interest distribution, cross-asset
+ *         collateral health factor, and per-market configurable reserve/liquidation parameters.
+ *         This mechanism/ version has no tests and no downstream references.
+ *
+ *         Notable differences in this version that may be forward-ported to the canonical:
+ *         - Per-asset configurable rate parameters (base, slope1, slope2, kink)
+ *           (canonical uses global constants)
+ *         - Normalized amount tracking (shares model) vs canonical's raw amount tracking
+ *         - Depositor/borrower counters
+ *
+ * @dev ORIGINAL DESCRIPTION (preserved for reference):
+ *      Aave-style lending pool with variable interest rates.
+ *      Supply assets to earn interest, borrow against collateral.
+ *
+ *      Interest rate model:
+ *      - Utilization-based: rate = base + (utilization x slope)
  *      - Kink at 80% utilization (rate jumps above kink)
  *      - LTV ratios per asset (typically 75-85%)
  *      - Liquidation at 90% LTV with 5% bonus

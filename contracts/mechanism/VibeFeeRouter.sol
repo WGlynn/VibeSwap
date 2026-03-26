@@ -9,10 +9,26 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VibeFeeRouter — Protocol-Wide Fee Aggregation & Distribution
- * @notice Collects fees from all VSOS modules and routes them to stakeholders.
- *         Single source of truth for protocol fee configuration.
  *
- * @dev Distribution splits:
+ * @notice DEPRECATED — Use contracts/core/FeeRouter.sol instead.
+ *
+ *         This contract is a duplicate of the canonical FeeRouter (contracts/core/FeeRouter.sol).
+ *         The canonical version implements IFeeRouter, has full test coverage (unit, fuzz,
+ *         invariant, integration), and is referenced by VibeAMM, BuybackEngine, StrategyVault,
+ *         and ProtocolFeeAdapter. This mechanism/ version has no tests and no downstream
+ *         references.
+ *
+ *         Notable differences in this version that may be forward-ported to the canonical:
+ *         - UUPS upgradeable (canonical is non-upgradeable)
+ *         - Dynamic recipient array with labels (canonical has 4 fixed recipients)
+ *         - Native ETH fee collection (canonical is ERC-20 only)
+ *         - Distribution threshold minimum
+ *
+ * @dev ORIGINAL DESCRIPTION (preserved for reference):
+ *      Collects fees from all VSOS modules and routes them to stakeholders.
+ *      Single source of truth for protocol fee configuration.
+ *
+ *      Distribution splits:
  *      - 40% → Stakers (veVIBE holders)
  *      - 25% → Liquidity Providers
  *      - 20% → Treasury

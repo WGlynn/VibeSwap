@@ -321,6 +321,20 @@ import { initInfoFi, shutdownInfoFi } from './infofi.js';
 import { initHell, flushHell, getHellStats, checkIdentity, getRegistry } from './hell.js';
 import { initDeepStorage, getDeepStorageGlobalStats } from './deep-storage.js';
 import { initContextMemory, flushContextMemory, getContextMemoryStats } from './context-memory.js';
+// SIE modules — graceful imports
+let handleAgentGateway = async () => ({ status: 404, body: { error: 'Agent gateway not loaded' } });
+let startKnowledgeBridge = async () => {};
+try {
+  const ag = await import('./agent-gateway.js');
+  handleAgentGateway = ag.handleAgentRequest;
+  console.log('[jarvis] agent-gateway loaded');
+} catch (e) { console.warn(`[jarvis] agent-gateway import failed: ${e.message}`); }
+try {
+  const kb = await import('./knowledge-bridge.js');
+  startKnowledgeBridge = kb.startKnowledgeBridge;
+  console.log('[jarvis] knowledge-bridge loaded');
+} catch (e) { console.warn(`[jarvis] knowledge-bridge import failed: ${e.message}`); }
+
 // Shard memory + self-improve — graceful imports (don't break bot if modules fail)
 let observeMemory = () => {}, initShardMemory = async () => {};
 let extractSignal = () => null, initRewardSignals = async () => {};
@@ -7891,6 +7905,7 @@ async function main() {
   await initRelay();
   await initLimni();
   registerKataraktiStrategies();
+  await startKnowledgeBridge(); // SIE: bridge knowledge epochs to on-chain
   // Wire Limni alerts to owner's Telegram DM
   onAlert((alert) => {
     try {
@@ -8604,6 +8619,24 @@ async function main() {
         if (!handled) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Not found' }));
+        }
+
+      // ============ Agent Gateway (SIE) ============
+      } else if (req.url?.startsWith('/agent/')) {
+        try {
+          const agentUrl = new URL(req.url, `http://localhost:${healthPort}`);
+          let body = {};
+          if (req.method === 'POST') {
+            const chunks = [];
+            for await (const chunk of req) chunks.push(chunk);
+            try { body = JSON.parse(Buffer.concat(chunks).toString()); } catch { body = {}; }
+          }
+          const result = await handleAgentGateway(agentUrl.pathname, req.method, body, req.headers);
+          res.writeHead(result.status || 200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify(result.body || {}));
+        } catch (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
         }
 
       // ============ Claude Code API Bridge ============

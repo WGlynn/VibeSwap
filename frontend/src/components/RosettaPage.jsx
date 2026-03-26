@@ -15,26 +15,76 @@ import {
   getUserLexicon,
   getAllUserLexicons,
   getProtocolStats,
+  getTopConnectedConcepts,
 } from '../utils/rosetta-engine'
 
 // ============ Rosetta Stone Protocol — Universal Translation ============
 // Runs 100% client-side. No backend required. Static Vercel deploy compatible.
 
-// ============ Agent Registry ============
+// ============ Lexicon Registry — built dynamically from LEXICONS export ============
 
-const AGENTS = [
-  { id: 'nyx',        name: 'Nyx',        domain: 'Shadow Ops & Covert Intelligence', color: '#a855f7' },
-  { id: 'poseidon',   name: 'Poseidon',   domain: 'Liquidity & Ocean Protocols',      color: '#3b82f6' },
-  { id: 'athena',     name: 'Athena',     domain: 'Strategy & Wisdom Systems',        color: '#f59e0b' },
-  { id: 'hephaestus', name: 'Hephaestus', domain: 'Forge & Infrastructure',           color: '#ef4444' },
-  { id: 'hermes',     name: 'Hermes',     domain: 'Messaging & Cross-Chain',          color: '#10b981' },
-  { id: 'apollo',     name: 'Apollo',     domain: 'Oracle & Price Discovery',         color: '#fbbf24' },
-  { id: 'proteus',    name: 'Proteus',    domain: 'Adaptive Morphology',              color: '#6366f1' },
-  { id: 'artemis',    name: 'Artemis',    domain: 'Hunting & MEV Prevention',         color: '#c084fc' },
-  { id: 'anansi',     name: 'Anansi',     domain: 'Web Weaving & Narrative',          color: '#f97316' },
-]
+// Colors for the 10 AI agents
+const AGENT_COLORS = {
+  nyx:        '#a855f7',
+  poseidon:   '#3b82f6',
+  athena:     '#f59e0b',
+  hephaestus: '#ef4444',
+  hermes:     '#10b981',
+  apollo:     '#fbbf24',
+  proteus:    '#6366f1',
+  artemis:    '#c084fc',
+  anansi:     '#f97316',
+  jarvis:     '#22d3ee',
+}
 
-const AGENT_MAP = Object.fromEntries(AGENTS.map(a => [a.id, a]))
+// Colors for the 14 human domain lexicons
+const HUMAN_DOMAIN_COLORS = {
+  medicine:     '#ef4444',
+  law:          '#6b7280',
+  engineering:  '#f97316',
+  education:    '#22c55e',
+  music:        '#ec4899',
+  agriculture:  '#84cc16',
+  psychology:   '#8b5cf6',
+  philosophy:   '#06b6d4',
+  military:     '#78716c',
+  cooking:      '#f59e0b',
+  sports:       '#14b8a6',
+  architecture: '#a3a3a3',
+  journalism:   '#0ea5e9',
+  trading:      '#eab308',
+}
+
+// Human-readable display names (capitalised) derived from the key
+function toDisplayName(id) {
+  return id.charAt(0).toUpperCase() + id.slice(1)
+}
+
+// Build ALL_LEXICONS dynamically from the engine's LEXICONS export
+// Each entry: { id, name, domain, color, group }
+const AI_AGENT_IDS = Object.keys(AGENT_COLORS)
+
+const ALL_LEXICONS = Object.entries(LEXICONS).map(([id, lex]) => {
+  const isAgent = AI_AGENT_IDS.includes(id)
+  return {
+    id,
+    name: toDisplayName(id),
+    domain: lex.domain,
+    color: isAgent ? AGENT_COLORS[id] : (HUMAN_DOMAIN_COLORS[id] || '#94a3b8'),
+    group: isAgent ? 'agent' : 'human',
+  }
+})
+
+// Separate groups for rendering
+const AGENT_LEXICONS  = ALL_LEXICONS.filter(l => l.group === 'agent')
+const HUMAN_LEXICONS  = ALL_LEXICONS.filter(l => l.group === 'human')
+
+// Fast lookup map
+const LEXICON_MAP = Object.fromEntries(ALL_LEXICONS.map(l => [l.id, l]))
+
+// Legacy alias so existing code that references AGENT_MAP still works
+const AGENTS    = ALL_LEXICONS   // full list, used in LexiconSelect optgroups
+const AGENT_MAP = LEXICON_MAP
 
 // User lexicons use a neutral slate color scheme
 const USER_LEXICON_COLOR = '#94a3b8'
@@ -59,7 +109,7 @@ function AgentDot({ color, size = 8 }) {
 
 function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [] }) {
   const allOptions = [
-    ...AGENTS.map(a => ({ id: a.id, name: a.name, color: a.color })),
+    ...ALL_LEXICONS.map(l => ({ id: l.id, name: l.name, color: l.color })),
     ...userLexicons.map(u => ({
       id: `user:${u.userId}`,
       name: u.domain || u.userId,
@@ -81,10 +131,17 @@ function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [] })
           className="w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
         >
           <option value="">Select lexicon...</option>
-          <optgroup label="Agents">
-            {AGENTS.filter(a => a.id !== excludeId).map(agent => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}
+          <optgroup label="AI Agents">
+            {AGENT_LEXICONS.filter(l => l.id !== excludeId).map(l => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Human Domains">
+            {HUMAN_LEXICONS.filter(l => l.id !== excludeId).map(l => (
+              <option key={l.id} value={l.id}>
+                {l.name}
               </option>
             ))}
           </optgroup>
@@ -940,7 +997,7 @@ export default function RosettaPage() {
           So everyone can finally understand everyone.
         </p>
         <p className="text-black-600 text-[10px] font-mono mt-1">
-          Universal translation layer for the Pantheon agent network
+          {ALL_LEXICONS.length} lexicons — AI Agents + Human Domains — universal translation layer
         </p>
       </div>
 
@@ -1100,29 +1157,64 @@ export default function RosettaPage() {
         />
       </div>
 
-      {/* ============ Agent Lexicon Grid ============ */}
+      {/* ============ Lexicon Grid — AI Agents ============ */}
       <div className="mb-4">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-3">
-          Agent Lexicons
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">
+          AI Agents
         </h2>
+        <p className="text-black-600 text-[10px] font-mono">
+          {AGENT_LEXICONS.length} agents — {AGENT_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)} terms
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {AGENTS.map(agent => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        {AGENT_LEXICONS.map(lexicon => (
           <LexiconCard
-            key={agent.id}
-            agent={agent}
-            termCount={agentTermCounts[agent.id] ?? '--'}
+            key={lexicon.id}
+            agent={lexicon}
+            termCount={agentTermCounts[lexicon.id] ?? '--'}
             onSelect={setSelectedAgent}
-            isSelected={selectedAgent === agent.id}
+            isSelected={selectedAgent === lexicon.id}
           />
         ))}
 
-        {/* Expanded lexicon panel — spans full grid width */}
+        {/* Expanded panel — only for agent group */}
         <AnimatePresence>
-          {selectedAgent && (
+          {selectedAgent && AGENT_LEXICONS.some(l => l.id === selectedAgent) && (
             <LexiconPanel
-              agent={AGENT_MAP[selectedAgent]}
+              agent={LEXICON_MAP[selectedAgent]}
+              terms={lexiconTerms}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ============ Lexicon Grid — Human Domains ============ */}
+      <div className="mb-4">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">
+          Human Domains
+        </h2>
+        <p className="text-black-600 text-[10px] font-mono">
+          {HUMAN_LEXICONS.length} domains — {HUMAN_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)} terms
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {HUMAN_LEXICONS.map(lexicon => (
+          <LexiconCard
+            key={lexicon.id}
+            agent={lexicon}
+            termCount={agentTermCounts[lexicon.id] ?? '--'}
+            onSelect={setSelectedAgent}
+            isSelected={selectedAgent === lexicon.id}
+          />
+        ))}
+
+        {/* Expanded panel — only for human domain group */}
+        <AnimatePresence>
+          {selectedAgent && HUMAN_LEXICONS.some(l => l.id === selectedAgent) && (
+            <LexiconPanel
+              agent={LEXICON_MAP[selectedAgent]}
               terms={lexiconTerms}
             />
           )}
@@ -1132,7 +1224,7 @@ export default function RosettaPage() {
       {/* ============ Footer ============ */}
       <div className="mt-8 text-center">
         <p className="text-black-700 text-[10px] font-mono">
-          Rosetta Stone Protocol v2.0 — Pantheon Cross-Domain Understanding Layer + User Lexicons
+          Rosetta Stone Protocol v2.0 — {ALL_LEXICONS.length} lexicons, {Object.values(agentTermCounts).reduce((a, b) => a + b, 0)} terms across AI Agents + Human Domains + User Lexicons
         </p>
         <p className="text-black-800 text-[9px] font-mono mt-0.5">
           Runs client-side — no backend required

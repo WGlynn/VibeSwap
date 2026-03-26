@@ -291,6 +291,273 @@ function DidYouKnow() {
   )
 }
 
+// ============ Surprise Me ============
+
+// Lazily computed once: all concepts with 4+ distinct domain mappings
+let _surpriseCandidates = null
+function getSurpriseCandidates() {
+  if (_surpriseCandidates) return _surpriseCandidates
+  const all = getTopConnectedConcepts(200)
+  _surpriseCandidates = all.filter(c => c.lexiconCount >= 4)
+  return _surpriseCandidates
+}
+
+function pickSurpriseRandom(arr, exclude) {
+  const pool = exclude ? arr.filter(c => c.universal !== exclude) : arr
+  if (pool.length === 0) return arr[Math.floor(Math.random() * arr.length)]
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+function SurpriseMe() {
+  const [concept, setConcept]     = useState(null)
+  const [revealKey, setRevealKey] = useState(0)
+  const [spinning, setSpinning]   = useState(false)
+  const candidatesRef             = useRef(null)
+
+  const handleSurprise = useCallback(() => {
+    if (!candidatesRef.current) candidatesRef.current = getSurpriseCandidates()
+    const candidates = candidatesRef.current
+    if (!candidates.length) return
+    setSpinning(true)
+    setTimeout(() => setSpinning(false), 500)
+    const next = pickSurpriseRandom(candidates, concept?.universal)
+    setConcept(next)
+    setRevealKey(k => k + 1)
+  }, [concept])
+
+  // Deduplicate mappings by lexiconId for display
+  const uniqueMappings = concept
+    ? (() => {
+        const seen = new Set()
+        return concept.mappings.filter(m => {
+          if (seen.has(m.lexiconId)) return false
+          seen.add(m.lexiconId)
+          return true
+        })
+      })()
+    : []
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.35 }}
+      className="mb-6"
+    >
+      <div
+        className="relative rounded-2xl border overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0,255,65,0.03) 0%, rgba(0,10,5,0.85) 60%, rgba(99,102,241,0.04) 100%)',
+          borderColor: concept ? 'rgba(0,255,65,0.22)' : 'rgba(0,255,65,0.12)',
+          transition: 'border-color 0.4s ease',
+        }}
+      >
+        {/* Ambient glow */}
+        <motion.div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(0,255,65,0.05) 0%, transparent 65%)' }}
+          animate={{ opacity: [0.4, 0.9, 0.4] }}
+          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+        />
+
+        <div className="relative z-10 p-5">
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                Surprise Me
+                <span
+                  className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: 'rgba(0,255,65,0.12)', color: '#00ff41' }}
+                >
+                  random connection
+                </span>
+              </h2>
+              <p className="text-black-500 text-[10px] font-mono mt-0.5">
+                One concept. Every domain. Keep clicking &mdash; no two are the same.
+              </p>
+            </div>
+
+            {/* The button */}
+            <motion.button
+              onClick={handleSurprise}
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.93 }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 flex-shrink-0 ml-4"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0,255,65,0.18) 0%, rgba(0,255,65,0.08) 100%)',
+                border: '1px solid rgba(0,255,65,0.40)',
+                color: '#00ff41',
+                boxShadow: '0 0 18px rgba(0,255,65,0.12)',
+              }}
+              aria-label="Show a random cross-domain concept"
+            >
+              {/* Dice icon — spins on click */}
+              <motion.span
+                animate={{ rotate: spinning ? 360 : 0 }}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                className="inline-block"
+                aria-hidden="true"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="4" />
+                  <circle cx="7"  cy="7"  r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="17" cy="7"  r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="7"  cy="17" r="1.2" fill="currentColor" stroke="none" />
+                  <circle cx="17" cy="17" r="1.2" fill="currentColor" stroke="none" />
+                </svg>
+              </motion.span>
+              {concept ? 'Again' : 'Surprise Me'}
+            </motion.button>
+          </div>
+
+          {/* Result — animated reveal */}
+          <AnimatePresence mode="wait">
+            {concept ? (
+              <motion.div
+                key={revealKey}
+                initial={{ opacity: 0, y: 16, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+              >
+                {/* Universal concept badge */}
+                <div className="text-center mb-5">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.35, delay: 0.05 }}
+                    className="inline-flex flex-col items-center gap-1"
+                  >
+                    <span className="text-[9px] font-mono text-black-500 uppercase tracking-widest">universal concept</span>
+                    <span
+                      className="text-lg sm:text-xl font-bold font-mono px-4 py-1.5 rounded-xl"
+                      style={{
+                        background: 'rgba(0,255,65,0.08)',
+                        border: '1px solid rgba(0,255,65,0.28)',
+                        color: '#00ff41',
+                        textShadow: '0 0 20px rgba(0,255,65,0.35)',
+                      }}
+                    >
+                      {concept.universal}
+                    </span>
+                    {concept.definition && (
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                        className="text-[11px] font-mono text-black-400 italic max-w-md mt-1 text-center leading-relaxed"
+                      >
+                        &ldquo;{concept.definition}&rdquo;
+                      </motion.p>
+                    )}
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.25 }}
+                      className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: 'rgba(0,255,65,0.1)', color: '#00ff41' }}
+                    >
+                      {concept.lexiconCount} domains speak this idea
+                    </motion.span>
+                  </motion.div>
+                </div>
+
+                {/* Translation chain — staggered pill reveal */}
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {uniqueMappings.map((m, i) => {
+                    const meta = LEXICON_MAP[m.lexiconId]
+                    const color = meta?.color || '#94a3b8'
+                    const label = meta?.name || m.lexiconId
+                    return (
+                      <motion.div
+                        key={m.lexiconId}
+                        initial={{ opacity: 0, y: 10, scale: 0.85 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.15 + i * 0.06, ease: 'easeOut' }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl border flex-shrink-0"
+                        style={{
+                          backgroundColor: `${color}0d`,
+                          borderColor: `${color}35`,
+                        }}
+                        title={m.desc || undefined}
+                      >
+                        <span
+                          className="inline-block rounded-full flex-shrink-0"
+                          style={{
+                            width: 7,
+                            height: 7,
+                            backgroundColor: color,
+                            boxShadow: `0 0 6px ${color}80`,
+                          }}
+                        />
+                        <span className="text-[10px] font-mono" style={{ color }}>
+                          {label}:
+                        </span>
+                        <span className="text-white text-[11px] font-mono font-semibold">
+                          {m.term}
+                        </span>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+
+                {/* Footer hint */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.3 + uniqueMappings.length * 0.06 }}
+                  className="mt-4 pt-3 border-t flex items-center justify-center gap-2"
+                  style={{ borderColor: 'rgba(0,255,65,0.08)' }}
+                >
+                  <span className="text-[9px] font-mono text-black-700 uppercase tracking-wider">
+                    click &ldquo;Again&rdquo; for a new connection
+                  </span>
+                  <motion.span
+                    animate={{ x: [0, 4, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="text-black-700 text-xs"
+                    aria-hidden="true"
+                  >
+                    &rarr;
+                  </motion.span>
+                </motion.div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-center py-8"
+              >
+                <motion.div
+                  animate={{ scale: [1, 1.08, 1], opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  className="mb-3 flex items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <svg className="w-10 h-10 text-matrix-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="4" />
+                    <circle cx="7"  cy="7"  r="1.4" fill="currentColor" stroke="none" />
+                    <circle cx="17" cy="7"  r="1.4" fill="currentColor" stroke="none" />
+                    <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+                    <circle cx="7"  cy="17" r="1.4" fill="currentColor" stroke="none" />
+                    <circle cx="17" cy="17" r="1.4" fill="currentColor" stroke="none" />
+                  </svg>
+                </motion.div>
+                <p className="text-black-500 text-xs font-mono">Hit the button to discover a random universal concept</p>
+                <p className="text-black-700 text-[10px] font-mono mt-1">that spans 4 or more domains at once</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 // ============ Agent Dot ============
 
 function AgentDot({ color, size = 8 }) {
@@ -4189,14 +4456,24 @@ export default function RosettaPage() {
         {/* Translate Button */}
         <button
           onClick={handleTranslate}
-          disabled={!canTranslate}
-          className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all ${
-            canTranslate
+          disabled={!canTranslate || isTranslating}
+          className={`w-full py-2.5 rounded-lg font-mono text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+            canTranslate && !isTranslating
               ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]'
               : 'bg-black-800 text-black-600 cursor-not-allowed'
           }`}
         >
-          {translateAll ? 'Translate to All Lexicons' : 'Translate'}
+          {isTranslating ? (
+            <>
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Translating…
+            </>
+          ) : (
+            translateAll ? 'Translate to All Lexicons' : 'Translate'
+          )}
         </button>
 
         {/* Results */}

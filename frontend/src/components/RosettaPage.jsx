@@ -598,6 +598,7 @@ function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [], s
           id={selectId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
           className="w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
         >
           <option value="">Select lexicon...</option>
@@ -2426,6 +2427,16 @@ function SentenceTranslator({ userLexicons = [] }) {
                     </span>
                   </>
                 )}
+              </div>
+            </div>
+          ) : isTranslatingSentence ? (
+            <div className="flex items-center justify-center h-[220px] rounded-lg border border-matrix-800/30">
+              <div className="flex flex-col items-center gap-3">
+                <svg className="w-6 h-6 animate-spin text-matrix-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <p className="text-matrix-600 text-[10px] font-mono uppercase tracking-wider">Scanning paragraph…</p>
               </div>
             </div>
           ) : (

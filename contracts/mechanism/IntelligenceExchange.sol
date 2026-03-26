@@ -208,6 +208,11 @@ contract IntelligenceExchange is
         _disableInitializers();
     }
 
+    /**
+     * @notice Initialize the IntelligenceExchange proxy.
+     * @param _vibeToken Address of the VIBE ERC20 token used for access payments
+     * @param _owner Initial owner address (admin control during bootstrap)
+     */
     function initialize(address _vibeToken, address _owner) external initializer {
         __Ownable_init(_owner);
         __UUPSUpgradeable_init();
@@ -542,10 +547,14 @@ contract IntelligenceExchange is
 
     // ============ Admin ============
 
+    /// @notice Authorize an address to submit knowledge epoch anchors.
+    /// @param submitter Address to authorize (typically a Jarvis shard)
     function addEpochSubmitter(address submitter) external onlyOwner {
         epochSubmitters[submitter] = true;
     }
 
+    /// @notice Revoke epoch submission authorization from an address.
+    /// @param submitter Address to deauthorize
     function removeEpochSubmitter(address submitter) external onlyOwner {
         epochSubmitters[submitter] = false;
     }
@@ -632,22 +641,37 @@ contract IntelligenceExchange is
 
     // ============ View Functions ============
 
+    /// @notice Retrieve full intelligence asset data by ID.
+    /// @param assetId Unique identifier of the asset
+    /// @return The IntelligenceAsset struct
     function getAsset(bytes32 assetId) external view returns (IntelligenceAsset memory) {
         return assets[assetId];
     }
 
+    /// @notice Get the list of assets that cite a given asset (reverse citations).
+    /// @param assetId Asset to query citations for
+    /// @return Array of citing asset IDs
     function getCitations(bytes32 assetId) external view returns (bytes32[] memory) {
         return citationsOf[assetId];
     }
 
+    /// @notice Get the list of assets cited by a given asset (forward citations).
+    /// @param assetId Asset to query cited works for
+    /// @return Array of cited asset IDs
     function getCitedBy(bytes32 assetId) external view returns (bytes32[] memory) {
         return citedBy[assetId];
     }
 
+    /// @notice Retrieve a knowledge epoch anchor by ID.
+    /// @param epochId Epoch number to query
+    /// @return The KnowledgeEpoch struct
     function getEpoch(uint256 epochId) external view returns (KnowledgeEpoch memory) {
         return epochs[epochId];
     }
 
+    /// @notice Calculate the bonding curve price for a given citation count.
+    /// @param citations_ Number of citations to price
+    /// @return The bonding curve price in wei
     function getBondingPrice(uint256 citations_) external pure returns (uint256) {
         return _calculateBondingPrice(citations_);
     }

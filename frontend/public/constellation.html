@@ -531,11 +531,16 @@ function setSpeed(ms) {
 
 async function fetchLiveShards() {
   try {
-    const res = await fetch('https://jarvis-vibeswap.fly.dev/router/status');
-    const data = await res.json();
-    updateDisplay(data.shards?.length || 1);
+    const res = await fetch('https://jarvis-vibeswap.fly.dev/health');
+    if (res.ok) {
+      const data = await res.json();
+      // Health endpoint returns shard info if available
+      const count = data?.shard?.totalShards || data?.shards || 1;
+      updateDisplay(Math.min(64, count));
+    } else {
+      updateDisplay(1); // Primary is always on
+    }
   } catch {
-    // Fallback: show 1 shard (primary is always on)
     updateDisplay(1);
   }
 }

@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../interfaces/ICognitiveConsensusMarket.sol";
 
 /**
  * @title IntelligenceExchange — Sovereign Intelligence Exchange Orchestrator
@@ -124,6 +125,17 @@ contract IntelligenceExchange is
     /// @notice Asset access: assetId => user => hasAccess
     mapping(bytes32 => mapping(address => bool)) public hasAccess;
 
+    // ============ Phase 1: CognitiveConsensusMarket Integration ============
+
+    /// @notice CognitiveConsensusMarket contract for decentralized evaluation
+    address public cognitiveConsensusMarket;
+
+    /// @notice Mapping: CCM claimId => SIE assetId (for settlement callback)
+    mapping(uint256 => bytes32) public claimToAsset;
+
+    /// @notice Mapping: SIE assetId => CCM claimId (for lookup)
+    mapping(bytes32 => uint256) public assetToClaimId;
+
     // ============ Events ============
 
     event IntelligenceSubmitted(
@@ -157,6 +169,8 @@ contract IntelligenceExchange is
     event AssetVerified(bytes32 indexed assetId);
     event AssetDisputed(bytes32 indexed assetId);
     event RewardsClaimed(address indexed contributor, uint256 amount);
+    event EvaluationRequested(bytes32 indexed assetId, uint256 indexed claimId, uint256 bounty);
+    event EvaluationSettled(bytes32 indexed assetId, uint256 indexed claimId, bool verified);
 
     // ============ Errors ============
 
@@ -172,6 +186,10 @@ contract IntelligenceExchange is
     error NothingToClaim();
     error AssetNotVerified();
     error InvalidAssetState();
+    error CognitiveConsensusMarketNotSet();
+    error EvaluationAlreadyRequested();
+    error ClaimNotResolved();
+    error NotAssetContributor();
 
     // ============ Initializer ============
 
@@ -392,12 +410,95 @@ contract IntelligenceExchange is
         emit KnowledgeEpochAnchored(epochCount, merkleRoot, _assetCount, totalValue);
     }
 
-    // ============ Verification (Phase 1 integration point) ============
+    // ============ Verification — CognitiveConsensusMarket Integration ============
 
     /**
-     * @notice Mark an asset as verified after CRPC evaluation.
-     *         In MVP, only owner can verify. Phase 1 integrates
-     *         CognitiveConsensusMarket for decentralized evaluation.
+     * @notice Request decentralized evaluation of an asset via CognitiveConsensusMarket.
+     *         The contributor submits their contentHash as a claim, funds a bounty,
+     *         and evaluators (AI agents, verified humans) stake on the verdict.
+     * @param assetId The asset to evaluate
+     * @param minEvaluators Minimum evaluators required (3-21)
+     * @param bounty Bounty to fund the evaluation (in vibeToken)
+     */
+    function requestEvaluation(
+        bytes32 assetId,
+        uint256 minEvaluators,
+        uint256 bounty
+    ) external nonReentrant {
+        if (cognitiveConsensusMarket == address(0)) revert CognitiveConsensusMarketNotSet();
+
+        IntelligenceAsset storage asset = assets[assetId];
+        if (asset.submittedAt == 0) revert AssetNotFound();
+        if (asset.contributor != msg.sender) revert NotAssetContributor();
+        if (asset.state != AssetState.SUBMITTED) revert InvalidAssetState();
+        if (assetToClaimId[assetId] != 0) revert EvaluationAlreadyRequested();
+
+        // Transfer bounty from contributor and approve CCM to pull it
+        vibeToken.safeTransferFrom(msg.sender, address(this), bounty);
+        vibeToken.approve(cognitiveConsensusMarket, bounty);
+
+        // Submit claim to CognitiveConsensusMarket
+        // The claim hash IS the asset's content hash — evaluators verify the same content
+        uint256 claimId = ICognitiveConsensusMarket(cognitiveConsensusMarket).submitClaim(
+            asset.contentHash,
+            bounty,
+            minEvaluators
+        );
+
+        // Track the mapping both ways
+        claimToAsset[claimId] = assetId;
+        assetToClaimId[assetId] = claimId;
+        asset.state = AssetState.EVALUATING;
+
+        emit EvaluationRequested(assetId, claimId, bounty);
+    }
+
+    /**
+     * @notice Settle an evaluation after CognitiveConsensusMarket resolves the claim.
+     *         Anyone can call this once the claim is resolved — it reads the verdict
+     *         from CCM and updates the asset state accordingly.
+     * @param claimId The CCM claim ID to settle
+     */
+    function settleEvaluation(uint256 claimId) external nonReentrant {
+        if (cognitiveConsensusMarket == address(0)) revert CognitiveConsensusMarketNotSet();
+
+        bytes32 assetId = claimToAsset[claimId];
+        if (assetId == bytes32(0)) revert AssetNotFound();
+
+        IntelligenceAsset storage asset = assets[assetId];
+        if (asset.state != AssetState.EVALUATING) revert InvalidAssetState();
+
+        // Read the claim state from CognitiveConsensusMarket
+        (,,,,,,
+            ICognitiveConsensusMarket.ClaimState claimState,
+            ICognitiveConsensusMarket.Verdict verdict,
+            ,,,,
+        ) = ICognitiveConsensusMarket(cognitiveConsensusMarket).claims(claimId);
+
+        if (claimState == ICognitiveConsensusMarket.ClaimState.RESOLVED) {
+            if (verdict == ICognitiveConsensusMarket.Verdict.TRUE) {
+                asset.state = AssetState.VERIFIED;
+                emit AssetVerified(assetId);
+                emit EvaluationSettled(assetId, claimId, true);
+            } else {
+                // FALSE or UNCERTAIN — mark as disputed
+                asset.state = AssetState.DISPUTED;
+                emit AssetDisputed(assetId);
+                emit EvaluationSettled(assetId, claimId, false);
+            }
+        } else if (claimState == ICognitiveConsensusMarket.ClaimState.EXPIRED) {
+            // Evaluation expired (not enough evaluators) — revert to SUBMITTED
+            asset.state = AssetState.SUBMITTED;
+            emit EvaluationSettled(assetId, claimId, false);
+        } else {
+            revert ClaimNotResolved();
+        }
+    }
+
+    /**
+     * @notice Owner-only verification (fallback / MVP path).
+     *         Retained for cases where CCM is not yet deployed or for
+     *         emergency manual verification.
      * @param assetId The asset to verify
      */
     function verifyAsset(bytes32 assetId) external onlyOwner {
@@ -431,6 +532,11 @@ contract IntelligenceExchange is
 
     function removeEpochSubmitter(address submitter) external onlyOwner {
         epochSubmitters[submitter] = false;
+    }
+
+    /// @notice Set the CognitiveConsensusMarket address (Phase 1 activation)
+    function setCognitiveConsensusMarket(address ccm) external onlyOwner {
+        cognitiveConsensusMarket = ccm;
     }
 
     // ============ Bonding Curve ============

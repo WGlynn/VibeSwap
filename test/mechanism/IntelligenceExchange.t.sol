@@ -426,7 +426,7 @@ contract IntelligenceExchangeTest is Test {
     // ============ Admin ============
 
     function test_addRemoveEpochSubmitter() public {
-        address newShard = address(0xNEE);
+        address newShard = address(uint160(0x7EE));
         sie.addEpochSubmitter(newShard);
         assertTrue(sie.epochSubmitters(newShard));
 

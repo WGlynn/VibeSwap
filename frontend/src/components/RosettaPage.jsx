@@ -366,15 +366,16 @@ function CopyButton({ text }) {
   return (
     <button
       onClick={handleCopy}
-      className="text-black-500 hover:text-matrix-400 transition-colors ml-1.5"
+      className="text-black-500 hover:text-matrix-400 transition-colors ml-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
       title="Copy to clipboard"
+      aria-label={copied ? 'Copied!' : 'Copy to clipboard'}
     >
       {copied ? (
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       ) : (
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
       )}
@@ -399,15 +400,16 @@ function ShareButton() {
     <div className="relative inline-flex items-center">
       <button
         onClick={handleShare}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider transition-all hover:opacity-90 active:scale-[0.97]"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wider transition-all hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
         style={{
           backgroundColor: 'rgba(0,255,65,0.10)',
           border: '1px solid rgba(0,255,65,0.30)',
           color: '#00ff41',
         }}
         title="Copy shareable link"
+        aria-label="Copy shareable link"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
         </svg>
         Share
@@ -3224,6 +3226,97 @@ export default function RosettaPage() {
   const isConnected = isExternalConnected || isDeviceConnected
   const userId = externalAddress || deviceAddress || null
 
+  // ---- SEO / Social meta tags + JSON-LD ----
+  useEffect(() => {
+    const TITLE       = 'Rosetta Stone Protocol — Universal Domain Translation'
+    const DESCRIPTION = 'Translate any concept across 24 lexicons — AI agents, medicine, law, engineering, music, and more. 100% client-side. No backend required.'
+    const OG_IMAGE    = 'https://frontend-jade-five-87.vercel.app/og-image.png'
+    const PAGE_URL    = 'https://frontend-jade-five-87.vercel.app/rosetta'
+
+    // Title
+    document.title = TITLE
+
+    const setMeta = (selector, value) => {
+      let el = document.querySelector(selector)
+      if (!el) {
+        el = document.createElement('meta')
+        // parse selector like meta[property="og:title"] or meta[name="description"]
+        const match = selector.match(/\[(\w+)="([^"]+)"\]/)
+        if (match) el.setAttribute(match[1], match[2])
+        document.head.appendChild(el)
+      }
+      el.setAttribute('content', value)
+    }
+
+    // Standard
+    setMeta('meta[name="description"]',        DESCRIPTION)
+    // Open Graph
+    setMeta('meta[property="og:title"]',       TITLE)
+    setMeta('meta[property="og:description"]', DESCRIPTION)
+    setMeta('meta[property="og:type"]',        'website')
+    setMeta('meta[property="og:url"]',         PAGE_URL)
+    setMeta('meta[property="og:image"]',       OG_IMAGE)
+    setMeta('meta[property="og:site_name"]',   'VibeSwap')
+    // Twitter Card
+    setMeta('meta[name="twitter:card"]',        'summary_large_image')
+    setMeta('meta[name="twitter:title"]',       TITLE)
+    setMeta('meta[name="twitter:description"]', DESCRIPTION)
+    setMeta('meta[name="twitter:image"]',       OG_IMAGE)
+
+    // JSON-LD structured data
+    const scriptId = 'rosetta-jsonld'
+    let jsonld = document.getElementById(scriptId)
+    if (!jsonld) {
+      jsonld = document.createElement('script')
+      jsonld.id   = scriptId
+      jsonld.type = 'application/ld+json'
+      document.head.appendChild(jsonld)
+    }
+    jsonld.textContent = JSON.stringify({
+      '@context':          'https://schema.org',
+      '@type':             'SoftwareApplication',
+      name:                'Rosetta Stone Protocol',
+      alternateName:       'RSP',
+      description:         DESCRIPTION,
+      url:                 PAGE_URL,
+      applicationCategory: 'UtilitiesApplication',
+      operatingSystem:     'Web',
+      offers: {
+        '@type':       'Offer',
+        price:         '0',
+        priceCurrency: 'USD',
+      },
+      creator: {
+        '@type': 'Organization',
+        name:    'VibeSwap',
+        url:     'https://frontend-jade-five-87.vercel.app',
+      },
+      featureList: [
+        'Universal concept translation across 24 lexicons',
+        'AI agent domain mapping (Nyx, Jarvis, Poseidon, and 7 more)',
+        'Human domain translation (medicine, law, engineering, music, and more)',
+        'Ten Covenants governance framework',
+        '100% client-side — no backend required',
+      ],
+      softwareVersion: '1.0.0',
+      inLanguage:      'en',
+      image:           OG_IMAGE,
+    })
+
+    // Restore defaults on unmount
+    return () => {
+      document.title = 'VibeSwap | MEV-Protected Trading'
+      setMeta('meta[name="description"]',         'Trade without getting robbed. VibeSwap eliminates front-running with commit-reveal batch auctions. Fair price, every time. Powered by JARVIS AI.')
+      setMeta('meta[property="og:title"]',        'VibeSwap - MEV-Protected DEX')
+      setMeta('meta[property="og:description"]',  'Trade tokens with zero frontrunning. Batch auctions protect you from MEV. Powered by JARVIS AI.')
+      setMeta('meta[property="og:url"]',          'https://frontend-jade-five-87.vercel.app')
+      setMeta('meta[name="twitter:title"]',       'VibeSwap - MEV-Protected DEX')
+      setMeta('meta[name="twitter:description"]', 'Trade tokens with zero frontrunning. Batch auctions protect you from MEV. Powered by JARVIS AI.')
+      const jld = document.getElementById(scriptId)
+      if (jld) jld.remove()
+    }
+  }, [])
+
   // ---- Translation state ----
   const [fromId, setFromId] = useState('')
   const [toId, setToId] = useState('')
@@ -3455,37 +3548,9 @@ export default function RosettaPage() {
           </span>
         </h1>
         <p className="text-black-300 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
-          24 lexicons. 510 terms. 242 universal concepts.{' '}
-          <span className="text-white font-semibold">Every domain speaks every other domain.</span>
+          Every domain speaks every other domain.{' '}
+          <span className="text-white font-semibold">Live. Client-side. Zero backend.</span>
         </p>
-
-        {/* Animated stat counters */}
-        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mt-5">
-          {[
-            { label: 'Lexicons', value: ALL_LEXICONS.length, color: '#00ff41' },
-            { label: 'Terms', value: stats.terms, color: '#22d3ee' },
-            { label: 'Concepts', value: stats.universals, color: '#a855f7' },
-            { label: 'Covenants', value: 10, color: '#d4aa50' },
-          ].map((s) => (
-            <motion.div
-              key={s.label}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-center"
-            >
-              <div
-                className="text-2xl sm:text-3xl font-bold font-mono"
-                style={{ color: s.color, textShadow: `0 0 16px ${s.color}50` }}
-              >
-                <AnimatedCounter target={s.value} duration={1400} />
-              </div>
-              <div className="text-[10px] font-mono text-black-500 uppercase tracking-wider mt-0.5">
-                {s.label}
-              </div>
-            </motion.div>
-          ))}
-        </div>
 
         {/* One-sentence intro for first-time visitors */}
         <p className="text-black-400 text-xs sm:text-sm font-mono mt-4 max-w-2xl mx-auto leading-relaxed px-2">
@@ -3493,9 +3558,172 @@ export default function RosettaPage() {
         </p>
 
         {/* Subtitle line */}
-        <p className="text-black-600 text-[10px] font-mono mt-3">
-          Runs 100% client-side — AI Agents + Human Domains + User Lexicons
+        <p className="text-black-600 text-[10px] font-mono mt-2">
+          AI Agents + Human Domains + User Lexicons — 100% client-side
         </p>
+      </motion.div>
+
+      {/* ============ Live Stats Dashboard ============ */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
+        className="mb-6"
+      >
+        {/* Dashboard header bar */}
+        <div className="flex items-center gap-2 mb-3">
+          <motion.span
+            className="inline-block w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: '#00ff41' }}
+            animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 10px #00ff41cc', '0 0 4px #00ff4166'] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-matrix-500">
+            Live Protocol Stats
+          </span>
+          <span className="flex-1 h-px" style={{ background: 'rgba(0,255,65,0.12)' }} />
+        </div>
+
+        {/* Primary stat tiles — 4-col grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          {[
+            {
+              label: 'Lexicons',
+              value: detailedStats.totalLexicons,
+              color: '#00ff41',
+              glow: 'rgba(0,255,65,0.18)',
+              border: 'rgba(0,255,65,0.22)',
+              bg: 'rgba(0,255,65,0.05)',
+              delay: 0.20,
+            },
+            {
+              label: 'Terms',
+              value: detailedStats.totalTerms,
+              color: '#22d3ee',
+              glow: 'rgba(34,211,238,0.18)',
+              border: 'rgba(34,211,238,0.22)',
+              bg: 'rgba(34,211,238,0.05)',
+              delay: 0.28,
+            },
+            {
+              label: 'Concepts',
+              value: detailedStats.totalUniversalConcepts,
+              color: '#a855f7',
+              glow: 'rgba(168,85,247,0.18)',
+              border: 'rgba(168,85,247,0.22)',
+              bg: 'rgba(168,85,247,0.05)',
+              delay: 0.36,
+            },
+            {
+              label: 'Cross-Domain Bridges',
+              value: detailedStats.crossDomainBridges,
+              color: '#f59e0b',
+              glow: 'rgba(245,158,11,0.18)',
+              border: 'rgba(245,158,11,0.22)',
+              bg: 'rgba(245,158,11,0.05)',
+              delay: 0.44,
+            },
+          ].map((tile) => (
+            <motion.div
+              key={tile.label}
+              initial={{ opacity: 0, scale: 0.88 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.45, delay: tile.delay, ease: 'easeOut' }}
+              className="relative rounded-xl p-4 text-center overflow-hidden"
+              style={{
+                background: tile.bg,
+                border: `1px solid ${tile.border}`,
+              }}
+            >
+              {/* Subtle inner glow pulse */}
+              <motion.div
+                className="absolute inset-0 pointer-events-none rounded-xl"
+                style={{
+                  background: `radial-gradient(ellipse at 50% 0%, ${tile.glow} 0%, transparent 65%)`,
+                }}
+                animate={{ opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: tile.delay }}
+              />
+              <div className="relative z-10">
+                <div
+                  className="text-2xl sm:text-3xl font-bold font-mono leading-none"
+                  style={{ color: tile.color, textShadow: `0 0 18px ${tile.color}55` }}
+                >
+                  <AnimatedCounter target={tile.value} duration={1400} />
+                </div>
+                <div className="text-[10px] font-mono text-black-400 uppercase tracking-wider mt-1.5 leading-tight">
+                  {tile.label}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Most-connected banner + secondary metrics */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.52, ease: 'easeOut' }}
+          className="rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,255,65,0.04) 0%, rgba(0,10,5,0.7) 100%)',
+            border: '1px solid rgba(0,255,65,0.14)',
+          }}
+        >
+          {/* Most connected concept */}
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider whitespace-nowrap">
+              Most connected
+            </span>
+            <span
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold truncate max-w-[200px]"
+              style={{
+                backgroundColor: 'rgba(0,255,65,0.10)',
+                border: '1px solid rgba(0,255,65,0.25)',
+                color: '#00ff41',
+              }}
+              title={detailedStats.mostConnected.name}
+            >
+              {detailedStats.mostConnected.name}
+            </span>
+            <span className="text-[9px] font-mono text-black-400 whitespace-nowrap">
+              {' — bridges '}
+              <span className="text-white font-bold">
+                {detailedStats.mostConnected.count}
+              </span>
+              {' domains'}
+            </span>
+          </div>
+
+          {/* Secondary metrics */}
+          <div className="flex items-center gap-4 flex-wrap">
+            {[
+              { label: 'AI Agents', value: AGENT_LEXICONS.length, color: '#22d3ee' },
+              { label: 'Human Domains', value: HUMAN_LEXICONS.length, color: '#10b981' },
+              { label: 'Avg Terms', value: detailedStats.avgTermsPerLexicon, color: '#a855f7' },
+              {
+                label: 'Covenant Hash',
+                value: stats.covenantHash
+                  ? `0x${stats.covenantHash.slice(0, 6)}…`
+                  : '--',
+                color: '#d4aa50',
+                copyable: stats.covenantHash,
+              },
+            ].map((m) => (
+              <div key={m.label} className="text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <span className="font-mono font-bold text-xs" style={{ color: m.color }}>
+                    {m.value}
+                  </span>
+                  {m.copyable && <CopyButton text={m.copyable} />}
+                </div>
+                <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider whitespace-nowrap">
+                  {m.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </motion.div>
 
       {/* ============ Did You Know? ============ */}
@@ -3504,38 +3732,8 @@ export default function RosettaPage() {
       {/* ============ Popular Translations — first-time onboarding ============ */}
       <PopularTranslations onTryPair={handleTryPair} />
 
-      {/* ============ Protocol Stats — compact ============ */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
-        {[
-          { label: 'AI Agents', value: AGENT_LEXICONS.length },
-          { label: 'Human Domains', value: HUMAN_LEXICONS.length },
-          {
-            label: 'Covenant Hash',
-            value: stats.covenantHash
-              ? `0x${stats.covenantHash.slice(0, 6)}…${stats.covenantHash.slice(-4)}`
-              : '--',
-            copyable: stats.covenantHash,
-          },
-          { label: 'User Lexicons', value: stats.userLexicons, accent: USER_LEXICON_COLOR },
-        ].map((s) => (
-          <div
-            key={s.label}
-            className="text-center p-2.5 bg-black-800/40 border border-black-700/50 rounded-lg"
-            style={s.accent ? { borderColor: `${s.accent}30` } : {}}
-          >
-            <div className="flex items-center justify-center gap-1">
-              <span
-                className="font-mono font-bold text-sm"
-                style={s.accent ? { color: s.accent } : { color: '#ffffff' }}
-              >
-                {s.value}
-              </span>
-              {s.copyable && <CopyButton text={s.copyable} />}
-            </div>
-            <div className="text-black-500 text-[10px] font-mono">{s.label}</div>
-          </div>
-        ))}
-      </div>
+            {/* ============ Concept Web ============ */}
+      <ConceptWeb />
 
       {/* ============ Concept Explorer ============ */}
       <ConceptExplorer userLexicons={userLexicons} />

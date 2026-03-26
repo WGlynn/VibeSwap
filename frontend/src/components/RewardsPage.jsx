@@ -167,7 +167,7 @@ export default function RewardsPage() {
                 <StatBox label="Days Active" value={userStats.daysActive} color={PURPLE} i={2} />
                 <StatBox label="Pending VIBE" value={userStats.pendingVibe.toLocaleString()} color={AMBER} i={3} />
               </div>
-              {!isConnected && <p className="text-[10px] font-mono text-black-500 text-center mt-4">Showing demo data. Connect wallet + link Telegram to see your real stats.</p>}
+              {!isConnected && <p className="text-[10px] font-mono text-black-500 text-center mt-4">Showing demo data. Sign in + link Telegram to see your real stats.</p>}
             </GlassCard>
           </motion.div>
         </section>

@@ -306,7 +306,7 @@ export default function GovernanceDelegatePage() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-black-400 font-mono text-sm mb-3">Connect your wallet to manage delegation</p>
+              <p className="text-black-400 font-mono text-sm mb-3">Sign in to manage delegation</p>
               <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
               >

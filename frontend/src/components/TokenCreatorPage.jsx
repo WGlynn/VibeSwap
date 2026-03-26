@@ -687,9 +687,9 @@ function NotConnectedState() {
       <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-black-800 border border-black-600 flex items-center justify-center text-3xl text-black-500">
         ◈
       </div>
-      <h3 className="text-xl font-semibold mb-2 text-white">Connect Wallet to Create a Token</h3>
+      <h3 className="text-xl font-semibold mb-2 text-white">Sign In to Create a Token</h3>
       <p className="text-sm text-black-400 max-w-md mx-auto mb-6">
-        Connect your wallet to access the token creator. You'll need ETH for gas fees
+        Sign in to access the token creator. You'll need ETH for gas fees
         to deploy your token contract on-chain.
       </p>
       <div className="flex items-center justify-center gap-4 text-xs text-black-500">

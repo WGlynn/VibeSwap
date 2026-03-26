@@ -923,7 +923,7 @@ function MigrationCTA({ isConnected }) {
           transition={{ delay: 0.8 }}
           className="text-[9px] font-mono text-black-500 text-center mt-3"
         >
-          Connect your wallet to get started — MetaMask, WalletConnect, or device wallet supported
+          Sign in to get started — MetaMask, WalletConnect, or device wallet supported
         </motion.p>
       )}
       {isConnected && (

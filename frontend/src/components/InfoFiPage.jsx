@@ -322,7 +322,7 @@ function SignalDashboard({ connected }) {
       </AnimatePresence>
       {!connected && (
         <div className="text-center py-4 text-black-500 text-[10px] font-mono">
-          Connect wallet to subscribe to signals and receive real-time alerts
+          Sign in to subscribe to signals and receive real-time alerts
         </div>
       )}
     </div>
@@ -673,7 +673,7 @@ export default function InfoFiPage() {
                 </AnimatePresence>
                 {primitives.length === 0 && (
                   <div className="text-center py-12 text-black-500 text-xs font-mono">
-                    {offline ? 'No data available — start backend' : isConnected ? 'No primitives found. Create the first one.' : 'Connect wallet to contribute.'}
+                    {offline ? 'No data available — start backend' : isConnected ? 'No primitives found. Create the first one.' : 'Sign in to contribute.'}
                   </div>
                 )}
                 {hasMore && <div ref={sentinelRef} className="h-4" />}
@@ -695,7 +695,7 @@ export default function InfoFiPage() {
 
       {!isConnected && (
         <div className="mt-6 text-center text-black-500 text-xs font-mono">
-          Connect wallet to register knowledge primitives and earn Shapley rewards
+          Sign in to register knowledge primitives and earn Shapley rewards
         </div>
       )}
 

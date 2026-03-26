@@ -292,7 +292,7 @@ export default function LendingPage() {
           <GlassCard glowColor="terminal" hover={false}>
             <div className="p-8 text-center">
               <div className="text-2xl mb-2" style={{ color: `${CYAN}30` }}>{'{ }'}</div>
-              <div className="text-gray-400 text-sm font-mono">Connect wallet to view positions</div>
+              <div className="text-gray-400 text-sm font-mono">Sign in to view positions</div>
             </div>
           </GlassCard>
         ) : (
@@ -548,7 +548,7 @@ export default function LendingPage() {
             <button disabled={numAmount <= 0 || !isConnected}
               className="w-full py-3 rounded-xl font-bold font-mono text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               style={{ backgroundColor: numAmount > 0 ? (activeTab === 'supply' ? CYAN : AMBER) : '#374151', color: numAmount > 0 ? '#0a0a0a' : '#6B7280' }}>
-              {!isConnected ? 'Connect Wallet' : numAmount > 0 ? `${activeTab === 'supply' ? 'Supply' : 'Borrow'} ${fmtNum(numAmount)} ${selectedToken}` : 'Enter Amount'}
+              {!isConnected ? 'Sign In' : numAmount > 0 ? `${activeTab === 'supply' ? 'Supply' : 'Borrow'} ${fmtNum(numAmount)} ${selectedToken}` : 'Enter Amount'}
             </button>
           </div>
         </GlassCard>

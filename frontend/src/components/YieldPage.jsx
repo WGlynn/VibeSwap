@@ -206,7 +206,7 @@ function DepositForm({ strategies, isConnected, connect }) {
           background: isConnected && dep > 0 ? `linear-gradient(135deg, ${CYAN}, #0891b2)` : 'rgba(55,55,55,1)',
           color: isConnected && dep > 0 ? '#000' : 'rgba(160,160,160,1)',
         }}>
-        {!isConnected ? 'Connect Wallet' : dep > 0 ? 'Deposit' : 'Enter Amount'}
+        {!isConnected ? 'Sign In' : dep > 0 ? 'Deposit' : 'Enter Amount'}
       </motion.button>
     </div>
   )
@@ -319,11 +319,11 @@ export default function YieldPage() {
         <Section index={3} title="Your Positions" subtitle="Active deposits and accumulated earnings">
           {!isConnected ? (
             <div className="text-center py-8">
-              <p className="text-black-400 text-sm mb-4">Connect your wallet to view positions</p>
+              <p className="text-black-400 text-sm mb-4">Sign in to view positions</p>
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={connect}
                 className="px-6 py-2.5 rounded-xl text-sm font-medium"
                 style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)`, color: '#000' }}>
-                Connect Wallet
+                Sign In
               </motion.button>
             </div>
           ) : (

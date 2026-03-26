@@ -147,7 +147,7 @@ export function useRecovery() {
    */
   const addGuardian = useCallback(async (guardianAddress, label, signatureProofOrMethod = 'none') => {
     if (!isConnected) {
-      toast.error('Connect wallet first')
+      toast.error('Sign in first')
       return false
     }
 

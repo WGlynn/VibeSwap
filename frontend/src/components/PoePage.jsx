@@ -185,7 +185,7 @@ export default function PoePage() {
           {!isConnected ? (
             <GlassCard glowColor="terminal" hover={false}>
               <div className="p-6 text-center">
-                <div className="text-gray-400 text-sm font-mono">Connect wallet to participate in governance</div>
+                <div className="text-gray-400 text-sm font-mono">Sign in to participate in governance</div>
               </div>
             </GlassCard>
           ) : (

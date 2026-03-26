@@ -181,7 +181,7 @@ function NotConnectedState() {
               <span className="text-2xl font-mono font-bold text-cyan-400/50">?</span>
             </div>
             <h3 className="text-lg font-bold font-mono text-white mb-2">
-              Connect wallet to view profile
+              Sign in to view profile
             </h3>
             <p className="text-sm font-mono text-black-500 max-w-sm mx-auto">
               Sign in with an external wallet or create a device wallet to access your profile,
@@ -554,7 +554,7 @@ export default function ProfilePage() {
                   className="bg-red-500/5 rounded-lg p-3 border border-red-500/15 text-center"
                 >
                   <p className="text-[11px] font-mono text-red-400 mb-2">
-                    Are you sure? This will disconnect your wallet from VibeSwap.
+                    Are you sure? This will dissign in from VibeSwap.
                   </p>
                   <motion.button
                     whileTap={{ scale: 0.95 }}

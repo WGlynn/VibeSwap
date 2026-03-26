@@ -129,7 +129,7 @@ export default function BondsPage() {
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">
               Acquire JUL at a discount by bonding assets to build protocol-owned liquidity.</p>
             <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
-              style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>Connect Wallet</button>
+              style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>Sign In</button>
           </motion.div>
         </GlassCard>
       </div>

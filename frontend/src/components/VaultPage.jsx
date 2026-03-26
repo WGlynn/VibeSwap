@@ -377,7 +377,7 @@ function VaultPage() {
             onClick={connect}
             className="px-6 py-3"
           >
-            Connect Wallet
+            Sign In
           </InteractiveButton>
         </GlassCard>
       </div>

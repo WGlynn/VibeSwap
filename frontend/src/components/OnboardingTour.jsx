@@ -42,7 +42,7 @@ const TOUR_STEPS = [
   },
   {
     id: 'wallet',
-    title: 'Connect Your Wallet',
+    title: 'Sign In',
     body: 'Tap "Get Started" to create a device wallet (keys stay on YOUR device via WebAuthn) or connect an external wallet like MetaMask. Your keys, your coins.',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -464,7 +464,7 @@ export default function FiatOffRampPage() {
                   }`}
                 >
                   {!isConnected
-                    ? 'Connect Wallet to Sell'
+                    ? 'Sign In to Sell'
                     : !sellAmount || parseFloat(sellAmount) <= 0
                       ? 'Enter Amount'
                       : `Sell ${sellAmount} ${selectedToken.symbol}`

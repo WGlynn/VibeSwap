@@ -155,7 +155,7 @@ export default function RevenueSharePage() {
             </p>
             <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
               style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>
-              Connect Wallet
+              Sign In
             </button>
           </motion.div>
         </GlassCard>

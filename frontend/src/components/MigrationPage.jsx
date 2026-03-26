@@ -200,9 +200,9 @@ export default function MigrationPage() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}>
             <GlassCard className="p-8 text-center">
               <div className="text-4xl mb-3 opacity-60">{'\u{1F512}'}</div>
-              <h3 className="text-lg font-semibold mb-2">Connect Wallet to Migrate</h3>
+              <h3 className="text-lg font-semibold mb-2">Sign In to Migrate</h3>
               <p className="text-sm text-gray-400 max-w-md mx-auto">
-                Connect your wallet to view your V1 balances and migrate to V2 contracts.
+                Sign in to view your V1 balances and migrate to V2 contracts.
               </p>
             </GlassCard>
           </motion.div>

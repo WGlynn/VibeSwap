@@ -430,7 +430,7 @@ export default function OptionsPage() {
           <h2 className="text-xl font-bold text-white mb-2">Connect to Trade Options</h2>
           <p className="text-black-400 text-sm mb-6">European-style options settled against TWAP oracle for MEV protection.</p>
           <button onClick={connect} className="px-8 py-3 rounded-xl font-semibold text-black" style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)` }}>
-            Connect Wallet
+            Sign In
           </button>
         </motion.div>
       </GlassCard>

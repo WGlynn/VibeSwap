@@ -605,7 +605,7 @@ export default function AchievementsPage() {
                   </svg>
                 </div>
                 <p className="text-lg font-bold font-mono text-white mb-2">
-                  Connect Wallet to Track Progress
+                  Sign In to Track Progress
                 </p>
                 <p className="text-xs font-mono text-white/40 max-w-md mx-auto">
                   Sign in with your wallet to track achievements, complete quests,

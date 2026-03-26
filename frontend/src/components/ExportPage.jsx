@@ -147,9 +147,9 @@ export default function ExportPage() {
                   d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
                 />
               </svg>
-              <h2 className="text-xl font-semibold text-white mb-2">Connect Wallet</h2>
+              <h2 className="text-xl font-semibold text-white mb-2">Sign In</h2>
               <p className="text-black-400 text-sm mb-6 max-w-md mx-auto">
-                Connect your wallet to export transaction history and generate tax reports for your VibeSwap activity.
+                Sign in to export transaction history and generate tax reports for your VibeSwap activity.
               </p>
               <motion.button
                 onClick={connect}
@@ -161,7 +161,7 @@ export default function ExportPage() {
                   borderColor: CYAN + '40',
                 }}
               >
-                Connect Wallet
+                Sign In
               </motion.button>
             </div>
           </GlassCard>

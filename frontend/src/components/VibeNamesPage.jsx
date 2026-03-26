@@ -1043,7 +1043,7 @@ export default function VibeNamesPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </div>
-                  <p className="text-sm font-mono text-black-300 mb-1">Connect wallet to manage your .vibe names</p>
+                  <p className="text-sm font-mono text-black-300 mb-1">Sign in to manage your .vibe names</p>
                   <p className="text-[10px] font-mono text-black-500">Register names, adjust prices, deposit tax, set resolvers</p>
                 </div>
               </GlassCard>

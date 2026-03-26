@@ -391,7 +391,7 @@ export default function TaxReportPage() {
 
               <motion.button onClick={handleGenerate} disabled={isGenerating || !isConnected} whileHover={{ scale: isConnected ? 1.02 : 1 }} whileTap={{ scale: isConnected ? 0.98 : 1 }}
                 className={`w-full py-3.5 rounded-xl text-sm font-mono font-bold border transition-all ${isConnected ? 'border-cyan-500/50 bg-gradient-to-r from-cyan-500/20 to-green-500/20 text-cyan-400 hover:from-cyan-500/30 hover:to-green-500/30' : 'border-black-700/50 bg-black-800/40 text-black-500 cursor-not-allowed'}`}>
-                {!isConnected ? 'Connect Wallet to Generate' : isGenerating ? 'Generating Report...' : reportGenerated ? 'Regenerate Report' : 'Generate Tax Report'}
+                {!isConnected ? 'Sign In to Generate' : isGenerating ? 'Generating Report...' : reportGenerated ? 'Regenerate Report' : 'Generate Tax Report'}
               </motion.button>
 
               {isGenerating && (
@@ -612,10 +612,10 @@ export default function TaxReportPage() {
                 <span className="text-[10px] font-mono text-cyan-400/70 uppercase tracking-wider">wallet required</span>
                 <h3 className="text-lg font-bold font-mono text-black-200 mb-2 mt-2">Connect to Generate Reports</h3>
                 <p className="text-xs font-mono text-black-400 max-w-md mx-auto mb-4">
-                  Connect your wallet to generate personalized tax reports based on your on-chain transaction history. All data stays client-side.
+                  Sign in to generate personalized tax reports based on your on-chain transaction history. All data stays client-side.
                 </p>
                 <Link to="/" className="inline-flex px-5 py-2.5 rounded-xl text-xs font-mono font-bold border border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-all">
-                  Connect Wallet
+                  Sign In
                 </Link>
               </div>
             </GlassCard>
@@ -624,7 +624,7 @@ export default function TaxReportPage() {
 
         {/* ============ Footer ============ */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2, duration: 0.5 }} className="text-center pt-4">
-          <p className="text-[10px] font-mono text-black-600">Data shown is for demonstration purposes. Connect wallet for real transaction analysis.</p>
+          <p className="text-[10px] font-mono text-black-600">Data shown is for demonstration purposes. Sign in for real transaction analysis.</p>
           <p className="text-[10px] font-mono text-black-700 mt-1">Powered by VibeSwap on-chain indexer &bull; {COST_BASIS_METHODS.find(m => m.value === costBasisMethod)?.label} method</p>
         </motion.div>
       </div>

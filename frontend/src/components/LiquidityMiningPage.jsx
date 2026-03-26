@@ -488,7 +488,7 @@ export default function LiquidityMiningPage() {
         <Section index={3} title="Harvest" subtitle="Collect all pending VIBE rewards">
           {!isConnected ? (
             <div className="text-center py-8">
-              <p className="text-black-400 text-sm mb-4">Connect your wallet to view pending rewards</p>
+              <p className="text-black-400 text-sm mb-4">Sign in to view pending rewards</p>
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
@@ -496,7 +496,7 @@ export default function LiquidityMiningPage() {
                 className="px-6 py-2.5 rounded-xl text-sm font-medium"
                 style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)`, color: '#000' }}
               >
-                Connect Wallet
+                Sign In
               </motion.button>
             </div>
           ) : (

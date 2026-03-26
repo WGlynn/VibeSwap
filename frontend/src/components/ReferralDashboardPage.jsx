@@ -409,14 +409,14 @@ export default function ReferralDashboardPage() {
               Referral <span style={{ color: AMBER }}>Dashboard</span>
             </h2>
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">
-              Connect your wallet to view detailed referral analytics, track your network, and manage referral links.
+              Sign in to view detailed referral analytics, track your network, and manage referral links.
             </p>
             <button
               onClick={connect}
               className="px-8 py-3 rounded-xl font-mono font-bold text-sm"
               style={{ background: AMBER, color: '#000', boxShadow: `0 0 20px ${AMBER}40` }}
             >
-              Connect Wallet
+              Sign In
             </button>
           </motion.div>
         </GlassCard>

@@ -448,7 +448,7 @@ export default function TreasuryPage() {
       {!isConnected && (
         <motion.div className="text-center mt-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}>
           <div className="text-black-500 text-xs font-mono py-4 border-t border-black-800/50">
-            Connect wallet to vote on grant proposals and view your treasury contribution history
+            Sign in to vote on grant proposals and view your treasury contribution history
           </div>
         </motion.div>
       )}

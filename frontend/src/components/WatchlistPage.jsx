@@ -554,7 +554,7 @@ function WatchlistPage() {
         {!isConnected && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: STAGGER * 8, duration: DURATION }}>
             <GlassCard glowColor="terminal" className="p-6 text-center">
-              <p className="text-black-400 text-sm mb-2">Connect your wallet to sync your watchlist and see real holdings</p>
+              <p className="text-black-400 text-sm mb-2">Sign in to sync your watchlist and see real holdings</p>
               <p className="text-black-600 text-xs font-mono">Your watchlist is saved locally for now</p>
             </GlassCard>
           </motion.div>

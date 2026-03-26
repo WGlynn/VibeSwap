@@ -673,7 +673,7 @@ export default function AggregatorPage() {
 
         {/* Footer */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.2, delay: 2.0 }} className="text-center py-8">
-          <p className="text-xs text-black-600 font-mono">Aggregation powered by VibeSwap Smart Routing v1 \u2014 {isConnected ? 'Wallet Connected' : 'Connect wallet to execute'}</p>
+          <p className="text-xs text-black-600 font-mono">Aggregation powered by VibeSwap Smart Routing v1 \u2014 {isConnected ? 'Signed In' : 'Sign in to execute'}</p>
         </motion.div>
       </div>
     </div>

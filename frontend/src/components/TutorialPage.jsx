@@ -26,7 +26,7 @@ const sectionV = {
 const TUTORIAL_STEPS = [
   {
     id: 'connect-wallet',
-    title: 'Connect Wallet',
+    title: 'Sign In',
     time: '~2 min',
     description: 'Link your wallet to VibeSwap. We support MetaMask, WalletConnect, and device wallets powered by WebAuthn passkeys.',
     instructions: [

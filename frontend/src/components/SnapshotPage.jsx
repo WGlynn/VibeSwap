@@ -458,7 +458,7 @@ function ProposalCard({ proposal, index, isConnected, onVote, userVote }) {
         {proposal.status === 'active' && !isConnected && (
           <div className="mt-3 pt-3 border-t border-black-800/60">
             <p className="text-[10px] font-mono text-black-500 text-center">
-              Connect wallet to vote
+              Sign in to vote
             </p>
           </div>
         )}
@@ -683,7 +683,7 @@ export default function SnapshotPage() {
               {!isConnected ? (
                 <GlassCard className="p-6 text-center" hover={false}>
                   <p className="text-sm font-mono text-black-400 mb-1">
-                    Connect your wallet to create proposals
+                    Sign in to create proposals
                   </p>
                   <p className="text-[10px] font-mono text-black-500">
                     Minimum 10,000 VIBE required to submit a governance proposal
@@ -921,7 +921,7 @@ export default function SnapshotPage() {
                   <div className="text-center py-4">
                     <div className="text-2xl mb-2 opacity-40">&#x2696;</div>
                     <p className="text-xs font-mono text-black-400 mb-1">
-                      Connect wallet to view voting power
+                      Sign in to view voting power
                     </p>
                     <p className="text-[10px] font-mono text-black-500">
                       Hold VIBE tokens to participate in governance
@@ -1007,7 +1007,7 @@ export default function SnapshotPage() {
                 ) : (
                   <div className="text-center py-3">
                     <p className="text-[10px] font-mono text-black-500">
-                      Connect wallet to manage delegation
+                      Sign in to manage delegation
                     </p>
                   </div>
                 )}

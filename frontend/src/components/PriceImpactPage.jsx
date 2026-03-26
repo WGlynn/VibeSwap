@@ -257,8 +257,8 @@ export default function PriceImpactPage() {
                 </div>
                 {!isConnected && (
                   <div className="bg-cyan-500/[0.04] rounded-xl p-4 border border-cyan-500/10 text-center">
-                    <p className="text-xs text-gray-400 mb-2">Connect your wallet to simulate with your actual balances</p>
-                    <Link to="/wallet" className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">Connect Wallet →</Link>
+                    <p className="text-xs text-gray-400 mb-2">Sign in to simulate with your actual balances</p>
+                    <Link to="/wallet" className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">Sign In →</Link>
                   </div>
                 )}
               </div>

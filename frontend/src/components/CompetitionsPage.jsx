@@ -608,14 +608,14 @@ export default function CompetitionsPage() {
             <GlassCard className="p-8 text-center">
               <h3 className="text-xl font-bold mb-2">Ready to Compete?</h3>
               <p className="text-sm text-black-400 mb-6 max-w-md mx-auto">
-                Connect your wallet to track your performance, view personalized stats,
+                Sign in to track your performance, view personalized stats,
                 and join active competitions.
               </p>
               <Link
                 to="/wallet"
                 className="inline-block px-6 py-3 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 transition-all shadow-lg shadow-purple-500/20"
               >
-                Connect Wallet
+                Sign In
               </Link>
             </GlassCard>
           </motion.div>

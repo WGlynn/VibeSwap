@@ -463,7 +463,7 @@ function ChatInput({ onSend, username, isConnected, replyTo, onCancelReply }) {
     return (
       <div className="px-4 py-3 border-t border-black-700 bg-black-900/80 flex-shrink-0">
         <div className="text-center text-sm text-black-500 py-2">
-          Connect your wallet to send messages
+          Sign in to send messages
         </div>
       </div>
     )

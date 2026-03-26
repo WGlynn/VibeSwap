@@ -314,7 +314,7 @@ export default function X402Page() {
           {!isConnected ? (
             <GlassCard glowColor="terminal" hover={false}>
               <div className="p-4 text-center">
-                <div className="text-gray-500 text-xs font-mono">Connect wallet to view API usage</div>
+                <div className="text-gray-500 text-xs font-mono">Sign in to view API usage</div>
               </div>
             </GlassCard>
           ) : (

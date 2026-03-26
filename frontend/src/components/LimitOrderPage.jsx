@@ -244,7 +244,7 @@ export default function LimitOrderPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
               </motion.div>
-              <h2 className="text-xl font-bold text-white mb-2">Connect wallet to place limit orders</h2>
+              <h2 className="text-xl font-bold text-white mb-2">Sign in to place limit orders</h2>
               <p className="text-black-400 text-sm mb-6 max-w-md mx-auto">
                 Set your target price and VibeSwap will fill your order in the next batch cycle at a uniform clearing price. Zero MEV. Zero front-running.
               </p>
@@ -253,7 +253,7 @@ export default function LimitOrderPage() {
                 className="px-6 py-3 rounded-xl font-medium text-white transition-all hover:scale-105"
                 style={{ backgroundColor: CYAN, boxShadow: `0 0 20px ${CYAN}33` }}
               >
-                Connect Wallet
+                Sign In
               </button>
             </div>
           </GlassCard>

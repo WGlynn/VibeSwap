@@ -247,7 +247,7 @@ function NotConnectedState() {
           <div className="h-px w-16 mx-auto mb-4"
             style={{ background: `linear-gradient(90deg, transparent, ${CYAN}, transparent)` }} />
           <p className="font-mono text-sm text-gray-400 mb-6 leading-relaxed">
-            Connect your wallet to view holdings,<br />track performance, and manage assets.
+            Sign in to view holdings,<br />track performance, and manage assets.
           </p>
           <Link to="/" className="inline-block font-mono text-sm px-6 py-2.5 rounded-xl transition-all"
             style={{ color: CYAN, border: `1px solid ${CYAN}40`, background: `${CYAN}10` }}>

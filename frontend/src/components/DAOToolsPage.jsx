@@ -878,7 +878,7 @@ export default function DAOToolsPage() {
         </div>
         {!isConnected && (
           <div className="text-[10px] font-mono text-black-600 text-center mt-3">
-            Connect wallet to perform actions
+            Sign in to perform actions
           </div>
         )}
       </Section>
@@ -935,7 +935,7 @@ export default function DAOToolsPage() {
           transition={{ delay: 1 }}
         >
           <div className="text-black-500 text-xs font-mono py-4 border-t border-black-800/50">
-            Connect wallet to manage your DAO, sign multi-sig transactions, and participate in governance
+            Sign in to manage your DAO, sign multi-sig transactions, and participate in governance
           </div>
         </motion.div>
       )}

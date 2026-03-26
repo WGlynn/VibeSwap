@@ -342,7 +342,7 @@ export default function ProposalDetailPage() {
       </Section>
 
       {/* ============ 3. Cast Your Vote ============ */}
-      <Section index={2} title="Cast Your Vote" subtitle={isConnected ? 'Select your position and amount' : 'Connect wallet to vote'}>
+      <Section index={2} title="Cast Your Vote" subtitle={isConnected ? 'Select your position and amount' : 'Sign in to vote'}>
         {isConnected ? (
           hasVoted ? (
             <motion.div
@@ -444,7 +444,7 @@ export default function ProposalDetailPage() {
           )
         ) : (
           <div className="text-sm font-mono text-black-500 text-center py-6">
-            Connect wallet to participate in governance voting
+            Sign in to participate in governance voting
           </div>
         )}
       </Section>
@@ -744,7 +744,7 @@ export default function ProposalDetailPage() {
           </div>
         ) : (
           <div className="mt-4 text-[10px] font-mono text-black-500 text-center pt-3 border-t border-black-700/30">
-            Connect wallet to join the discussion
+            Sign in to join the discussion
           </div>
         )}
       </Section>
@@ -758,7 +758,7 @@ export default function ProposalDetailPage() {
           transition={{ delay: 1 / PHI }}
         >
           <div className="text-black-500 text-xs font-mono py-4 border-t border-black-800/50">
-            Connect wallet to vote, comment, and participate in governance
+            Sign in to vote, comment, and participate in governance
           </div>
         </motion.div>
       )}

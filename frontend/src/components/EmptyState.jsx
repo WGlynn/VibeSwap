@@ -16,16 +16,16 @@ export function WalletNotConnected({ onConnect, isConnecting }) {
           <circle cx="17" cy="14" r="2" />
         </svg>
       </div>
-      <h3 className="text-lg font-bold mb-2">connect your wallet</h3>
+      <h3 className="text-lg font-bold mb-2">sign in</h3>
       <p className="text-sm text-black-400 mb-6 max-w-xs mx-auto">
-        connect a wallet to start trading with zero MEV extraction
+        sign in to start trading with zero MEV extraction
       </p>
       <button
         onClick={onConnect}
         disabled={isConnecting}
         className="px-6 py-3 rounded-lg font-semibold bg-matrix-600 hover:bg-matrix-500 text-black-900 border border-matrix-500 transition-colors disabled:opacity-50"
       >
-        {isConnecting ? 'connecting...' : 'connect wallet'}
+        {isConnecting ? 'connecting...' : 'sign in'}
       </button>
       <div className="mt-8 flex items-center justify-center space-x-6 text-xs text-black-500">
         <div className="flex items-center space-x-1">

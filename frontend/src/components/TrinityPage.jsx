@@ -495,7 +495,7 @@ export default function TrinityPage() {
             <GlassCard glowColor="terminal" hover={false}>
               <div className="p-8 text-center">
                 <div className="text-2xl mb-2" style={{ color: `${CYAN}30` }}>{'{ }'}</div>
-                <div className="text-gray-400 text-sm font-mono">Connect wallet to view your mesh position</div>
+                <div className="text-gray-400 text-sm font-mono">Sign in to view your mesh position</div>
               </div>
             </GlassCard>
           </motion.div>

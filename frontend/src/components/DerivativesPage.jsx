@@ -760,7 +760,7 @@ export default function DerivativesPage() {
                 className="px-8 py-3 rounded-xl font-semibold text-black"
                 style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)` }}
               >
-                Connect Wallet
+                Sign In
               </button>
             </motion.div>
           </GlassCard>

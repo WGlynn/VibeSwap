@@ -405,7 +405,7 @@ function HomePage() {
             </motion.button>
           </Link>
 
-          {/* Secondary: Connect wallet for real transactions */}
+          {/* Secondary: Sign in for real transactions */}
           {!isConnected && (
             <motion.button
               whileHover={{ scale: 1.02 }}

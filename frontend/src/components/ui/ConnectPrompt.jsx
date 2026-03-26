@@ -10,7 +10,7 @@ const CYAN = '#06b6d4'
 const PHI = 1.618033988749895
 
 export default function ConnectPrompt({
-  title = 'Connect Your Wallet',
+  title = 'Sign In',
   description = 'Connect a wallet to access this feature.',
   action = 'Sign In',
   onConnect,

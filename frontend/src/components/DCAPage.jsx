@@ -282,7 +282,7 @@ export default function DCAPage() {
             </div>
             <h2 className="text-2xl font-bold font-mono mb-3 text-white">Connect to <span style={{ color: CYAN }}>DCA</span></h2>
             <p className="text-gray-400 font-mono text-sm mb-6 leading-relaxed">Automate your buying strategy. Dollar cost average into any token with MEV-protected batch auctions.</p>
-            <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm" style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>Connect Wallet</button>
+            <button onClick={connect} className="px-8 py-3 rounded-xl font-mono font-bold text-sm" style={{ background: CYAN, color: '#000', boxShadow: `0 0 20px ${CYAN}40` }}>Sign In</button>
           </motion.div>
         </GlassCard>
       </div>

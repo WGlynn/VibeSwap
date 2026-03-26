@@ -274,7 +274,7 @@ export default function IdeaPage() {
 
   const handleVote = (ideaId) => {
     if (!isConnected) {
-      toast.error('Connect wallet to vote')
+      toast.error('Sign in to vote')
       return
     }
     setIdeas(prev => prev.map(idea => {
@@ -337,7 +337,7 @@ export default function IdeaPage() {
       {/* Submit button */}
       <div className="mb-6">
         <button
-          onClick={() => isConnected ? setShowSubmit(true) : toast.error('Connect wallet to submit')}
+          onClick={() => isConnected ? setShowSubmit(true) : toast.error('Sign in to submit')}
           className="w-full py-3 rounded-xl bg-matrix-600/10 border border-matrix-500/30 text-matrix-400 font-medium hover:bg-matrix-600/20 hover:border-matrix-500/50 transition-colors flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

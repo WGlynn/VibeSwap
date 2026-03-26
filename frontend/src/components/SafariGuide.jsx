@@ -42,7 +42,7 @@ const TOUR_STOPS = [
     path: '/portfolio',
     title: 'Your Portfolio',
     narration: "Your holdings at a glance. Real balances from your wallet — no fake numbers. When you connect, you see exactly what you have. When you don't have anything yet, you see zeros. Honesty is structural here.",
-    tip: 'Connect your wallet to see your actual balances and positions.',
+    tip: 'Sign in to see your actual balances and positions.',
   },
   {
     id: 'earn',

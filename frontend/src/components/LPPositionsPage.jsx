@@ -477,10 +477,10 @@ export default function LPPositionsPage() {
           <Section index={1} title="Your Positions" subtitle="Active liquidity positions with real-time metrics">
             {!isConnected ? (
               <div className="text-center py-8">
-                <p className="text-black-400 text-sm mb-4">Connect your wallet to view your LP positions</p>
+                <p className="text-black-400 text-sm mb-4">Sign in to view your LP positions</p>
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={connect}
                   className="px-6 py-2.5 rounded-xl text-sm font-medium"
-                  style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)`, color: '#000' }}>Connect Wallet</motion.button>
+                  style={{ background: `linear-gradient(135deg, ${CYAN}, #0891b2)`, color: '#000' }}>Sign In</motion.button>
               </div>
             ) : positions.length === 0 ? (
               <div className="text-center py-8">

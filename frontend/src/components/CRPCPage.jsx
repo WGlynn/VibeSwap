@@ -465,7 +465,7 @@ export default function CRPCPage() {
           </button>
           {!isConnected && (
             <p className="text-[10px] text-gray-600 mt-2 text-center">
-              Connect wallet to see protocol stats and submit on-chain prompts
+              Sign in to see protocol stats and submit on-chain prompts
             </p>
           )}
         </GlassCard>

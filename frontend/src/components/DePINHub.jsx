@@ -399,10 +399,10 @@ export default function DePINHub() {
       </Section>
 
       {/* 7. Your Nodes Dashboard */}
-      <Section title="Your Nodes" subtitle={isConnected ? `${userNodeCount} registered node${userNodeCount !== 1 ? 's' : ''}` : 'Connect wallet to view'} delay={0.5}>
+      <Section title="Your Nodes" subtitle={isConnected ? `${userNodeCount} registered node${userNodeCount !== 1 ? 's' : ''}` : 'Sign in to view'} delay={0.5}>
         {!isConnected ? (
           <GlassCard glowColor="terminal" className="p-6 text-center">
-            <p className="text-gray-500 text-sm">Connect your wallet to manage nodes and view rewards.</p>
+            <p className="text-gray-500 text-sm">Sign in to manage nodes and view rewards.</p>
           </GlassCard>
         ) : (
           <div className="space-y-2">
@@ -518,7 +518,7 @@ export default function DePINHub() {
                 style={{ background: isConnected ? CYAN : '#374151', color: isConnected ? '#000' : '#6b7280' }}
                 whileHover={isConnected ? { scale: 1.02, boxShadow: `0 0 20px ${CYAN_GLOW}` } : {}}
                 whileTap={isConnected ? { scale: 0.98 } : {}} disabled={!isConnected}>
-                {isConnected ? 'Stake & Activate' : 'Connect Wallet'}
+                {isConnected ? 'Stake & Activate' : 'Sign In'}
               </motion.button>
             )}
           </div>

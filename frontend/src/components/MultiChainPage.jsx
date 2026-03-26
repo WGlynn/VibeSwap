@@ -347,7 +347,7 @@ export default function MultiChainPage() {
         <div className="max-w-7xl mx-auto px-4">
           <GlassCard className="p-12 text-center">
             <div className="text-4xl mb-4">{'\u26d3'}</div>
-            <h2 className="text-xl font-semibold mb-2">Connect Your Wallet</h2>
+            <h2 className="text-xl font-semibold mb-2">Sign In</h2>
             <p className="text-gray-400 text-sm max-w-md mx-auto mb-6">
               Connect a wallet to view your multi-chain portfolio. VibeSwap aggregates
               balances across Ethereum, Arbitrum, Optimism, Polygon, Base, and Nervos.

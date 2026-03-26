@@ -369,7 +369,7 @@ export default function RWAHub() {
           </div>
         ) : (
           <GlassCard glowColor="terminal" className="p-6 text-center">
-            <div className="text-sm font-mono text-black-400 mb-2">Connect your wallet to view your RWA positions</div>
+            <div className="text-sm font-mono text-black-400 mb-2">Sign in to view your RWA positions</div>
             <motion.div className="inline-block px-3 py-1 rounded-full text-[10px] font-mono" style={{ background: CYAN_DIM, border: `1px solid ${CYAN_GLOW}`, color: CYAN }} animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2 * PHI, repeat: Infinity }}>Wallet required</motion.div>
           </GlassCard>
         )}
@@ -463,7 +463,7 @@ export default function RWAHub() {
             </div>
           </div>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full mt-5 py-3 rounded-xl text-sm font-mono font-bold" style={{ background: isBuy ? `linear-gradient(135deg, ${CYAN}, #0891b2)` : 'linear-gradient(135deg, #f43f5e, #e11d48)', color: isBuy ? '#000' : '#fff' }}>
-            {isConnected ? `${isBuy ? 'Buy' : 'Sell'} ${active?.ticker || ''}` : 'Connect Wallet to Trade'}
+            {isConnected ? `${isBuy ? 'Buy' : 'Sell'} ${active?.ticker || ''}` : 'Sign In to Trade'}
           </motion.button>
         </GlassCard>
       </Section>
@@ -512,7 +512,7 @@ export default function RWAHub() {
       {!isConnected && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2 }} className="text-center pb-4">
           <GlassCard glowColor="terminal" className="p-6 max-w-md mx-auto">
-            <div className="text-sm font-mono text-black-400 mb-3">Connect your wallet to trade RWAs, track your portfolio, and earn yield</div>
+            <div className="text-sm font-mono text-black-400 mb-3">Sign in to trade RWAs, track your portfolio, and earn yield</div>
             <motion.div className="inline-block px-3 py-1 rounded-full text-[10px] font-mono" style={{ background: CYAN_DIM, border: `1px solid ${CYAN_GLOW}`, color: CYAN }} animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2 * PHI, repeat: Infinity }}>Wallet required for full access</motion.div>
           </GlassCard>
         </motion.div>

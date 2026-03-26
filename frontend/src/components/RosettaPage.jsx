@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
 import { useWallet } from '../hooks/useWallet'
@@ -609,15 +609,27 @@ function TranslateAllResults({ results, fromId, userLexicons = [] }) {
 // ============ Lexicon Card (Agent Grid) ============
 
 function LexiconCard({ agent, termCount, onSelect, isSelected }) {
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(isSelected ? null : agent.id)
+    }
+  }, [agent.id, isSelected, onSelect])
+
   return (
     <motion.div
       layout
       onClick={() => onSelect(isSelected ? null : agent.id)}
+      onKeyDown={handleKeyDown}
       className="cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-expanded={isSelected}
+      aria-label={`${agent.name} lexicon — ${termCount} terms. ${isSelected ? 'Click to collapse' : 'Click to expand'}`}
     >
       <GlassCard
         hover
-        className="p-4"
+        className="p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
         style={{ borderColor: isSelected ? agent.color : undefined }}
       >
         <div
@@ -636,6 +648,7 @@ function LexiconCard({ agent, termCount, onSelect, isSelected }) {
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -765,9 +778,10 @@ function ConceptExplorer({ userLexicons = [] }) {
         {filter && (
           <button
             onClick={() => { setFilter(''); setExpandedConcept(null) }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
+            aria-label="Clear search"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -809,7 +823,9 @@ function ConceptExplorer({ userLexicons = [] }) {
                   {/* Row — click to expand */}
                   <button
                     onClick={() => handleToggle(concept.universal)}
-                    className="w-full text-left p-3 rounded-xl border transition-all duration-200"
+                    aria-expanded={isExpanded}
+                    aria-label={`${concept.universal} — ${concept.lexiconCount} domain${concept.lexiconCount !== 1 ? 's' : ''}. ${isExpanded ? 'Collapse' : 'Expand'}`}
+                    className="w-full text-left p-3 rounded-xl border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
                     style={{
                       backgroundColor: isExpanded ? 'rgba(0,255,65,0.04)' : 'rgba(15,20,15,0.6)',
                       borderColor: isExpanded ? 'rgba(0,255,65,0.25)' : 'rgba(37,37,37,0.8)',
@@ -870,6 +886,7 @@ function ConceptExplorer({ userLexicons = [] }) {
                       <svg
                         className={`w-3.5 h-3.5 text-black-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        aria-hidden="true"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -1100,14 +1117,20 @@ function DiscoverSection({ onSuggestionClick }) {
           onBlur={handleBlur}
           placeholder={activePlaceholder}
           autoComplete="off"
+          aria-label="Discover term across all domains"
+          aria-autocomplete="list"
+          aria-controls="rosetta-discover-dropdown"
+          aria-expanded={showDropdown && suggestions.length > 0}
+          role="combobox"
           className="w-full bg-black-900/80 border border-black-700 rounded-lg pl-9 pr-10 py-2.5 text-sm text-white font-mono placeholder-black-600 focus:outline-none focus:border-terminal-600 transition-colors"
         />
         {searchTerm && (
           <button
             onClick={clearSearch}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors z-10"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-black-600 hover:text-black-400 transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
+            aria-label="Clear search"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -1118,6 +1141,9 @@ function DiscoverSection({ onSuggestionClick }) {
           {showDropdown && suggestions.length > 0 && (
             <motion.div
               ref={dropdownRef}
+              id="rosetta-discover-dropdown"
+              role="listbox"
+              aria-label="Autocomplete suggestions"
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
@@ -1135,7 +1161,10 @@ function DiscoverSection({ onSuggestionClick }) {
                     key={`${s.lexiconId}:${s.term}`}
                     onMouseDown={(e) => { e.preventDefault(); commitSuggestion(s) }}
                     onMouseEnter={() => setActiveIndex(i)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-black-800 last:border-b-0"
+                    role="option"
+                    aria-selected={i === activeIndex}
+                    aria-label={`${s.term.replace(/_/g, ' ')} — ${s.domain || s.lexiconId}`}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-black-800 last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-matrix-500"
                     style={{ background: i === activeIndex ? 'rgba(0,255,65,0.07)' : 'transparent' }}
                   >
                     {/* Domain colored dot */}

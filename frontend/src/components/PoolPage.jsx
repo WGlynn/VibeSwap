@@ -43,7 +43,7 @@ function buildPools() {
     const tvl = (500_000 + r() * 2_000_000) * tvlMultiplier
     const vol = tvl * (0.05 + r() * 0.15)
     return { id: `${a}-${b}`, tokenA: TK[a], tokenB: TK[b], tvl, volume24h: vol,
-      apr: 4 + r() * 18, fees24h: vol * 0.003, feeTier: r() > 0.5 ? 0.3 : 0.05,
+      feeYield7d: 0.5 + r() * 3.5, fees24h: vol * 0.003, feeTier: r() > 0.5 ? 0.3 : 0.05,
       sparkData: generateSparklineData(seed, 24, 0.04), seed }
   })
 }
@@ -128,7 +128,7 @@ function PositionCard({ p, i }) {
 }
 
 function PoolRow({ pool, i, onAdd }) {
-  const { tokenA, tokenB, tvl, volume24h, apr, fees24h, feeTier, sparkData } = pool
+  const { tokenA, tokenB, tvl, volume24h, feeYield7d, fees24h, feeTier, sparkData } = pool
   return (
     <motion.tr initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }}
       transition={{ delay: i * STAGGER * 0.5, duration: STAGGER * PHI }}
@@ -146,7 +146,7 @@ function PoolRow({ pool, i, onAdd }) {
       <td className="py-3.5 px-4 text-right">
         <div className="flex items-center justify-end gap-2">
           <Sparkline data={sparkData} width={48} height={16} color="#22c55e" />
-          <span className="text-sm font-semibold font-mono text-green-400">{fmtPct(apr)}</span>
+          <span className="text-sm font-semibold font-mono text-black-300">{fmtPct(feeYield7d)}</span>
         </div>
       </td>
       <td className="py-3.5 px-4 text-right">
@@ -160,7 +160,7 @@ function PoolRow({ pool, i, onAdd }) {
 }
 
 function MobilePoolCard({ pool, i, onAdd }) {
-  const { tokenA, tokenB, tvl, volume24h, apr, sparkData, feeTier } = pool
+  const { tokenA, tokenB, tvl, volume24h, feeYield7d, sparkData, feeTier } = pool
   return (
     <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
       transition={{ delay: i * STAGGER * 0.5, duration: STAGGER * PHI }}
@@ -173,7 +173,7 @@ function MobilePoolCard({ pool, i, onAdd }) {
         </div>
         <div className="flex items-center gap-2">
           <Sparkline data={sparkData} width={36} height={12} color="#22c55e" />
-          <span className="text-sm font-semibold font-mono text-green-400">{fmtPct(apr)}</span>
+          <span className="text-sm font-semibold font-mono text-black-300">{fmtPct(feeYield7d)}</span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3 mb-3">
@@ -192,9 +192,9 @@ function MobilePoolCard({ pool, i, onAdd }) {
 function AddLiquidityModal({ pool, onClose }) {
   const [amtA, setAmtA] = useState(''), [amtB, setAmtB] = useState('')
   const [pMin, setPMin] = useState(''), [pMax, setPMax] = useState('')
-  const tA = pool?.tokenA || TK.ETH, tB = pool?.tokenB || TK.USDC, base = pool?.apr || 22.5
+  const tA = pool?.tokenA || TK.ETH, tB = pool?.tokenB || TK.USDC, base = pool?.feeYield7d || 2.0
 
-  const estApr = useMemo(() => {
+  const estFeeYield = useMemo(() => {
     if (!pMin || !pMax || +pMax <= +pMin) return base
     return Math.min(base * Math.sqrt(Math.max(1, 1000 / (+pMax - +pMin))), base * 4)
   }, [pMin, pMax, base])
@@ -275,7 +275,7 @@ function AddLiquidityModal({ pool, onClose }) {
 
           {/* Estimates */}
           <div className="p-4 rounded-xl bg-black-800/60 border border-black-700/30 space-y-2">
-            {[['Estimated APR', <span className="font-semibold font-mono text-green-400">{fmtPct(estApr)}</span>],
+            {[['7d Fee Yield', <span className="font-semibold font-mono text-black-300">{fmtPct(estFeeYield)}</span>],
               ['IL Risk', <span className={`font-semibold font-mono ${riskColor[ilRisk]}`}>{ilRisk}</span>],
               ['Fee Tier', <span className="font-mono">{pool?.feeTier || 0.3}%</span>],
               ['Shapley Rewards', <span className="font-mono text-green-400">Active</span>],
@@ -398,7 +398,7 @@ function PoolPage() {
           <StatCard label="Your Liquidity" value={userTotal > 0 ? userTotal/1000 : 0} prefix="$"
             suffix={userTotal > 0 ? 'K' : ''} decimals={userTotal > 0 ? 1 : 0} sparkSeed={9002} />
           <StatCard label="24h Fees" value={142} prefix="$" suffix="K" decimals={0} change={8.71} sparkSeed={9003} />
-          <StatCard label="APR Range" value={8} suffix="-45%" decimals={0} sparkSeed={9004} />
+          <StatCard label="7d Fee Range" value={0.5} suffix="-4%" decimals={1} sparkSeed={9004} />
         </motion.div>
 
         {/* Your Positions */}
@@ -431,7 +431,7 @@ function PoolPage() {
                 <th className="py-3 px-4 text-right"><SortBtn label="TVL" sortKey="tvl" sort={sort} onSort={onSort} /></th>
                 <th className="py-3 px-4 text-right hidden md:table-cell"><SortBtn label="24h Volume" sortKey="volume" sort={sort} onSort={onSort} /></th>
                 <th className="py-3 px-4 text-right hidden lg:table-cell"><SortBtn label="24h Fees" sortKey="fees" sort={sort} onSort={onSort} /></th>
-                <th className="py-3 px-4 text-right"><SortBtn label="7d APR" sortKey="apr" sort={sort} onSort={onSort} /></th>
+                <th className="py-3 px-4 text-right"><SortBtn label="7d Fees" sortKey="feeYield7d" sort={sort} onSort={onSort} /></th>
                 <th className="py-3 px-4 text-right text-[10px] font-mono uppercase tracking-wider text-black-500">Action</th>
               </tr></thead>
               <tbody>{sorted.map((p, i) => <PoolRow key={p.id} pool={p} i={i} onAdd={onAdd} />)}</tbody>

@@ -167,6 +167,17 @@ function HeaderMinimal() {
                 </span>
               )}
 
+              {/* Rosetta Stone Protocol */}
+              <Link
+                to="/rosetta"
+                className="rsp-button px-3 py-1.5 rounded-full text-xs font-mono font-bold border border-white/20 transition-all hover:scale-110 relative overflow-hidden"
+                style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)' }}
+              >
+                <span className="rsp-letter" style={{ animationDelay: '0s' }}>R</span>
+                <span className="rsp-letter" style={{ animationDelay: '0.15s' }}>S</span>
+                <span className="rsp-letter" style={{ animationDelay: '0.3s' }}>P</span>
+              </Link>
+
               {/* Wallet */}
               {isConnected ? (
                 <button

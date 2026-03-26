@@ -10,7 +10,7 @@
     "dev": "node --expose-gc --watch src/index.js",
     "chatterbox": "node src/chatterbox/index.js",
     "chatterbox:dev": "node --watch src/chatterbox/index.js",
-    "test": "node --test test/mi-bandit.test.js test/shard-learnings.test.js test/mi-manifest.test.js test/mi-host.test.js test/mi-lifecycle.test.js"
+    "test": "node --test test/mi-bandit.test.js test/shard-learnings.test.js test/mi-manifest.test.js test/mi-host.test.js test/mi-lifecycle.test.js test/rosetta.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

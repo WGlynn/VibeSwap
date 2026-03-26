@@ -2,6 +2,17 @@
   "version": "1.0",
   "constellation": "jarvis-mind-mesh",
   "target_shards": 64,
+  "constitutional_constraints": {
+    "P-000": "Fairness Above All — every shard enforces this as runtime invariant",
+    "P-001": "No Extraction Ever — shards cannot extract value from users or each other",
+    "lawson_constant": "keccak256('FAIRNESS_ABOVE_ALL:W.GLYNN:2026') — load-bearing in every shard's CKB",
+    "vibe_cap": "21,000,000 VIBE lifetime cap — shard economics bounded by same scarcity",
+    "shapley_axioms": "Efficiency, Symmetry, Null Player, Pairwise Proportionality, Time Neutrality",
+    "shard_weight": "Shapley-distributed, not equal — contribution determines influence in CRPC",
+    "consensus_threshold": "33 of 64 (Byzantine fault tolerance: f < n/2)",
+    "credibility_neutral": "No shard is privileged. Every shard speaks for the whole mind.",
+    "corpus_hash_required": "All shards must share identical constitutional corpus hash to participate in CRPC"
+  },
   "primary": {
     "id": "shard-0",
     "app": "jarvis-vibeswap",

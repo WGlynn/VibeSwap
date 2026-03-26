@@ -44,7 +44,7 @@ const AGENT_COLORS = {
   jarvis:     '#22d3ee',
 }
 
-// Colors for the 14 human domain lexicons
+// Colors for the 20 human domain lexicons
 const HUMAN_DOMAIN_COLORS = {
   medicine:     '#ef4444',
   law:          '#6b7280',
@@ -60,6 +60,12 @@ const HUMAN_DOMAIN_COLORS = {
   architecture: '#a3a3a3',
   journalism:   '#0ea5e9',
   trading:      '#eab308',
+  ecology:      '#22c55e',
+  astronomy:    '#818cf8',
+  linguistics:  '#fb923c',
+  cinema:       '#f43f5e',
+  mathematics:  '#60a5fa',
+  sociology:    '#c084fc',
 }
 
 // Human-readable display names (capitalised) derived from the key
@@ -501,14 +507,27 @@ function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
           </div>
 
           {/* To */}
-          <div className="flex-1 text-center p-3 bg-black-900/60 rounded-lg border border-black-800">
+          <div
+            className="flex-1 text-center p-3 rounded-lg border"
+            style={{
+              backgroundColor: result.to_term ? 'rgba(0,0,0,0.4)' : 'rgba(239,68,68,0.04)',
+              borderColor: result.to_term ? 'rgba(37,37,37,0.8)' : 'rgba(239,68,68,0.2)',
+            }}
+          >
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <AgentDot color={to?.color} size={6} />
               <span className="text-[10px] font-mono text-black-500">{to?.name}</span>
             </div>
-            <div className="text-white text-sm font-medium font-mono">
-              {result.to_term || '— no equivalent —'}
-            </div>
+            {result.to_term ? (
+              <div className="text-white text-sm font-medium font-mono">{result.to_term}</div>
+            ) : (
+              <div>
+                <div className="text-[11px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(239,68,68,0.7)' }}>no equivalent</div>
+                <div className="text-[9px] font-mono text-black-600 leading-snug">
+                  {to?.name} has no term for this concept
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -524,6 +543,29 @@ function TranslationResult({ result, fromId, toId, userLexicons = [] }) {
           <div className="mt-2">
             <span className="text-[10px] font-mono text-black-500">{result.explanation}</span>
           </div>
+        )}
+
+        {/* No-equivalent guidance */}
+        {!result.to_term && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-3 px-3 py-2.5 rounded-lg border"
+            style={{ backgroundColor: 'rgba(245,158,11,0.05)', borderColor: 'rgba(245,158,11,0.2)' }}
+          >
+            <div className="flex items-start gap-2">
+              <svg className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'rgba(245,158,11,0.7)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-[10px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(245,158,11,0.7)' }}>No direct translation found</p>
+                <p className="text-[10px] font-mono text-black-500 leading-relaxed">
+                  Switch on <span className="text-white font-bold">Translate to All</span> to see every domain that has an equivalent, or use <span className="text-white font-bold">Discover</span> to search the universal concept graph directly.
+                </p>
+              </div>
+            </div>
+          </motion.div>
         )}
       </GlassCard>
     </motion.div>
@@ -1258,13 +1300,26 @@ function DiscoverSection({ onSuggestionClick }) {
               })}
             </div>
           ) : (
-            <div className="text-center py-6 border border-black-800 rounded-lg">
-              <p className="text-black-500 text-xs font-mono">
-                No equivalents found for &quot;{activeSearch}&quot;
-              </p>
-              <p className="text-black-700 text-[10px] font-mono mt-1">
-                Try a different term or register it in your lexicon below.
-              </p>
+            <div className="py-6 px-4 border rounded-lg" style={{ borderColor: 'rgba(245,158,11,0.2)', backgroundColor: 'rgba(245,158,11,0.03)' }}>
+              <div className="flex items-start gap-2.5 mb-2">
+                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'rgba(245,158,11,0.6)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <div>
+                  <p className="text-[11px] font-mono font-semibold mb-0.5" style={{ color: 'rgba(245,158,11,0.7)' }}>
+                    No equivalents found for &ldquo;{activeSearch}&rdquo;
+                  </p>
+                  <p className="text-[10px] font-mono text-black-500 leading-relaxed">
+                    This term isn&apos;t in any built-in lexicon. Try:
+                  </p>
+                </div>
+              </div>
+              <ul className="ml-6 space-y-1">
+                <li className="text-[10px] font-mono text-black-500">&#x2022; A related word — e.g. &ldquo;capital&rdquo; instead of &ldquo;money&rdquo;</li>
+                <li className="text-[10px] font-mono text-black-500">&#x2022; The root concept — e.g. &ldquo;flow&rdquo; instead of &ldquo;cash flow&rdquo;</li>
+                <li className="text-[10px] font-mono text-black-500">&#x2022; One of the example terms: <button onClick={() => { setSearchTerm('triage'); handleInputChange('triage') }} className="underline hover:text-white transition-colors">triage</button>, <button onClick={() => { setSearchTerm('liquidity'); handleInputChange('liquidity') }} className="underline hover:text-white transition-colors">liquidity</button>, <button onClick={() => { setSearchTerm('cadence'); handleInputChange('cadence') }} className="underline hover:text-white transition-colors">cadence</button></li>
+                <li className="text-[10px] font-mono text-black-500">&#x2022; Register this term in your own lexicon below</li>
+              </ul>
             </div>
           )}
         </div>
@@ -1752,7 +1807,12 @@ function HighlightedText({ segments, onTermClick, activeTermIndex }) {
           <span
             key={i}
             onClick={() => onTermClick(i)}
-            className="relative cursor-pointer rounded px-0.5 transition-all duration-150"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTermClick(i) } }}
+            role="button"
+            tabIndex={0}
+            aria-pressed={isActive}
+            aria-label={`${seg.text}: translates to ${seg.toTerm ? seg.toTerm.replace(/_/g, ' ') : 'no equivalent'} via concept ${seg.universal}`}
+            className="relative cursor-pointer rounded px-0.5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
             style={{
               backgroundColor: isActive ? color + '25' : color + '15',
               borderBottom: '2px solid ' + color,
@@ -1935,10 +1995,11 @@ function SentenceTranslator({ userLexicons = [] }) {
               handleStFromChange(stToId)
               handleStToChange(tmp)
             }}
-            className="w-8 h-9 flex items-center justify-center rounded-lg border border-black-700 bg-black-900/60 text-black-500 hover:text-matrix-400 hover:border-matrix-700 transition-colors"
+            className="w-8 h-9 flex items-center justify-center rounded-lg border border-black-700 bg-black-900/60 text-black-500 hover:text-matrix-400 hover:border-matrix-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
             title="Swap domains"
+            aria-label="Swap source and target domains"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
             </svg>
           </button>
@@ -2016,15 +2077,16 @@ function SentenceTranslator({ userLexicons = [] }) {
                 </p>
                 <button
                   onClick={handleCopy}
-                  className="absolute top-2 right-2 text-black-600 hover:text-matrix-400 transition-colors"
+                  className="absolute top-2 right-2 text-black-600 hover:text-matrix-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
                   title="Copy translated text"
+                  aria-label={copied ? 'Copied!' : 'Copy translated text'}
                 >
                   {copied ? (
-                    <svg className="w-3.5 h-3.5 text-matrix-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5 text-matrix-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   )}
@@ -2100,7 +2162,9 @@ function SentenceTranslator({ userLexicons = [] }) {
                 <button
                   key={'chip-' + chipIdx}
                   onClick={() => segIdx !== -1 && handleTermClick(segIdx)}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono transition-all"
+                  aria-pressed={isActive}
+                  aria-label={`${seg.text}${seg.toTerm ? ` → ${seg.toTerm.replace(/_/g, ' ')}` : ' (no equivalent)'}`}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-mono transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
                   style={{
                     backgroundColor: isActive ? color + '25' : color + '12',
                     border: '1px solid ' + (isActive ? color : color + '40'),
@@ -2110,7 +2174,7 @@ function SentenceTranslator({ userLexicons = [] }) {
                   <span>{seg.text}</span>
                   {seg.toTerm && (
                     <>
-                      <svg className="w-2.5 h-2.5 mx-0.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-2.5 h-2.5 mx-0.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                       </svg>
                       <span style={{ opacity: 0.8 }}>{seg.toTerm.replace(/_/g, ' ')}</span>
@@ -2152,8 +2216,12 @@ function RelatedConceptsPanel({ universalKey, onClose, userLexicons = [] }) {
             </span>
           )}
         </div>
-        <button onClick={onClose} className="text-black-600 hover:text-black-400 transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <button
+          onClick={onClose}
+          className="text-black-600 hover:text-black-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
+          aria-label={`Close related concepts for ${universalKey}`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -2282,8 +2350,11 @@ function ConceptChainFinder({ userLexicons = [] }) {
           />
         </div>
         <div className="flex items-end pb-0.5 flex-shrink-0">
-          <button onClick={handleFind} disabled={!termA.trim() || !termB.trim()}
-            className={`px-5 h-9 rounded-lg font-mono text-sm font-bold transition-all ${termA.trim() && termB.trim() ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]' : 'bg-black-800 text-black-600 cursor-not-allowed'}`}
+          <button
+            onClick={handleFind}
+            disabled={!termA.trim() || !termB.trim()}
+            aria-label={`Find concept path between "${termA}" and "${termB}"`}
+            className={`px-5 h-9 rounded-lg font-mono text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 ${termA.trim() && termB.trim() ? 'bg-matrix-600 text-black-900 hover:bg-matrix-500 active:scale-[0.99]' : 'bg-black-800 text-black-600 cursor-not-allowed'}`}
           >
             Find Path
           </button>
@@ -2311,7 +2382,8 @@ function ConceptChainFinder({ userLexicons = [] }) {
                     {result.suggestions.map((s) => (
                       <button key={s}
                         onClick={() => { if (result.error?.includes(`'${termA}'`)) setTermA(s); else setTermB(s); setResult(null) }}
-                        className="text-[10px] font-mono text-matrix-400 hover:text-matrix-300 underline mx-1 transition-colors"
+                        aria-label={`Use suggestion: ${s}`}
+                        className="text-[10px] font-mono text-matrix-400 hover:text-matrix-300 underline mx-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500 rounded"
                       >{s}</button>
                     ))}
                   </div>
@@ -2335,11 +2407,13 @@ function ConceptChainFinder({ userLexicons = [] }) {
                   {' '}both map to the same universal concept.
                 </p>
                 {result.path[0] && (
-                  <button onClick={() => handleNodeClick(result.path[0].node)}
-                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-mono text-xs transition-all hover:opacity-80"
+                  <button
+                    onClick={() => handleNodeClick(result.path[0].node)}
+                    aria-label={`Explore concept ${result.path[0].node}`}
+                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-mono text-xs transition-all hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
                     style={{ backgroundColor: 'rgba(0,255,65,0.1)', borderColor: 'rgba(0,255,65,0.3)', color: '#00ff41' }}
                   >
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#00ff41', boxShadow: '0 0 5px #00ff4180' }} />
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: '#00ff41', boxShadow: '0 0 5px #00ff4180' }} aria-hidden="true" />
                     {result.path[0].node}
                   </button>
                 )}
@@ -2394,8 +2468,11 @@ function ConceptChainFinder({ userLexicons = [] }) {
                             </div>
 
                             {/* Universal concept bubble */}
-                            <button onClick={() => handleNodeClick(step.node)}
-                              className="w-28 px-2 py-2 rounded-xl border font-mono text-[9px] font-semibold transition-all hover:opacity-80 active:scale-95 text-center leading-tight"
+                            <button
+                              onClick={() => handleNodeClick(step.node)}
+                              aria-pressed={isSelected}
+                              aria-label={`${step.node}${step.definition ? ` — ${step.definition}` : ''}. ${isSelected ? 'Click to collapse neighbors' : 'Click to explore neighbors'}`}
+                              className="w-28 px-2 py-2 rounded-xl border font-mono text-[9px] font-semibold transition-all hover:opacity-80 active:scale-95 text-center leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
                               style={{
                                 backgroundColor: isSelected ? `${nodeColor}20` : `${nodeColor}0e`,
                                 borderColor: isSelected ? nodeColor : `${nodeColor}40`,
@@ -2539,13 +2616,16 @@ function CovenantCard({ covenant, index }) {
         {/* Collapsible spirit button */}
         <button
           onClick={() => setOpen(v => !v)}
-          className="flex items-center gap-1.5 text-[10px] font-mono transition-colors"
+          aria-expanded={open}
+          aria-label={open ? `Hide spirit of Covenant ${roman}` : `Reveal spirit of Covenant ${roman}`}
+          className="flex items-center gap-1.5 text-[10px] font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-600 rounded"
           style={{ color: open ? "rgba(212,170,80,0.7)" : "rgba(100,80,40,0.8)" }}
         >
           <svg
             className="w-3 h-3 transition-transform"
             style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
             fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            aria-hidden="true"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
@@ -2620,16 +2700,17 @@ function TenCovenantsSection() {
           </span>
           <button
             onClick={handleCopyHash}
-            className="transition-colors"
+            className="transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-600 rounded"
             title="Copy full hash"
+            aria-label={hashCopied ? 'Covenant hash copied!' : 'Copy covenant hash'}
             style={{ color: hashCopied ? "#10b981" : "rgba(140,110,50,0.7)" }}
           >
             {hashCopied ? (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
             )}
@@ -3230,6 +3311,147 @@ function ConceptWeb() {
   )
 }
 
+// ============ Translation History Hook ============
+
+const HISTORY_KEY = 'rosetta-translation-history'
+const HISTORY_MAX = 20
+
+function useTranslationHistory() {
+  const [history, setHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch { return [] }
+  })
+
+  const addToHistory = useCallback((entry) => {
+    setHistory(prev => {
+      const deduplicated = prev.filter(h =>
+        !(h.fromId === entry.fromId &&
+          h.toId === entry.toId &&
+          h.concept === entry.concept &&
+          h.translateAll === entry.translateAll)
+      )
+      const next = [entry, ...deduplicated].slice(0, HISTORY_MAX)
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
+
+  const clearHistory = useCallback(() => {
+    setHistory([])
+    try { localStorage.removeItem(HISTORY_KEY) } catch {}
+  }, [])
+
+  return { history, addToHistory, clearHistory }
+}
+
+// ============ Recent Translations Section ============
+
+function RecentTranslations({ history, onReplay, onClear }) {
+  if (history.length === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.3 }}
+      className="mb-6"
+    >
+      <GlassCard glowColor="matrix" className="p-5">
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <motion.span
+              className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: '#00ff41' }}
+              animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 8px #00ff41aa', '0 0 4px #00ff4166'] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-matrix-400">
+              Recent Translations
+            </span>
+            <span
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(0,255,65,0.1)', border: '1px solid rgba(0,255,65,0.25)', color: '#00ff41' }}
+            >
+              {history.length}
+            </span>
+          </div>
+          <button
+            onClick={onClear}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-mono text-[10px] transition-all hover:opacity-90 active:scale-95"
+            style={{
+              backgroundColor: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.25)',
+              color: '#f87171',
+            }}
+            title="Clear translation history"
+          >
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Clear History
+          </button>
+        </div>
+
+        {/* Chips */}
+        <div className="flex flex-wrap gap-1.5">
+          {history.map((entry, i) => {
+            const fromMeta = AGENT_MAP[entry.fromId]
+            const toMeta = entry.translateAll ? null : AGENT_MAP[entry.toId]
+            const fromColor = fromMeta?.color || USER_LEXICON_COLOR
+            const toColor = toMeta?.color || USER_LEXICON_COLOR
+            return (
+              <motion.button
+                key={i}
+                onClick={() => onReplay(entry)}
+                initial={{ opacity: 0, scale: 0.88 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.03, duration: 0.2 }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-mono text-[11px] transition-all"
+                style={{
+                  backgroundColor: 'rgba(15,22,15,0.8)',
+                  border: '1px solid rgba(0,255,65,0.18)',
+                  color: '#d1d5db',
+                }}
+                title={`Replay: ${entry.concept} (${entry.fromId} → ${entry.translateAll ? 'all' : entry.toId})`}
+              >
+                <span
+                  className="inline-block rounded-full flex-shrink-0"
+                  style={{ width: 6, height: 6, backgroundColor: fromColor, boxShadow: `0 0 5px ${fromColor}80` }}
+                />
+                <span style={{ color: fromColor }}>{fromMeta?.name || entry.fromId}</span>
+                <svg className="w-3 h-3 text-black-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                <span className="text-white font-semibold">&ldquo;{entry.concept}&rdquo;</span>
+                <svg className="w-3 h-3 text-black-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                {entry.translateAll ? (
+                  <span style={{ color: '#22d3ee' }}>all</span>
+                ) : (
+                  <>
+                    <span
+                      className="inline-block rounded-full flex-shrink-0"
+                      style={{ width: 6, height: 6, backgroundColor: toColor, boxShadow: `0 0 5px ${toColor}80` }}
+                    />
+                    <span style={{ color: toColor }}>{toMeta?.name || entry.toId}</span>
+                  </>
+                )}
+              </motion.button>
+            )
+          })}
+        </div>
+      </GlassCard>
+    </motion.div>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
@@ -3407,6 +3629,9 @@ export default function RosettaPage() {
 
   const [lexiconRevision, setLexiconRevision] = useState(0)
 
+  // ---- Translation history ----
+  const { history: translationHistory, addToHistory, clearHistory } = useTranslationHistory()
+
   // ---- Compute agent lexicon terms on demand ----
   const lexiconTerms = selectedAgent
     ? Object.entries(LEXICONS[selectedAgent]?.concepts || {}).map(([term, m]) => ({
@@ -3434,11 +3659,13 @@ export default function RosettaPage() {
       window.location.hash = `translate/${fromId}/${toId}/${encodeURIComponent(concept.trim())}`
     }
 
+    addToHistory({ fromId, toId, concept: concept.trim(), translateAll })
+
     // Smooth scroll to result after state update
     setTimeout(() => {
       translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }, 80)
-  }, [fromId, toId, concept, translateAll])
+  }, [fromId, toId, concept, translateAll, addToHistory])
 
   // ---- Try a pre-filled example or popular pair ----
   const handleTryPair = useCallback((pair) => {
@@ -3452,10 +3679,33 @@ export default function RosettaPage() {
     const result = translate(pair.fromId, pair.toId, pair.term)
     setTranslationResult(result)
     window.location.hash = `translate/${pair.fromId}/${pair.toId}/${encodeURIComponent(pair.term)}`
+    addToHistory({ fromId: pair.fromId, toId: pair.toId, concept: pair.term, translateAll: false })
     setTimeout(() => {
       translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }, 80)
-  }, [])
+  }, [addToHistory])
+
+  // ---- Replay a history entry ----
+  const handleReplayHistory = useCallback((entry) => {
+    setFromId(entry.fromId)
+    setToId(entry.toId || '')
+    setConcept(entry.concept)
+    setTranslateAll(entry.translateAll)
+    setTranslationResult(null)
+    setTranslateAllResults(null)
+    if (entry.translateAll) {
+      const results = translateToAll(entry.fromId, entry.concept)
+      setTranslateAllResults(results)
+      window.location.hash = `translate/${entry.fromId}/all/${encodeURIComponent(entry.concept)}`
+    } else {
+      const result = translate(entry.fromId, entry.toId, entry.concept)
+      setTranslationResult(result)
+      window.location.hash = `translate/${entry.fromId}/${entry.toId}/${encodeURIComponent(entry.concept)}`
+    }
+    setTimeout(() => {
+      translationResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 80)
+  }, [translationResultRef])
 
   // ---- Derived ----
   const stats = {
@@ -3468,6 +3718,7 @@ export default function RosettaPage() {
 
   const agentTermCounts = protocolData.agent_terms || {}
   const canTranslate = fromId && concept.trim() && (translateAll || toId)
+  const [isTranslating, setIsTranslating] = useState(false)
 
   // ---- Keyboard shortcuts ----
   const [showHelp, setShowHelp] = useState(false)
@@ -3776,6 +4027,17 @@ export default function RosettaPage() {
       {/* ============ Concept Chain ============ */}
       <ConceptChainFinder userLexicons={userLexicons} />
 
+      {/* ============ Recent Translations ============ */}
+      <AnimatePresence>
+        {translationHistory.length > 0 && (
+          <RecentTranslations
+            history={translationHistory}
+            onReplay={handleReplayHistory}
+            onClear={clearHistory}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ============ Translation Interface ============ */}
       <GlassCard glowColor="matrix" className="p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -3788,7 +4050,9 @@ export default function RosettaPage() {
               setTranslationResult(null)
               setTranslateAllResults(null)
             }}
-            className={`flex items-center gap-2 text-[10px] font-mono px-3 py-1.5 rounded-full transition-colors ${
+            aria-pressed={translateAll}
+            aria-label={translateAll ? 'Translate to all lexicons — active. Click to disable.' : 'Translate to all lexicons — inactive. Click to enable.'}
+            className={`flex items-center gap-2 text-[10px] font-mono px-3 py-1.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-500 ${
               translateAll
                 ? 'bg-terminal-600/20 text-terminal-400 border border-terminal-600/40'
                 : 'bg-black-800/60 text-black-400 border border-black-700 hover:border-black-600'
@@ -3798,6 +4062,7 @@ export default function RosettaPage() {
               className={`w-2 h-2 rounded-full transition-colors ${
                 translateAll ? 'bg-terminal-400' : 'bg-black-600'
               }`}
+              aria-hidden="true"
             />
             Translate to All
           </button>
@@ -3833,15 +4098,16 @@ export default function RosettaPage() {
                 disabled={!fromId || !toId}
                 whileHover={{ scale: fromId && toId ? 1.1 : 1 }}
                 whileTap={{ scale: fromId && toId ? 0.92 : 1, rotate: fromId && toId ? 180 : 0 }}
-                className="flex-shrink-0 w-9 h-9 mb-0.5 rounded-full flex items-center justify-center border transition-all"
+                className="flex-shrink-0 w-9 h-9 mb-0.5 rounded-full flex items-center justify-center border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-matrix-500"
                 style={
                   fromId && toId
                     ? { backgroundColor: 'rgba(0,255,65,0.1)', borderColor: 'rgba(0,255,65,0.35)', color: '#00ff41' }
                     : { backgroundColor: 'rgba(30,30,30,0.6)', borderColor: 'rgba(60,60,60,0.5)', color: '#374151' }
                 }
                 title="Swap lexicons"
+                aria-label="Swap source and target lexicons"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
               </motion.button>

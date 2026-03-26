@@ -178,4 +178,4 @@ The Siren Protocol represents a paradigm shift in adversarial defense: from resi
 
 ---
 
-*"He thought he was hacking God. God was hacking him."*
+*"He thought he was hacking the system. The system was hacking him."*

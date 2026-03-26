@@ -1,4 +1,4 @@
-# The Omniscient Adversary Proof: Security That Holds Against God
+# The Omniscient Adversary Proof: Security That Holds Against Omniscient Adversaries
 
 *Nervos Talks Post -- Faraday1*
 *March 2026*

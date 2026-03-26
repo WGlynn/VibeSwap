@@ -24,7 +24,7 @@ VibeSwap is an omnichain decentralized exchange that eliminates MEV (Miner Extra
 | CKB SDK tests | 15,155 |
 | Frontend components (React) | 338 |
 | Frontend hooks | 72 |
-| Research papers & docs | 80 |
+| Research papers & docs | 99 |
 | Total git commits | 2,016 |
 | Funding raised | $0 |
 

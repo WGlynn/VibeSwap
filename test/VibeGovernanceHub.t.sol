@@ -234,7 +234,7 @@ contract VibeGovernanceHubTest is Test {
 
     function test_propose_emergency() public {
         uint256 proposalId = _createTokenProposal(true);
-        (,,,,,,,,,,,,,,bool emergency,,,) = hub.proposals(proposalId);
+        (,,,,,,,,,,,,bool emergency,,,) = hub.proposals(proposalId);
         assertTrue(emergency);
     }
 
@@ -364,7 +364,7 @@ contract VibeGovernanceHubTest is Test {
         vm.prank(voter2);
         hub.castVote(proposalId, false);
 
-        (,,,,,,,uint256 votesFor, uint256 votesAgainst,,,,,,,,,,) = hub.proposals(proposalId);
+        (,,,,uint256 votesFor, uint256 votesAgainst,,,,,,,,,,) = hub.proposals(proposalId);
         assertTrue(votesFor > 0);
         assertTrue(votesAgainst > 0);
     }
@@ -820,7 +820,7 @@ contract VibeGovernanceHubTest is Test {
         vm.prank(endpoint);
         hub.receiveCrossChainVote(42161, proposalId, 5000 ether, true);
 
-        (,,,,,,,uint256 votesFor,,,,,,,,,,) = hub.proposals(proposalId);
+        (,,,,uint256 votesFor,,,,,,,,,,,) = hub.proposals(proposalId);
         assertEq(votesFor, 5000 ether);
     }
 

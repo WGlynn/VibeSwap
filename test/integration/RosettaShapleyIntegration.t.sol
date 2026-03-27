@@ -424,11 +424,11 @@ contract RosettaShapleyIntegrationTest is Test {
 
         // Different owner → different ID
         bytes32 id3 = rosetta.getSIEAssetId(bob, "slippage", UCI_THRESHOLD_BREACH);
-        assertTrue(id1 != id3, "Different owner → different ID");
+        assertTrue(id1 != id3, "Different owner -> different ID");
 
         // Different term → different ID
         bytes32 id4 = rosetta.getSIEAssetId(alice, "other_term", UCI_THRESHOLD_BREACH);
-        assertTrue(id1 != id4, "Different term → different ID");
+        assertTrue(id1 != id4, "Different term -> different ID");
     }
 
     // ============ Test 12: setSIE Access Control ============

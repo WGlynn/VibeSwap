@@ -30,7 +30,7 @@ contract PostQuantumShieldTest is Test {
     uint256 constant TOTAL_KEYS = 256;
     uint8 constant SEC_128 = 128;
     uint8 constant SEC_192 = 192;
-    uint8 constant SEC_256 = 256;
+    uint8 constant SEC_256 = 255; // max uint8, represents 256-bit security level
 
     // ============ Re-declare Events for expectEmit ============
 

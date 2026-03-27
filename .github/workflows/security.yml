@@ -56,7 +56,7 @@ jobs:
           version: nightly
 
       - name: Build contracts
-        run: forge build
+        run: FOUNDRY_PROFILE=fast forge build
 
       - uses: actions/setup-python@v5
         with:

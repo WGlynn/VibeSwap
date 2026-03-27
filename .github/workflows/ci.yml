@@ -145,10 +145,10 @@ jobs:
         with:
           version: nightly
 
-      - name: Build contracts
-        run: forge build
+      - name: Build contracts (fast profile - no via_ir to avoid Yul stack-too-deep on 988 files)
+        run: FOUNDRY_PROFILE=fast forge build
 
-      - name: Run tests (fast profile - no via_ir for speed)
+      - name: Run tests (fast profile)
         run: FOUNDRY_PROFILE=fast forge test -vvv
 
   # ============ Deploy Dry Run ============
@@ -170,7 +170,7 @@ jobs:
           version: nightly
 
       - name: Build contracts
-        run: forge build
+        run: FOUNDRY_PROFILE=fast forge build
 
       - name: Dry run Deploy.s.sol
         run: forge script script/Deploy.s.sol --fork-url https://sepolia.base.org -vvv

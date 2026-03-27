@@ -65,12 +65,15 @@ contract FractalShapley is
     error ContributionNotFound(bytes32 id);
     error TooManyParents(uint256 count);
     error SelfReference();
-    error CycleDetected(bytes32 id);
+    // CycleDetected removed — cycles are structurally impossible because
+    // parents must exist before child registration (TRP R1 finding, 2026-03-27)
     error ZeroReward();
     error InvalidDecay();
     error InvalidDepth();
     error AlreadyAttested();
     error ETHTransferFailed();
+    error ETHValueMismatch();
+    error UnexpectedETH();
 
     // ============ State ============
 
@@ -203,9 +206,11 @@ contract FractalShapley is
         bytes32[] memory parentIds = _parents[contributionId];
         if (parentIds.length > 0 && propagationShare > 0) {
             uint256 perParent = propagationShare / parentIds.length;
+            uint256 remainder = propagationShare % parentIds.length;
             for (uint256 i; i < parentIds.length && tail < MAX_QUEUE_SIZE; ++i) {
                 queue[tail] = parentIds[i];
-                credits[tail] = perParent;
+                // First parent absorbs remainder — no credit leaks (efficiency axiom)
+                credits[tail] = (i == 0) ? perParent + remainder : perParent;
                 depths[tail] = 1;
                 ++tail;
             }
@@ -238,9 +243,11 @@ contract FractalShapley is
             bytes32[] memory grandparents = _parents[currentId];
             if (grandparents.length > 0 && upstreamShare > 0 && currentDepth < MAX_PROPAGATION_DEPTH) {
                 uint256 perGrandparent = upstreamShare / grandparents.length;
+                uint256 gpRemainder = upstreamShare % grandparents.length;
                 for (uint256 i; i < grandparents.length && tail < MAX_QUEUE_SIZE; ++i) {
                     queue[tail] = grandparents[i];
-                    credits[tail] = perGrandparent;
+                    // First grandparent absorbs remainder — closed loop, no leakage
+                    credits[tail] = (i == 0) ? perGrandparent + gpRemainder : perGrandparent;
                     depths[tail] = currentDepth + 1;
                     ++tail;
                 }
@@ -265,6 +272,13 @@ contract FractalShapley is
         uint256 rewardAmount,
         address token
     ) external payable override nonReentrant {
+        // Validate ETH: exact match required, no locked funds
+        if (token == address(0)) {
+            if (msg.value != rewardAmount) revert ETHValueMismatch();
+        } else {
+            if (msg.value != 0) revert UnexpectedETH();
+        }
+
         CreditAllocation[] memory allocations = computeCredit(contributionId, rewardAmount);
 
         // Update accounting

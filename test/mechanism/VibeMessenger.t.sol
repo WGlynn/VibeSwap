@@ -101,7 +101,7 @@ contract VibeMessengerTest is Test {
         assertEq(messenger.channelCount(), 1);
         assertEq(messenger.getChannelCount(), 1);
 
-        VibeMessenger.Channel memory ch = messenger.channels(1);
+        VibeMessenger.Channel memory ch = messenger.getChannel(1);
         assertEq(ch.channelId, 1);
         assertEq(ch.owner, alice);
         assertEq(ch.subscriberCount, 0);
@@ -132,7 +132,7 @@ contract VibeMessengerTest is Test {
         messenger.subscribe(1);
 
         assertTrue(messenger.subscriptions(1, bob));
-        assertEq(messenger.channels(1).subscriberCount, 1);
+        assertEq(messenger.getChannel(1).subscriberCount, 1);
         assertTrue(messenger.isSubscribed(1, bob));
     }
 
@@ -173,7 +173,7 @@ contract VibeMessengerTest is Test {
         messenger.unsubscribe(1);
 
         assertFalse(messenger.subscriptions(1, bob));
-        assertEq(messenger.channels(1).subscriberCount, 0);
+        assertEq(messenger.getChannel(1).subscriberCount, 0);
         assertFalse(messenger.isSubscribed(1, bob));
     }
 
@@ -210,7 +210,7 @@ contract VibeMessengerTest is Test {
         assertEq(messenger.messageCount(), 1);
         assertEq(messenger.getMessageCount(), 1);
 
-        VibeMessenger.Message memory m = messenger.messages(1);
+        VibeMessenger.Message memory m = messenger.getMessage(1);
         assertEq(m.messageId, 1);
         assertEq(m.sender, alice);
         assertEq(m.channelId, 1);
@@ -225,7 +225,7 @@ contract VibeMessengerTest is Test {
         vm.prank(alice);
         messenger.sendMessage(1, address(0), keccak256("msg"));
 
-        assertEq(messenger.channels(1).messageCount, 1);
+        assertEq(messenger.getChannel(1).messageCount, 1);
     }
 
     function test_sendMessage_channelBroadcast_emitsEvent() public {
@@ -263,7 +263,7 @@ contract VibeMessengerTest is Test {
         uint256 msgId = messenger.sendMessage(0, bob, keccak256("hi bob"));
 
         assertEq(msgId, 1);
-        VibeMessenger.Message memory m = messenger.messages(1);
+        VibeMessenger.Message memory m = messenger.getMessage(1);
         assertEq(m.recipient, bob);
         assertEq(m.channelId, 0);
     }
@@ -292,7 +292,7 @@ contract VibeMessengerTest is Test {
         vm.prank(bob);
         messenger.acknowledgeDelivery(1);
 
-        assertTrue(messenger.messages(1).delivered);
+        assertTrue(messenger.getMessage(1).delivered);
         assertTrue(messenger.deliveryReceipts(1));
     }
 
@@ -346,7 +346,7 @@ contract VibeMessengerTest is Test {
 
         assertEq(msgId, 1);
 
-        VibeMessenger.Message memory m = messenger.messages(1);
+        VibeMessenger.Message memory m = messenger.getMessage(1);
         assertEq(m.dstChainId, dstChainId);
         assertEq(m.contentHash, contentHash);
         assertFalse(m.delivered);
@@ -381,7 +381,7 @@ contract VibeMessengerTest is Test {
             uint256(1), block.chainid, dstChainId, contentHash
         ));
 
-        VibeMessenger.CrossChainRelay memory relay = messenger.relays(relayId);
+        VibeMessenger.CrossChainRelay memory relay = messenger.getRelay(relayId);
         assertEq(relay.dstChainId, dstChainId);
         assertEq(relay.messageHash, contentHash);
         assertEq(relay.attestations, 0);
@@ -404,7 +404,7 @@ contract VibeMessengerTest is Test {
         vm.prank(validator1);
         messenger.attestRelay(relayId);
 
-        VibeMessenger.CrossChainRelay memory relay = messenger.relays(relayId);
+        VibeMessenger.CrossChainRelay memory relay = messenger.getRelay(relayId);
         assertEq(relay.attestations, 1);
         assertFalse(relay.executed); // need REQUIRED_ATTESTATIONS = 2
         assertTrue(messenger.relayAttestations(relayId, validator1));
@@ -445,7 +445,7 @@ contract VibeMessengerTest is Test {
         messenger.attestRelay(relayId);
 
         // REQUIRED_ATTESTATIONS = 2 → should now be executed
-        VibeMessenger.CrossChainRelay memory relay = messenger.relays(relayId);
+        VibeMessenger.CrossChainRelay memory relay = messenger.getRelay(relayId);
         assertEq(relay.attestations, 2);
         assertTrue(relay.executed);
     }
@@ -567,7 +567,7 @@ contract VibeMessengerTest is Test {
         vm.prank(carol);
         messenger.subscribe(channelId);
 
-        assertEq(messenger.channels(channelId).subscriberCount, 2);
+        assertEq(messenger.getChannel(channelId).subscriberCount, 2);
 
         // 3. Alice broadcasts to channel
         vm.prank(alice);
@@ -593,7 +593,7 @@ contract VibeMessengerTest is Test {
         // 7. Bob unsubscribes
         vm.prank(bob);
         messenger.unsubscribe(channelId);
-        assertEq(messenger.channels(channelId).subscriberCount, 1);
+        assertEq(messenger.getChannel(channelId).subscriberCount, 1);
 
         assertEq(messenger.messageCount(), 2);
     }

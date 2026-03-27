@@ -69,7 +69,7 @@ contract VibeVesting is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 vestingDuration,
         VestingType vestingType,
         bool revocable
-    ) external payable onlyOwner {
+    ) external payable onlyOwner returns (uint256) {
         require(msg.value > 0, "Zero amount");
         require(beneficiary != address(0), "Zero beneficiary");
         require(vestingDuration > 0, "Zero duration");
@@ -91,6 +91,7 @@ contract VibeVesting is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         totalAllocated += msg.value;
 
         emit ScheduleCreated(id, beneficiary, msg.value, vestingDuration);
+        return id;
     }
 
     /// @notice Release vested tokens

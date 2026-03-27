@@ -314,6 +314,7 @@ contract VibeContentMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function getPublication(uint256 id) external view returns (Publication memory) { return publications[id]; }
     function getArticle(uint256 id) external view returns (Article memory) { return articles[id]; }
+    function getSubscription(address subscriber, uint256 pubId) external view returns (Subscription memory) { return subscriptions[subscriber][pubId]; }
     function hasAccess(uint256 articleId, address reader) external view returns (bool) {
         if (articleAccess[articleId][reader]) return true;
         Article storage a = articles[articleId];

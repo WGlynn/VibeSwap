@@ -385,17 +385,15 @@ contract ClawbackRegistryTest is Test {
     // ============ submitForVoting ============
 
     /// @dev Helper to read case status. The `cases` public getter excludes the string
-    ///      `reason` field, so we destructure only non-string fields via the auto-getter:
-    ///      (caseId, originWallet, claimant, status, createdAt, resolvedAt,
-    ///       totalAmount, token, consensusProposalId, cascadeCount)
-    ///      Solidity auto-getter drops dynamic types (string) from the return tuple.
+    ///      Auto-getter tuple: (caseId, originWallet, claimant, reason, status,
+    ///       createdAt, resolvedAt, totalAmount, token, consensusProposalId, cascadeCount)
     function _getCaseStatus(bytes32 caseId) internal view returns (ClawbackRegistry.CaseStatus) {
-        (,,,ClawbackRegistry.CaseStatus status,,,,,,) = registry.cases(caseId);
+        (,,,,ClawbackRegistry.CaseStatus status,,,,,,) = registry.cases(caseId);
         return status;
     }
 
     function _getCaseProposalId(bytes32 caseId) internal view returns (bytes32) {
-        (,,,,,,,,bytes32 proposalId,) = registry.cases(caseId);
+        (,,,,,,,,,bytes32 proposalId,) = registry.cases(caseId);
         return proposalId;
     }
 

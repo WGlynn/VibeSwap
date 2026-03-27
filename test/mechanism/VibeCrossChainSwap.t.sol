@@ -356,7 +356,7 @@ contract VibeCrossChainSwapTest is Test {
     // ============ Fuzz: lock duration boundaries ============
 
     function testFuzz_initiateETHSwap_lockDuration(uint256 duration) public {
-        duration = bound(duration, VibeCrossChainSwap.MIN_LOCK_TIME(), VibeCrossChainSwap.MAX_LOCK_TIME());
+        duration = bound(duration, swap.MIN_LOCK_TIME(), swap.MAX_LOCK_TIME());
 
         vm.prank(alice);
         bytes32 swapId = swap.initiateETHSwap{value: 1 ether}(bob, HASH_LOCK, duration, DST_CHAIN);

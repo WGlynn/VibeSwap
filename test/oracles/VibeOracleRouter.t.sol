@@ -21,6 +21,8 @@ contract ETHReceiver {
  *         accuracy scoring, reward distribution, and admin controls.
  */
 contract VibeOracleRouterTest is Test {
+    event PriceReported(bytes32 indexed feedId, address indexed reporter, uint256 price, uint256 confidence, uint256 round);
+
     VibeOracleRouter public router;
 
     address public owner;
@@ -160,7 +162,7 @@ contract VibeOracleRouterTest is Test {
 
     function test_reportPrice_emitsEvent() public {
         vm.expectEmit(true, true, false, false, address(router));
-        emit VibeOracleRouter.PriceReported(feedId, providerA, 1000e18, 100, 0);
+        emit PriceReported(feedId, providerA, 1000e18, 100, 0);
         vm.prank(providerA);
         router.reportPrice(feedId, 1000e18, 100);
     }

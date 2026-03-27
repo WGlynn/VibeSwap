@@ -122,7 +122,7 @@ contract VibeSecurityOracleTest is Test {
         vm.prank(auditor1);
         oracle.registerAuditor{value: 1 ether}(keccak256("agent1"), true);
 
-        VibeSecurityOracle.Auditor memory a = oracle.auditors(auditor1);
+        VibeSecurityOracle.Auditor memory a = oracle.getAuditor(auditor1);
         assertEq(a.addr, auditor1);
         assertTrue(a.isAI);
         assertTrue(a.active);
@@ -134,7 +134,7 @@ contract VibeSecurityOracleTest is Test {
         vm.prank(auditor1);
         oracle.registerAuditor{value: 1 ether}(bytes32(0), false);
 
-        assertFalse(oracle.auditors(auditor1).isAI);
+        assertFalse(oracle.getAuditor(auditor1).isAI);
     }
 
     function test_registerAuditor_emitsEvent() public {
@@ -270,7 +270,7 @@ contract VibeSecurityOracleTest is Test {
 
         _submitFinding(auditor1, auditId, VibeSecurityOracle.Severity.CRITICAL);
 
-        assertEq(oracle.auditors(auditor1).totalFindings, 1);
+        assertEq(oracle.getAuditor(auditor1).totalFindings, 1);
     }
 
     // ============ Finding Verification & Payout ============
@@ -398,11 +398,11 @@ contract VibeSecurityOracleTest is Test {
         uint256 auditId = _requestAudit(10 ether, 30);
         uint256 findingId = _submitFinding(auditor1, auditId, VibeSecurityOracle.Severity.HIGH);
 
-        uint256 repBefore = oracle.auditors(auditor1).reputation;
+        uint256 repBefore = oracle.getAuditor(auditor1).reputation;
         vm.prank(auditRequester);
         oracle.verifyFinding(findingId);
 
-        assertEq(oracle.auditors(auditor1).reputation, repBefore + 100);
+        assertEq(oracle.getAuditor(auditor1).reputation, repBefore + 100);
     }
 
     function test_verifyFinding_reputationCappedAt10000() public {
@@ -417,7 +417,7 @@ contract VibeSecurityOracleTest is Test {
             oracle.verifyFinding(findingId);
         }
 
-        assertLe(oracle.auditors(auditor1).reputation, 10000);
+        assertLe(oracle.getAuditor(auditor1).reputation, 10000);
     }
 
     function test_verifyFinding_updatesGlobalStats() public {
@@ -635,7 +635,7 @@ contract VibeSecurityOracleTest is Test {
         // Stats check
         assertEq(oracle.totalVerifiedBugs(), 1);
         assertEq(oracle.totalBountyPaid(), 8 ether);
-        assertEq(oracle.auditors(auditor1).verifiedFindings, 1);
-        assertEq(oracle.auditors(auditor1).totalEarned, 8 ether);
+        assertEq(oracle.getAuditor(auditor1).verifiedFindings, 1);
+        assertEq(oracle.getAuditor(auditor1).totalEarned, 8 ether);
     }
 }

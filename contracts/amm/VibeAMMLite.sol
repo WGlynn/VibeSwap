@@ -224,11 +224,16 @@ contract VibeAMMLite is
         bytes32 poolId, address tokenIn, uint256 amountIn, uint256 minAmountOut, address recipient
     ) external nonReentrant poolExists(poolId) noFlashLoan(poolId) notPaused
       brkOk(_VOL) brkOk(_PRC) validatePrice(poolId) returns (uint256 amountOut) {
+        amountOut = _swapInternal(poolId, tokenIn, amountIn, recipient);
+        if (amountOut < minAmountOut) revert InsufficientOutput();
+    }
+
+    /// @dev Internal swap — separated to keep stack depth under 16
+    function _swapInternal(bytes32 poolId, address tokenIn, uint256 amountIn, address recipient) internal returns (uint256 amountOut) {
         Pool storage pool = pools[poolId];
         if (tokenIn != pool.token0 && tokenIn != pool.token1) revert InvalidToken();
         bool isT0 = tokenIn == pool.token0;
         amountOut = BatchMath.getAmountOut(amountIn, isT0 ? pool.reserve0 : pool.reserve1, isT0 ? pool.reserve1 : pool.reserve0, pool.feeRate);
-        if (amountOut < minAmountOut) revert InsufficientOutput();
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         IERC20(isT0 ? pool.token1 : pool.token0).safeTransfer(recipient, amountOut);
         unchecked {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "./VibeZKVerifier.sol";
 
 /**
  * @title VibePrivacyPool — Compliant Privacy-Preserving Transactions
@@ -69,13 +70,19 @@ contract VibePrivacyPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     uint256[] public denominations;
     mapping(uint256 => bool) public validDenomination;
 
+    /// @notice ZK Verifier contract for proof validation
+    VibeZKVerifier public zkVerifier;
+
+    /// @notice Verification key ID for the withdrawal circuit
+    bytes32 public withdrawalKeyId;
+
     /// @notice Stats
     uint256 public totalDeposited;
     uint256 public totalWithdrawn;
 
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -236,13 +243,30 @@ contract VibePrivacyPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         uint256 amount,
         uint256 associationSetId,
         bytes calldata proof
-    ) internal view returns (bool) {
-        // Simplified verification — in production, delegate to VibeZKVerifier
-        // Verify that the proof binds to the nullifier, recipient, amount, and association set
-        bytes32 proofHash = keccak256(abi.encodePacked(nullifier, recipient, amount, associationSetId));
-        bytes32 proofCheck = keccak256(proof);
-        // Accept any well-formed proof (real impl would verify Groth16/PLONK)
-        return proofHash != bytes32(0) && proofCheck != bytes32(0);
+    ) internal returns (bool) {
+        // If no ZK verifier is configured, fall back to basic validation
+        // (deployment phase — will be removed when ZK verifier is mandatory)
+        if (address(zkVerifier) == address(0) || withdrawalKeyId == bytes32(0)) {
+            // Legacy mode: accept well-formed proofs (for testing/migration)
+            bytes32 proofHash = keccak256(abi.encodePacked(nullifier, recipient, amount, associationSetId));
+            return proofHash != bytes32(0) && proof.length > 0;
+        }
+
+        // REAL ZK VERIFICATION via VibeZKVerifier → Groth16Verifier → bn256 pairing
+        // Public inputs bind the proof to: nullifier, recipient, amount, association set root
+        bytes32[] memory publicInputs = new bytes32[](4);
+        publicInputs[0] = nullifier;
+        publicInputs[1] = bytes32(uint256(uint160(recipient)));
+        publicInputs[2] = bytes32(amount);
+        publicInputs[3] = associationSets[associationSetId].merkleRoot;
+
+        return zkVerifier.verifyProof(withdrawalKeyId, proof, publicInputs);
+    }
+
+    /// @notice Set the ZK verifier contract (Disintermediation: Grade B → DAO)
+    function setZKVerifier(address _zkVerifier, bytes32 _keyId) external onlyOwner {
+        zkVerifier = VibeZKVerifier(_zkVerifier);
+        withdrawalKeyId = _keyId;
     }
 
     // ============ View ============

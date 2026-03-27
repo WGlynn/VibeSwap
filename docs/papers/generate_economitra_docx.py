@@ -265,7 +265,7 @@ def build_document(md_path, output_path):
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(120)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    text = 'From the Greek economía (household management) and metron (measurement). The measurement of economic reality — not as governments report it, not as textbooks teach it, not as markets display it. As it actually is.'
+    text = 'From the Greek economía (household management) and metron (measurement).'
     run = p.add_run(text)
     run.font.size = Pt(11)
     run.font.italic = True

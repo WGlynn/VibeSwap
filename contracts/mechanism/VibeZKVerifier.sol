@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "../libraries/Groth16Verifier.sol";
 
 /**
  * @title VibeZKVerifier — Zero-Knowledge Proof Verification Hub
@@ -204,37 +205,68 @@ contract VibeZKVerifier is OwnableUpgradeable, UUPSUpgradeable {
     // ============ Internal Verifiers ============
 
     /**
-     * @dev Groth16 verification using precompiled bn256 pairing
+     * @dev Groth16 verification using bn256 pairing precompile (0x08).
+     *      REAL IMPLEMENTATION — no stubs, no placeholders.
+     *      Uses Groth16Verifier library for ec_add, ec_mul, ec_pairing.
      */
     function _verifyGroth16(
         bytes memory vkData,
         bytes calldata proof,
         bytes32[] calldata publicInputs
     ) internal view returns (bool) {
-        // In production: use bn256 pairing precompile at address 0x08
-        // For now: hash-based verification placeholder
-        // The actual Groth16 verifier would use ec_pairing precompile
-        bytes32 check = keccak256(abi.encodePacked(vkData, proof, publicInputs));
-        // Placeholder — real implementation uses alt_bn128 pairing
-        return uint256(check) % 2 == 0; // Will be replaced with real pairing check
+        // Decode proof from raw bytes (256 bytes: A + B + C)
+        Groth16Verifier.Proof memory grothProof = Groth16Verifier.decodeProof(
+            bytes(proof)
+        );
+
+        // Convert public inputs from bytes32[] to uint256[]
+        uint256[] memory inputs = new uint256[](publicInputs.length);
+        for (uint256 i = 0; i < publicInputs.length; i++) {
+            inputs[i] = uint256(publicInputs[i]);
+        }
+
+        // Decode verification key (IC count = publicInputs.length + 1)
+        Groth16Verifier.VerifyingKey memory vk = Groth16Verifier.decodeVK(
+            vkData, publicInputs.length + 1
+        );
+
+        // Verify using real bn256 pairing
+        return Groth16Verifier.verify(vk, grothProof, inputs);
     }
 
+    /**
+     * @dev PLONK verification — requires external PLONK verifier contract.
+     *      Architecture: delegate to a registered PLONK verifier deployment.
+     *      TODO: Integrate when PLONK verifier contract is deployed.
+     */
     function _verifyPlonk(
         bytes memory vkData,
         bytes calldata proof,
         bytes32[] calldata publicInputs
     ) internal view returns (bool) {
-        bytes32 check = keccak256(abi.encodePacked(vkData, proof, publicInputs));
-        return uint256(check) % 2 == 0;
+        // PLONK verification requires a custom polynomial commitment verifier.
+        // Unlike Groth16, there is no EVM precompile for PLONK.
+        // This will delegate to an external PLONK verifier contract.
+        // For now: reject all PLONK proofs until verifier is deployed.
+        (vkData, proof, publicInputs); // silence unused warnings
+        return false;
     }
 
+    /**
+     * @dev STARK verification — requires external STARK verifier contract.
+     *      Architecture: delegate to a registered STARK verifier (e.g., SHARP).
+     *      TODO: Integrate when STARK verifier contract is deployed.
+     */
     function _verifyStark(
         bytes memory vkData,
         bytes calldata proof,
         bytes32[] calldata publicInputs
     ) internal view returns (bool) {
-        bytes32 check = keccak256(abi.encodePacked(vkData, proof, publicInputs));
-        return uint256(check) % 2 == 0;
+        // STARK verification is computationally heavy on-chain.
+        // Production path: use StarkWare SHARP or equivalent.
+        // For now: reject all STARK proofs until verifier is deployed.
+        (vkData, proof, publicInputs); // silence unused warnings
+        return false;
     }
 
     // ============ View ============

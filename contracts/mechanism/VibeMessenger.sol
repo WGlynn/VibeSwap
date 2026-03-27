@@ -284,6 +284,9 @@ contract VibeMessenger is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ View ============
 
+    function getChannel(uint256 channelId) external view returns (Channel memory) { return channels[channelId]; }
+    function getMessage(uint256 messageId) external view returns (Message memory) { return messages[messageId]; }
+    function getRelay(bytes32 relayId) external view returns (CrossChainRelay memory) { return relays[relayId]; }
     function getChannelCount() external view returns (uint256) { return channelCount; }
     function getMessageCount() external view returns (uint256) { return messageCount; }
 

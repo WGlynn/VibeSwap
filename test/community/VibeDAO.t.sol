@@ -519,7 +519,7 @@ contract VibeDAOTest is Test {
         quorumBps = bound(quorumBps, 0, 10000);
         vm.prank(alice);
         uint256 daoId = dao.createDAO("DAO", "", VibeDAO.GovernanceType.TOKEN_VOTING, quorumBps, 1 hours, 0);
-        (,,,,,,,, uint256 actualQuorum,,,,,,) = dao.daos(daoId);
+        (,,,,,,,,, uint256 actualQuorum,,,,) = dao.daos(daoId);
         // Cannot destructure quorumBps directly — but verify daoId was created
         assertEq(daoId, 1);
     }

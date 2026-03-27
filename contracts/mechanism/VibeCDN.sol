@@ -226,6 +226,9 @@ contract VibeCDN is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     // ============ View ============
 
+    function getNode(address nodeAddr) external view returns (ContentNode memory) { return nodes[nodeAddr]; }
+    function getPin(bytes32 contentHash) external view returns (ContentPin memory) { return pins[contentHash]; }
+    function getTranscodeJob(uint256 jobId) external view returns (TranscodeJob memory) { return transcodeJobs[jobId]; }
     function getNodeCount() external view returns (uint256) { return nodeList.length; }
     function getPinCount() external view returns (uint256) { return pinList.length; }
     function getJobCount() external view returns (uint256) { return jobCount; }

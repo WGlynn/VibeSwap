@@ -172,7 +172,7 @@ contract VibeStableTest is Test {
     // ============ Admin ============
 
     function test_addCollateralType() public view {
-        VibeStable.CollateralType memory ct = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ct = vsd.getCollateralType(address(weth));
         assertEq(ct.token, address(weth));
         assertEq(ct.minCollateralRatio, MCR);
         assertEq(ct.debtCeiling, DEBT_CEILING);
@@ -202,7 +202,7 @@ contract VibeStableTest is Test {
         vm.prank(proxyOwner);
         vsd.setCollateralActive(address(weth), false);
 
-        VibeStable.CollateralType memory ct = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ct = vsd.getCollateralType(address(weth));
         assertFalse(ct.active);
     }
 
@@ -210,7 +210,7 @@ contract VibeStableTest is Test {
         vm.prank(proxyOwner);
         vsd.setDebtCeiling(address(weth), 500_000e18);
 
-        VibeStable.CollateralType memory ct = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ct = vsd.getCollateralType(address(weth));
         assertEq(ct.debtCeiling, 500_000e18);
     }
 
@@ -240,7 +240,7 @@ contract VibeStableTest is Test {
         assertEq(vsd.balanceOf(alice), debt);
         assertEq(vsd.totalSupply(), debt);
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.owner, alice);
         assertEq(v.collateralToken, address(weth));
         assertEq(v.collateralAmount, collateral);
@@ -301,7 +301,7 @@ contract VibeStableTest is Test {
         uint256 vaultId = vsd.openVault(address(weth), 1e18, 0);
         vm.stopPrank();
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.debtAmount, 0);
         assertEq(vsd.totalSupply(), 0);
     }
@@ -316,7 +316,7 @@ contract VibeStableTest is Test {
         vsd.addCollateral(vaultId, 0.5e18);
         vm.stopPrank();
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.collateralAmount, 1.5e18);
     }
 
@@ -338,7 +338,7 @@ contract VibeStableTest is Test {
         vm.prank(alice);
         vsd.removeCollateral(vaultId, 0.5e18);
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.collateralAmount, 1.5e18);
     }
 
@@ -362,7 +362,7 @@ contract VibeStableTest is Test {
 
         assertEq(vsd.balanceOf(alice), 1500e18);
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.debtAmount, 1500e18);
     }
 
@@ -398,7 +398,7 @@ contract VibeStableTest is Test {
         assertEq(vsd.balanceOf(alice), 600e18);
         assertEq(vsd.totalSupply(), 600e18);
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.debtAmount, 600e18);
     }
 
@@ -414,7 +414,7 @@ contract VibeStableTest is Test {
         assertEq(weth.balanceOf(alice), wethBalBefore + 1e18, "Collateral returned after full repay");
         assertEq(vsd.balanceOf(alice), 0);
 
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.collateralAmount, 0);
         assertEq(v.debtAmount, 0);
     }
@@ -427,7 +427,7 @@ contract VibeStableTest is Test {
         vsd.repay(vaultId, 5000e18);
 
         assertEq(vsd.balanceOf(alice), 0);
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.debtAmount, 0);
     }
 
@@ -466,14 +466,14 @@ contract VibeStableTest is Test {
         uint256 auctionId = vsd.liquidate(vaultId);
         assertEq(auctionId, 1);
 
-        VibeStable.LiquidationAuction memory a = vsd.auctions(auctionId);
+        VibeStable.LiquidationAuction memory a = vsd.getAuction(auctionId);
         assertEq(a.vaultId, vaultId);
         assertFalse(a.settled);
         assertGt(a.debtToRaise, 1300e18, "Debt includes liquidation penalty");
         assertGt(a.startPrice, a.endPrice);
 
         // Vault should be cleared
-        VibeStable.Vault memory v = vsd.vaults(vaultId);
+        VibeStable.Vault memory v = vsd.getVault(vaultId);
         assertEq(v.collateralAmount, 0);
         assertEq(v.debtAmount, 0);
     }
@@ -584,7 +584,7 @@ contract VibeStableTest is Test {
     // ============ PID: Stability Fee Adjustment ============
 
     function test_adjustStabilityFee_belowPeg_increasesFee() public {
-        VibeStable.CollateralType memory ctBefore = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ctBefore = vsd.getCollateralType(address(weth));
         uint256 feeBefore = ctBefore.stabilityFee;
 
         // vUSD trading at $0.90 (below peg) → should increase stability fee
@@ -593,18 +593,18 @@ contract VibeStableTest is Test {
         vm.warp(block.timestamp + 1 hours);
         vsd.adjustStabilityFee();
 
-        VibeStable.CollateralType memory ctAfter = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ctAfter = vsd.getCollateralType(address(weth));
         assertGt(ctAfter.stabilityFee, feeBefore, "Fee should increase when vUSD < peg");
     }
 
     function test_adjustStabilityFee_atPeg_noChange() public {
         // vUSD at exactly $1.00 → no adjustment
-        VibeStable.CollateralType memory ctBefore = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ctBefore = vsd.getCollateralType(address(weth));
 
         vm.warp(block.timestamp + 1 hours);
         vsd.adjustStabilityFee(); // error = 0, no change
 
-        VibeStable.CollateralType memory ctAfter = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ctAfter = vsd.getCollateralType(address(weth));
         // At peg: error = 1e18 - 1e18 = 0. Adjustment = 0.
         assertEq(ctAfter.stabilityFee, ctBefore.stabilityFee);
     }
@@ -621,7 +621,7 @@ contract VibeStableTest is Test {
             vsd.adjustStabilityFee();
         }
 
-        VibeStable.CollateralType memory ct = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ct = vsd.getCollateralType(address(weth));
         assertLe(ct.stabilityFee, vsd.MAX_FEE(), "Fee clamped at MAX_FEE");
     }
 
@@ -636,18 +636,18 @@ contract VibeStableTest is Test {
             vsd.adjustStabilityFee();
         }
 
-        VibeStable.CollateralType memory ct = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ct = vsd.getCollateralType(address(weth));
         assertGe(ct.stabilityFee, vsd.MIN_FEE(), "Fee clamped at MIN_FEE");
     }
 
     function test_adjustStabilityFee_sameBlock_noChange() public {
-        VibeStable.CollateralType memory ctBefore = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ctBefore = vsd.getCollateralType(address(weth));
 
         // Call twice in same block — second call returns immediately (dt == 0)
         vsd.adjustStabilityFee();
         vsd.adjustStabilityFee();
 
-        VibeStable.CollateralType memory ctAfter = vsd.collateralTypes(address(weth));
+        VibeStable.CollateralType memory ctAfter = vsd.getCollateralType(address(weth));
         assertEq(ctAfter.stabilityFee, ctBefore.stabilityFee);
     }
 
@@ -676,7 +676,7 @@ contract VibeStableTest is Test {
         weth.approve(address(vsd), 0.5e18);
         vsd.addCollateral(vaultId, 0.5e18);
         vm.stopPrank();
-        assertEq(vsd.vaults(vaultId).collateralAmount, 2e18);
+        assertEq(vsd.getVault(vaultId).collateralAmount, 2e18);
 
         // 3. Mint more vUSD
         vm.prank(alice);

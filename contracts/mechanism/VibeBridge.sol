@@ -296,6 +296,10 @@ contract VibeBridge is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
         return messages[messageId].status;
     }
 
+    function getMessage(bytes32 messageId) external view returns (BridgeMessage memory) {
+        return messages[messageId];
+    }
+
     /// @notice Receive ETH for bridge operations
     receive() external payable {}
 }

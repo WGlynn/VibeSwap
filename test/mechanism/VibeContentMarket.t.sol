@@ -334,7 +334,7 @@ contract VibeContentMarketTest is Test {
 
         assertEq(market.getPublication(pubId).subscriberCount, 1);
 
-        VibeContentMarket.Subscription memory sub = market.subscriptions(bob, pubId);
+        VibeContentMarket.Subscription memory sub = market.getSubscription(bob, pubId);
         assertEq(sub.subscriber, bob);
         assertEq(sub.pubId, pubId);
         assertGt(sub.expiresAt, block.timestamp);
@@ -365,7 +365,7 @@ contract VibeContentMarketTest is Test {
         vm.prank(bob);
         market.subscribe{value: SUB_PRICE}(pubId);
 
-        VibeContentMarket.Subscription memory sub = market.subscriptions(bob, pubId);
+        VibeContentMarket.Subscription memory sub = market.getSubscription(bob, pubId);
         assertApproxEqAbs(sub.expiresAt, before + 30 days, 2);
     }
 
@@ -375,14 +375,14 @@ contract VibeContentMarketTest is Test {
         vm.prank(bob);
         market.subscribe{value: SUB_PRICE}(pubId);
 
-        VibeContentMarket.Subscription memory sub1 = market.subscriptions(bob, pubId);
+        VibeContentMarket.Subscription memory sub1 = market.getSubscription(bob, pubId);
         uint256 firstExpiry = sub1.expiresAt;
 
         // Extend before expiry
         vm.prank(bob);
         market.subscribe{value: SUB_PRICE}(pubId);
 
-        VibeContentMarket.Subscription memory sub2 = market.subscriptions(bob, pubId);
+        VibeContentMarket.Subscription memory sub2 = market.getSubscription(bob, pubId);
         // New expiry = firstExpiry + 30 days
         assertApproxEqAbs(sub2.expiresAt, firstExpiry + 30 days, 2);
     }

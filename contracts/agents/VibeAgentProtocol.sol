@@ -390,6 +390,10 @@ contract VibeAgentProtocol is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
         return agents[agentId];
     }
 
+    function getSkill(bytes32 skillId) external view returns (Skill memory) {
+        return skills[skillId];
+    }
+
     function getAgentSkills(bytes32 agentId) external view returns (bytes32[] memory) {
         return agentSkills[agentId];
     }

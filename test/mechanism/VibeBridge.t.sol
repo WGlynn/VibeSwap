@@ -228,7 +228,7 @@ contract VibeBridgeTest is Test {
         bytes32 routeId = _addDefaultRoute();
         bytes32 msgId = _initiateBridge(alice, routeId, bob, 100 ether);
 
-        VibeBridge.BridgeMessage memory m = bridge.messages(msgId);
+        VibeBridge.BridgeMessage memory m = bridge.getMessage(msgId);
         assertEq(m.sender,    alice);
         assertEq(m.recipient, bob);
         assertEq(m.amount,    100 ether); // feeBps = 0, amount unchanged
@@ -354,7 +354,7 @@ contract VibeBridgeTest is Test {
 
         _attest(msgId, validator1);
 
-        VibeBridge.BridgeMessage memory m = bridge.messages(msgId);
+        VibeBridge.BridgeMessage memory m = bridge.getMessage(msgId);
         assertEq(m.attestationCount, 1);
         assertEq(uint8(m.status), uint8(VibeBridge.BridgeStatus.PENDING));
     }
@@ -365,9 +365,9 @@ contract VibeBridgeTest is Test {
 
         _reachBFT(msgId); // 2 of 3 validators
 
-        VibeBridge.BridgeMessage memory m = bridge.messages(msgId);
+        VibeBridge.BridgeMessage memory m = bridge.getMessage(msgId);
         assertEq(uint8(m.status), uint8(VibeBridge.BridgeStatus.ATTESTED));
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.ATTESTED);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.ATTESTED));
     }
 
     function test_attest_emitsEvent() public {
@@ -430,7 +430,7 @@ contract VibeBridgeTest is Test {
 
         bridge.executeBridge(msgId);
 
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.EXECUTED);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.EXECUTED));
     }
 
     function test_executeBridge_emitsEvent() public {
@@ -493,7 +493,7 @@ contract VibeBridgeTest is Test {
         bridge.refund(msgId);
 
         assertEq(tokenA.balanceOf(alice), aliceBefore + 100 ether);
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.REFUNDED);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.REFUNDED));
     }
 
     function test_refund_emitsEvent() public {
@@ -580,16 +580,16 @@ contract VibeBridgeTest is Test {
 
         // 1. Initiate
         bytes32 msgId = _initiateBridge(alice, routeId, bob, 500 ether);
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.PENDING);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.PENDING));
 
         // 2. Two validators attest
         _reachBFT(msgId);
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.ATTESTED);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.ATTESTED));
 
         // 3. Execute on destination side
         uint256 bobBefore = tokenA.balanceOf(bob);
         bridge.executeBridge(msgId);
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.EXECUTED);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.EXECUTED));
         assertEq(tokenA.balanceOf(bob), bobBefore + 500 ether);
     }
 
@@ -605,7 +605,7 @@ contract VibeBridgeTest is Test {
         // 3. Refund
         uint256 aliceBefore = tokenA.balanceOf(alice);
         bridge.refund(msgId);
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.REFUNDED);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.REFUNDED));
         assertEq(tokenA.balanceOf(alice), aliceBefore + 500 ether);
     }
 
@@ -617,9 +617,9 @@ contract VibeBridgeTest is Test {
         tokenA.mint(alice, amount);
 
         bytes32 msgId = _initiateBridge(alice, routeId, bob, amount);
-        assertEq(bridge.getMessageStatus(msgId), VibeBridge.BridgeStatus.PENDING);
+        assertEq(uint8(bridge.getMessageStatus(msgId)), uint8(VibeBridge.BridgeStatus.PENDING));
 
-        VibeBridge.BridgeMessage memory m = bridge.messages(msgId);
+        VibeBridge.BridgeMessage memory m = bridge.getMessage(msgId);
         assertEq(m.amount, amount); // zero fee, always exact
     }
 }

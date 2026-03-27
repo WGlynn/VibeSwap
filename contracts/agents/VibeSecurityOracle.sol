@@ -289,6 +289,7 @@ contract VibeSecurityOracle is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     function getAudit(uint256 id) external view returns (AuditRequest memory) { return audits[id]; }
     function getFinding(uint256 id) external view returns (Finding memory) { return findings[id]; }
+    function getAuditor(address addr) external view returns (Auditor memory) { return auditors[addr]; }
     function getAuditFindings(uint256 auditId) external view returns (uint256[] memory) { return auditFindings[auditId]; }
     function getAuditorCount() external view returns (uint256) { return auditorList.length; }
     function getAuditCount() external view returns (uint256) { return auditCount; }

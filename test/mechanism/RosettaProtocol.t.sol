@@ -21,6 +21,15 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  *  - P-001: zero protocol fee invariant
  */
 contract RosettaProtocolTest is Test {
+    // ============ Re-declared Events ============
+    event LexiconRegistered(address indexed owner, string domain, uint256 timestamp);
+    event TermAdded(address indexed owner, string term, bytes32 termHash, bytes32 universalConcept);
+    event TermRemoved(address indexed owner, string term, bytes32 termHash);
+    event TranslationVerified(address indexed from, address indexed to, string sourceTerm, string targetTerm, bytes32 universalConcept, bool result);
+    event ChallengeInitiated(uint256 indexed challengeId, address indexed challenger, address indexed opponent, bytes32 stakes, uint256 stakeAmount);
+    event GameRulesSubmitted(uint256 indexed challengeId, string gameRules);
+    event ChallengeResolved(uint256 indexed challengeId, address indexed winner, uint256 payout);
+
     RosettaProtocol public rosetta;
 
     address public owner  = address(this);
@@ -94,8 +103,8 @@ contract RosettaProtocolTest is Test {
         }
     }
 
-    function test_P001_zeroProtocolFee() public pure {
-        assertEq(RosettaProtocol.PROTOCOL_FEE_BPS(), 0);
+    function test_P001_zeroProtocolFee() public view {
+        assertEq(rosetta.PROTOCOL_FEE_BPS(), 0);
     }
 
     function test_initialize_challengeCountZero() public view {
@@ -135,7 +144,7 @@ contract RosettaProtocolTest is Test {
 
         vm.prank(alice);
         vm.expectEmit(true, false, false, true);
-        emit RosettaProtocol.LexiconRegistered(alice, "trading", block.timestamp);
+        emit LexiconRegistered(alice, "trading", block.timestamp);
         rosetta.registerLexicon("trading", termArr, uciArr);
     }
 
@@ -155,7 +164,7 @@ contract RosettaProtocolTest is Test {
         bytes32 termHash = keccak256(bytes("order_flow"));
         vm.prank(alice);
         vm.expectEmit(true, false, false, true);
-        emit RosettaProtocol.TermAdded(alice, "order_flow", termHash, UCI_VALUE_TRANSFER);
+        emit TermAdded(alice, "order_flow", termHash, UCI_VALUE_TRANSFER);
         rosetta.addTerm("order_flow", UCI_VALUE_TRANSFER);
     }
 
@@ -186,7 +195,7 @@ contract RosettaProtocolTest is Test {
         bytes32 termHash = keccak256(bytes("slippage"));
         vm.prank(alice);
         vm.expectEmit(true, false, false, true);
-        emit RosettaProtocol.TermRemoved(alice, "slippage", termHash);
+        emit TermRemoved(alice, "slippage", termHash);
         rosetta.removeTerm("slippage");
     }
 
@@ -341,7 +350,7 @@ contract RosettaProtocolTest is Test {
         rosetta.registerLexicon("governance", t, u);
 
         vm.expectEmit(true, true, false, true);
-        emit RosettaProtocol.TranslationVerified(
+        emit TranslationVerified(
             alice,
             bob,
             "slippage",
@@ -498,7 +507,7 @@ contract RosettaProtocolTest is Test {
     function test_initiateChallenge_emits_event() public {
         vm.prank(alice);
         vm.expectEmit(true, true, true, true);
-        emit RosettaProtocol.ChallengeInitiated(
+        emit ChallengeInitiated(
             1, alice, bob, bytes32("d"), 1 ether
         );
         rosetta.initiateChallenge{value: 1 ether}(bob, bytes32("d"));
@@ -544,7 +553,7 @@ contract RosettaProtocolTest is Test {
 
         vm.prank(bob);
         vm.expectEmit(true, false, false, true);
-        emit RosettaProtocol.GameRulesSubmitted(1, "simulation_tournament");
+        emit GameRulesSubmitted(1, "simulation_tournament");
         rosetta.acceptChallenge{value: 1 ether}(1, "simulation_tournament");
     }
 
@@ -637,7 +646,7 @@ contract RosettaProtocolTest is Test {
 
         vm.prank(oracle);
         vm.expectEmit(true, true, false, true);
-        emit RosettaProtocol.ChallengeResolved(1, alice, 2 ether);
+        emit ChallengeResolved(1, alice, 2 ether);
         rosetta.resolveChallenge(1, alice);
     }
 
@@ -832,8 +841,8 @@ contract RosettaProtocolTest is Test {
         assertTrue(rosetta.COVENANT_HASH() != bytes32(0));
     }
 
-    function invariant_protocolFeeAlwaysZero() public pure {
-        assertEq(RosettaProtocol.PROTOCOL_FEE_BPS(), 0);
+    function invariant_protocolFeeAlwaysZero() public view {
+        assertEq(rosetta.PROTOCOL_FEE_BPS(), 0);
     }
 
     // ============ Helpers ============

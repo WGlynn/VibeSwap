@@ -129,11 +129,12 @@ contract VibeMultisigTest is Test {
         assertEq(txId, 1);
         assertEq(msig.getTransactionCount(), 1);
 
-        // Note: bytes `data` field is skipped in the auto-generated getter
+        // Note: bytes `data` field is included in the auto-generated getter at index 3
         (
             uint256 id,
             address to,
             uint256 value,
+            ,
             uint256 confirmations,
             bool executed,
 
@@ -173,7 +174,7 @@ contract VibeMultisigTest is Test {
 
         assertEq(target.value(), 99);
 
-        (, , , , bool executed, ) = solo.transactions(1);
+        (, , , , , bool executed, ) = solo.transactions(1);
         assertTrue(executed);
     }
 
@@ -193,7 +194,7 @@ contract VibeMultisigTest is Test {
 
         assertEq(target.value(), 42);
 
-        (, , , , bool executed, ) = msig.transactions(txId);
+        (, , , , , bool executed, ) = msig.transactions(txId);
         assertTrue(executed);
         assertTrue(msig.isConfirmed(txId));
     }
@@ -254,7 +255,7 @@ contract VibeMultisigTest is Test {
 
         assertFalse(msig.confirmed(txId, alice));
 
-        (, , , uint256 confirmations, , ) = msig.transactions(txId);
+        (, , , , uint256 confirmations, , ) = msig.transactions(txId);
         assertEq(confirmations, 0);
     }
 

@@ -474,7 +474,7 @@ contract VerifierCheckpointBridgeTest is Test {
         assertFalse(bridge.isCheckpointed(keccak256("nonexistent")));
     }
 
-    function test_verifierSource_default() public view {
+    function test_verifierSource_default() public {
         assertEq(bridge.verifierSource(makeAddr("unregistered")), bytes32(0));
     }
 

@@ -570,6 +570,10 @@ contract VibeStable is
         return collateralList.length;
     }
 
+    function getCollateralType(address token) external view returns (CollateralType memory) { return collateralTypes[token]; }
+    function getVault(uint256 vaultId) external view returns (Vault memory) { return vaults[vaultId]; }
+    function getAuction(uint256 auctionId) external view returns (LiquidationAuction memory) { return auctions[auctionId]; }
+
     /// @notice Get the current Dutch auction price for an active auction
     function getAuctionPrice(uint256 auctionId) external view returns (uint256) {
         LiquidationAuction storage a = auctions[auctionId];

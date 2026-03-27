@@ -7,6 +7,10 @@ import "../../contracts/core/VSOSKernel.sol";
 
 contract VSOSKernelTest is Test {
 
+    event ServiceRegistered(bytes32 indexed serviceId, string name, VSOSKernel.ServiceCategory category, address implementation);
+    event ServiceUpdated(bytes32 indexed serviceId, address oldImpl, address newImpl);
+    event ServiceDeactivated(bytes32 indexed serviceId);
+
     VSOSKernel public kernel;
 
     address public owner;
@@ -266,7 +270,7 @@ contract VSOSKernelTest is Test {
         bytes32 expectedId = keccak256(abi.encodePacked("CommitRevealAuction", uint8(VSOSKernel.ServiceCategory.KERNEL)));
 
         vm.expectEmit(true, false, false, true);
-        emit VSOSKernel.ServiceRegistered(
+        emit ServiceRegistered(
             expectedId,
             "CommitRevealAuction",
             VSOSKernel.ServiceCategory.KERNEL,
@@ -290,7 +294,7 @@ contract VSOSKernelTest is Test {
         address newRouter = makeAddr("CrossChainRouterV2");
 
         vm.expectEmit(true, false, false, true);
-        emit VSOSKernel.ServiceUpdated(serviceId, crossChainRouter, newRouter);
+        emit ServiceUpdated(serviceId, crossChainRouter, newRouter);
 
         kernel.updateService(serviceId, newRouter, "2.0.0");
 
@@ -308,7 +312,7 @@ contract VSOSKernelTest is Test {
         );
 
         vm.expectEmit(true, false, false, false);
-        emit VSOSKernel.ServiceDeactivated(serviceId);
+        emit ServiceDeactivated(serviceId);
 
         kernel.deactivateService(serviceId);
 

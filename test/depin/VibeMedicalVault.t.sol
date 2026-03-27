@@ -149,7 +149,6 @@ contract VibeMedicalVaultTest is Test {
             bytes32 cId,
             bytes32 cPatientId,
             address grantee,
-            ,
             VibeMedicalVault.AccessPurpose purpose,
             uint256 grantedAt,
             uint256 expiresAt,
@@ -227,7 +226,7 @@ contract VibeMedicalVaultTest is Test {
         vm.prank(patient);
         vault.revokeConsent(consentId);
 
-        (, , , , , , , VibeMedicalVault.ConsentStatus status, , ) = vault.consents(consentId);
+        (, , , , , , VibeMedicalVault.ConsentStatus status, , ) = vault.consents(consentId);
         assertEq(uint8(status), uint8(VibeMedicalVault.ConsentStatus.REVOKED));
     }
 
@@ -255,7 +254,7 @@ contract VibeMedicalVaultTest is Test {
             keccak256("zk_proof")
         );
 
-        (, , , , , , , , uint256 accessCount, ) = vault.consents(consentId);
+        (, , , , , , , uint256 accessCount, ) = vault.consents(consentId);
         assertEq(accessCount, 1);
         assertEq(vault.getAccessLogCount(), 1);
         assertEq(vault.totalAccessFees(), 0.01 ether);
@@ -273,7 +272,7 @@ contract VibeMedicalVaultTest is Test {
             keccak256("proof")
         );
 
-        (, , , , , , , , uint256 accessCount, ) = vault.consents(consentId);
+        (, , , , , , , uint256 accessCount, ) = vault.consents(consentId);
         assertEq(accessCount, 1);
     }
 
@@ -384,7 +383,6 @@ contract VibeMedicalVaultTest is Test {
             uint256 enrolledParticipants,
             uint256 compensation,
             ,
-            ,
             bool active,
             bool approved
         ) = vault.studies(1);
@@ -449,7 +447,7 @@ contract VibeMedicalVaultTest is Test {
 
         assertTrue(vault.enrolled(studyId, patientId));
 
-        (, , , , , uint256 enrolledParticipants, , , , , ) = vault.studies(studyId);
+        (, , , , , uint256 enrolledParticipants, , , , ) = vault.studies(studyId);
         assertEq(enrolledParticipants, 1);
 
         // Check compensation was paid

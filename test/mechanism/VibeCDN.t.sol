@@ -96,7 +96,7 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.registerNode{value: MIN_STAKE}(NODE_BANDWIDTH, NODE_STORAGE, ENDPOINT, regions);
 
-        VibeCDN.ContentNode memory node = cdn.nodes(alice);
+        VibeCDN.ContentNode memory node = cdn.getNode(alice);
         assertTrue(node.active);
         assertEq(node.stake, MIN_STAKE);
         assertEq(node.bandwidth, NODE_BANDWIDTH);
@@ -143,8 +143,8 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.exitNode();
 
-        assertFalse(cdn.nodes(alice).active);
-        assertEq(cdn.nodes(alice).stake, 0);
+        assertFalse(cdn.getNode(alice).active);
+        assertEq(cdn.getNode(alice).stake, 0);
         assertEq(alice.balance, balBefore + MIN_STAKE);
     }
 
@@ -175,7 +175,7 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.pinContent{value: totalBounty}(CONTENT_HASH, CONTENT_SIZE, REPLICATION, DURATION, BOUNTY_PER_NODE);
 
-        VibeCDN.ContentPin memory pin = cdn.pins(CONTENT_HASH);
+        VibeCDN.ContentPin memory pin = cdn.getPin(CONTENT_HASH);
         assertTrue(pin.active);
         assertEq(pin.publisher, alice);
         assertEq(pin.size, CONTENT_SIZE);
@@ -203,7 +203,7 @@ contract VibeCDNTest is Test {
         cdn.claimPin(CONTENT_HASH);
 
         assertTrue(cdn.nodePins(CONTENT_HASH, alice));
-        assertEq(cdn.pins(CONTENT_HASH).replicationCount, 1);
+        assertEq(cdn.getPin(CONTENT_HASH).replicationCount, 1);
     }
 
     function test_claimPin_revertsIfNotNode() public {
@@ -264,7 +264,7 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.reportServed(CONTENT_HASH, bytesServed);
 
-        assertEq(cdn.nodes(alice).served, bytesServed);
+        assertEq(cdn.getNode(alice).served, bytesServed);
         assertEq(cdn.totalBytesServed(), bytesServed);
     }
 
@@ -289,7 +289,7 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.reportServed(CONTENT_HASH, 2000);
 
-        assertEq(cdn.nodes(alice).served, 3000);
+        assertEq(cdn.getNode(alice).served, 3000);
         assertEq(cdn.totalBytesServed(), 3000);
     }
 
@@ -307,7 +307,7 @@ contract VibeCDNTest is Test {
         assertEq(jobId, 1);
         assertEq(cdn.getJobCount(), 1);
 
-        VibeCDN.TranscodeJob memory job = cdn.transcodeJobs(1);
+        VibeCDN.TranscodeJob memory job = cdn.getTranscodeJob(1);
         assertEq(job.requester, alice);
         assertEq(job.sourceHash, srcHash);
         assertEq(job.outputFormat, "1080p");
@@ -336,13 +336,13 @@ contract VibeCDNTest is Test {
         vm.prank(bob);
         cdn.submitTranscode(jobId, resultHash);
 
-        VibeCDN.TranscodeJob memory job = cdn.transcodeJobs(jobId);
+        VibeCDN.TranscodeJob memory job = cdn.getTranscodeJob(jobId);
         assertTrue(job.completed);
         assertEq(job.transcoder, bob);
         assertEq(job.resultHash, resultHash);
 
         assertEq(bob.balance, balBefore + 0.5 ether);
-        assertEq(cdn.nodes(bob).earnings, 0.5 ether);
+        assertEq(cdn.getNode(bob).earnings, 0.5 ether);
         assertEq(cdn.totalEarnings(), 0.5 ether);
     }
 
@@ -392,8 +392,8 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.registerNode{value: stake}(100, 50, "endpoint", regions);
 
-        assertEq(cdn.nodes(alice).stake, stake);
-        assertTrue(cdn.nodes(alice).active);
+        assertEq(cdn.getNode(alice).stake, stake);
+        assertTrue(cdn.getNode(alice).active);
     }
 
     function testFuzz_pinContentWithVariousBounties(uint96 bountyPerNode) public {
@@ -404,6 +404,6 @@ contract VibeCDNTest is Test {
         vm.prank(alice);
         cdn.pinContent{value: total}(CONTENT_HASH, CONTENT_SIZE, REPLICATION, DURATION, bountyPerNode);
 
-        assertEq(cdn.pins(CONTENT_HASH).bountyPerNode, bountyPerNode);
+        assertEq(cdn.getPin(CONTENT_HASH).bountyPerNode, bountyPerNode);
     }
 }

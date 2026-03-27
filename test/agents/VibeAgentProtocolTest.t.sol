@@ -151,7 +151,7 @@ contract VibeAgentProtocolTest is Test {
 
     function test_registerSkill_success() public {
         bytes32 skillId = _registerSkill("Trading", "Autonomous trading capability");
-        VibeAgentProtocol.Skill memory skill = protocol.skills(skillId);
+        VibeAgentProtocol.Skill memory skill = protocol.getSkill(skillId);
         assertEq(skill.name, "Trading");
         assertEq(skill.description, "Autonomous trading capability");
         assertTrue(skill.active);

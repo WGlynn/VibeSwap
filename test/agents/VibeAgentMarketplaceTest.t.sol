@@ -194,12 +194,12 @@ contract VibeAgentMarketplaceTest is Test {
         uint256 taskId = _requestTask(requester1, agentId, PRICE_PER_TASK);
         assertEq(taskId, 0);
 
-        VibeAgentMarketplace.TaskRequest memory t = marketplace.tasks(taskId);
-        assertEq(t.requester, requester1);
-        assertEq(t.agentId, agentId);
-        assertEq(t.payment, PRICE_PER_TASK);
-        assertEq(uint8(t.status), uint8(VibeAgentMarketplace.TaskStatus.PENDING));
-        assertEq(t.taskHash, TASK_HASH);
+        (, address tRequester, bytes32 tAgentId, bytes32 tTaskHash, uint256 tPayment, VibeAgentMarketplace.TaskStatus tStatus,,) = marketplace.tasks(taskId);
+        assertEq(tRequester, requester1);
+        assertEq(tAgentId, agentId);
+        assertEq(tPayment, PRICE_PER_TASK);
+        assertEq(uint8(tStatus), uint8(VibeAgentMarketplace.TaskStatus.PENDING));
+        assertEq(tTaskHash, TASK_HASH);
     }
 
     function test_RequestTask_RejectsUnknownAgent() public {
@@ -240,7 +240,8 @@ contract VibeAgentMarketplaceTest is Test {
         vm.prank(creator1);
         marketplace.acceptTask(taskId);
 
-        assertEq(uint8(marketplace.tasks(taskId).status), uint8(VibeAgentMarketplace.TaskStatus.ACTIVE));
+        (,,,,, VibeAgentMarketplace.TaskStatus taskStatus,,) = marketplace.tasks(taskId);
+        assertEq(uint8(taskStatus), uint8(VibeAgentMarketplace.TaskStatus.ACTIVE));
     }
 
     function test_AcceptTask_RejectsNonCreator() public {
@@ -284,7 +285,8 @@ contract VibeAgentMarketplaceTest is Test {
         marketplace.completeTask(taskId);
 
         assertEq(creator1.balance, creatorBalBefore + expectedPayout);
-        assertEq(uint8(marketplace.tasks(taskId).status), uint8(VibeAgentMarketplace.TaskStatus.COMPLETED));
+        (,,,,, VibeAgentMarketplace.TaskStatus completedStatus,,) = marketplace.tasks(taskId);
+        assertEq(uint8(completedStatus), uint8(VibeAgentMarketplace.TaskStatus.COMPLETED));
         assertEq(marketplace.getAgent(agentId).totalTasksCompleted, 1);
         assertEq(marketplace.getAgent(agentId).totalEarned, expectedPayout);
         assertEq(marketplace.platformBalance(), PRICE_PER_TASK - expectedPayout);
@@ -315,7 +317,8 @@ contract VibeAgentMarketplaceTest is Test {
         vm.prank(requester1);
         marketplace.disputeTask(taskId);
 
-        assertEq(uint8(marketplace.tasks(taskId).status), uint8(VibeAgentMarketplace.TaskStatus.DISPUTED));
+        (,,,,, VibeAgentMarketplace.TaskStatus disputedStatus,,) = marketplace.tasks(taskId);
+        assertEq(uint8(disputedStatus), uint8(VibeAgentMarketplace.TaskStatus.DISPUTED));
     }
 
     function test_DisputeTask_OnlyRequester() public {
@@ -351,7 +354,8 @@ contract VibeAgentMarketplaceTest is Test {
         marketplace.resolveDispute(taskId, true);
 
         assertGt(creator1.balance, creatorBalBefore);
-        assertEq(uint8(marketplace.tasks(taskId).status), uint8(VibeAgentMarketplace.TaskStatus.COMPLETED));
+        (,,,,, VibeAgentMarketplace.TaskStatus resolvedStatus,,) = marketplace.tasks(taskId);
+        assertEq(uint8(resolvedStatus), uint8(VibeAgentMarketplace.TaskStatus.COMPLETED));
     }
 
     function test_ResolveDispute_FavorRequester() public {
@@ -624,7 +628,8 @@ contract VibeAgentMarketplaceTest is Test {
         vm.prank(requester1);
         uint256 taskId = marketplace.requestTask{value: payment}(agentId, TASK_HASH);
 
-        assertEq(marketplace.tasks(taskId).payment, payment);
+        (,,,, uint256 taskPayment,,,) = marketplace.tasks(taskId);
+        assertEq(taskPayment, payment);
     }
 
     function testFuzz_RateAgent_RatingBounds(uint256 rating) public {

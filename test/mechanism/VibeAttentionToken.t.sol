@@ -29,6 +29,7 @@ contract VibeAttentionTokenTest is Test {
     address public advertiser;
     address public verifier;
     address public user;
+    address public bob;
     address public creator;
 
     // ============ Events ============
@@ -49,6 +50,7 @@ contract VibeAttentionTokenTest is Test {
         advertiser = makeAddr("advertiser");
         verifier = makeAddr("verifier");
         user = makeAddr("user");
+        bob = makeAddr("bob");
         creator = makeAddr("creator");
 
         vm.deal(advertiser, 100 ether);

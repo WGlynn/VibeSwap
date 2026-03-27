@@ -303,7 +303,7 @@ This is the mechanism that sustains cooperation in human societies — not gover
 
 ## 10. Measurement
 
-A claim that cannot be measured cannot be verified. A system that cannot be verified must be trusted. Economítra eliminates the need for trust by making every claim measurable.
+A claim that cannot be measured cannot be verified. A system that cannot be verified must be trusted. This framework eliminates the need for trust by making every claim measurable.
 
 **True price.** Kalman filtering separates signal from noise in multi-venue market data. Output: confidence interval, not point estimate.
 

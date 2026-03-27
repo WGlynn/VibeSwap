@@ -3,18 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Will Glynn — Builder Profile</title>
+<title>Will Glynn — Mechanism Designer</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
   :root {
     --bg: #0a0a0f;
     --surface: #111118;
     --border: #1e1e2e;
     --text: #e4e4ef;
-    --text-dim: #8888a0;
+    --dim: #8888a0;
     --cyan: #06b6d4;
-    --green: #00ff41;
+    --green: #22c55e;
     --purple: #a855f7;
     --amber: #fbbf24;
   }
@@ -22,113 +20,149 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
-    padding: 40px;
-    max-width: 900px;
+    padding: 28px 20px 48px;
+    max-width: 640px;
     margin: 0 auto;
-  }
-
-  @media print {
-    body { background: #fff; color: #111; padding: 20px; }
-    .header { border-color: #06b6d4 !important; }
-    .stat-value { color: #06b6d4 !important; }
-    .section-title { color: #06b6d4 !important; }
-    .tag { background: #f0f0f0 !important; color: #333 !important; }
-    .contribution-title { color: #06b6d4 !important; }
-    .role { color: #06b6d4 !important; }
-    .divider { border-color: #ddd !important; }
-    a { color: #06b6d4 !important; }
-    .closing-box { background: #f8f8f8 !important; border-color: #06b6d4 !important; }
-    .closing-box p { color: #333 !important; }
   }
 
   /* ============ Header ============ */
   .header {
     border-left: 3px solid var(--cyan);
-    padding-left: 24px;
-    margin-bottom: 40px;
+    padding-left: 20px;
+    margin-bottom: 32px;
   }
 
   .name {
-    font-size: 36px;
+    font-size: 30px;
     font-weight: 700;
-    letter-spacing: -1px;
+    letter-spacing: -0.5px;
     margin-bottom: 4px;
   }
 
   .title {
-    font-size: 15px;
+    font-size: 13px;
     color: var(--cyan);
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: 2px;
     text-transform: uppercase;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
 
-  .contact {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    color: var(--text-dim);
+  /* ============ Links ============ */
+  .links {
     display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
+    flex-direction: column;
+    gap: 8px;
   }
 
-  .contact a {
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .link-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .link-row a {
     color: var(--cyan);
     text-decoration: none;
+    font-family: monospace;
+    font-size: 13px;
   }
 
-  .contact a:hover { text-decoration: underline; }
+  .link-row a:hover { text-decoration: underline; }
 
-  /* ============ Stats Grid ============ */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 40px;
+  .link-label {
+    color: var(--dim);
+    font-size: 12px;
+    margin-left: 4px;
   }
 
-  .stat-box {
+  /* ============ One-liner ============ */
+  .oneliner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--purple);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin: 28px 0;
+    font-size: 14px;
+    color: var(--text);
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  /* ============ Project Banner ============ */
+  .project-banner {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 16px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+
+  .project-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--cyan);
+    margin-bottom: 4px;
+  }
+
+  .project-desc {
+    font-size: 13px;
+    color: var(--dim);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+
+  .project-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .stat {
     text-align: center;
   }
 
-  .stat-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 22px;
+  .stat-val {
+    font-family: monospace;
+    font-size: 16px;
     font-weight: 700;
     color: var(--cyan);
     display: block;
   }
 
-  .stat-label {
-    font-size: 11px;
-    color: var(--text-dim);
+  .stat-lbl {
+    font-size: 10px;
+    color: var(--dim);
     text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-top: 4px;
+    letter-spacing: 0.5px;
   }
 
-  /* ============ Sections ============ */
-  .section { margin-bottom: 36px; }
+  /* ============ Section ============ */
+  .section { margin-bottom: 28px; }
 
   .section-title {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--cyan);
+    color: var(--dim);
     text-transform: uppercase;
     letter-spacing: 3px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
   }
 
   .section-title::after {
@@ -138,35 +172,30 @@
     background: var(--border);
   }
 
-  .divider {
-    border: none;
-    border-top: 1px solid var(--border);
-    margin: 32px 0;
-  }
-
-  /* ============ Contributions ============ */
-  .contribution {
-    margin-bottom: 16px;
-    padding-left: 16px;
+  /* ============ Work Cards ============ */
+  .work-card {
     border-left: 2px solid var(--border);
+    padding-left: 14px;
+    margin-bottom: 14px;
+    transition: border-color 0.15s;
   }
 
-  .contribution:hover { border-left-color: var(--cyan); }
+  .work-card:hover { border-left-color: var(--cyan); }
 
-  .contribution-title {
+  .work-title {
+    font-size: 14px;
     font-weight: 600;
-    font-size: 15px;
     color: var(--green);
     margin-bottom: 2px;
   }
 
-  .contribution-desc {
-    font-size: 13px;
-    color: var(--text-dim);
+  .work-desc {
+    font-size: 12px;
+    color: var(--dim);
     line-height: 1.5;
   }
 
-  /* ============ Stack Tags ============ */
+  /* ============ Tags ============ */
   .tags {
     display: flex;
     flex-wrap: wrap;
@@ -174,105 +203,40 @@
   }
 
   .tag {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: monospace;
     font-size: 11px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 4px 10px;
-    color: var(--text-dim);
+    padding: 3px 8px;
+    color: var(--dim);
   }
 
-  /* ============ Experience ============ */
-  .role-block {
-    margin-bottom: 20px;
+  /* ============ Footer ============ */
+  .footer {
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-align: center;
   }
 
-  .role-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+  .footer-line {
+    font-size: 12px;
+    color: var(--dim);
     margin-bottom: 4px;
   }
 
-  .role {
-    font-weight: 600;
-    font-size: 15px;
+  .footer-code {
+    font-family: monospace;
+    font-size: 12px;
     color: var(--cyan);
   }
 
-  .role-org {
-    font-weight: 400;
-    color: var(--text);
+  @media (max-width: 420px) {
+    body { padding: 20px 16px 40px; }
+    .name { font-size: 26px; }
+    .project-stats { grid-template-columns: repeat(2, 1fr); }
   }
-
-  .role-date {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-  }
-
-  .role-desc {
-    font-size: 13px;
-    color: var(--text-dim);
-    line-height: 1.6;
-    margin-top: 4px;
-  }
-
-  /* ============ Education ============ */
-  .edu-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 6px;
-  }
-
-  .edu-degree {
-    font-weight: 500;
-    font-size: 14px;
-  }
-
-  .edu-school {
-    font-size: 13px;
-    color: var(--text-dim);
-  }
-
-  /* ============ Closing ============ */
-  .closing-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--cyan);
-    border-radius: 8px;
-    padding: 24px;
-    margin-top: 40px;
-  }
-
-  .closing-box p {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-  }
-
-  .closing-box p:last-child { margin-bottom: 0; }
-
-  .closing-box strong { color: var(--text); }
-
-  .closing-box .punchline {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    color: var(--cyan);
-    margin-top: 12px;
-  }
-
-  /* ============ Project Line ============ */
-  .project-line {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-bottom: 40px;
-  }
-
-  .project-line strong { color: var(--text); }
-  .project-line .highlight { color: var(--cyan); }
 </style>
 </head>
 <body>
@@ -280,69 +244,94 @@
   <!-- Header -->
   <div class="header">
     <div class="name">Will Glynn</div>
-    <div class="title">Mechanism Designer · Protocol Engineer · Founder</div>
-    <div class="contact">
-      <span>(774) 571-4257</span>
-      <span>willglynn123@gmail.com</span>
-      <span>Cape Cod, MA</span>
-      <a href="https://github.com/WGlynn/VibeSwap">GitHub</a>
-      <a href="https://t.me/+3uHbNxyZH-tiOGY8">Telegram</a>
-      <a href="https://frontend-jade-five-87.vercel.app">Live Demo</a>
+    <div class="title">Mechanism Designer &amp; Full-Stack Blockchain Engineer</div>
+    <div class="links">
+      <div class="link-row">
+        <span class="link-icon">&#128279;</span>
+        <a href="https://github.com/wglynn/vibeswap" target="_blank">github.com/wglynn/vibeswap</a>
+        <span class="link-label">— source + 1,845+ commits</span>
+      </div>
+      <div class="link-row">
+        <span class="link-icon">&#127760;</span>
+        <a href="https://frontend-jade-five-87.vercel.app" target="_blank">frontend-jade-five-87.vercel.app</a>
+        <span class="link-label">— live demo</span>
+      </div>
+      <div class="link-row">
+        <span class="link-icon">&#128172;</span>
+        <a href="https://t.me/+3uHbNxyZH-tiOGY8" target="_blank">t.me/+3uHbNxyZH-tiOGY8</a>
+        <span class="link-label">— Telegram community</span>
+      </div>
     </div>
   </div>
 
-  <!-- Project -->
-  <p class="project-line">
-    <strong>VibeSwap</strong> — Omnichain DEX eliminating MEV through commit-reveal batch auctions with Shapley-fair reward distribution. <span class="highlight">Zero protocol fees.</span> Deployed on Base. Built on LayerZero V2.
-  </p>
+  <!-- One-liner -->
+  <div class="oneliner">
+    "An OS that ignores economics is just a VM. An OS that ignores governance is just a dictatorship."
+  </div>
 
-  <!-- Stats -->
-  <div class="stats-grid">
-    <div class="stat-box">
-      <span class="stat-value">351</span>
-      <span class="stat-label">Contracts</span>
+  <!-- Project Banner -->
+  <div class="project-banner">
+    <div class="project-name">VibeSwap</div>
+    <div class="project-desc">
+      Omnichain DEX on LayerZero V2. MEV eliminated via commit-reveal batch auctions with uniform clearing prices and Fisher-Yates shuffle. Zero protocol fees. Shapley-fair reward distribution.
     </div>
-    <div class="stat-box">
-      <span class="stat-value">20K+</span>
-      <span class="stat-label">Tests</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-value">1,845+</span>
-      <span class="stat-label">Commits</span>
-    </div>
-    <div class="stat-box">
-      <span class="stat-value">$0</span>
-      <span class="stat-label">Funding</span>
+    <div class="project-stats">
+      <div class="stat">
+        <span class="stat-val">351</span>
+        <span class="stat-lbl">Contracts</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">20K+</span>
+        <span class="stat-lbl">Tests</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">1,845+</span>
+        <span class="stat-lbl">Commits</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">$0</span>
+        <span class="stat-lbl">Funding</span>
+      </div>
     </div>
   </div>
 
-  <!-- Original Contributions -->
+  <!-- Key Work -->
   <div class="section">
-    <div class="section-title">Original Contributions</div>
+    <div class="section-title">Key Work</div>
 
-    <div class="contribution">
-      <div class="contribution-title">Augmented Governance</div>
-      <div class="contribution-desc">Shapley axioms as on-chain constitutional invariants. Governance capture becomes mathematically impossible. Proven in simulation — 9 tests, 2 fuzz, 100% extraction detection.</div>
+    <div class="work-card">
+      <div class="work-title">Economitra</div>
+      <div class="work-desc">
+        Information theory meets mechanism design. Shannon entropy applied to market microstructure — price discovery as signal extraction, liquidity as channel capacity. The theoretical backbone of VibeSwap's auction architecture.
+      </div>
     </div>
 
-    <div class="contribution">
-      <div class="contribution-title">P-001: No Extraction Ever</div>
-      <div class="contribution-desc">Self-correcting fairness invariant. Same Shapley math that distributes rewards detects extraction. Autonomous correction without governance votes.</div>
+    <div class="work-card">
+      <div class="work-title">FractalShapley</div>
+      <div class="work-desc">
+        Recursive Shapley attribution for multi-agent systems. Attribution flows through nested coalitions without double-counting. Used in ShapleyDistributor.sol to make governance capture mathematically impossible.
+      </div>
     </div>
 
-    <div class="contribution">
-      <div class="contribution-title">Commit-Reveal Batch Auctions</div>
-      <div class="contribution-desc">8s commit → 2s reveal → Fisher-Yates shuffle via XORed secrets → uniform clearing price. MEV structurally eliminated.</div>
+    <div class="work-card">
+      <div class="work-title">VSOS — VibeSwap Operating System</div>
+      <div class="work-desc">
+        DeFi as a full operating system: scheduler (batch auctions), memory manager (AMM state), filesystem (IPFS + on-chain), process isolation (circuit breakers), and cooperative resource allocation across chains.
+      </div>
     </div>
 
-    <div class="contribution">
-      <div class="contribution-title">x402 + SIWX Session Auth</div>
-      <div class="contribution-desc">CAIP-122 wallet sessions for HTTP 402 payments. Pay once, authenticate in microseconds. 4,000x latency reduction. Implemented same day as protocol announcement.</div>
+    <div class="work-card">
+      <div class="work-title">Commit-Reveal Batch Auctions</div>
+      <div class="work-desc">
+        8s commit &rarr; 2s reveal &rarr; Fisher-Yates shuffle via XORed secrets &rarr; uniform clearing price. MEV is structurally impossible, not just disincentivized.
+      </div>
     </div>
 
-    <div class="contribution">
-      <div class="contribution-title">Three-Layer Oracle Stack</div>
-      <div class="contribution-desc">On-chain TWAP + Kalman filter true price + regime detection. Circuit breakers on price deviation, volume spikes, TVL surges.</div>
+    <div class="work-card">
+      <div class="work-title">Augmented Governance</div>
+      <div class="work-desc">
+        Physics (P-001: No Extraction Ever) &gt; Constitution (P-000: Fairness Above All) &gt; DAO. Shapley axioms encoded as on-chain invariants. If the math holds, the governance holds.
+      </div>
     </div>
   </div>
 
@@ -356,93 +345,20 @@
       <span class="tag">UUPS</span>
       <span class="tag">React</span>
       <span class="tag">Vite</span>
-      <span class="tag">Tailwind</span>
       <span class="tag">ethers.js v6</span>
-      <span class="tag">Node.js</span>
-      <span class="tag">Express</span>
       <span class="tag">Python</span>
-      <span class="tag">Rust</span>
       <span class="tag">LayerZero V2</span>
-      <span class="tag">Base</span>
-      <span class="tag">Nervos CKB</span>
-      <span class="tag">RISC-V</span>
       <span class="tag">WebAuthn</span>
       <span class="tag">ERC-4337</span>
+      <span class="tag">cooperative game theory</span>
     </div>
   </div>
 
-  <hr class="divider">
-
-  <!-- Experience -->
-  <div class="section">
-    <div class="section-title">Experience</div>
-
-    <div class="role-block">
-      <div class="role-header">
-        <div><span class="role">Founder & Protocol Engineer</span> <span class="role-org">— VibeSwap</span></div>
-        <span class="role-date">2025 – Present</span>
-      </div>
-      <div class="role-desc">Built a full-stack omnichain DEX from zero: 351 contracts, 336 frontend components, 73-module Rust SDK, multi-shard AI system, Python oracle, and 44 research papers. Designed commit-reveal batch auctions, Shapley distribution, augmented governance, and the cooperative capitalism economic model.</div>
-    </div>
-
-    <div class="role-block">
-      <div class="role-header">
-        <div><span class="role">Outreach & Growth</span> <span class="role-org">— Nervos Network</span></div>
-        <span class="role-date">2020 – 2024</span>
-      </div>
-      <div class="role-desc">Partnerships with top-50 projects by market cap. C-level meetings resulting in 20% spend of acquisition budget. White papers and educational content on UTXO cell model architecture. Boston-area events for 300+ professionals. Strategic input on marketing programs supporting 3% Y/Y growth.</div>
-    </div>
-
-    <div class="role-block">
-      <div class="role-header">
-        <div><span class="role">Marketing & Sales Manager</span> <span class="role-org">— Ergon</span></div>
-        <span class="role-date">2023 – Present</span>
-      </div>
-      <div class="role-desc">Social media campaign driving 5x ROI by market cap. White papers on multi-asset blockchain architecture. Boston-area conferences, product launches, sales collateral.</div>
-    </div>
-
-    <div class="role-block">
-      <div class="role-header">
-        <div><span class="role">Startup Consultant</span> <span class="role-org">— Blockchain Projects</span></div>
-        <span class="role-date">2019 – Present</span>
-      </div>
-      <div class="role-desc">Gitcoin, Ampleforth, Etherisc, Sidepit Exchange, and others. Tokenomics design, white papers, market strategy, architecture review, smart contract security analysis.</div>
-    </div>
-
-    <div class="role-block">
-      <div class="role-header">
-        <div><span class="role">Independent Researcher</span> <span class="role-org">— Cryptoeconomics</span></div>
-        <span class="role-date">2016 – Present</span>
-      </div>
-      <div class="role-desc">10 years. 100+ papers. Scalability, interoperability, security, applied game theory. Designed the first trustless bridge for peer-to-peer digital cash. Worked alongside dozens of research teams.</div>
-    </div>
-  </div>
-
-  <hr class="divider">
-
-  <!-- Education -->
-  <div class="section">
-    <div class="section-title">Education</div>
-    <div class="edu-row">
-      <div>
-        <div class="edu-degree">M.S. Digital Currency</div>
-        <div class="edu-school">University of Nicosia</div>
-      </div>
-    </div>
-    <div class="edu-row">
-      <div>
-        <div class="edu-degree">B.S. Business</div>
-        <div class="edu-school">Southern New Hampshire University · 2016–2020</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Closing -->
-  <div class="closing-box">
-    <p>Most founders raise money to build.</p>
-    <p><strong>I built first.</strong></p>
-    <p>The code is public. The tests pass. The math works.</p>
-    <p class="punchline">github.com/WGlynn/VibeSwap — 1,845+ commits. $0 funding. Built in a cave.</p>
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-line">Most founders raise money to build.</div>
+    <div class="footer-line"><strong>I built first.</strong> The code is public. The tests pass. The math works.</div>
+    <div class="footer-code">Built in a cave. &mdash; Cape Cod, MA &mdash; MIT Bitcoin Expo 2026</div>
   </div>
 
 </body>

@@ -505,31 +505,33 @@ contract VibeAMM is
     ) {
         Pool storage pool = pools[poolId];
 
-        // Gas: cache token addresses from storage to avoid repeated SLOADs
-        address _t0 = pool.token0;
-        address _t1 = pool.token1;
+        // Scoped to free stack slots after token transfers complete
+        {
+            // Gas: cache token addresses from storage to avoid repeated SLOADs
+            address _t0 = pool.token0;
+            address _t1 = pool.token1;
 
-        // Check for donation attack before calculating optimal amounts
-        _checkDonationAttack(_t0);
-        _checkDonationAttack(_t1);
+            // Check for donation attack before calculating optimal amounts
+            _checkDonationAttack(_t0);
+            _checkDonationAttack(_t1);
 
-        // Calculate optimal amounts
-        (amount0, amount1) = BatchMath.calculateOptimalLiquidity(
-            amount0Desired,
-            amount1Desired,
-            pool.reserve0,
-            pool.reserve1
-        );
+            // Calculate optimal amounts
+            (amount0, amount1) = BatchMath.calculateOptimalLiquidity(
+                amount0Desired,
+                amount1Desired,
+                pool.reserve0,
+                pool.reserve1
+            );
 
-        if (amount0 < amount0Min) revert InsufficientToken0();
-        if (amount1 < amount1Min) revert InsufficientToken1();
+            if (amount0 < amount0Min) revert InsufficientToken0();
+            if (amount1 < amount1Min) revert InsufficientToken1();
 
-        // Transfer tokens
-        IERC20(_t0).safeTransferFrom(msg.sender, address(this), amount0);
-        IERC20(_t1).safeTransferFrom(msg.sender, address(this), amount1);
+            // Transfer tokens
+            IERC20(_t0).safeTransferFrom(msg.sender, address(this), amount0);
+            IERC20(_t1).safeTransferFrom(msg.sender, address(this), amount1);
+        }
 
         // Calculate liquidity tokens
-        bool isFirstDeposit = pool.totalLiquidity == 0;
         liquidity = BatchMath.calculateLiquidity(
             amount0,
             amount1,
@@ -541,7 +543,8 @@ contract VibeAMM is
         // FIRST DEPOSITOR ATTACK PROTECTION (M-02 dissolved)
         // Lock minimum liquidity + require meaningful initial deposit to prevent
         // price manipulation via extreme token ratios.
-        if (isFirstDeposit) {
+        // Scoped with inline condition to avoid extra bool on the stack
+        if (pool.totalLiquidity == 0) {
             require(amount0 >= 1e15 && amount1 >= 1e15, "M-02: Minimum initial deposit");
             if (liquidity <= MINIMUM_LIQUIDITY) revert InitialLiquidityTooLow();
             // Burn minimum liquidity to dead address (prevents share manipulation)
@@ -549,11 +552,9 @@ contract VibeAMM is
             VibeLP(lpTokens[poolId]).mint(address(0xdead), MINIMUM_LIQUIDITY);
             pool.totalLiquidity += MINIMUM_LIQUIDITY;
 
-            // Initialize TWAP oracle for this pool
+            // Initialize TWAP + VWAP oracles for this pool
             uint256 initialPrice = amount0 > 0 ? (amount1 * 1e18) / amount0 : 0;
             poolOracles[poolId].initialize(initialPrice);
-
-            // Initialize VWAP oracle
             poolVWAP[poolId].initialize(initialPrice);
         }
 
@@ -567,8 +568,9 @@ contract VibeAMM is
         }
 
         // Update tracked balances for donation detection
-        trackedBalances[_t0] += amount0;
-        trackedBalances[_t1] += amount1;
+        // Read from storage (cached vars were scoped out to prevent stack-too-deep)
+        trackedBalances[pool.token0] += amount0;
+        trackedBalances[pool.token1] += amount1;
 
         // Update TWAP oracle
         _updateOracle(poolId);
@@ -614,10 +616,6 @@ contract VibeAMM is
         // Verify user has the LP tokens (check actual balance, not internal tracking)
         if (IERC20(lpToken).balanceOf(msg.sender) < liquidity) revert InsufficientLiquidityBalance();
 
-        // Gas: cache token addresses from storage to avoid repeated SLOADs
-        address _t0 = pool.token0;
-        address _t1 = pool.token1;
-
         // Calculate amounts
         amount0 = (liquidity * pool.reserve0) / pool.totalLiquidity;
         amount1 = (liquidity * pool.reserve1) / pool.totalLiquidity;
@@ -641,12 +639,13 @@ contract VibeAMM is
             pool.totalLiquidity -= liquidity;
         }
 
-        // Update tracked balances
-        if (trackedBalances[_t0] >= amount0) {
-            unchecked { trackedBalances[_t0] -= amount0; }
+        // Update tracked balances (read token addresses from storage each time
+        // to avoid holding them on the stack — prevents stack-too-deep)
+        if (trackedBalances[pool.token0] >= amount0) {
+            unchecked { trackedBalances[pool.token0] -= amount0; }
         }
-        if (trackedBalances[_t1] >= amount1) {
-            unchecked { trackedBalances[_t1] -= amount1; }
+        if (trackedBalances[pool.token1] >= amount1) {
+            unchecked { trackedBalances[pool.token1] -= amount1; }
         }
 
         // Update internal tracking (use min to prevent underflow if LP was transferred)
@@ -666,8 +665,8 @@ contract VibeAMM is
         VibeLP(lpToken).burn(msg.sender, liquidity);
 
         // Transfer tokens
-        IERC20(_t0).safeTransfer(msg.sender, amount0);
-        IERC20(_t1).safeTransfer(msg.sender, amount1);
+        IERC20(pool.token0).safeTransfer(msg.sender, amount0);
+        IERC20(pool.token1).safeTransfer(msg.sender, amount1);
 
         // Update TWAP oracle
         _updateOracle(poolId);
@@ -701,29 +700,33 @@ contract VibeAMM is
 
         Pool storage pool = pools[poolId];
 
-        // Gas: cache token addresses from storage to avoid repeated SLOADs
-        address _poolToken0 = pool.token0;
-        address _poolToken1 = pool.token1;
+        // Scoped to free stack slots for _poolToken0, _poolToken1, buyOrders, sellOrders
+        uint256 clearingPrice;
+        {
+            // Gas: cache token addresses from storage to avoid repeated SLOADs
+            address _poolToken0 = pool.token0;
+            address _poolToken1 = pool.token1;
 
-        // Check for donation attacks before batch execution
-        _checkDonationAttack(_poolToken0);
-        _checkDonationAttack(_poolToken1);
+            // Check for donation attacks before batch execution
+            _checkDonationAttack(_poolToken0);
+            _checkDonationAttack(_poolToken1);
 
-        // Separate buy and sell orders for clearing price calculation
-        (uint256[] memory buyOrders, uint256[] memory sellOrders) = _categorizeOrders(
-            orders,
-            _poolToken0,
-            pool.reserve0,
-            pool.reserve1
-        );
+            // Separate buy and sell orders for clearing price calculation
+            (uint256[] memory buyOrders, uint256[] memory sellOrders) = _categorizeOrders(
+                orders,
+                _poolToken0,
+                pool.reserve0,
+                pool.reserve1
+            );
 
-        // Calculate uniform clearing price
-        (uint256 clearingPrice, ) = BatchMath.calculateClearingPrice(
-            buyOrders,
-            sellOrders,
-            pool.reserve0,
-            pool.reserve1
-        );
+            // Calculate uniform clearing price
+            (clearingPrice, ) = BatchMath.calculateClearingPrice(
+                buyOrders,
+                sellOrders,
+                pool.reserve0,
+                pool.reserve1
+            );
+        }
 
         // ============ Oracle Update (Pre-Validation) ============
         // Write current spot price to TWAP oracle BEFORE validation so consult()
@@ -783,8 +786,9 @@ contract VibeAMM is
         _checkAndUpdatePriceBreaker(poolId);
 
         // Sync tracked balances to prevent donation attack false positives on next batch
-        trackedBalances[_poolToken0] = IERC20(_poolToken0).balanceOf(address(this));
-        trackedBalances[_poolToken1] = IERC20(_poolToken1).balanceOf(address(this));
+        // Re-read from storage (originals were scoped out to avoid stack-too-deep)
+        trackedBalances[pool.token0] = IERC20(pool.token0).balanceOf(address(this));
+        trackedBalances[pool.token1] = IERC20(pool.token1).balanceOf(address(this));
 
         emit BatchSwapExecuted(
             poolId,
@@ -829,28 +833,37 @@ contract VibeAMM is
         {
             uint256 reserveIn = isToken0 ? pool.reserve0 : pool.reserve1;
             uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-            uint256 effResIn = reserveIn;
-            uint256 effResOut = reserveOut;
 
-            // Liquidity Protection
-            if ((protectionFlags & FLAG_LIQUIDITY) != 0 && poolProtectionConfig[p.poolId].amplificationFactor > 0) {
-                (uint256 adjustedFee, uint256 effRes0, uint256 effRes1) = _applyLiquidityProtection(
-                    p.poolId, p.amountIn, _getTradeValueUsd(p.tokenIn, p.amountIn)
-                );
-                feeRate = adjustedFee;
-                effResIn = isToken0 ? effRes0 : effRes1;
-                effResOut = isToken0 ? effRes1 : effRes0;
-                if (adjustedFee != pool.feeRate) emit DynamicFeeApplied(p.poolId, pool.feeRate, adjustedFee);
-            }
+            // Apply protections (scoped to avoid stack overflow)
+            uint256 effResIn;
+            uint256 effResOut;
+            {
+                effResIn = reserveIn;
+                effResOut = reserveOut;
 
-            // Fibonacci Scaling
-            if ((protectionFlags & FLAG_FIBONACCI) != 0) {
-                feeRate = _applyFibonacciScaling(p.poolId, msg.sender, p.amountIn, feeRate);
+                // Liquidity Protection
+                if ((protectionFlags & FLAG_LIQUIDITY) != 0 && poolProtectionConfig[p.poolId].amplificationFactor > 0) {
+                    uint256 tradeUsd = _getTradeValueUsd(p.tokenIn, p.amountIn);
+                    (uint256 adjustedFee, uint256 effRes0, uint256 effRes1) = _applyLiquidityProtection(
+                        p.poolId, p.amountIn, tradeUsd
+                    );
+                    feeRate = adjustedFee;
+                    effResIn = isToken0 ? effRes0 : effRes1;
+                    effResOut = isToken0 ? effRes1 : effRes0;
+                    if (adjustedFee != pool.feeRate) emit DynamicFeeApplied(p.poolId, pool.feeRate, adjustedFee);
+                }
+
+                // Fibonacci Scaling
+                if ((protectionFlags & FLAG_FIBONACCI) != 0) {
+                    feeRate = _applyFibonacciScaling(p.poolId, msg.sender, p.amountIn, feeRate);
+                }
             }
 
             // Trade size limit
-            uint256 maxTradeSize = poolMaxTradeSize[p.poolId] > 0 ? poolMaxTradeSize[p.poolId] : (reserveIn * MAX_TRADE_SIZE_BPS) / 10000;
-            if (p.amountIn > maxTradeSize) { emit LargeTradeLimited(p.poolId, p.amountIn, maxTradeSize); revert TradeTooLarge(maxTradeSize); }
+            {
+                uint256 maxTradeSize = poolMaxTradeSize[p.poolId] > 0 ? poolMaxTradeSize[p.poolId] : (reserveIn * MAX_TRADE_SIZE_BPS) / 10000;
+                if (p.amountIn > maxTradeSize) { emit LargeTradeLimited(p.poolId, p.amountIn, maxTradeSize); revert TradeTooLarge(maxTradeSize); }
+            }
 
             amountOut = BatchMath.getAmountOut(p.amountIn, effResIn, effResOut, feeRate);
             if (effResIn != reserveIn && amountOut > reserveOut * MAX_RESERVE_DRAIN_PERCENT / 100) amountOut = reserveOut * MAX_RESERVE_DRAIN_PERCENT / 100;
@@ -1309,17 +1322,9 @@ contract VibeAMM is
         uint256 amountOut,
         uint256 protocolFee
     ) {
-        // Gas: cache token addresses from storage to avoid repeated SLOADs
-        address _token0 = pool.token0;
-        address _token1 = pool.token1;
-        bool isToken0 = order.tokenIn == _token0;
-        address tokenOut = isToken0 ? _token1 : _token0;
+        bool isToken0 = order.tokenIn == pool.token0;
 
         // C-01: Dissolve fee-on-transfer attack surface — verify actual tokens received
-        // VibeSwapCore transfers tokens before calling executeBatchSwap. We verify
-        // the contract's balance actually reflects the claimed amountIn. If a token
-        // has transfer fees, the actual balance is less than expected and we revert.
-        // This makes fee-on-transfer token drains structurally impossible.
         {
             uint256 actualBalance = IERC20(order.tokenIn).balanceOf(address(this));
             uint256 requiredBalance = (isToken0 ? pool.reserve0 : pool.reserve1) + order.amountIn;
@@ -1330,10 +1335,8 @@ contract VibeAMM is
 
         // Calculate output at clearing price
         if (isToken0) {
-            // Selling token0: amountOut = amountIn * clearingPrice / 1e18
             amountOut = (amountIn * clearingPrice) / 1e18;
         } else {
-            // Buying token0: amountOut = amountIn * 1e18 / clearingPrice
             amountOut = clearingPrice > 0 ? (amountIn * 1e18) / clearingPrice : 0;
         }
 
@@ -1344,86 +1347,76 @@ contract VibeAMM is
             protocolFeeShare
         );
 
-        // Reduce output by fee — multiply before dividing to minimize precision loss
-        uint256 netOut = (amountOut * (10000 - feeRate)) / 10000;
-        uint256 totalFee = amountOut - netOut;
-        amountOut = netOut;
+        // Compute gross amount (before fees) and net amount
+        uint256 grossOut = amountOut;
+        amountOut = (grossOut * (10000 - feeRate)) / 10000;
 
-        // Gas: compute poolId once from cached token addresses (avoids 3x keccak256 recomputation)
-        bytes32 _poolId = getPoolId(_token0, _token1);
+        // Validate and execute — all checks scoped to minimize stack depth
+        {
+            bytes32 pid = getPoolId(pool.token0, pool.token1);
 
-        // Check minimum output after fees
-        if (amountOut < order.minAmountOut) {
-            // FIX #5: Emit failure event instead of silent return
-            emit SwapFailed(
-                _poolId,
-                order.trader,
-                order.tokenIn,
-                amountIn,
-                amountOut,
-                order.minAmountOut,
-                "Slippage exceeded"
-            );
-            // FIX #6: Return unfilled tokens to CALLER (VibeSwapCore), not trader
-            // VibeSwapCore manages deposit accounting and handles refunds to traders
-            IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
-            return (0, 0, 0);
+            // Check minimum output after fees
+            if (amountOut < order.minAmountOut) {
+                emit SwapFailed(pid, order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut, "Slippage exceeded");
+                IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
+                return (0, 0, 0);
+            }
+
+            // Verify enough output tokens (LP fees stay in pool)
+            {
+                uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
+                if (grossOut - protocolFee > reserveOut) {
+                    emit SwapFailed(pid, order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut, "Insufficient liquidity");
+                    IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
+                    return (0, 0, 0);
+                }
+            }
+
+            // Transfer output tokens to trader
+            address tokenOut = isToken0 ? pool.token1 : pool.token0;
+            IERC20(tokenOut).safeTransfer(order.trader, amountOut);
+
+            // Update reserves
+            {
+                uint256 lpDeduction = grossOut - protocolFee;
+                if (isToken0) {
+                    pool.reserve0 += amountIn;
+                    pool.reserve1 -= lpDeduction;
+                } else {
+                    pool.reserve1 += amountIn;
+                    pool.reserve0 -= lpDeduction;
+                }
+            }
+
+            // Track protocol fees — route surcharge surplus to insurance pool
+            _trackProtocolFees(pid, tokenOut, feeRate, pool.feeRate, amountOut, protocolFee);
+
+            emit SwapExecuted(pid, order.trader, order.tokenIn, tokenOut, amountIn, amountOut);
         }
+    }
 
-        // Verify we have enough output tokens (including LP fee deduction)
-        uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-        uint256 reserveDeduction = amountOut + totalFee - protocolFee;
-        if (reserveDeduction > reserveOut) {
-            // FIX #5: Emit failure event
-            emit SwapFailed(
-                _poolId,
-                order.trader,
-                order.tokenIn,
-                amountIn,
-                amountOut,
-                order.minAmountOut,
-                "Insufficient liquidity"
-            );
-            // FIX #6: Return unfilled tokens to CALLER (VibeSwapCore), not trader
-            IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
-            return (0, 0, 0);
-        }
-
-        // Transfer output tokens to trader
-        IERC20(tokenOut).safeTransfer(order.trader, amountOut);
-
-        // Update reserves (input tokens are already in contract)
-        if (isToken0) {
-            pool.reserve0 += amountIn;
-            pool.reserve1 -= (amountOut + totalFee - protocolFee); // LP fees stay in pool
-        } else {
-            pool.reserve1 += amountIn;
-            pool.reserve0 -= (amountOut + totalFee - protocolFee);
-        }
-
-        // Track protocol fees — route surcharge surplus to insurance pool
-        if (address(incentiveController) != address(0) && feeRate > pool.feeRate && protocolFee > 0) {
-            (uint256 basePFee, ) = BatchMath.calculateFees(amountOut, pool.feeRate, protocolFeeShare);
+    /// @dev Track protocol fees, routing surcharge surplus to insurance pool
+    function _trackProtocolFees(
+        bytes32 poolId,
+        address tokenOut,
+        uint256 feeRate,
+        uint256 baseFeeRate,
+        uint256 amountOut,
+        uint256 protocolFee
+    ) internal {
+        if (address(incentiveController) != address(0) && feeRate > baseFeeRate && protocolFee > 0) {
+            (uint256 basePFee, ) = BatchMath.calculateFees(amountOut, baseFeeRate, protocolFeeShare);
             uint256 surplus = protocolFee > basePFee ? protocolFee - basePFee : 0;
             if (surplus > 0) {
                 accumulatedFees[tokenOut] += protocolFee - surplus;
                 IERC20(tokenOut).safeTransfer(address(incentiveController), surplus);
-                try incentiveController.routeVolatilityFee(_poolId, tokenOut, surplus) {} catch {}
+                try incentiveController.routeVolatilityFee(poolId, tokenOut, surplus) {} catch {}
             } else {
                 accumulatedFees[tokenOut] += protocolFee;
             }
         } else {
             accumulatedFees[tokenOut] += protocolFee;
         }
-
-        emit SwapExecuted(
-            _poolId,
-            order.trader,
-            order.tokenIn,
-            tokenOut,
-            amountIn,
-            amountOut
-        );
     }
 
     // ============ Security Internal Functions ============

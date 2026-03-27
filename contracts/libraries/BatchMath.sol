@@ -50,16 +50,19 @@ library BatchMath {
             return (spotPrice, 0);
         }
 
-        // Find price bounds
-        (uint256 minPrice, uint256 maxPrice) = findPriceBounds(
-            buyOrders,
-            sellOrders,
-            spotPrice
-        );
-
         // Binary search for clearing price
-        uint256 low = minPrice;
-        uint256 high = maxPrice;
+        // Scoped: findPriceBounds returns directly into low/high to save stack slots
+        uint256 low;
+        uint256 high;
+        {
+            (uint256 minPrice, uint256 maxPrice) = findPriceBounds(
+                buyOrders,
+                sellOrders,
+                spotPrice
+            );
+            low = minPrice;
+            high = maxPrice;
+        }
 
         for (uint256 i = 0; i < MAX_ITERATIONS; i++) {
             uint256 mid = (low + high) / 2;

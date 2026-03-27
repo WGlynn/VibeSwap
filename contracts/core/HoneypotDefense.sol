@@ -477,9 +477,13 @@ contract HoneypotDefense {
     function getTotalRecycled() external view returns (
         uint256 stake_,
         uint256 fees_,
-        uint256 entropy_,
-        string memory message
+        uint256 entropy_
     ) {
-        return (recycledStake, recycledFees, harvestedEntropy, "The extractors got extracted.");
+        return (recycledStake, recycledFees, harvestedEntropy);
+    }
+
+    /// @notice "The extractors got extracted."
+    function getRecycledMessage() external pure returns (string memory) {
+        return "The extractors got extracted.";
     }
 }

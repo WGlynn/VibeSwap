@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/ICommitRevealAuction.sol";
 import "./PoolComplianceConfig.sol";
@@ -44,7 +43,6 @@ contract CommitRevealAuction is
     ReentrancyGuardUpgradeable,
     ICommitRevealAuction
 {
-    using SafeERC20 for IERC20;
     using DeterministicShuffle for bytes32[];
     using ProofOfWorkLib for ProofOfWorkLib.PoWProof;
 
@@ -79,6 +77,7 @@ contract CommitRevealAuction is
     error AccreditationRequired();
     error TradeSizeExceeded();
     error FlashLoanDetected();
+    error NoRefundPending();
 
     // ============ Protocol Constants (Uniform Fairness) ============
     // These are FIXED for all pools - they define HOW trading works
@@ -549,71 +548,73 @@ contract CommitRevealAuction is
         }
 
         // Calculate PoW value if proof submitted
-        uint256 powValue = 0;
-        if (claimedDifficulty > 0 && powNonce != bytes32(0)) {
-            // Generate challenge unique to this trader and batch
-            bytes32 challenge = ProofOfWorkLib.generateChallenge(
-                msg.sender,
-                _currentBatchId,
-                bytes32(0) // No pool ID for priority
-            );
-
-            // Create proof struct
-            ProofOfWorkLib.PoWProof memory proof = ProofOfWorkLib.PoWProof({
-                challenge: challenge,
-                nonce: powNonce,
-                algorithm: ProofOfWorkLib.Algorithm(powAlgorithm)
-            });
-
-            // Verify the proof meets claimed difficulty
-            if (!ProofOfWorkLib.verify(proof, claimedDifficulty)) revert InvalidPoWProof();
-
-            // Prevent replay: mark proof as used
-            bytes32 proofHash = ProofOfWorkLib.computeProofHash(challenge, powNonce);
-            if (usedPoWProofs[proofHash]) revert PoWAlreadyUsed();
-            usedPoWProofs[proofHash] = true;
-
-            // Convert difficulty to ETH-equivalent value
-            powValue = ProofOfWorkLib.difficultyToValue(claimedDifficulty, powBaseValue);
-
-            emit PoWProofAccepted(commitId, msg.sender, claimedDifficulty, powValue);
-        }
+        uint256 powValue = _verifyPoW(commitId, _currentBatchId, powNonce, powAlgorithm, claimedDifficulty);
 
         commitment.status = CommitStatus.REVEALED;
 
-        // Store revealed order
-        uint256 orderIndex = revealedOrders[_currentBatchId].length;
+        // Delegate order storage and event emission to helper (avoids stack-too-deep
+        // from having 10 function params + locals simultaneously on the stack)
+        _storeRevealedOrder(
+            _currentBatchId, commitId,
+            tokenIn, tokenOut, amountIn, minAmountOut,
+            secret, priorityBid + powValue
+        );
 
-        revealedOrders[_currentBatchId].push(RevealedOrder({
+        // FIX TRP-R1-F01: Refund excess ETH via pull pattern (parity with revealOrder)
+        if (msg.value > priorityBid) {
+            pendingRefunds[msg.sender] += msg.value - priorityBid;
+        }
+    }
+
+    /// @dev Store revealed order, track priority, store secret, emit event
+    function _storeRevealedOrder(
+        uint64 batchId, bytes32 commitId,
+        address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut,
+        bytes32 secret, uint256 effectivePriority
+    ) internal {
+        uint256 orderIndex = revealedOrders[batchId].length;
+
+        revealedOrders[batchId].push(RevealedOrder({
             trader: msg.sender,
             tokenIn: tokenIn,
             tokenOut: tokenOut,
             amountIn: amountIn,
             minAmountOut: minAmountOut,
             secret: secret,
-            priorityBid: priorityBid + powValue, // Combined ETH + PoW value
+            priorityBid: effectivePriority,
             srcChainId: uint32(block.chainid)
         }));
 
-        // Track priority orders (if any priority from ETH or PoW)
-        uint256 effectivePriority = priorityBid + powValue;
         if (effectivePriority > 0) {
-            priorityOrderIndices[_currentBatchId].push(orderIndex);
-            batches[_currentBatchId].totalPriorityBids += effectivePriority;
+            priorityOrderIndices[batchId].push(orderIndex);
+            batches[batchId].totalPriorityBids += effectivePriority;
         }
 
-        // Store secret for shuffle seed
-        batchSecrets[_currentBatchId].push(secret);
+        batchSecrets[batchId].push(secret);
 
-        emit OrderRevealed(
-            commitId,
-            msg.sender,
-            _currentBatchId,
-            tokenIn,
-            tokenOut,
-            amountIn,
-            effectivePriority
-        );
+        emit OrderRevealed(commitId, msg.sender, batchId, tokenIn, tokenOut, amountIn, effectivePriority);
+    }
+
+    /// @dev Verify PoW proof and return ETH-equivalent value (0 if no proof submitted)
+    function _verifyPoW(
+        bytes32 commitId, uint64 batchId, bytes32 powNonce, uint8 powAlgorithm, uint8 claimedDifficulty
+    ) internal returns (uint256 powValue) {
+        if (claimedDifficulty == 0 || powNonce == bytes32(0)) return 0;
+
+        bytes32 challenge = ProofOfWorkLib.generateChallenge(msg.sender, batchId, bytes32(0));
+        ProofOfWorkLib.PoWProof memory proof = ProofOfWorkLib.PoWProof({
+            challenge: challenge,
+            nonce: powNonce,
+            algorithm: ProofOfWorkLib.Algorithm(powAlgorithm)
+        });
+        if (!ProofOfWorkLib.verify(proof, claimedDifficulty)) revert InvalidPoWProof();
+
+        bytes32 proofHash = ProofOfWorkLib.computeProofHash(challenge, powNonce);
+        if (usedPoWProofs[proofHash]) revert PoWAlreadyUsed();
+        usedPoWProofs[proofHash] = true;
+
+        powValue = ProofOfWorkLib.difficultyToValue(claimedDifficulty, powBaseValue);
+        emit PoWProofAccepted(commitId, msg.sender, claimedDifficulty, powValue);
     }
 
     /**
@@ -671,6 +672,14 @@ contract CommitRevealAuction is
             if (revealEndBlock > 0 && block.number > revealEndBlock) {
                 // Use blockhash of reveal end block (unpredictable during reveal)
                 blockEntropy = blockhash(revealEndBlock);
+                // FIX TRP-R1-F06: blockhash returns 0 after 256 blocks — fall through
+                if (blockEntropy == bytes32(0)) {
+                    blockEntropy = keccak256(abi.encodePacked(
+                        blockhash(block.number - 1),
+                        block.timestamp,
+                        block.prevrandao
+                    ));
+                }
             } else {
                 // Fallback: use previous block hash + current block data
                 blockEntropy = keccak256(abi.encodePacked(
@@ -774,9 +783,12 @@ contract CommitRevealAuction is
 
         commitment.status = CommitStatus.EXECUTED;
 
-        // Return deposit
+        // Return deposit — fallback to pull pattern if direct transfer fails
+        // FIX TRP-R1-F14: Contract depositors without receive() can still recover funds
         (bool success, ) = msg.sender.call{value: commitment.depositAmount}("");
-        if (!success) revert TransferFailed();
+        if (!success) {
+            pendingRefunds[msg.sender] += commitment.depositAmount;
+        }
     }
 
     /**
@@ -818,6 +830,14 @@ contract CommitRevealAuction is
         if (commitment.status != CommitStatus.COMMITTED) revert InvalidCommitment();
         if (commitment.batchId != _currentBatchId) revert WrongBatch();
 
+        // FIX TRP-R1-F03: Verify settler is revealing for the correct depositor
+        if (commitment.depositor != originalDepositor) revert NotOwner();
+
+        // FIX TRP-R1-F02: Validate priority bid payment (parity with revealOrder)
+        if (priorityBid > 0) {
+            if (msg.value < priorityBid) revert InsufficientPriorityBid();
+        }
+
         // Verify commitment hash (using original depositor, not msg.sender)
         bytes32 expectedHash = keccak256(abi.encodePacked(
             originalDepositor,
@@ -855,6 +875,12 @@ contract CommitRevealAuction is
 
         batchSecrets[_currentBatchId].push(secret);
 
+        // FIX TRP-R1-F02: Refund excess ETH to settler (parity with revealOrder)
+        uint256 excess = msg.value - priorityBid;
+        if (excess > 0) {
+            pendingRefunds[msg.sender] += excess;
+        }
+
         emit OrderRevealed(
             commitId,
             originalDepositor,
@@ -872,10 +898,10 @@ contract CommitRevealAuction is
     /// @dev Pull pattern: user calls this to withdraw, no reentrancy surface during reveal
     function claimRefund() external nonReentrant {
         uint256 amount = pendingRefunds[msg.sender];
-        require(amount > 0, "No refund pending");
+        if (amount == 0) revert NoRefundPending();
         pendingRefunds[msg.sender] = 0;
         (bool success, ) = msg.sender.call{value: amount}("");
-        require(success, "Refund transfer failed");
+        if (!success) revert TransferFailed();
     }
 
     // ============ View Functions ============
@@ -1201,6 +1227,10 @@ contract CommitRevealAuction is
         }
 
         // Check KYC if required
+        // FIX TRP-R1-F10: Revert if KYC required but no registry — never silently skip
+        if (config.kycRequired && complianceRegistry == address(0)) {
+            revert KYCRequired();
+        }
         if (config.kycRequired && complianceRegistry != address(0)) {
             try IComplianceRegistry(complianceRegistry).getKYCStatus(user) returns (bool hasKYC, bool isValid) {
                 if (!hasKYC || !isValid) {
@@ -1212,6 +1242,10 @@ contract CommitRevealAuction is
         }
 
         // Check accreditation if required
+        // FIX TRP-R1-F10: Revert if accreditation required but no registry
+        if (config.accreditationRequired && complianceRegistry == address(0)) {
+            revert AccreditationRequired();
+        }
         if (config.accreditationRequired && complianceRegistry != address(0)) {
             try IComplianceRegistry(complianceRegistry).isAccredited(user) returns (bool accredited) {
                 if (!accredited) {
@@ -1322,8 +1356,8 @@ contract CommitRevealAuction is
      * No discretion in where funds go. Safe to make permissionless.
      */
     function withdrawPendingSlashedFunds() external {
-        require(treasury != address(0), "No treasury configured");
-        require(pendingSlashedFunds > 0, "No pending funds");
+        if (treasury == address(0)) revert InvalidTreasury();
+        if (pendingSlashedFunds == 0) revert NoRefundPending();
 
         uint256 amount = pendingSlashedFunds;
         pendingSlashedFunds = 0;

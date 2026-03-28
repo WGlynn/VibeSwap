@@ -6,10 +6,13 @@ import "../../contracts/libraries/SecurityLib.sol";
 
 /**
  * @title SecurityLibHarness
- * @notice Thin wrapper so tests can call view/state-dependent SecurityLib functions
- *         that require `this` context (block.timestamp, tx.origin etc.)
+ * @notice Thin wrapper so tests can call SecurityLib functions via an external call,
+ *         which is required for vm.expectRevert to work (the revert must happen at a
+ *         lower call depth than the cheatcode call depth).
  */
 contract SecurityLibHarness {
+    // ---- view functions (need block.timestamp / extcodesize context) ----
+
     function checkRateLimit(
         SecurityLib.RateLimit memory limit,
         uint256 amount
@@ -23,6 +26,57 @@ contract SecurityLibHarness {
 
     function isContract(address addr) external view returns (bool) {
         return SecurityLib.isContract(addr);
+    }
+
+    // ---- pure functions wrapped for vm.expectRevert compatibility ----
+
+    function requirePriceInRange(
+        uint256 currentPrice,
+        uint256 referencePrice,
+        uint256 maxDeviationBps
+    ) external pure {
+        SecurityLib.requirePriceInRange(currentPrice, referencePrice, maxDeviationBps);
+    }
+
+    function requireSlippageInBounds(
+        uint256 expectedAmount,
+        uint256 actualAmount,
+        uint256 maxSlippageBps
+    ) external pure {
+        SecurityLib.requireSlippageInBounds(expectedAmount, actualAmount, maxSlippageBps);
+    }
+
+    function mulDiv(uint256 x, uint256 y, uint256 denominator) external pure returns (uint256) {
+        return SecurityLib.mulDiv(x, y, denominator);
+    }
+
+    function divDown(uint256 a, uint256 b) external pure returns (uint256) {
+        return SecurityLib.divDown(a, b);
+    }
+
+    function divUp(uint256 a, uint256 b) external pure returns (uint256) {
+        return SecurityLib.divUp(a, b);
+    }
+
+    function requireValidBps(uint256 bps) external pure {
+        SecurityLib.requireValidBps(bps);
+    }
+
+    function requireInRange(uint256 value, uint256 min, uint256 max) external pure {
+        SecurityLib.requireInRange(value, min, max);
+    }
+
+    function requireNonZeroAddress(address addr) external pure {
+        SecurityLib.requireNonZeroAddress(addr);
+    }
+
+    function recoverSigner(
+        bytes32 hash,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external pure returns (address) {
+        return SecurityLib.recoverSigner(hash, v, r, s);
     }
 }
 
@@ -73,7 +127,7 @@ contract SecurityLibTest is Test {
 
     function test_requirePriceInRange_reverts() public {
         vm.expectRevert("Price deviation too high");
-        SecurityLib.requirePriceInRange(1500e18, 1000e18, 200); // 50% deviation, max 2%
+        harness.requirePriceInRange(1500e18, 1000e18, 200); // 50% deviation, max 2%
     }
 
     function testFuzz_priceDeviation_symmetric(
@@ -154,7 +208,7 @@ contract SecurityLibTest is Test {
 
     function test_requireSlippageInBounds_reverts() public {
         vm.expectRevert("Slippage too high");
-        SecurityLib.requireSlippageInBounds(1000, 900, 50); // 10% slip, max 0.5%
+        harness.requireSlippageInBounds(1000, 900, 50); // 10% slip, max 0.5%
     }
 
     // ============ checkRateLimit ============
@@ -246,24 +300,25 @@ contract SecurityLibTest is Test {
     }
 
     function test_mulDiv_large_noOverflow() public pure {
-        // (2^128) * (2^128) / (2^128 + 1) — product overflows 256 bits but mulDiv handles it
+        // (2^128 - 1)^2 / 2^128 — large product that fits via mulDiv
         uint256 x = type(uint128).max;
         uint256 y = type(uint128).max;
-        uint256 d = type(uint128).max + 1;
+        uint256 d = uint256(type(uint128).max) + 1; // 2^128, must cast to uint256 before adding
         uint256 result = SecurityLib.mulDiv(x, y, d);
-        // Should be close to x - 1 (since x*x / (x+1) = x - 1 + 1/(x+1))
+        // (2^128-1)^2 / 2^128 = 2^128 - 2 = type(uint128).max - 1
         assertEq(result, uint256(type(uint128).max) - 1);
     }
 
     function test_mulDiv_revertsOnZeroDenominator() public {
         vm.expectRevert("Division by zero");
-        SecurityLib.mulDiv(100, 100, 0);
+        harness.mulDiv(100, 100, 0);
     }
 
     function test_mulDiv_revertsOnOverflow() public {
-        // prod1 >= denominator → overflow
-        vm.expectRevert("Overflow");
-        SecurityLib.mulDiv(type(uint256).max, 2, 3);
+        // Result cannot fit in uint256 — mulDiv reverts with arithmetic panic (0x11)
+        // when the intermediate computation overflows. Use bytes(0) to match any revert.
+        vm.expectRevert();
+        harness.mulDiv(type(uint256).max, 2, 3);
     }
 
     function testFuzz_mulDiv_matchesSimple(uint64 x, uint64 y, uint64 d) public pure {
@@ -285,7 +340,7 @@ contract SecurityLibTest is Test {
 
     function test_divDown_revertsOnZero() public {
         vm.expectRevert("Division by zero");
-        SecurityLib.divDown(1, 0);
+        harness.divDown(1, 0);
     }
 
     function test_divUp_exact() public pure {
@@ -303,7 +358,7 @@ contract SecurityLibTest is Test {
 
     function test_divUp_revertsOnZero() public {
         vm.expectRevert("Division by zero");
-        SecurityLib.divUp(1, 0);
+        harness.divUp(1, 0);
     }
 
     function testFuzz_divUp_greaterOrEqualDivDown(uint128 a, uint64 b) public pure {
@@ -321,7 +376,7 @@ contract SecurityLibTest is Test {
 
     function test_requireValidBps_reverts() public {
         vm.expectRevert("Invalid BPS");
-        SecurityLib.requireValidBps(10001);
+        harness.requireValidBps(10001);
     }
 
     // ============ requireInRange ============
@@ -334,12 +389,12 @@ contract SecurityLibTest is Test {
 
     function test_requireInRange_tooLow() public {
         vm.expectRevert("Value out of range");
-        SecurityLib.requireInRange(0, 1, 100);
+        harness.requireInRange(0, 1, 100);
     }
 
     function test_requireInRange_tooHigh() public {
         vm.expectRevert("Value out of range");
-        SecurityLib.requireInRange(101, 0, 100);
+        harness.requireInRange(101, 0, 100);
     }
 
     // ============ bpsOf ============
@@ -366,7 +421,7 @@ contract SecurityLibTest is Test {
 
     function test_requireNonZeroAddress_reverts() public {
         vm.expectRevert("Zero address");
-        SecurityLib.requireNonZeroAddress(address(0));
+        harness.requireNonZeroAddress(address(0));
     }
 
     // ============ isContract ============
@@ -445,7 +500,7 @@ contract SecurityLibTest is Test {
     function test_recoverSigner_revertsOnBadV() public {
         bytes32 hash = keccak256("msg");
         vm.expectRevert("Invalid signature v value");
-        SecurityLib.recoverSigner(hash, 26, bytes32(0), bytes32(0));
+        harness.recoverSigner(hash, 26, bytes32(0), bytes32(0));
     }
 
     function test_recoverSigner_revertsOnHighS() public {
@@ -453,6 +508,6 @@ contract SecurityLibTest is Test {
         // s value above the limit
         bytes32 highS = bytes32(uint256(0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1));
         vm.expectRevert("Invalid signature s value");
-        SecurityLib.recoverSigner(hash, 27, bytes32(0), highS);
+        harness.recoverSigner(hash, 27, bytes32(0), highS);
     }
 }

@@ -148,8 +148,12 @@ contract TWAPOracleTest is Test {
 
     function test_write_rejectsOversizedPrice() public {
         // price so large that price * delta overflows uint224
-        uint256 hugePrice = type(uint224).max; // > safe range with delta=1
-        vm.warp(block.timestamp + 1);
+        // TWAPOracle.write is an internal library function inlined into the harness.
+        // The require() message needs to match. With delta=1:
+        // require(price <= type(uint224).max / 1) — so price = type(uint224).max passes.
+        // Need a delta > 1 to make the check fail.
+        uint256 hugePrice = type(uint224).max;
+        vm.warp(block.timestamp + 2); // delta=2 so hugePrice * 2 overflows uint224
         vm.expectRevert("M-07: Price too large for oracle");
         oracle.write(hugePrice);
     }
@@ -262,11 +266,11 @@ contract TWAPOracleTest is Test {
 
         uint256 postSpikeTwap = oracle.consult(MIN_PERIOD);
 
-        // Spike should have minimal effect: < 20x the baseline TWAP
-        assertLt(postSpikeTwap, 20 * preSpikeTwap);
-        // More precisely: since the spike lasts only one step out of
-        // 5 steps in the window, weight ≈ 1/5 — TWAP should stay well below spike
-        assertLt(postSpikeTwap, 50e18);
+        // Spike should have minimal effect: < 25x the baseline TWAP
+        // With 1/5 weight, TWAP = (4*1e18 + 1*100e18)/5 ≈ 20.8e18 ≈ 21x baseline
+        assertLt(postSpikeTwap, 25 * preSpikeTwap);
+        // Should still be well below the spike price of 100e18
+        assertLt(postSpikeTwap, 25e18);
     }
 
     // ============ Ring buffer wrap-around ============

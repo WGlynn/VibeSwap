@@ -4,6 +4,22 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../../contracts/libraries/DeterministicShuffle.sol";
 
+/// @notice Harness contract that wraps DeterministicShuffle library calls as external functions
+/// so vm.expectRevert() can intercept reverts from internal library calls.
+contract DeterministicShuffleHarness {
+    function getShuffledIndex(uint256 totalLength, uint256 position, bytes32 seed)
+        external pure returns (uint256)
+    {
+        return DeterministicShuffle.getShuffledIndex(totalLength, position, seed);
+    }
+
+    function partitionAndShuffle(uint256 totalOrders, uint256 priorityCount, bytes32 seed)
+        external pure returns (uint256[] memory)
+    {
+        return DeterministicShuffle.partitionAndShuffle(totalOrders, priorityCount, seed);
+    }
+}
+
 /**
  * @title DeterministicShuffleTest
  * @notice Unit tests for DeterministicShuffle — seed generation, Fisher-Yates,
@@ -12,6 +28,11 @@ import "../../contracts/libraries/DeterministicShuffle.sol";
 contract DeterministicShuffleTest is Test {
     bytes32 constant SEED_A = keccak256("seedA");
     bytes32 constant SEED_B = keccak256("seedB");
+    DeterministicShuffleHarness harness;
+
+    function setUp() public {
+        harness = new DeterministicShuffleHarness();
+    }
 
     // ============ generateSeed ============
 
@@ -206,7 +227,7 @@ contract DeterministicShuffleTest is Test {
 
     function test_getShuffledIndex_revertsOutOfBounds() public {
         vm.expectRevert("Position out of bounds");
-        DeterministicShuffle.getShuffledIndex(5, 5, SEED_A);
+        harness.getShuffledIndex(5, 5, SEED_A);
     }
 
     // ============ verifyShuffle ============
@@ -284,7 +305,7 @@ contract DeterministicShuffleTest is Test {
 
     function test_partitionAndShuffle_revertsInvalidPriorityCount() public {
         vm.expectRevert("Invalid priority count");
-        DeterministicShuffle.partitionAndShuffle(5, 6, SEED_A);
+        harness.partitionAndShuffle(5, 6, SEED_A);
     }
 
     function testFuzz_partitionAndShuffle_isPermutation(

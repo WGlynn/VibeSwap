@@ -4,12 +4,54 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../../contracts/libraries/BatchMath.sol";
 
+/// @notice Harness contract that wraps BatchMath library calls as external functions
+/// so vm.expectRevert() can intercept reverts from internal library calls.
+contract BatchMathHarness {
+    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut, uint256 feeRate)
+        external pure returns (uint256)
+    {
+        return BatchMath.getAmountOut(amountIn, reserveIn, reserveOut, feeRate);
+    }
+
+    function getAmountIn(uint256 amountOut, uint256 reserveIn, uint256 reserveOut, uint256 feeRate)
+        external pure returns (uint256)
+    {
+        return BatchMath.getAmountIn(amountOut, reserveIn, reserveOut, feeRate);
+    }
+
+    function calculateClearingPrice(
+        uint256[] memory buyOrders,
+        uint256[] memory sellOrders,
+        uint256 reserve0,
+        uint256 reserve1
+    ) external pure returns (uint256, uint256) {
+        return BatchMath.calculateClearingPrice(buyOrders, sellOrders, reserve0, reserve1);
+    }
+
+    function calculateLiquidity(uint256 a0, uint256 a1, uint256 r0, uint256 r1, uint256 ts)
+        external pure returns (uint256)
+    {
+        return BatchMath.calculateLiquidity(a0, a1, r0, r1, ts);
+    }
+
+    function calculateOptimalLiquidity(uint256 d0, uint256 d1, uint256 r0, uint256 r1)
+        external pure returns (uint256, uint256)
+    {
+        return BatchMath.calculateOptimalLiquidity(d0, d1, r0, r1);
+    }
+}
+
 /**
  * @title BatchMathTest
  * @notice Unit tests for BatchMath library — AMM math, fees, clearing price
  */
 contract BatchMathTest is Test {
     uint256 constant PRECISION = 1e18;
+    BatchMathHarness harness;
+
+    function setUp() public {
+        harness = new BatchMathHarness();
+    }
 
     // ============ sqrt ============
 
@@ -82,15 +124,15 @@ contract BatchMathTest is Test {
 
     function test_getAmountOut_revertsOnZeroInput() public {
         vm.expectRevert();
-        BatchMath.getAmountOut(0, 1000, 1000, 30);
+        harness.getAmountOut(0, 1000, 1000, 30);
     }
 
     function test_getAmountOut_revertsOnZeroReserves() public {
         vm.expectRevert();
-        BatchMath.getAmountOut(100, 0, 1000, 30);
+        harness.getAmountOut(100, 0, 1000, 30);
 
         vm.expectRevert();
-        BatchMath.getAmountOut(100, 1000, 0, 30);
+        harness.getAmountOut(100, 1000, 0, 30);
     }
 
     function test_getAmountOut_outputLessThanInput() public pure {
@@ -129,17 +171,17 @@ contract BatchMathTest is Test {
 
     function test_getAmountIn_revertsOnZeroOutput() public {
         vm.expectRevert();
-        BatchMath.getAmountIn(0, 1000, 1000, 30);
+        harness.getAmountIn(0, 1000, 1000, 30);
     }
 
     function test_getAmountIn_revertsWhenOutputExceedsReserve() public {
         vm.expectRevert();
-        BatchMath.getAmountIn(1000, 1000, 1000, 30); // amountOut == reserveOut
+        harness.getAmountIn(1000, 1000, 1000, 30); // amountOut == reserveOut
     }
 
     function test_getAmountIn_revertsWhenOutputGreaterThanReserve() public {
         vm.expectRevert();
-        BatchMath.getAmountIn(1001, 1000, 1000, 30);
+        harness.getAmountIn(1001, 1000, 1000, 30);
     }
 
     // Round-trip: getAmountIn -> getAmountOut should recover >= desired amount
@@ -247,13 +289,14 @@ contract BatchMathTest is Test {
         assertLe(a1, desired1);
 
         // Ratio check: a0 / a1 should approximately equal reserve0 / reserve1
-        // i.e., a0 * reserve1 == a1 * reserve0 (within 1 wei rounding)
+        // i.e., a0 * reserve1 == a1 * reserve0 (within integer division rounding)
         if (a0 > 0 && a1 > 0) {
             uint256 lhs = a0 * uint256(reserve1);
             uint256 rhs = a1 * uint256(reserve0);
-            // Allow 1 unit rounding tolerance on each side
-            assertLe(lhs, rhs + uint256(reserve1));
-            assertLe(rhs, lhs + uint256(reserve0));
+            // The rounding error from integer division can be up to max(reserve0, reserve1)
+            uint256 tolerance = uint256(reserve0) > uint256(reserve1) ? uint256(reserve0) : uint256(reserve1);
+            assertLe(lhs, rhs + tolerance);
+            assertLe(rhs, lhs + tolerance);
         }
     }
 
@@ -270,7 +313,7 @@ contract BatchMathTest is Test {
     function test_calculateLiquidity_initial_revertsIfTooSmall() public {
         // sqrt(100*100)=100 <= 1000 => revert
         vm.expectRevert();
-        BatchMath.calculateLiquidity(100, 100, 0, 0, 0);
+        harness.calculateLiquidity(100, 100, 0, 0, 0);
     }
 
     function test_calculateLiquidity_proportional() public pure {
@@ -307,7 +350,7 @@ contract BatchMathTest is Test {
         uint256[] memory buyOrders = new uint256[](0);
         uint256[] memory sellOrders = new uint256[](0);
         vm.expectRevert();
-        BatchMath.calculateClearingPrice(buyOrders, sellOrders, 0, 1000);
+        harness.calculateClearingPrice(buyOrders, sellOrders, 0, 1000);
     }
 
     function test_calculateClearingPrice_withOrders() public pure {

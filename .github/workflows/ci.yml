@@ -132,7 +132,7 @@ jobs:
 
   # ============ Smart Contracts ============
   contracts:
-    name: Smart Contract Tests
+    name: Smart Contract Build + Unit Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -148,8 +148,31 @@ jobs:
       - name: Build contracts
         run: FOUNDRY_PROFILE=fast forge build
 
-      - name: Run tests
-        run: FOUNDRY_PROFILE=fast forge test -vvv
+      - name: Run unit tests (no fuzz/invariant — fast feedback)
+        run: FOUNDRY_PROFILE=fast forge test -vvv --no-match-test "fuzz|invariant|Fuzz|Invariant"
+
+  # ============ Fuzz + Invariant (nightly deep coverage) ============
+  contracts-fuzz:
+    name: Fuzz & Invariant Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[fuzz]')
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build contracts
+        run: FOUNDRY_PROFILE=fast forge build
+
+      - name: Run fuzz + invariant tests
+        run: FOUNDRY_PROFILE=fast forge test -vvv --match-test "fuzz|invariant|Fuzz|Invariant"
 
   # ============ Deploy Dry Run ============
   deploy-dryrun:

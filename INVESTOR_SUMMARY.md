@@ -18,14 +18,14 @@ VibeSwap is an omnichain decentralized exchange that eliminates MEV (Miner Extra
 
 | Metric | Count |
 |--------|-------|
-| Solidity smart contracts | 351 |
-| Solidity test files (0 failures) | 374 |
-| Rust CKB SDK modules | 73 |
-| CKB SDK tests | 15,155 |
-| Frontend components (React) | 336 |
-| Frontend hooks | 70 |
-| Research papers & docs | 247 |
-| Total git commits | 1,835 |
+| Solidity smart contracts | 376 |
+| Solidity test files | 510 |
+| Automated tests | 9,090 |
+| Frontend components (React) | 413 |
+| Frontend hooks | 72 |
+| Research papers (DOCUMENTATION/) | 138 |
+| Additional docs (docs/) | 466 |
+| Total git commits | 2,301 |
 | Funding raised | $0 |
 
 **Deployments:**
@@ -67,7 +67,7 @@ Predictable emission schedule with halvings. Augmented bonding curves for price 
 
 **MEV is eliminated, not mitigated.** Flashbots and MEV-Share try to redistribute MEV. We remove the conditions that create it. Batch auctions with hidden orders and uniform clearing prices leave nothing to extract.
 
-**AI-native development.** Jarvis (built on Claude) is not a tool — it's a core team member with on-chain identity, Shapley attribution weight, and autonomous operation. 1,835 commits, the vast majority pair-programmed human+AI.
+**AI-native development.** Jarvis (built on Claude) is not a tool — it's a core team member with on-chain identity, Shapley attribution weight, and autonomous operation. 2,301 commits, the vast majority pair-programmed human+AI.
 
 **Cooperative, not extractive.** Insurance pools for impermanent loss. Treasury stabilization. Quadratic voting for governance. Conviction-weighted proposals. The protocol is designed so that helping others is the profit-maximizing strategy.
 

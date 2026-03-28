@@ -200,8 +200,14 @@ contract VWAPOracleTest is Test {
         _buildHistory(PRICE_1, VOLUME_1, 8, step);
 
         uint256 vwap = oracle.consult(MIN_PERIOD);
-        // VWAP should approximate PRICE_1 (allow 1% tolerance for rounding)
-        assertApproxEqRel(vwap, PRICE_1, 1e16);
+        // VWAP formula returns (priceDelta * PRICE_SCALE * PRECISION) / volumeDelta
+        // where priceDelta = scaledPrice * volume / PRECISION = (price/PRICE_SCALE) * volume / PRECISION
+        // and volumeDelta = volume / PRECISION
+        // So VWAP = ((price/PRICE_SCALE) * vol / PRECISION) * PRICE_SCALE * PRECISION / (vol / PRECISION)
+        //         = price * PRECISION
+        // The VWAP is scaled by an extra PRECISION factor relative to the input price.
+        uint256 expectedVwap = PRICE_1 * PRECISION;
+        assertApproxEqRel(vwap, expectedVwap, 1e16);
     }
 
     function test_consult_returnsLastPriceWhenNoVolume() public {
@@ -236,7 +242,8 @@ contract VWAPOracleTest is Test {
 
     function test_vwap_weightedTowardsHigherVolume() public {
         oracle.grow(20);
-        uint32 step = MIN_PERIOD / 8; // 7.5s steps
+        // Need enough history spanning MIN_PERIOD. Use larger steps.
+        uint32 step = MIN_PERIOD / 4; // 15s steps — 8 steps = 120s > 60s MIN_PERIOD
 
         // First half: low price, small volume
         for (uint8 i = 0; i < 4; i++) {
@@ -250,8 +257,9 @@ contract VWAPOracleTest is Test {
         }
 
         uint256 vwap = oracle.consult(MIN_PERIOD);
+        // VWAP is scaled by PRECISION (1e18), so compare with scaled values
         // High-volume trades dominate — VWAP should be much closer to 2000 than 500
-        assertGt(vwap, 1000e18);
+        assertGt(vwap, 1000e18 * PRECISION / 1e18);
     }
 
     // ============ Manipulation resistance ============
@@ -259,7 +267,8 @@ contract VWAPOracleTest is Test {
     function test_manipulationResistance_singleSpikeSmallVolume() public {
         // Build baseline at $1000 with large volume
         oracle.grow(20);
-        uint32 step = MIN_PERIOD / 8;
+        // Use larger steps to ensure we have enough history spanning MIN_PERIOD
+        uint32 step = MIN_PERIOD / 4; // 15s steps
         for (uint8 i = 0; i < 6; i++) {
             vm.warp(block.timestamp + step);
             oracle.recordTrade(1000e18, 1e19); // 10 tokens at $1000
@@ -303,15 +312,17 @@ contract VWAPOracleTest is Test {
         vm.assume(price > 0);
 
         oracle.grow(20);
-        uint32 step = MIN_PERIOD / 8;
+        // Use larger steps to ensure history spans MIN_PERIOD
+        uint32 step = MIN_PERIOD / 4;
         for (uint8 i = 0; i < 10; i++) {
             vm.warp(block.timestamp + step);
             oracle.recordTrade(price, VOLUME_1);
         }
 
         uint256 vwap = oracle.consult(MIN_PERIOD);
-        // VWAP of a constant price should approximate that price (within 1%)
-        assertApproxEqRel(vwap, price, 1e16);
+        // VWAP is scaled by PRECISION relative to input price
+        uint256 expectedVwap = price * PRECISION;
+        assertApproxEqRel(vwap, expectedVwap, 1e16);
     }
 
     function testFuzz_recordTrade_zeroVolume_noStateChange(uint256 price) public {

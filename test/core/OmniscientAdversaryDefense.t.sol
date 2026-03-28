@@ -23,6 +23,9 @@ contract OmniscientAdversaryDefenseTest is Test {
         oad.addSentinel(sentinel3);
         vm.deal(challenger, 10 ether);
         vm.deal(address(oad), 10 ether); // fund for rewards
+        // Advance past CHECKPOINT_INTERVAL (100 blocks) so the first setAnchor call
+        // satisfies: block.number >= latestAnchor + CHECKPOINT_INTERVAL
+        vm.roll(100);
     }
 
     // ============ Temporal Anchoring ============

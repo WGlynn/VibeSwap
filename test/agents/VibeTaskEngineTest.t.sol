@@ -17,6 +17,16 @@ contract VibeTaskEngineTest is Test {
     event TaskTreeCompleted(uint256 indexed treeId, uint256 totalTasks);
     event SubtaskCreated(uint256 indexed parentId, uint256 indexed subtaskId);
 
+    // ============ Helpers ============
+
+    /// @dev Reconstruct Task struct from split getters (getTask was removed to avoid stack-too-deep)
+    function _getTask(uint256 id) internal view returns (VibeTaskEngine.Task memory t) {
+        (t.taskId, t.parentId, t.creator, t.agentId, t.specHash, t.resultHash, t.status, t.priority) = engine.getTaskCore(id);
+        (t.budget, t.spent, t.deadline, t.createdAt, t.completedAt, t.retryCount, t.maxRetries) = engine.getTaskMeta(id);
+        t.dependencies = engine.getDependencies(id);
+        t.subtasks = engine.getSubtasks(id);
+    }
+
     // ============ State ============
 
     VibeTaskEngine public engine;
@@ -68,7 +78,7 @@ contract VibeTaskEngineTest is Test {
         assertEq(taskId, 1);
         assertEq(treeId, 1);
 
-        VibeTaskEngine.Task memory task = engine.getTask(taskId);
+        VibeTaskEngine.Task memory task = _getTask(taskId);
         assertEq(task.parentId, 0);
         assertEq(task.creator, creator);
         assertEq(task.budget, 10 ether);
@@ -124,7 +134,7 @@ contract VibeTaskEngineTest is Test {
                 7,
                 3
             );
-            assertEq(uint8(engine.getTask(taskId).priority), i);
+            assertEq(uint8(_getTask(taskId).priority), i);
         }
     }
 
@@ -137,7 +147,7 @@ contract VibeTaskEngineTest is Test {
         vm.prank(creator);
         uint256 subId = engine.createSubtask(rootId, keccak256("sub-spec"), VibeTaskEngine.TaskPriority.LOW, deps, 3 ether);
 
-        VibeTaskEngine.Task memory sub = engine.getTask(subId);
+        VibeTaskEngine.Task memory sub = _getTask(subId);
         assertEq(sub.parentId, rootId);
         assertEq(sub.budget, 3 ether);
         assertEq(uint8(sub.status), uint8(VibeTaskEngine.TaskStatus.PENDING));
@@ -218,7 +228,7 @@ contract VibeTaskEngineTest is Test {
         vm.prank(creator);
         engine.assignTask(rootId, agentId1);
 
-        VibeTaskEngine.Task memory task = engine.getTask(rootId);
+        VibeTaskEngine.Task memory task = _getTask(rootId);
         assertEq(task.agentId, agentId1);
         assertEq(uint8(task.status), uint8(VibeTaskEngine.TaskStatus.ASSIGNED));
 
@@ -284,7 +294,7 @@ contract VibeTaskEngineTest is Test {
         engine.assignTask(rootId, agentId1);
 
         engine.startTask(rootId);
-        assertEq(uint8(engine.getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.IN_PROGRESS));
+        assertEq(uint8(_getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.IN_PROGRESS));
     }
 
     function test_startTask_revert_notAssigned() public {
@@ -308,7 +318,7 @@ contract VibeTaskEngineTest is Test {
 
         engine.completeTask(rootId, resultHash);
 
-        VibeTaskEngine.Task memory task = engine.getTask(rootId);
+        VibeTaskEngine.Task memory task = _getTask(rootId);
         assertEq(uint8(task.status), uint8(VibeTaskEngine.TaskStatus.COMPLETED));
         assertEq(task.resultHash, resultHash);
         assertGt(task.completedAt, 0);
@@ -326,7 +336,7 @@ contract VibeTaskEngineTest is Test {
 
         // Complete directly from ASSIGNED (no startTask)
         engine.completeTask(rootId, keccak256("result"));
-        assertEq(uint8(engine.getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.COMPLETED));
+        assertEq(uint8(_getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.COMPLETED));
     }
 
     function test_completeTask_revert_wrongStatus() public {
@@ -400,9 +410,9 @@ contract VibeTaskEngineTest is Test {
 
         // First failure — should reset to PENDING (retry)
         engine.failTask(rootId);
-        assertEq(uint8(engine.getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.PENDING));
-        assertEq(engine.getTask(rootId).retryCount, 1);
-        assertEq(engine.getTask(rootId).agentId, bytes32(0)); // unassigned
+        assertEq(uint8(_getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.PENDING));
+        assertEq(_getTask(rootId).retryCount, 1);
+        assertEq(_getTask(rootId).agentId, bytes32(0)); // unassigned
     }
 
     function test_failTask_exhaustsRetries() public {
@@ -416,7 +426,7 @@ contract VibeTaskEngineTest is Test {
         }
 
         // After 2 retries (maxRetries=2), task should be FAILED
-        assertEq(uint8(engine.getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.FAILED));
+        assertEq(uint8(_getTask(rootId).status), uint8(VibeTaskEngine.TaskStatus.FAILED));
     }
 
     function test_failTask_revert_notInProgress() public {
@@ -450,7 +460,7 @@ contract VibeTaskEngineTest is Test {
         vm.stopPrank();
 
         // Parent spent = 3 + 4 = 7 ether
-        assertEq(engine.getTask(rootId).spent, 7 ether);
+        assertEq(_getTask(rootId).spent, 7 ether);
     }
 
     // ============ View Functions ============
@@ -485,7 +495,7 @@ contract VibeTaskEngineTest is Test {
             7,
             3
         );
-        assertEq(engine.getTask(taskId).budget, budget);
+        assertEq(_getTask(taskId).budget, budget);
         assertEq(engine.getTree(treeId).totalBudget, budget);
     }
 
@@ -499,8 +509,8 @@ contract VibeTaskEngineTest is Test {
         vm.prank(creator);
         uint256 subId = engine.createSubtask(rootId, keccak256("sub"), VibeTaskEngine.TaskPriority.LOW, deps, subBudget);
 
-        assertEq(engine.getTask(subId).budget, subBudget);
-        assertEq(engine.getTask(rootId).spent, subBudget);
+        assertEq(_getTask(subId).budget, subBudget);
+        assertEq(_getTask(rootId).spent, subBudget);
     }
 
     // ============ Receive for payment callback ============

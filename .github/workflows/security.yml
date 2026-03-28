@@ -56,7 +56,8 @@ jobs:
           version: nightly
 
       - name: Build contracts
-        run: FOUNDRY_PROFILE=fast forge build
+        run: FOUNDRY_PROFILE=ci forge build
+        timeout-minutes: 30
 
       - uses: actions/setup-python@v5
         with:

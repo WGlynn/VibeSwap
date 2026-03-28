@@ -450,9 +450,10 @@ contract ReentrancyHardeningTests is Test {
     }
 
     function testAMMCollectFees_onlyTreasuryOrOwner() public {
-        // Random address cannot collect
+        // DISSOLVED: collectFees is permissionless — anyone can trigger fee distribution.
+        // Caller pays gas, protocol benefits. The error is NoFeesToCollect, not NotAuthorized.
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(VibeAMM.NotAuthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(VibeAMM.NoFeesToCollect.selector));
         amm.collectFees(address(tokenA));
     }
 
@@ -515,8 +516,10 @@ contract ReentrancyHardeningTests is Test {
     }
 
     function testAMMLiteCollectFees_onlyTreasuryOrOwner() public {
+        // DISSOLVED: collectFees is permissionless — anyone can trigger fee distribution.
+        // Caller pays gas, protocol benefits. The error is InsufficientOutput (no fees), not NotAuthorized.
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(VibeAMMLite.NotAuthorized.selector));
+        vm.expectRevert(abi.encodeWithSelector(VibeAMMLite.InsufficientOutput.selector));
         ammLite.collectFees(address(tokenA));
     }
 
@@ -563,13 +566,13 @@ contract ReentrancyHardeningTests is Test {
     }
 
     function testCollectFees_afterOwnerChange() public {
-        // Verify that after transferring ownership, old owner cannot collect
-        // and new owner can
+        // DISSOLVED: collectFees is permissionless — ownership change doesn't affect
+        // fee collection access. Anyone can trigger it; funds always go to treasury.
         address newOwner = makeAddr("newOwner");
         amm.transferOwnership(newOwner);
 
-        // Old owner (this) cannot collect (also no fees, but check auth first)
-        vm.expectRevert(abi.encodeWithSelector(VibeAMM.NotAuthorized.selector));
+        // Old owner can still call (permissionless), but no fees to collect
+        vm.expectRevert(abi.encodeWithSelector(VibeAMM.NoFeesToCollect.selector));
         amm.collectFees(address(tokenA));
 
         // Treasury can still collect (if there were fees)

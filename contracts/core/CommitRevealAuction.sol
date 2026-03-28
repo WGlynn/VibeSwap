@@ -517,50 +517,45 @@ contract CommitRevealAuction is
         uint8 powAlgorithm,
         uint8 claimedDifficulty
     ) external payable nonReentrant inPhase(BatchPhase.REVEAL) {
-        OrderCommitment storage commitment = commitments[commitId];
+        // All logic delegated to _revealWithPoW to avoid 10-param stack-too-deep.
+        // The external function only exists for the modifiers + ABI.
+        _revealWithPoW(commitId, tokenIn, tokenOut, amountIn, minAmountOut, secret,
+                        priorityBid, powNonce, powAlgorithm, claimedDifficulty);
+    }
 
-        // Gas: cache storage read in memory (avoid repeated SLOAD)
-        uint64 _currentBatchId = currentBatchId;
+    function _revealWithPoW(
+        bytes32 commitId, address tokenIn, address tokenOut,
+        uint256 amountIn, uint256 minAmountOut, bytes32 secret,
+        uint256 priorityBid, bytes32 powNonce, uint8 powAlgorithm, uint8 claimedDifficulty
+    ) internal {
+        // Step 1: Validate + mark revealed (scoped to free stack for step 2)
+        uint64 _currentBatchId;
+        {
+            _currentBatchId = currentBatchId;
+            OrderCommitment storage commitment = commitments[commitId];
+            if (commitment.status != CommitStatus.COMMITTED) revert InvalidCommitment();
+            if (commitment.batchId != _currentBatchId) revert WrongBatch();
+            if (commitment.depositor != msg.sender) revert NotOwner();
 
-        if (commitment.status != CommitStatus.COMMITTED) revert InvalidCommitment();
-        if (commitment.batchId != _currentBatchId) revert WrongBatch();
-        if (commitment.depositor != msg.sender) revert NotOwner();
-
-        // Verify commitment hash
-        bytes32 expectedHash = keccak256(abi.encodePacked(
-            msg.sender,
-            tokenIn,
-            tokenOut,
-            amountIn,
-            minAmountOut,
-            secret
-        ));
-
-        if (expectedHash != commitment.commitHash) {
-            // Invalid reveal - slash deposit
-            _slashCommitment(commitId);
-            return;
+            bytes32 expectedHash = keccak256(abi.encodePacked(
+                msg.sender, tokenIn, tokenOut, amountIn, minAmountOut, secret
+            ));
+            if (expectedHash != commitment.commitHash) { _slashCommitment(commitId); return; }
+            if (priorityBid > 0 && msg.value < priorityBid) revert InsufficientPriorityBid();
+            commitment.status = CommitStatus.REVEALED;
         }
 
-        // Verify ETH priority bid payment
-        if (priorityBid > 0) {
-            if (msg.value < priorityBid) revert InsufficientPriorityBid();
+        // Step 2: PoW + store (separate stack frame via _storeRevealedOrder)
+        {
+            uint256 powValue = _verifyPoW(commitId, _currentBatchId, powNonce, powAlgorithm, claimedDifficulty);
+            _storeRevealedOrder(
+                _currentBatchId, commitId,
+                tokenIn, tokenOut, amountIn, minAmountOut,
+                secret, priorityBid + powValue
+            );
         }
 
-        // Calculate PoW value if proof submitted
-        uint256 powValue = _verifyPoW(commitId, _currentBatchId, powNonce, powAlgorithm, claimedDifficulty);
-
-        commitment.status = CommitStatus.REVEALED;
-
-        // Delegate order storage and event emission to helper (avoids stack-too-deep
-        // from having 10 function params + locals simultaneously on the stack)
-        _storeRevealedOrder(
-            _currentBatchId, commitId,
-            tokenIn, tokenOut, amountIn, minAmountOut,
-            secret, priorityBid + powValue
-        );
-
-        // FIX TRP-R1-F01: Refund excess ETH via pull pattern (parity with revealOrder)
+        // Step 3: Refund excess ETH
         if (msg.value > priorityBid) {
             pendingRefunds[msg.sender] += msg.value - priorityBid;
         }

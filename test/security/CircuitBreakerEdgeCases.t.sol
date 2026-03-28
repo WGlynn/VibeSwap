@@ -180,16 +180,21 @@ contract CircuitBreakerEdgeCases is Test {
     }
 
     function test_multipleBreakers_resetOneOthersRemain() public {
+        // Trip volume at t=0
         cb.updateBreaker(VOL, VOLUME_THRESHOLD);
+
+        // Trip price 30 minutes later so its cooldown expires later
+        vm.warp(block.timestamp + 30 minutes);
         cb.updateBreaker(PRICE, PRICE_THRESHOLD);
 
-        vm.warp(block.timestamp + COOLDOWN + 1);
+        // Warp past volume cooldown (1h from trip) but NOT past price cooldown (1h from 30min later)
+        vm.warp(block.timestamp + 31 minutes);
 
-        // Reset only volume
+        // Reset volume (cooldown expired)
         vm.prank(guardian);
         cb.resetBreaker(VOL);
 
-        // Volume passes, price still blocked
+        // Volume passes (reset), price still blocked (cooldown still active)
         cb.gatedAction(VOL);
 
         vm.expectRevert(abi.encodeWithSelector(CircuitBreaker.BreakerTrippedError.selector, PRICE));

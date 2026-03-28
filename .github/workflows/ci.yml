@@ -145,13 +145,11 @@ jobs:
         with:
           version: nightly
 
-      - name: Build contracts (ci profile — via_ir required for 988-file ABI encoding)
-        run: FOUNDRY_PROFILE=ci forge build
-        timeout-minutes: 60
+      - name: Build contracts
+        run: FOUNDRY_PROFILE=fast forge build
 
-      - name: Run tests (ci profile)
-        run: FOUNDRY_PROFILE=ci forge test -vvv
-        timeout-minutes: 60
+      - name: Run tests
+        run: FOUNDRY_PROFILE=fast forge test -vvv
 
   # ============ Deploy Dry Run ============
   deploy-dryrun:

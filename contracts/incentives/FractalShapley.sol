@@ -216,7 +216,7 @@ contract FractalShapley is
             }
         }
 
-        // BFS walk
+        // BFS walk — each iteration scoped to minimize stack depth
         while (head < tail && count < MAX_QUEUE_SIZE) {
             bytes32 currentId = queue[head];
             uint256 currentCredit = credits[head];
@@ -225,37 +225,36 @@ contract FractalShapley is
 
             if (currentCredit == 0 || currentDepth > MAX_PROPAGATION_DEPTH) continue;
 
-            // This contribution's contributor receives credit
-            ContributionStorage storage contrib = _contributions[currentId];
-
-            // Split: contributor keeps (1 - decay), parents get decay portion
-            uint256 upstreamShare = (currentCredit * propagationDecay) / BPS;
-            uint256 keepShare = currentCredit - upstreamShare;
-
-            buffer[count++] = CreditAllocation({
-                recipient: contrib.contributor,
-                contributionId: currentId,
-                amount: keepShare,
-                depth: currentDepth
-            });
-
-            // Propagate upstream
-            bytes32[] memory grandparents = _parents[currentId];
-            if (grandparents.length > 0 && upstreamShare > 0 && currentDepth < MAX_PROPAGATION_DEPTH) {
-                uint256 perGrandparent = upstreamShare / grandparents.length;
-                uint256 gpRemainder = upstreamShare % grandparents.length;
-                for (uint256 i; i < grandparents.length && tail < MAX_QUEUE_SIZE; ++i) {
-                    queue[tail] = grandparents[i];
-                    // First grandparent absorbs remainder — closed loop, no leakage
-                    credits[tail] = (i == 0) ? perGrandparent + gpRemainder : perGrandparent;
-                    depths[tail] = currentDepth + 1;
-                    ++tail;
-                }
+            // Allocate credit to this node's contributor
+            {
+                address recipient = _contributions[currentId].contributor;
+                uint256 keepShare = currentCredit - (currentCredit * propagationDecay) / BPS;
+                buffer[count++] = CreditAllocation({
+                    recipient: recipient,
+                    contributionId: currentId,
+                    amount: keepShare,
+                    depth: currentDepth
+                });
             }
-            // If no grandparents, upstream share goes back to direct contributor
-            // (credit doesn't vanish — Shapley efficiency axiom)
-            else if (grandparents.length == 0 && upstreamShare > 0) {
-                buffer[0].amount += upstreamShare;
+
+            // Propagate upstream to parents
+            {
+                uint256 upstreamShare = (currentCredit * propagationDecay) / BPS;
+                bytes32[] memory grandparents = _parents[currentId];
+                if (grandparents.length > 0 && upstreamShare > 0 && currentDepth < MAX_PROPAGATION_DEPTH) {
+                    uint256 perGp = upstreamShare / grandparents.length;
+                    uint256 gpRem = upstreamShare % grandparents.length;
+                    for (uint256 i; i < grandparents.length && tail < MAX_QUEUE_SIZE; ++i) {
+                        queue[tail] = grandparents[i];
+                        credits[tail] = (i == 0) ? perGp + gpRem : perGp;
+                        depths[tail] = currentDepth + 1;
+                        ++tail;
+                    }
+                }
+                // No parents → upstream returns to direct contributor (efficiency axiom)
+                else if (grandparents.length == 0 && upstreamShare > 0) {
+                    buffer[0].amount += upstreamShare;
+                }
             }
         }
 

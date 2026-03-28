@@ -151,23 +151,22 @@ contract VibeRWA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
             msg.sender, name, block.timestamp
         ));
 
-        assets[assetId] = RealWorldAsset({
-            assetId: assetId,
-            issuer: msg.sender,
-            assetClass: assetClass,
-            name: name,
-            legalDocHash: legalDocHash,
-            appraisalHash: appraisalHash,
-            totalShares: totalShares,
-            sharesSold: 0,
-            pricePerShare: pricePerShare,
-            appraisedValue: appraisedValue,
-            totalYieldDistributed: 0,
-            registeredAt: block.timestamp,
-            lastAppraisalAt: block.timestamp,
-            status: AssetStatus.PENDING,
-            jurisdiction: jurisdiction
-        });
+        // Populate struct field-by-field to avoid stack overflow from
+        // named-field constructor with 14 params
+        RealWorldAsset storage asset = assets[assetId];
+        asset.assetId = assetId;
+        asset.issuer = msg.sender;
+        asset.assetClass = assetClass;
+        asset.name = name;
+        asset.legalDocHash = legalDocHash;
+        asset.appraisalHash = appraisalHash;
+        asset.totalShares = totalShares;
+        asset.pricePerShare = pricePerShare;
+        asset.appraisedValue = appraisedValue;
+        asset.registeredAt = block.timestamp;
+        asset.lastAppraisalAt = block.timestamp;
+        asset.status = AssetStatus.PENDING;
+        asset.jurisdiction = jurisdiction;
 
         assetList.push(assetId);
         totalAssetsRegistered++;

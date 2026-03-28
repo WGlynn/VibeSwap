@@ -281,7 +281,25 @@ contract VibeTaskEngine is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
 
     // ============ View ============
 
-    function getTask(uint256 id) external view returns (Task memory) { return tasks[id]; }
+    /// @dev Split into two getters to avoid 15-field struct ABI encoding stack overflow.
+    ///      The original getTask(uint256) returning Task memory caused the legacy
+    ///      (non-via_ir) ABI encoder to exceed 16 stack slots during encoding.
+    function getTaskCore(uint256 id) external view returns (
+        uint256 taskId, uint256 parentId, address creator, bytes32 agentId,
+        bytes32 specHash, bytes32 resultHash, TaskStatus status, TaskPriority priority
+    ) {
+        Task storage t = tasks[id];
+        return (t.taskId, t.parentId, t.creator, t.agentId, t.specHash, t.resultHash, t.status, t.priority);
+    }
+
+    function getTaskMeta(uint256 id) external view returns (
+        uint256 budget, uint256 spent, uint256 deadline,
+        uint256 createdAt, uint256 completedAt, uint8 retryCount, uint8 maxRetries
+    ) {
+        Task storage t = tasks[id];
+        return (t.budget, t.spent, t.deadline, t.createdAt, t.completedAt, t.retryCount, t.maxRetries);
+    }
+
     function getTree(uint256 id) external view returns (TaskTree memory) { return taskTrees[id]; }
     function getSubtasks(uint256 taskId) external view returns (uint256[] memory) { return tasks[taskId].subtasks; }
     function getDependencies(uint256 taskId) external view returns (uint256[] memory) { return tasks[taskId].dependencies; }

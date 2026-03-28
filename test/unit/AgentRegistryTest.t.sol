@@ -1186,6 +1186,9 @@ contract AgentRegistryTest is Test {
     }
 
     function test_vouchForAgent_bridgesToDAG() public {
+        // DISSOLVED: addVouchOnBehalf removed (Grade 4 — trust is peer-to-peer)
+        // Human must call contributionDAG.addVouch() directly to vouch for agent operator.
+        // Verify vouchForAgent succeeds but does NOT call the DAG.
         uint256 agentId = _registerJarvis();
         mockSBI.setIdentity(alice, true);
         bytes32 msgHash = keccak256("trust");
@@ -1193,10 +1196,13 @@ contract AgentRegistryTest is Test {
         vm.prank(alice);
         registry.vouchForAgent(agentId, msgHash);
 
-        // Verify the DAG was called with agent's operator
-        assertEq(mockDAG.lastVouchTo(), operator1);
-        assertEq(mockDAG.lastVouchHash(), msgHash);
-        assertEq(mockDAG.vouchCallCount(), 1);
+        // DAG should NOT be called — bridging was dissolved
+        assertEq(mockDAG.vouchCallCount(), 0);
+
+        // But the vouch itself should still be recorded
+        address[] memory vouchers = registry.getHumanVouchers(agentId);
+        assertEq(vouchers.length, 1);
+        assertEq(vouchers[0], alice);
     }
 
     function test_vouchForAgent_dagRevert_doesNotBubble() public {

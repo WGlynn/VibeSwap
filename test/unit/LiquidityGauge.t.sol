@@ -223,6 +223,9 @@ contract LiquidityGaugeTest is Test {
     }
 
     function test_rewards_twoStakers() public {
+        // Warp first so no unallocated emissions accumulate between weight-set and stake
+        vm.warp(1000);
+
         gauge.createGauge(poolA, address(lpTokenA));
 
         bytes32[] memory pools = new bytes32[](1);
@@ -231,7 +234,6 @@ contract LiquidityGaugeTest is Test {
         weights[0] = 100;
         gauge.updateWeights(pools, weights);
 
-        vm.warp(1000);
         vm.prank(alice);
         gauge.stake(poolA, 1000 ether);
         vm.prank(bob);
@@ -276,6 +278,9 @@ contract LiquidityGaugeTest is Test {
     }
 
     function test_rewards_claim() public {
+        // Warp first so no unallocated emissions accumulate between weight-set and stake
+        vm.warp(1000);
+
         gauge.createGauge(poolA, address(lpTokenA));
 
         bytes32[] memory pools = new bytes32[](1);
@@ -284,7 +289,6 @@ contract LiquidityGaugeTest is Test {
         weights[0] = 100;
         gauge.updateWeights(pools, weights);
 
-        vm.warp(1000);
         vm.prank(alice);
         gauge.stake(poolA, 1000 ether);
 
@@ -302,6 +306,9 @@ contract LiquidityGaugeTest is Test {
     }
 
     function test_rewards_claimAll() public {
+        // Warp first so no unallocated emissions accumulate between weight-set and stake
+        vm.warp(1000);
+
         gauge.createGauge(poolA, address(lpTokenA));
         gauge.createGauge(poolB, address(lpTokenB));
 
@@ -313,7 +320,6 @@ contract LiquidityGaugeTest is Test {
         weights[1] = 50;
         gauge.updateWeights(pools, weights);
 
-        vm.warp(1000);
         vm.prank(alice);
         gauge.stake(poolA, 1000 ether);
         vm.prank(alice);
@@ -442,6 +448,9 @@ contract LiquidityGaugeTest is Test {
     }
 
     function test_emissionRate_change_midEpoch() public {
+        // Warp first so no unallocated emissions accumulate between weight-set and stake
+        vm.warp(1000);
+
         gauge.createGauge(poolA, address(lpTokenA));
 
         bytes32[] memory pools = new bytes32[](1);
@@ -450,8 +459,6 @@ contract LiquidityGaugeTest is Test {
         weights[0] = 100;
         gauge.updateWeights(pools, weights);
 
-        // Use absolute timestamps to avoid optimizer re-reading block.timestamp
-        vm.warp(1000);
         vm.prank(alice);
         gauge.stake(poolA, 1000 ether);
 
@@ -470,6 +477,9 @@ contract LiquidityGaugeTest is Test {
     // ============ Late Entry Tests ============
 
     function test_lateStaker_fairDistribution() public {
+        // Warp first so no unallocated emissions accumulate between weight-set and stake
+        vm.warp(1000);
+
         gauge.createGauge(poolA, address(lpTokenA));
 
         bytes32[] memory pools = new bytes32[](1);
@@ -477,9 +487,6 @@ contract LiquidityGaugeTest is Test {
         uint256[] memory weights = new uint256[](1);
         weights[0] = 100;
         gauge.updateWeights(pools, weights);
-
-        // Use absolute timestamps to avoid optimizer re-reading block.timestamp
-        vm.warp(1000);
 
         // Alice stakes at t=1000
         vm.prank(alice);
@@ -505,6 +512,9 @@ contract LiquidityGaugeTest is Test {
     // ============ Integration Tests ============
 
     function test_fullLifecycle() public {
+        // Warp first so no unallocated emissions accumulate between weight-set and stake
+        vm.warp(1000);
+
         // 1. Create gauges
         gauge.createGauge(poolA, address(lpTokenA));
         gauge.createGauge(poolB, address(lpTokenB));
@@ -517,9 +527,6 @@ contract LiquidityGaugeTest is Test {
         weights[0] = 70;
         weights[1] = 30;
         gauge.updateWeights(pools, weights);
-
-        // Use absolute timestamp to avoid optimizer re-reading block.timestamp
-        vm.warp(1000);
 
         // 3. Users stake
         vm.prank(alice);

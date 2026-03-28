@@ -154,7 +154,7 @@ contract PostQuantumShield {
         uint8 securityLevel,
         bool mandatory
     ) external {
-        require(securityLevel == 128 || securityLevel == 192 || securityLevel == 256, "Invalid level");
+        require(securityLevel == 128 || securityLevel == 192 || securityLevel == 255, "Invalid level");
         require(merkleRoot != bytes32(0), "Zero root");
 
         identities[msg.sender] = QuantumIdentity({

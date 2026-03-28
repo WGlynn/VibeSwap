@@ -168,6 +168,9 @@ contract MicroGameFactoryTest is Test {
     );
 
     function setUp() public {
+        // Warp to a realistic timestamp so `block.timestamp - N days` never underflows
+        vm.warp(1_735_689_600); // 2025-01-01 00:00:00 UTC
+
         owner = address(this);
         alice = makeAddr("alice");
         bob = makeAddr("bob");

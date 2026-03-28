@@ -56,6 +56,12 @@ contract VibeEmergencyDAOTest is Test {
         dao = VibeEmergencyDAO(payable(address(proxy)));
 
         stub = new PausableStub();
+
+        // Foundry starts at block.timestamp = 1. COOLDOWN = 5 minutes (300s).
+        // proposeEmergency requires block.timestamp >= lastActionTime + COOLDOWN.
+        // With lastActionTime=0 and ts=1, 1 >= 300 is false → "Cooldown active".
+        // Warp to 1 hour so the initial cooldown window is cleared.
+        vm.warp(1 hours);
     }
 
     // ============ Helpers ============
@@ -229,9 +235,13 @@ contract VibeEmergencyDAOTest is Test {
 
     function test_execute_pause() public {
         bytes memory data = "";
+        uint256 id = _propose(g0, VibeEmergencyDAO.ActionType.PAUSE, address(stub), data, "pause test");
+        _approve(g1, id);
+
         vm.expectEmit(false, false, false, true);
         emit ContractPaused(address(stub));
-        _reach3of5(VibeEmergencyDAO.ActionType.PAUSE, address(stub), data, "pause test");
+        vm.prank(g2);
+        dao.approveEmergency(id);
 
         assertTrue(dao.isPaused(address(stub)));
         assertEq(dao.totalActionsExecuted(), 1);
@@ -242,9 +252,13 @@ contract VibeEmergencyDAOTest is Test {
         _reach3of5(VibeEmergencyDAO.ActionType.PAUSE, address(stub), "", "pause");
         vm.warp(block.timestamp + dao.COOLDOWN() + 1);
 
+        uint256 id = _propose(g0, VibeEmergencyDAO.ActionType.UNPAUSE, address(stub), "", "unpause");
+        _approve(g1, id);
+
         vm.expectEmit(false, false, false, true);
         emit ContractUnpaused(address(stub));
-        _reach3of5(VibeEmergencyDAO.ActionType.UNPAUSE, address(stub), "", "unpause");
+        vm.prank(g2);
+        dao.approveEmergency(id);
 
         assertFalse(dao.isPaused(address(stub)));
         assertEq(dao.totalActionsExecuted(), 2);
@@ -253,9 +267,13 @@ contract VibeEmergencyDAOTest is Test {
     function test_execute_freezeAddress() public {
         address victim = makeAddr("victim");
 
+        uint256 id = _propose(g0, VibeEmergencyDAO.ActionType.FREEZE_ADDRESS, victim, "", "hacker");
+        _approve(g1, id);
+
         vm.expectEmit(true, false, false, false);
         emit AddressFrozen(victim, "hacker");
-        _reach3of5(VibeEmergencyDAO.ActionType.FREEZE_ADDRESS, victim, "", "hacker");
+        vm.prank(g2);
+        dao.approveEmergency(id);
 
         assertTrue(dao.isFrozen(victim));
     }
@@ -277,9 +295,13 @@ contract VibeEmergencyDAOTest is Test {
     }
 
     function test_execute_emitsExecuted() public {
+        uint256 id = _propose(g0, VibeEmergencyDAO.ActionType.PAUSE, address(stub), "", "emit test");
+        _approve(g1, id);
+
         vm.expectEmit(true, false, false, true);
         emit EmergencyExecuted(0, VibeEmergencyDAO.ActionType.PAUSE, address(stub));
-        _reach3of5(VibeEmergencyDAO.ActionType.PAUSE, address(stub), "", "emit test");
+        vm.prank(g2);
+        dao.approveEmergency(id);
     }
 
     function test_execute_updatesLastActionTime() public {

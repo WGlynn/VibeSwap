@@ -522,10 +522,10 @@ contract ClawbackRegistryTest is Test {
     }
 
     function test_executeClawback_transfersFundsWhenApproved() public {
-        // Give bad actor tokens and approve the vault to pull them
+        // Give bad actor tokens and approve the registry (which calls transferFrom) to pull them
         token.mint(badActor, 500 ether);
         vm.prank(badActor);
-        token.approve(vault, type(uint256).max);
+        token.approve(address(registry), type(uint256).max);
 
         vm.prank(owner);
         bytes32 caseId = registry.openCase(badActor, 100 ether, address(token), "theft");

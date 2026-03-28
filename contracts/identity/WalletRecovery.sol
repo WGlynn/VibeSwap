@@ -100,7 +100,7 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     mapping(uint256 => Guardian[]) public guardians;
 
     // Identity token ID => Recovery config
-    mapping(uint256 => RecoveryConfig) public configs;
+    mapping(uint256 => RecoveryConfig) internal configs;
 
     // Identity token ID => Last activity timestamp
     mapping(uint256 => uint256) public lastActivity;
@@ -735,6 +735,10 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
             }
         }
         return false;
+    }
+
+    function getConfig(uint256 tokenId) external view returns (RecoveryConfig memory) {
+        return configs[tokenId];
     }
 
     function getGuardians(uint256 tokenId) external view returns (Guardian[] memory) {

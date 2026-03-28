@@ -171,6 +171,14 @@ contract FractalShapley is
 
     // ============ Core: Credit Propagation ============
 
+    struct BFSState {
+        bytes32[] queue;
+        uint256[] credits;
+        uint8[] depths;
+        uint256 head;
+        uint256 tail;
+    }
+
     /// @inheritdoc IFractalShapley
     function computeCredit(
         bytes32 contributionId,
@@ -179,89 +187,92 @@ contract FractalShapley is
         if (!_contributions[contributionId].exists) revert ContributionNotFound(contributionId);
         if (rewardAmount == 0) revert ZeroReward();
 
-        // BFS backward through the influence DAG
-        // Pre-allocate max possible size, then trim
         CreditAllocation[] memory buffer = new CreditAllocation[](MAX_QUEUE_SIZE);
         uint256 count;
+        BFSState memory bfs;
+        bfs.queue = new bytes32[](MAX_QUEUE_SIZE);
+        bfs.credits = new uint256[](MAX_QUEUE_SIZE);
+        bfs.depths = new uint8[](MAX_QUEUE_SIZE);
 
-        // Queue for BFS: (contributionId, remaining credit, depth)
-        bytes32[] memory queue = new bytes32[](MAX_QUEUE_SIZE);
-        uint256[] memory credits = new uint256[](MAX_QUEUE_SIZE);
-        uint8[] memory depths = new uint8[](MAX_QUEUE_SIZE);
-        uint256 head;
-        uint256 tail;
+        // Seed direct contributor
+        count = _seedBFS(contributionId, rewardAmount, buffer, bfs);
 
-        // Seed: direct contributor gets (1 - propagation share) of reward
-        uint256 propagationShare = _computePropagationShare(contributionId, rewardAmount);
-        uint256 directShare = rewardAmount - propagationShare;
-
-        buffer[count++] = CreditAllocation({
-            recipient: _contributions[contributionId].contributor,
-            contributionId: contributionId,
-            amount: directShare,
-            depth: 0
-        });
-
-        // Queue parents for propagation
-        bytes32[] memory parentIds = _parents[contributionId];
-        if (parentIds.length > 0 && propagationShare > 0) {
-            uint256 perParent = propagationShare / parentIds.length;
-            uint256 remainder = propagationShare % parentIds.length;
-            for (uint256 i; i < parentIds.length && tail < MAX_QUEUE_SIZE; ++i) {
-                queue[tail] = parentIds[i];
-                // First parent absorbs remainder — no credit leaks (efficiency axiom)
-                credits[tail] = (i == 0) ? perParent + remainder : perParent;
-                depths[tail] = 1;
-                ++tail;
-            }
-        }
-
-        // BFS walk — each iteration scoped to minimize stack depth
-        while (head < tail && count < MAX_QUEUE_SIZE) {
-            bytes32 currentId = queue[head];
-            uint256 currentCredit = credits[head];
-            uint8 currentDepth = depths[head];
-            ++head;
-
-            if (currentCredit == 0 || currentDepth > MAX_PROPAGATION_DEPTH) continue;
-
-            // Allocate credit to this node's contributor
-            {
-                address recipient = _contributions[currentId].contributor;
-                uint256 keepShare = currentCredit - (currentCredit * propagationDecay) / BPS;
-                buffer[count++] = CreditAllocation({
-                    recipient: recipient,
-                    contributionId: currentId,
-                    amount: keepShare,
-                    depth: currentDepth
-                });
-            }
-
-            // Propagate upstream to parents
-            {
-                uint256 upstreamShare = (currentCredit * propagationDecay) / BPS;
-                bytes32[] memory grandparents = _parents[currentId];
-                if (grandparents.length > 0 && upstreamShare > 0 && currentDepth < MAX_PROPAGATION_DEPTH) {
-                    uint256 perGp = upstreamShare / grandparents.length;
-                    uint256 gpRem = upstreamShare % grandparents.length;
-                    for (uint256 i; i < grandparents.length && tail < MAX_QUEUE_SIZE; ++i) {
-                        queue[tail] = grandparents[i];
-                        credits[tail] = (i == 0) ? perGp + gpRem : perGp;
-                        depths[tail] = currentDepth + 1;
-                        ++tail;
-                    }
-                }
-                // No parents → upstream returns to direct contributor (efficiency axiom)
-                else if (grandparents.length == 0 && upstreamShare > 0) {
-                    buffer[0].amount += upstreamShare;
-                }
-            }
+        // BFS walk
+        while (bfs.head < bfs.tail && count < MAX_QUEUE_SIZE) {
+            count = _processBFSNode(buffer, count, bfs);
         }
 
         // Trim buffer to actual size
         allocations = new CreditAllocation[](count);
         for (uint256 i; i < count; ++i) {
             allocations[i] = buffer[i];
+        }
+    }
+
+    /// @dev Seed the BFS with the direct contributor allocation and queue parents
+    function _seedBFS(
+        bytes32 contributionId,
+        uint256 rewardAmount,
+        CreditAllocation[] memory buffer,
+        BFSState memory bfs
+    ) internal view returns (uint256 count) {
+        uint256 propagationShare = _computePropagationShare(contributionId, rewardAmount);
+        buffer[0] = CreditAllocation({
+            recipient: _contributions[contributionId].contributor,
+            contributionId: contributionId,
+            amount: rewardAmount - propagationShare,
+            depth: 0
+        });
+        count = 1;
+
+        bytes32[] memory parentIds = _parents[contributionId];
+        if (parentIds.length > 0 && propagationShare > 0) {
+            uint256 perParent = propagationShare / parentIds.length;
+            uint256 remainder = propagationShare % parentIds.length;
+            for (uint256 i; i < parentIds.length && bfs.tail < MAX_QUEUE_SIZE; ++i) {
+                bfs.queue[bfs.tail] = parentIds[i];
+                bfs.credits[bfs.tail] = (i == 0) ? perParent + remainder : perParent;
+                bfs.depths[bfs.tail] = 1;
+                ++bfs.tail;
+            }
+        }
+    }
+
+    /// @dev Process one BFS node (extracted to reduce stack depth in main loop)
+    function _processBFSNode(
+        CreditAllocation[] memory buffer,
+        uint256 count,
+        BFSState memory bfs
+    ) internal view returns (uint256 newCount) {
+        newCount = count;
+        bytes32 currentId = bfs.queue[bfs.head];
+        uint256 currentCredit = bfs.credits[bfs.head];
+        uint8 currentDepth = bfs.depths[bfs.head];
+        ++bfs.head;
+
+        if (currentCredit == 0 || currentDepth > MAX_PROPAGATION_DEPTH) return newCount;
+
+        uint256 keepShare = currentCredit - (currentCredit * propagationDecay) / BPS;
+        buffer[newCount++] = CreditAllocation({
+            recipient: _contributions[currentId].contributor,
+            contributionId: currentId,
+            amount: keepShare,
+            depth: currentDepth
+        });
+
+        uint256 upstreamShare = (currentCredit * propagationDecay) / BPS;
+        bytes32[] memory grandparents = _parents[currentId];
+        if (grandparents.length > 0 && upstreamShare > 0 && currentDepth < MAX_PROPAGATION_DEPTH) {
+            uint256 perGp = upstreamShare / grandparents.length;
+            uint256 gpRem = upstreamShare % grandparents.length;
+            for (uint256 i; i < grandparents.length && bfs.tail < MAX_QUEUE_SIZE; ++i) {
+                bfs.queue[bfs.tail] = grandparents[i];
+                bfs.credits[bfs.tail] = (i == 0) ? perGp + gpRem : perGp;
+                bfs.depths[bfs.tail] = currentDepth + 1;
+                ++bfs.tail;
+            }
+        } else if (grandparents.length == 0 && upstreamShare > 0) {
+            buffer[0].amount += upstreamShare;
         }
     }
 

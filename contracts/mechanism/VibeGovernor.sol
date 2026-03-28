@@ -120,7 +120,10 @@ contract VibeGovernor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
         p.description = description;
         p.targets = targets;
         p.values = values;
-        p.calldatas = calldatas;
+        // Copy bytes[] calldata element-by-element (nested calldata->storage not supported in old codegen)
+        for (uint256 i = 0; i < calldatas.length; i++) {
+            p.calldatas.push(calldatas[i]);
+        }
         p.startBlock = block.number + (VOTING_DELAY / 12); // ~12s blocks
         p.endBlock = p.startBlock + (VOTING_PERIOD / 12);
 

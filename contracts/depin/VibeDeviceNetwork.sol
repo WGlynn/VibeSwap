@@ -59,10 +59,10 @@ contract VibeDeviceNetwork is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     // ============ State ============
 
-    mapping(bytes32 => Device) public devices;
+    mapping(bytes32 => Device) internal devices;
     bytes32[] public deviceList;
 
-    mapping(uint256 => Fleet) public fleets;
+    mapping(uint256 => Fleet) internal fleets;
     uint256 public fleetCount;
 
     /// @notice Device to fleet mapping
@@ -321,6 +321,8 @@ contract VibeDeviceNetwork is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     function getDeviceCount() external view returns (uint256) { return totalDevices; }
     function getActiveCount() external view returns (uint256) { return totalActiveDevices; }
     function getFleetDevices(uint256 fleetId) external view returns (bytes32[] memory) { return fleetDevices[fleetId]; }
+    function getDevice(bytes32 deviceId) external view returns (Device memory) { return devices[deviceId]; }
+    function getFleet(uint256 fleetId) external view returns (Fleet memory) { return fleets[fleetId]; }
 
     receive() external payable {}
 }

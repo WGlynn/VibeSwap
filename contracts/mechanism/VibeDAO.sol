@@ -97,9 +97,9 @@ contract VibeDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
         p.proposer = msg.sender;
         p.title = title;
         p.descriptionHash = descriptionHash;
-        p.targets = targets;
-        p.values = values;
-        p.calldatas = calldatas;
+        for (uint256 i = 0; i < targets.length; i++) p.targets.push(targets[i]);
+        for (uint256 i = 0; i < values.length; i++) p.values.push(values[i]);
+        for (uint256 i = 0; i < calldatas.length; i++) p.calldatas.push(calldatas[i]);
         p.startBlock = block.timestamp;
         p.endBlock = block.timestamp + VOTING_PERIOD;
         p.status = ProposalStatus.ACTIVE;

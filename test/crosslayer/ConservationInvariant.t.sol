@@ -181,58 +181,48 @@ contract ConservationInvariantTest is Test {
      *         orderings. If rounding systematically benefits one position (e.g., last
      *         participant always gets more due to dust), that's a micro-arbitrage surface.
      */
+    // Scratch storage for _getSharesAbc/Cab/Bca to avoid stack overflow
+    uint256 private _share_a_abc;
+    uint256 private _share_b_abc;
+    uint256 private _share_c_abc;
+    uint256 private _share_a_cab;
+    uint256 private _share_b_cab;
+    uint256 private _share_c_cab;
+    uint256 private _share_a_bca;
+    uint256 private _share_b_bca;
+    uint256 private _share_c_bca;
+
+    function _computeOrderingShares(uint256 totalValue, address a, address b, address c) internal {
+        _runGameEqual(keccak256("order_abc"), totalValue, a, b, c);
+        _share_a_abc = distributor.getShapleyValue(keccak256("order_abc"), a);
+        _share_b_abc = distributor.getShapleyValue(keccak256("order_abc"), b);
+        _share_c_abc = distributor.getShapleyValue(keccak256("order_abc"), c);
+
+        _runGameEqual(keccak256("order_cab"), totalValue, c, a, b);
+        _share_c_cab = distributor.getShapleyValue(keccak256("order_cab"), c);
+        _share_a_cab = distributor.getShapleyValue(keccak256("order_cab"), a);
+        _share_b_cab = distributor.getShapleyValue(keccak256("order_cab"), b);
+
+        _runGameEqual(keccak256("order_bca"), totalValue, b, c, a);
+        _share_b_bca = distributor.getShapleyValue(keccak256("order_bca"), b);
+        _share_c_bca = distributor.getShapleyValue(keccak256("order_bca"), c);
+        _share_a_bca = distributor.getShapleyValue(keccak256("order_bca"), a);
+    }
+
     function test_noRoundingSubsidy_positionIndependent() public {
-        uint256 totalValue = 100 * PRECISION;
-
-        address a = makeAddr("a");
-        address b = makeAddr("b");
-        address c = makeAddr("c");
-
-        // All three have identical contributions
-        uint256 direct = 10 * PRECISION;
-        uint256 timeInPool = 30 days;
-        uint256 scarcity = 5000;
-        uint256 stability = 5000;
-
-        // Run with ordering [a, b, c]
-        bytes32 gameId_abc = keccak256("order_abc");
-        _runGame(gameId_abc, totalValue, a, b, c, direct, timeInPool, scarcity, stability);
-
-        uint256 a_share_abc = distributor.getShapleyValue(gameId_abc, a);
-        uint256 b_share_abc = distributor.getShapleyValue(gameId_abc, b);
-        uint256 c_share_abc = distributor.getShapleyValue(gameId_abc, c);
-
-        // Run with ordering [c, a, b]
-        bytes32 gameId_cab = keccak256("order_cab");
-        _runGame(gameId_cab, totalValue, c, a, b, direct, timeInPool, scarcity, stability);
-
-        uint256 c_share_cab = distributor.getShapleyValue(gameId_cab, c);
-        uint256 a_share_cab = distributor.getShapleyValue(gameId_cab, a);
-        uint256 b_share_cab = distributor.getShapleyValue(gameId_cab, b);
-
-        // Run with ordering [b, c, a]
-        bytes32 gameId_bca = keccak256("order_bca");
-        _runGame(gameId_bca, totalValue, b, c, a, direct, timeInPool, scarcity, stability);
-
-        uint256 b_share_bca = distributor.getShapleyValue(gameId_bca, b);
-        uint256 c_share_bca = distributor.getShapleyValue(gameId_bca, c);
-        uint256 a_share_bca = distributor.getShapleyValue(gameId_bca, a);
-
-        // For identical contributions, each participant should get ~33.33 ether
-        // Dust goes to last participant (+1 wei max). The KEY assertion:
-        // no participant gets MORE than 1 wei extra regardless of position
-        uint256 expectedBase = totalValue / 3;  // 33.333... ether (truncated)
+        _setContribParams(10 * PRECISION, 30 days, 5000, 5000);
+        _computeOrderingShares(100 * PRECISION, makeAddr("a"), makeAddr("b"), makeAddr("c"));
 
         // a's share should not vary by more than 1 wei across orderings
-        assertApproxEqAbs(a_share_abc, a_share_cab, 1, "a's share position-dependent");
-        assertApproxEqAbs(a_share_abc, a_share_bca, 1, "a's share position-dependent");
+        assertApproxEqAbs(_share_a_abc, _share_a_cab, 1, "a's share position-dependent");
+        assertApproxEqAbs(_share_a_abc, _share_a_bca, 1, "a's share position-dependent");
 
         // Same for b and c
-        assertApproxEqAbs(b_share_abc, b_share_cab, 1, "b's share position-dependent");
-        assertApproxEqAbs(b_share_abc, b_share_bca, 1, "b's share position-dependent");
+        assertApproxEqAbs(_share_b_abc, _share_b_cab, 1, "b's share position-dependent");
+        assertApproxEqAbs(_share_b_abc, _share_b_bca, 1, "b's share position-dependent");
 
-        assertApproxEqAbs(c_share_abc, c_share_cab, 1, "c's share position-dependent");
-        assertApproxEqAbs(c_share_abc, c_share_bca, 1, "c's share position-dependent");
+        assertApproxEqAbs(_share_c_abc, _share_c_cab, 1, "c's share position-dependent");
+        assertApproxEqAbs(_share_c_abc, _share_c_bca, 1, "c's share position-dependent");
     }
 
     /**
@@ -327,5 +317,22 @@ contract ConservationInvariantTest is Test {
         vm.prank(creator);
         distributor.createGame(gameId, totalValue, address(rewardToken), ps);
         distributor.computeShapleyValues(gameId);
+    }
+
+    // Stored contribution params for _runGameEqual
+    uint256 private _rge_direct;
+    uint256 private _rge_timeInPool;
+    uint256 private _rge_scarcity;
+    uint256 private _rge_stability;
+
+    function _setContribParams(uint256 direct, uint256 timeInPool, uint256 scarcity, uint256 stability) internal {
+        _rge_direct = direct;
+        _rge_timeInPool = timeInPool;
+        _rge_scarcity = scarcity;
+        _rge_stability = stability;
+    }
+
+    function _runGameEqual(bytes32 gameId, uint256 totalValue, address p1, address p2, address p3) internal {
+        _runGame(gameId, totalValue, p1, p2, p3, _rge_direct, _rge_timeInPool, _rge_scarcity, _rge_stability);
     }
 }

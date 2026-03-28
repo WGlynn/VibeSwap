@@ -75,7 +75,7 @@ contract VibeLendingPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     // ============ State ============
 
     /// @notice Asset configurations
-    mapping(address => AssetConfig) public assets;
+    mapping(address => AssetConfig) internal assets;
     address[] public assetList;
 
     /// @notice User deposits: asset => user => UserDeposit
@@ -135,21 +135,20 @@ contract VibeLendingPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         require(!assets[asset].active, "Already added");
         require(ltvBps < liquidationLtvBps, "LTV must be < liquidation");
 
-        assets[asset] = AssetConfig({
-            asset: asset,
-            totalDeposited: 0,
-            totalBorrowed: 0,
-            depositIndex: SCALE,
-            borrowIndex: SCALE,
-            lastUpdateTime: block.timestamp,
-            baseBorrowRate: baseBorrowRate,
-            slope1: slope1,
-            slope2: slope2,
-            kinkBps: kinkBps,
-            ltvBps: ltvBps,
-            liquidationLtvBps: liquidationLtvBps,
-            active: true
-        });
+        {
+            AssetConfig storage a = assets[asset];
+            a.asset = asset;
+            a.depositIndex = SCALE;
+            a.borrowIndex = SCALE;
+            a.lastUpdateTime = block.timestamp;
+            a.baseBorrowRate = baseBorrowRate;
+            a.slope1 = slope1;
+            a.slope2 = slope2;
+            a.kinkBps = kinkBps;
+            a.ltvBps = ltvBps;
+            a.liquidationLtvBps = liquidationLtvBps;
+            a.active = true;
+        }
 
         assetList.push(asset);
         emit AssetAdded(asset);
@@ -250,39 +249,32 @@ contract VibeLendingPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
         address borrower,
         uint256 repayAmount
     ) external nonReentrant {
-        AssetConfig storage config = assets[asset];
         _accrueInterest(asset);
 
-        UserBorrow storage userBor = borrows[asset][borrower];
-        uint256 debt = (userBor.amount * config.borrowIndex) / SCALE;
-        require(debt > 0, "No debt");
-
-        // Simplified health check (in production, check cross-asset collateral)
-        UserDeposit storage userDep = deposits[asset][borrower];
-        uint256 collateral = (userDep.amount * config.depositIndex) / SCALE;
-        uint256 maxBorrow = (collateral * config.liquidationLtvBps) / BPS;
-        require(debt > maxBorrow, "Not liquidatable");
-
-        // Cap repay at 50% of debt
-        uint256 maxRepay = debt / 2;
-        uint256 actualRepay = repayAmount > maxRepay ? maxRepay : repayAmount;
+        uint256 actualRepay;
+        uint256 collateralSeized;
+        {
+            AssetConfig storage config = assets[asset];
+            uint256 debt = (borrows[asset][borrower].amount * config.borrowIndex) / SCALE;
+            require(debt > 0, "No debt");
+            uint256 collateral = (deposits[asset][borrower].amount * config.depositIndex) / SCALE;
+            require(debt > (collateral * config.liquidationLtvBps) / BPS, "Not liquidatable");
+            actualRepay = repayAmount > debt / 2 ? debt / 2 : repayAmount;
+            collateralSeized = actualRepay + (actualRepay * LIQUIDATION_BONUS_BPS) / BPS;
+            if (collateralSeized > collateral) collateralSeized = collateral;
+        }
 
         IERC20(asset).safeTransferFrom(msg.sender, address(this), actualRepay);
 
-        // Liquidator gets collateral + bonus
-        uint256 collateralSeized = actualRepay + (actualRepay * LIQUIDATION_BONUS_BPS) / BPS;
-        if (collateralSeized > collateral) collateralSeized = collateral;
-
-        uint256 normalizedRepay = (actualRepay * SCALE) / config.borrowIndex;
-        userBor.amount -= normalizedRepay;
-        config.totalBorrowed -= actualRepay;
-
-        uint256 normalizedSeized = (collateralSeized * SCALE) / config.depositIndex;
-        userDep.amount -= normalizedSeized;
-        config.totalDeposited -= collateralSeized;
+        {
+            AssetConfig storage config = assets[asset];
+            borrows[asset][borrower].amount -= (actualRepay * SCALE) / config.borrowIndex;
+            config.totalBorrowed -= actualRepay;
+            deposits[asset][borrower].amount -= (collateralSeized * SCALE) / config.depositIndex;
+            config.totalDeposited -= collateralSeized;
+        }
 
         IERC20(asset).safeTransfer(msg.sender, collateralSeized);
-
         emit Liquidated(asset, borrower, msg.sender, actualRepay);
     }
 
@@ -345,6 +337,7 @@ contract VibeLendingPool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
     }
 
     function getAssetCount() external view returns (uint256) { return assetList.length; }
+    function getAsset(address asset) external view returns (AssetConfig memory) { return assets[asset]; }
 
     function getAssetInfo(address asset) external view returns (
         uint256 totalDeposited_,

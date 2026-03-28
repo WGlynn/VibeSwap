@@ -57,10 +57,10 @@ contract VibeNFTMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ State ============
 
-    mapping(uint256 => Listing) public listings;
+    mapping(uint256 => Listing) internal listings;
     uint256 public listingCount;
 
-    mapping(uint256 => Offer) public offers;
+    mapping(uint256 => Offer) internal offers;
     uint256 public offerCount;
 
     /// @notice Platform fee (basis points)
@@ -352,6 +352,8 @@ contract VibeNFTMarket is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     function getListingCount() external view returns (uint256) { return listingCount; }
     function getOfferCount() external view returns (uint256) { return offerCount; }
+    function getListing(uint256 id) external view returns (Listing memory) { return listings[id]; }
+    function getOffer(uint256 id) external view returns (Offer memory) { return offers[id]; }
     function getDutchPrice(uint256 listingId) external view returns (uint256) {
         return _getDutchPrice(listings[listingId]);
     }

@@ -285,16 +285,20 @@ contract TimeNeutralityProofsTest is Test {
         assertEq(uint8(distributor.getGameType(gameId1)), uint8(ShapleyDistributor.GameType.FEE_DISTRIBUTION));
         assertEq(uint8(distributor.getGameType(gameId2)), uint8(ShapleyDistributor.GameType.FEE_DISTRIBUTION));
 
-        // TIME NEUTRALITY: Rewards must be identical across eras
-        uint256 aliceEra0 = distributor.getShapleyValue(gameId1, alice);
-        uint256 aliceEra1 = distributor.getShapleyValue(gameId2, alice);
-        uint256 bobEra0 = distributor.getShapleyValue(gameId1, bob);
-        uint256 bobEra1 = distributor.getShapleyValue(gameId2, bob);
+        _assertTimeNeutral(gameId1, gameId2, alice, bob);
+    }
 
-        assertEq(aliceEra0, aliceEra1, "TIME NEUTRALITY VIOLATED: Alice got different reward in Era 1");
-        assertEq(bobEra0, bobEra1, "TIME NEUTRALITY VIOLATED: Bob got different reward in Era 1");
-
-        // Use on-chain verification
+    function _assertTimeNeutral(bytes32 gameId1, bytes32 gameId2, address alice, address bob) internal view {
+        assertEq(
+            distributor.getShapleyValue(gameId1, alice),
+            distributor.getShapleyValue(gameId2, alice),
+            "TIME NEUTRALITY VIOLATED: Alice got different reward in Era 1"
+        );
+        assertEq(
+            distributor.getShapleyValue(gameId1, bob),
+            distributor.getShapleyValue(gameId2, bob),
+            "TIME NEUTRALITY VIOLATED: Bob got different reward in Era 1"
+        );
         (bool neutral, uint256 deviation) = distributor.verifyTimeNeutrality(gameId1, gameId2, alice);
         assertTrue(neutral, "On-chain time neutrality check failed for Alice");
         assertEq(deviation, 0, "Non-zero deviation for identical games");

@@ -131,18 +131,14 @@ contract VibeEscrowTest is Test {
 
     function test_createEscrow_ETH_storesFields() public {
         uint256 id = _createETHEscrow(1 ether, 7 days);
-        (
-            uint256 escrowId, address depositor, address beneficiary, address arbiter,
-            address tkn, uint256 amount, , , , VibeEscrow.EscrowStatus status, ,
-        ) = escrow.escrows(id);
-
-        assertEq(escrowId,    id);
-        assertEq(depositor,   alice);
-        assertEq(beneficiary, bob);
-        assertEq(arbiter,     carol);
-        assertEq(tkn,         address(0));
-        assertEq(amount,      1 ether);
-        assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.FUNDED));
+        VibeEscrow.Escrow memory e = escrow.getEscrow(id);
+        assertEq(e.escrowId,    id);
+        assertEq(e.depositor,   alice);
+        assertEq(e.beneficiary, bob);
+        assertEq(e.arbiter,     carol);
+        assertEq(e.token,       address(0));
+        assertEq(e.amount,      1 ether);
+        assertEq(uint8(e.status), uint8(VibeEscrow.EscrowStatus.FUNDED));
     }
 
     function test_createEscrow_ETH_emitsEvents() public {
@@ -189,7 +185,8 @@ contract VibeEscrowTest is Test {
 
     function test_createEscrow_milestones_storesData() public {
         uint256 id = _createMilestoneEscrow(2 ether);
-        (,,,,,,,,,, uint256 milestoneCount, uint256 milestonesCompleted) = escrow.escrows(id);
+        uint256 milestoneCount = escrow.getEscrow(id).milestoneCount;
+        uint256 milestonesCompleted = escrow.getEscrow(id).milestonesCompleted;
         assertEq(milestoneCount,       2);
         assertEq(milestonesCompleted,  0);
     }
@@ -241,7 +238,7 @@ contract VibeEscrowTest is Test {
         vm.prank(alice);
         escrow.releaseAll(id);
 
-        (,,,,,,,,, VibeEscrow.EscrowStatus status,,) = escrow.escrows(id);
+        VibeEscrow.EscrowStatus status = escrow.getEscrow(id).status;
         assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.RELEASED));
     }
 
@@ -285,7 +282,9 @@ contract VibeEscrowTest is Test {
         vm.prank(bob);
         escrow.completeMilestone(id, 0);
 
-        (,, bool completed, bool approved) = escrow.milestones(id, 0);
+        VibeEscrow.Milestone memory ms = escrow.getMilestone(id, 0);
+        bool completed = ms.completed;
+        bool approved = ms.approved;
         assertTrue(completed);
         assertFalse(approved);
     }
@@ -334,7 +333,7 @@ contract VibeEscrowTest is Test {
         vm.prank(bob); escrow.completeMilestone(id, 1);
         vm.prank(alice); escrow.approveMilestone(id, 1);
 
-        (,,,,,,,,, VibeEscrow.EscrowStatus status,,) = escrow.escrows(id);
+        VibeEscrow.EscrowStatus status = escrow.getEscrow(id).status;
         assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.RELEASED));
         assertEq(escrow.getActiveCount(), 0);
     }
@@ -372,7 +371,7 @@ contract VibeEscrowTest is Test {
         vm.prank(alice);
         escrow.dispute(id);
 
-        (,,,,,,,,, VibeEscrow.EscrowStatus status,,) = escrow.escrows(id);
+        VibeEscrow.EscrowStatus status = escrow.getEscrow(id).status;
         assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.DISPUTED));
     }
 
@@ -381,7 +380,7 @@ contract VibeEscrowTest is Test {
         vm.prank(bob);
         escrow.dispute(id);
 
-        (,,,,,,,,, VibeEscrow.EscrowStatus status,,) = escrow.escrows(id);
+        VibeEscrow.EscrowStatus status = escrow.getEscrow(id).status;
         assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.DISPUTED));
     }
 
@@ -451,7 +450,7 @@ contract VibeEscrowTest is Test {
         vm.prank(alice); escrow.dispute(id);
         vm.prank(carol); escrow.resolveDispute(id, 5000);
 
-        (,,,,,,,,, VibeEscrow.EscrowStatus status,,) = escrow.escrows(id);
+        VibeEscrow.EscrowStatus status = escrow.getEscrow(id).status;
         assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.RESOLVED));
         assertEq(escrow.getActiveCount(), 0);
     }
@@ -508,7 +507,7 @@ contract VibeEscrowTest is Test {
         vm.warp(block.timestamp + 1 days + 1);
         escrow.refundExpired(id);
 
-        (,,,,,,,,, VibeEscrow.EscrowStatus status,,) = escrow.escrows(id);
+        VibeEscrow.EscrowStatus status = escrow.getEscrow(id).status;
         assertEq(uint8(status), uint8(VibeEscrow.EscrowStatus.REFUNDED));
         assertEq(escrow.getActiveCount(), 0);
     }

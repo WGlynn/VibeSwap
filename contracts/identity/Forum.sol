@@ -55,8 +55,8 @@ contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeabl
     uint256 private _nextReplyId;
 
     mapping(uint256 => Category) public categories;
-    mapping(uint256 => Post) public posts;
-    mapping(uint256 => Reply) public replies;
+    mapping(uint256 => Post) internal posts;
+    mapping(uint256 => Reply) internal replies;
 
     mapping(uint256 => uint256[]) public categoryPosts;      // categoryId => postIds
     mapping(uint256 => uint256[]) public postReplies;        // postId => replyIds
@@ -350,6 +350,9 @@ contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeabl
     function totalReplies() external view returns (uint256) {
         return _nextReplyId - 1;
     }
+
+    function getPost(uint256 postId) external view returns (Post memory) { return posts[postId]; }
+    function getReply(uint256 replyId) external view returns (Reply memory) { return replies[replyId]; }
 
     // ============ UUPS ============
 

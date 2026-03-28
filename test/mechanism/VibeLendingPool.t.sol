@@ -694,22 +694,12 @@ contract VibeLendingPoolTest is Test {
         uint256 ltvBps_,
         uint256 liquidationLtvBps_
     ) {
-        bool active_;
-        (
-            ,                    // address asset
-            totalDeposited_,     // 1
-            totalBorrowed_,      // 2
-            depositIndex_,       // 3
-            borrowIndex_,        // 4
-            ,                    // lastUpdateTime
-            ,                    // baseBorrowRate
-            ,                    // slope1
-            ,                    // slope2
-            ,                    // kinkBps
-            ltvBps_,             // 10
-            liquidationLtvBps_,  // 11
-            active_              // 12 bool — must capture
-        ) = pool.assets(address(usdc));
-        active_; // suppress unused warning
+        VibeLendingPool.AssetConfig memory cfg = pool.getAsset(address(usdc));
+        totalDeposited_ = cfg.totalDeposited;
+        totalBorrowed_ = cfg.totalBorrowed;
+        depositIndex_ = cfg.depositIndex;
+        borrowIndex_ = cfg.borrowIndex;
+        ltvBps_ = cfg.ltvBps;
+        liquidationLtvBps_ = cfg.liquidationLtvBps;
     }
 }

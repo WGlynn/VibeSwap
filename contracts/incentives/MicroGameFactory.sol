@@ -103,47 +103,41 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
      *   stabilityScore = 5000 base, +2500 HIGH, +5000 EXTREME
      *   Sorted by directContribution descending, capped at maxParticipants.
      */
-    function createMicroGame(bytes32 poolId, uint256 epochId) public {
-        IUtilizationAccumulator.EpochPoolData memory data = accumulator.getEpochPoolData(epochId, poolId);
-        if (!data.finalized) revert EpochNotFinalized();
-        if (lastSettledEpoch[poolId] >= epochId && epochId != 0) revert EpochAlreadySettled();
-
-        address[] memory lps = accumulator.getPoolLPs(poolId);
-        uint256 lpCount = lps.length;
-
-        // First pass: gather snapshots, compute total liquidity
-        uint128[] memory snapshots = new uint128[](lpCount);
-        uint256 totalPoolLiq = 0;
-        uint256 qualifiedCount = 0;
-        for (uint256 i = 0; i < lpCount; i++) {
+    /// @dev Gather LP snapshots and compute total liquidity + qualified count
+    function _gatherSnapshots(
+        bytes32 poolId,
+        address[] memory lps
+    ) internal view returns (uint128[] memory snapshots, uint256 totalPoolLiq, uint256 qualifiedCount) {
+        snapshots = new uint128[](lps.length);
+        for (uint256 i = 0; i < lps.length; i++) {
             snapshots[i] = accumulator.getLPSnapshot(poolId, lps[i]);
             if (snapshots[i] >= minLiquidity) {
                 totalPoolLiq += snapshots[i];
                 qualifiedCount++;
             }
         }
-        if (qualifiedCount == 0 || totalPoolLiq == 0) revert NoQualifiedParticipants();
+    }
 
-        // Stability score from epoch volatility tier
-        uint256 stability = 5000;
-        if (data.maxVolatilityTier >= VOLATILITY_EXTREME) stability = 10000;
-        else if (data.maxVolatilityTier >= VOLATILITY_HIGH) stability = 7500;
-
-        // Second pass: build participant array
-        IEmissionController.Participant[] memory candidates = new IEmissionController.Participant[](qualifiedCount);
+    /// @dev Build candidate participants array (extracted to reduce stack depth)
+    function _buildCandidates(
+        bytes32 poolId,
+        address[] memory lps,
+        uint128[] memory snapshots,
+        uint256 totalPoolLiq,
+        uint256 qualifiedCount,
+        uint256 totalVol,
+        uint256 stability
+    ) internal view returns (IEmissionController.Participant[] memory candidates) {
+        candidates = new IEmissionController.Participant[](qualifiedCount);
         uint256 idx = 0;
-        uint256 totalVol = uint256(data.totalVolumeIn);
-
-        for (uint256 i = 0; i < lpCount; i++) {
+        for (uint256 i = 0; i < lps.length; i++) {
             if (snapshots[i] < minLiquidity) continue;
             uint256 direct = (uint256(snapshots[i]) * totalVol) / totalPoolLiq;
-
-            uint256 timeInPool = 1 days; // default fallback
+            uint256 timeInPool = 1 days;
             if (address(loyaltyRewards) != address(0)) {
                 uint256 ts = loyaltyRewards.getStakeTimestamp(poolId, lps[i]);
                 if (ts > 0 && ts < block.timestamp) timeInPool = block.timestamp - ts;
             }
-
             candidates[idx++] = IEmissionController.Participant({
                 participant: lps[i],
                 directContribution: direct,
@@ -152,8 +146,27 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
                 stabilityScore: stability
             });
         }
+    }
 
-        // Sort descending by directContribution (insertion sort, bounded by maxParticipants)
+    function createMicroGame(bytes32 poolId, uint256 epochId) public {
+        IUtilizationAccumulator.EpochPoolData memory data = accumulator.getEpochPoolData(epochId, poolId);
+        if (!data.finalized) revert EpochNotFinalized();
+        if (lastSettledEpoch[poolId] >= epochId && epochId != 0) revert EpochAlreadySettled();
+
+        address[] memory lps = accumulator.getPoolLPs(poolId);
+
+        (uint128[] memory snapshots, uint256 totalPoolLiq, uint256 qualifiedCount) = _gatherSnapshots(poolId, lps);
+        if (qualifiedCount == 0 || totalPoolLiq == 0) revert NoQualifiedParticipants();
+
+        uint256 stability = 5000;
+        if (data.maxVolatilityTier >= VOLATILITY_EXTREME) stability = 10000;
+        else if (data.maxVolatilityTier >= VOLATILITY_HIGH) stability = 7500;
+
+        IEmissionController.Participant[] memory candidates = _buildCandidates(
+            poolId, lps, snapshots, totalPoolLiq, qualifiedCount, uint256(data.totalVolumeIn), stability
+        );
+
+        // Sort descending by directContribution (insertion sort)
         for (uint256 i = 1; i < qualifiedCount; i++) {
             IEmissionController.Participant memory key = candidates[i];
             uint256 j = i;
@@ -164,7 +177,6 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
             candidates[j] = key;
         }
 
-        // Cap at maxParticipants, build final array
         uint256 finalCount = qualifiedCount > maxParticipants ? maxParticipants : qualifiedCount;
         IEmissionController.Participant[] memory participants = new IEmissionController.Participant[](finalCount);
         for (uint256 i = 0; i < finalCount; i++) participants[i] = candidates[i];

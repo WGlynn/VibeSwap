@@ -70,12 +70,12 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     uint256 private _nextTokenId;
     uint256 private _nextContributionId;
 
-    mapping(uint256 => Identity) public identities;
+    mapping(uint256 => Identity) internal identities;
     mapping(address => uint256) public addressToTokenId;
     mapping(string => bool) public usernameTaken;
     mapping(bytes32 => bool) public usernameHashTaken;
 
-    mapping(uint256 => Contribution) public contributions;
+    mapping(uint256 => Contribution) internal contributions;
     mapping(uint256 => uint256[]) public identityContributions; // tokenId => contribution IDs
 
     // Voting tracking
@@ -625,51 +625,74 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
 
     // ============ Token URI ============
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        _requireOwned(tokenId);
-
-        Identity memory identity = identities[tokenId];
-
-        // Generate on-chain SVG avatar
-        string memory svg = _generateSVG(identity);
-
-        string memory json = string(abi.encodePacked(
-            '{"name":"', identity.username, '",',
-            '"description":"VibeSwap Soulbound Identity - Level ', _toString(identity.level), '",',
-            '"image":"data:image/svg+xml;base64,', _base64Encode(bytes(svg)), '",',
+    function _buildTokenAttributes(uint256 tokenId) internal view returns (string memory) {
+        string memory part1 = string(abi.encodePacked(
             '"attributes":[',
-                '{"trait_type":"Level","value":', _toString(identity.level), '},',
-                '{"trait_type":"XP","value":', _toString(identity.xp), '},',
-                '{"trait_type":"Alignment","value":', _toSignedString(identity.alignment), '},',
-                '{"trait_type":"Contributions","value":', _toString(identity.contributions), '},',
-                '{"trait_type":"Reputation","value":', _toString(identity.reputation), '}',
+            '{"trait_type":"Level","value":', _toString(identities[tokenId].level), '},',
+            '{"trait_type":"XP","value":', _toString(identities[tokenId].xp), '},'
+        ));
+        string memory part2 = string(abi.encodePacked(
+            '{"trait_type":"Alignment","value":', _toSignedString(identities[tokenId].alignment), '},',
+            '{"trait_type":"Contributions","value":', _toString(identities[tokenId].contributions), '},',
+            '{"trait_type":"Reputation","value":', _toString(identities[tokenId].reputation), '}',
             ']}'
         ));
-
-        return string(abi.encodePacked("data:application/json;base64,", _base64Encode(bytes(json))));
+        return string(abi.encodePacked(part1, part2));
     }
 
-    function _generateSVG(Identity memory identity) internal pure returns (string memory) {
-        AvatarTraits memory a = identity.avatar;
+    function _buildSvgDataUrl(uint256 tokenId) internal view returns (string memory) {
+        AvatarTraits memory avatar = identities[tokenId].avatar;
+        uint256 level = identities[tokenId].level;
+        return string(abi.encodePacked(
+            "data:image/svg+xml;base64,",
+            _base64Encode(bytes(_generateSVGFromTraits(avatar, level)))
+        ));
+    }
 
-        // Background colors
-        string[16] memory bgColors = [
+    function _buildNameDesc(uint256 tokenId) internal view returns (string memory) {
+        return string(abi.encodePacked(
+            '{"name":"', identities[tokenId].username, '",',
+            '"description":"VibeSwap Soulbound Identity - Level ',
+            _toString(identities[tokenId].level), '",'
+        ));
+    }
+
+    function _buildTokenJson(uint256 tokenId) internal view returns (string memory) {
+        string memory nameDesc = _buildNameDesc(tokenId);
+        string memory imgPart = string(abi.encodePacked('"image":"', _buildSvgDataUrl(tokenId), '",'));
+        return string(abi.encodePacked(nameDesc, imgPart, _buildTokenAttributes(tokenId)));
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        return string(abi.encodePacked(
+            "data:application/json;base64,",
+            _base64Encode(bytes(_buildTokenJson(tokenId)))
+        ));
+    }
+
+    function _getBgColor(uint8 idx) internal pure returns (string memory) {
+        string[16] memory c = [
             "#0a0a0a", "#1a0a1a", "#0a1a1a", "#1a1a0a",
             "#0f0f1f", "#1f0f0f", "#0f1f0f", "#1f1f0f",
             "#000000", "#0d0d0d", "#1a0d0d", "#0d1a0d",
             "#0d0d1a", "#151515", "#101018", "#181010"
         ];
+        return c[idx];
+    }
 
-        // Body colors (skin tones + fantasy)
-        string[16] memory bodyColors = [
+    function _getBodyColor(uint8 idx) internal pure returns (string memory) {
+        string[16] memory c = [
             "#00ff41", "#00cc34", "#1aff76", "#4dff94",
             "#00d4ff", "#00a8cc", "#1ae0ff", "#67e8f9",
             "#ff3366", "#ff1a53", "#ff4d7a", "#ff6699",
             "#a855f7", "#9333ea", "#c084fc", "#d8b4fe"
         ];
+        return c[idx];
+    }
 
-        // Eye styles
-        string[16] memory eyeStyles = [
+    function _getEyeStyle(uint8 idx) internal pure returns (string memory) {
+        string[16] memory c = [
             "M35,40 L40,40 M60,40 L65,40",
             "M35,40 Q37,38 40,40 M60,40 Q62,38 65,40",
             "M35,42 L40,38 M60,38 L65,42",
@@ -687,29 +710,47 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
             "M35,40 Q37,37 40,40 M60,40 Q62,37 65,40",
             "M33,40 L42,40 M58,40 L67,40"
         ];
+        return c[idx];
+    }
 
-        // Aura colors (level-gated)
-        string[8] memory auraColors = [
+    function _getAuraColor(uint8 idx) internal pure returns (string memory) {
+        string[8] memory c = [
             "none", "#00ff4140", "#00d4ff40", "#a855f740",
             "#ff336640", "#ffd70040", "#ffffff30", "#00ff4180"
         ];
+        return c[idx];
+    }
 
-        string memory auraElement = "";
-        if (a.aura > 0 && bytes(auraColors[a.aura]).length > 4) {
-            auraElement = string(abi.encodePacked(
-                '<circle cx="50" cy="50" r="45" fill="', auraColors[a.aura], '" />'
-            ));
-        }
-
+    function _svgBody(AvatarTraits memory a) internal pure returns (string memory) {
         return string(abi.encodePacked(
+            '<circle cx="50" cy="55" r="25" fill="', _getBodyColor(a.body), '"/>',
+            '<path d="', _getEyeStyle(a.eyes), '" stroke="#000" stroke-width="2" fill="none"/>'
+        ));
+    }
+
+    function _generateSVGFromTraits(AvatarTraits memory a, uint256 level) internal pure returns (string memory) {
+        string memory auraElement = "";
+        if (a.aura > 0) {
+            string memory ac = _getAuraColor(a.aura);
+            if (bytes(ac).length > 4) {
+                auraElement = string(abi.encodePacked('<circle cx="50" cy="50" r="45" fill="', ac, '" />'));
+            }
+        }
+        string memory bg = string(abi.encodePacked(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">',
-            '<rect width="100" height="100" fill="', bgColors[a.background], '"/>',
-            auraElement,
-            '<circle cx="50" cy="55" r="25" fill="', bodyColors[a.body], '"/>',
-            '<path d="', eyeStyles[a.eyes], '" stroke="#000" stroke-width="2" fill="none"/>',
-            '<text x="50" y="95" text-anchor="middle" font-size="6" fill="#666">Lv.', _toString(identity.level), '</text>',
+            '<rect width="100" height="100" fill="', _getBgColor(a.background), '"/>',
+            auraElement
+        ));
+        return string(abi.encodePacked(
+            bg, _svgBody(a),
+            '<text x="50" y="95" text-anchor="middle" font-size="6" fill="#666">Lv.', _toString(level), '</text>',
             '</svg>'
         ));
+    }
+
+    /// @dev Legacy helper kept for interface compatibility
+    function _generateSVG(Identity memory identity) internal pure returns (string memory) {
+        return _generateSVGFromTraits(identity.avatar, identity.level);
     }
 
     function _toString(uint256 value) internal pure returns (string memory) {

@@ -277,38 +277,8 @@ contract PsiNetPipelineTest is Test {
         vm.warp(block.timestamp + 30 minutes + 1);
         verifier.advancePhase(taskId);
 
-        // Step 6: Validators commit comparisons (all vote for worker1)
-        bytes32 vSecret1 = keccak256("v1-secret");
-        bytes32 vSecret2 = keccak256("v2-secret");
-        bytes32 vSecret3 = keccak256("v3-secret");
-
-        // choice=1 means FIRST (worker1's submission)
-        bytes32 vCommit1 = keccak256(abi.encodePacked(uint8(1), vSecret1));
-        bytes32 vCommit2 = keccak256(abi.encodePacked(uint8(1), vSecret2));
-        bytes32 vCommit3 = keccak256(abi.encodePacked(uint8(1), vSecret3));
-
-        vm.prank(validator1);
-        bytes32 comp1 = verifier.commitComparison(taskId, sub1Id, sub2Id, vCommit1);
-
-        vm.prank(validator2);
-        bytes32 comp2 = verifier.commitComparison(taskId, sub1Id, sub2Id, vCommit2);
-
-        vm.prank(validator3);
-        bytes32 comp3 = verifier.commitComparison(taskId, sub1Id, sub2Id, vCommit3);
-
-        // Step 7: Advance to COMPARE_REVEAL
-        vm.warp(block.timestamp + 1 hours + 1);
-        verifier.advancePhase(taskId);
-
-        // Step 8: Validators reveal
-        vm.prank(validator1);
-        verifier.revealComparison(comp1, IPairwiseVerifier.CompareChoice.FIRST, vSecret1);
-
-        vm.prank(validator2);
-        verifier.revealComparison(comp2, IPairwiseVerifier.CompareChoice.FIRST, vSecret2);
-
-        vm.prank(validator3);
-        verifier.revealComparison(comp3, IPairwiseVerifier.CompareChoice.FIRST, vSecret3);
+        // Steps 6-8: Validators commit and reveal (all vote for worker1)
+        _validatorsVoteFirst(taskId, sub1Id, sub2Id);
 
         // Step 9: Advance to SETTLED and settle
         vm.warp(block.timestamp + 30 minutes + 1);
@@ -529,6 +499,37 @@ contract PsiNetPipelineTest is Test {
         } else {
             return keccak256(abi.encodePacked(b, a));
         }
+    }
+
+    function _validatorsVoteFirst(bytes32 taskId, bytes32 sub1Id, bytes32 sub2Id) internal {
+        bytes32 vSecret1 = keccak256("v1-secret");
+        bytes32 vSecret2 = keccak256("v2-secret");
+        bytes32 vSecret3 = keccak256("v3-secret");
+
+        bytes32 comp1;
+        bytes32 comp2;
+        bytes32 comp3;
+        {
+            bytes32 vCommit1 = keccak256(abi.encodePacked(uint8(1), vSecret1));
+            bytes32 vCommit2 = keccak256(abi.encodePacked(uint8(1), vSecret2));
+            bytes32 vCommit3 = keccak256(abi.encodePacked(uint8(1), vSecret3));
+            vm.prank(validator1);
+            comp1 = verifier.commitComparison(taskId, sub1Id, sub2Id, vCommit1);
+            vm.prank(validator2);
+            comp2 = verifier.commitComparison(taskId, sub1Id, sub2Id, vCommit2);
+            vm.prank(validator3);
+            comp3 = verifier.commitComparison(taskId, sub1Id, sub2Id, vCommit3);
+        }
+
+        vm.warp(block.timestamp + 1 hours + 1);
+        verifier.advancePhase(taskId);
+
+        vm.prank(validator1);
+        verifier.revealComparison(comp1, IPairwiseVerifier.CompareChoice.FIRST, vSecret1);
+        vm.prank(validator2);
+        verifier.revealComparison(comp2, IPairwiseVerifier.CompareChoice.FIRST, vSecret2);
+        vm.prank(validator3);
+        verifier.revealComparison(comp3, IPairwiseVerifier.CompareChoice.FIRST, vSecret3);
     }
 
     // Receive ETH for refunds

@@ -592,9 +592,9 @@ contract VibeRWATest is Test {
 
         // Verify yield per share calculation
         uint256 expectedYieldPerShare = (yieldAmount * 1e18) / sharesSold;
-        (, , uint256 totalYield, uint256 yieldPerShare, , ) = rwa.yieldEpochs(assetId, 1);
-        assertEq(totalYield, yieldAmount);
-        assertEq(yieldPerShare, expectedYieldPerShare);
+        VibeRWA.YieldEpoch memory ep = rwa.getYieldEpoch(assetId, 1);
+        assertEq(ep.totalYield, yieldAmount);
+        assertEq(ep.yieldPerShare, expectedYieldPerShare);
     }
 
     function testFuzz_SecondaryMarket_FeeCalculation(uint256 pricePerShare) public {

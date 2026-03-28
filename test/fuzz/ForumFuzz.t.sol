@@ -104,7 +104,6 @@ contract ForumFuzzTest is Test {
             forum.createReply(1, keccak256(abi.encodePacked("r", i)), 0);
         }
 
-        (, , , , , , , , uint256 count, , ) = forum.posts(1);
-        assertEq(count, replyCount);
+        assertEq(forum.getPost(1).replyCount, replyCount);
     }
 }

@@ -241,9 +241,12 @@ contract GovernanceGuard is
         address proposer, address target, uint256 value, bytes memory data,
         string memory description, uint256 executeAfter, bool emergency, ProposalState state
     ) {
+        // Pre-compute state before accessing proposal fields to avoid stack-too-deep
+        // (8 return values + storage pointer + nested function call exceed 16-slot limit)
+        ProposalState _state = getProposalState(proposalId);
         Proposal storage p = proposals[proposalId];
         return (p.proposer, p.target, p.value, p.data, p.description,
-                p.executeAfter, p.emergency, getProposalState(proposalId));
+                p.executeAfter, p.emergency, _state);
     }
 
     function isExecutable(bytes32 proposalId) external view returns (bool) {

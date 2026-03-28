@@ -166,7 +166,10 @@ contract VibeAppStore is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
         config.name = name;
         config.description = description;
         config.modules = moduleIds;
-        config.moduleParams = moduleParams;
+        // Copy bytes[] calldata element-by-element (nested calldata->storage not supported in old codegen)
+        for (uint256 i = 0; i < moduleParams.length; i++) {
+            config.moduleParams.push(moduleParams[i]);
+        }
         config.price = price;
         config.createdAt = block.timestamp;
         config.active = true;
@@ -198,14 +201,17 @@ contract VibeAppStore is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpg
         config.installCount++;
         setupCount++;
 
-        setups[setupCount] = UserSetup({
-            setupId: setupCount,
-            owner: msg.sender,
-            configId: configId,
-            customParams: customParams,
-            installedAt: block.timestamp,
-            active: true
-        });
+        // Initialize setup without nested array (can't use struct literal with bytes[])
+        UserSetup storage setup = setups[setupCount];
+        setup.setupId = setupCount;
+        setup.owner = msg.sender;
+        setup.configId = configId;
+        // Copy bytes[] calldata element-by-element (nested calldata->storage not supported in old codegen)
+        for (uint256 i = 0; i < customParams.length; i++) {
+            setup.customParams.push(customParams[i]);
+        }
+        setup.installedAt = block.timestamp;
+        setup.active = true;
 
         userSetups[msg.sender].push(setupCount);
 

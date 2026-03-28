@@ -76,18 +76,19 @@ contract VibeRWA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     // ============ State ============
 
-    mapping(bytes32 => RealWorldAsset) public assets;
+    // Internal to avoid auto-generated getters for 15-field RealWorldAsset struct (stack-too-deep)
+    mapping(bytes32 => RealWorldAsset) internal assets;
     bytes32[] public assetList;
 
     /// @notice Share balances: assetId => holder => ShareHolder
-    mapping(bytes32 => mapping(address => ShareHolder)) public holders;
+    mapping(bytes32 => mapping(address => ShareHolder)) internal holders;
 
     /// @notice Yield epochs: assetId => epochId => YieldEpoch
-    mapping(bytes32 => mapping(uint256 => YieldEpoch)) public yieldEpochs;
+    mapping(bytes32 => mapping(uint256 => YieldEpoch)) internal yieldEpochs;
     mapping(bytes32 => uint256) public currentEpoch;
 
     /// @notice Secondary market listings
-    mapping(uint256 => Listing) public listings;
+    mapping(uint256 => Listing) internal listings;
     uint256 public listingCount;
 
     /// @notice Approved appraisers
@@ -359,6 +360,9 @@ contract VibeRWA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     // ============ View ============
 
+    function getHolder(bytes32 assetId, address user) external view returns (ShareHolder memory) { return holders[assetId][user]; }
+    function getYieldEpoch(bytes32 assetId, uint256 epochId) external view returns (YieldEpoch memory) { return yieldEpochs[assetId][epochId]; }
+    function getListing(uint256 listingId) external view returns (Listing memory) { return listings[listingId]; }
     function getAsset(bytes32 assetId) external view returns (RealWorldAsset memory) {
         return assets[assetId];
     }

@@ -43,11 +43,11 @@ contract VibeEscrow is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
 
     // ============ State ============
 
-    mapping(uint256 => Escrow) public escrows;
+    mapping(uint256 => Escrow) internal escrows;
     uint256 public escrowCount;
 
     /// @notice Milestones: escrowId => index => milestone
-    mapping(uint256 => mapping(uint256 => Milestone)) public milestones;
+    mapping(uint256 => mapping(uint256 => Milestone)) internal milestones;
 
     /// @notice Platform fee (basis points)
     uint256 public feeBps;
@@ -246,6 +246,8 @@ contract VibeEscrow is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgra
 
     function getEscrowCount() external view returns (uint256) { return escrowCount; }
     function getActiveCount() external view returns (uint256) { return activeEscrowCount; }
+    function getEscrow(uint256 id) external view returns (Escrow memory) { return escrows[id]; }
+    function getMilestone(uint256 id, uint256 idx) external view returns (Milestone memory) { return milestones[id][idx]; }
 
     receive() external payable {}
 }

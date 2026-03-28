@@ -102,33 +102,18 @@ contract VibeDCATest is Test {
         assertEq(orderId, 1);
         assertEq(dca.getOrderCount(), 1);
 
-        (
-            uint256 id_,
-            address user_,
-            address tIn_,
-            address tOut_,
-            uint256 totalDeposited_,
-            uint256 amountPerExecution_,
-            uint256 totalExecuted_,
-            uint256 executionCount_,
-            uint256 maxExecutions_,
-            VibeDCA.Frequency freq_,
-            ,
-            ,
-            bool active_
-        ) = dca.orders(orderId);
-
-        assertEq(id_,                orderId);
-        assertEq(user_,              alice);
-        assertEq(tIn_,               address(tokenIn));
-        assertEq(tOut_,              address(tokenOut));
-        assertEq(totalDeposited_,    1200 ether);
-        assertEq(amountPerExecution_, 100 ether);
-        assertEq(totalExecuted_,     0);
-        assertEq(executionCount_,    0);
-        assertEq(maxExecutions_,     12);
-        assertEq(uint8(freq_),       uint8(VibeDCA.Frequency.DAILY));
-        assertTrue(active_);
+        VibeDCA.DCAOrder memory o = dca.getOrder(orderId);
+        assertEq(o.orderId,              orderId);
+        assertEq(o.user,                 alice);
+        assertEq(o.tokenIn,              address(tokenIn));
+        assertEq(o.tokenOut,             address(tokenOut));
+        assertEq(o.totalDeposited,       1200 ether);
+        assertEq(o.amountPerExecution,   100 ether);
+        assertEq(o.totalExecuted,        0);
+        assertEq(o.executionCount,       0);
+        assertEq(o.maxExecutions,        12);
+        assertEq(uint8(o.frequency),     uint8(VibeDCA.Frequency.DAILY));
+        assertTrue(o.active);
     }
 
     function test_createDCA_transfersTokenIn() public {
@@ -213,9 +198,8 @@ contract VibeDCATest is Test {
 
         _executeAs(orderId, keeper, 99 ether);
 
-        (, , , , , , uint256 totalExecuted, uint256 executionCount, , , , , ) = dca.orders(orderId);
-        assertEq(executionCount, 1);
-        assertEq(totalExecuted,  100 ether);
+        assertEq(dca.getOrder(orderId).executionCount, 1);
+        assertEq(dca.getOrder(orderId).totalExecuted,  100 ether);
     }
 
     function test_executeDCA_updatesGlobalCounters() public {
@@ -283,8 +267,7 @@ contract VibeDCATest is Test {
         // Alice should get 50 ether remainder back
         assertEq(tokenIn.balanceOf(alice), aliceTokenInBefore + 50 ether);
 
-        (, , , , , , , , , , , , bool active_) = dca.orders(orderId);
-        assertFalse(active_);
+        assertFalse(dca.getOrder(orderId).active);
     }
 
     function test_executeDCA_completesOrder_emitsDCACompleted() public {
@@ -329,8 +312,7 @@ contract VibeDCATest is Test {
         vm.prank(alice);
         dca.cancelDCA(orderId);
 
-        (, , , , , , , , , , , , bool active_) = dca.orders(orderId);
-        assertFalse(active_);
+        assertFalse(dca.getOrder(orderId).active);
     }
 
     function test_cancelDCA_emitsEvent() public {
@@ -468,9 +450,8 @@ contract VibeDCATest is Test {
             _executeAs(orderId, keeper, 95 ether);
         }
 
-        (, , , , , , , uint256 executionCount_, uint256 maxExecutions_, , , , bool active_) = dca.orders(orderId);
-        assertEq(executionCount_, maxExecutions_);
-        assertFalse(active_);
+        assertEq(dca.getOrder(orderId).executionCount, dca.getOrder(orderId).maxExecutions);
+        assertFalse(dca.getOrder(orderId).active);
         assertEq(dca.totalExecutions(), 3);
     }
 

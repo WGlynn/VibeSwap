@@ -6,7 +6,7 @@
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
 [![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5.0.1-purple)](https://www.openzeppelin.com/contracts)
 [![LayerZero](https://img.shields.io/badge/LayerZero-V2%20OApp-green)](https://layerzero.network/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT%20(libs)%20%7C%20Proprietary%20(protocol)-yellow.svg)](#license)
 
 ---
 
@@ -121,12 +121,12 @@ The mechanism makes virtue the optimal strategy.
 
 | Metric | Value |
 |--------|-------|
-| Solidity contracts | **364** across 32 modules |
-| Test files | **394** (unit, fuzz, invariant, integration, security) |
+| Solidity contracts | **376** across 32 modules |
+| Test files | **510** (unit, fuzz, invariant, integration, security) |
 | Proxy architecture | UUPS upgradeable (OpenZeppelin v5.0.1) |
 | Cross-chain | LayerZero V2 OApp — Ethereum, Arbitrum, Optimism, Base |
-| Research | **242** original mechanism design papers |
-| Frontend | React 18 + Vite 5 + ethers.js v6 — 338 components, 72 hooks — [live demo](https://frontend-jade-five-87.vercel.app) |
+| Research | **138** published papers + **466** docs |
+| Frontend | React 18 + Vite 5 + ethers.js v6 — 413 components, 72 hooks — [live demo](https://frontend-jade-five-87.vercel.app) |
 
 ---
 
@@ -170,7 +170,7 @@ forge script script/ConfigurePeers.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast
 Contracts:    Solidity 0.8.20  ·  Foundry  ·  OpenZeppelin v5.0.1  ·  LayerZero V2
 Frontend:     React 18  ·  Vite 5  ·  Tailwind CSS  ·  ethers.js v6  ·  WebAuthn
 Oracle:       Python 3.9+  ·  Kalman filter  ·  Bayesian estimation
-Testing:      Foundry (unit + fuzz + invariant)  ·  Slither  ·  394 test files
+Testing:      Foundry (unit + fuzz + invariant)  ·  Slither  ·  510 test files
 Deployment:   Anvil (local)  ·  Sepolia/Mainnet  ·  Vercel (frontend)
 ```
 
@@ -180,7 +180,7 @@ Deployment:   Anvil (local)  ·  Sepolia/Mainnet  ·  Vercel (frontend)
 
 ```
 vibeswap/
-├── contracts/                 # 364 Solidity files across 32 modules
+├── contracts/                 # 376 Solidity files across 32 modules
 │   ├── core/                  #   CommitRevealAuction, VibeSwapCore
 │   ├── amm/                   #   VibeAMM (x·y=k), VibeLP
 │   ├── governance/            #   DAOTreasury, TreasuryStabilizer, VibeTimelock
@@ -191,11 +191,11 @@ vibeswap/
 │   ├── oracle/                #   VolatilityOracle
 │   ├── security/              #   CircuitBreaker, RateLimiter
 │   └── libraries/             #   DeterministicShuffle, BatchMath, TWAPOracle
-├── test/                      # 394 test files
+├── test/                      # 510 test files
 ├── script/                    # Deployment scripts
-├── frontend/                  # React 18 + Vite 5 (338 components, 72 hooks)
+├── frontend/                  # React 18 + Vite 5 (413 components, 72 hooks)
 ├── oracle/                    # Python Kalman filter price oracle
-├── DOCUMENTATION/             # 99 original research papers
+├── DOCUMENTATION/             # 138 original research papers
 └── docs/                      # Proposals and additional docs
 ```
 
@@ -213,10 +213,10 @@ vibeswap/
 | [Formal Fairness Proofs](DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) | Mathematical proofs of fairness properties |
 | [Proof Index](DOCUMENTATION/PROOF_INDEX.md) | Master catalog: 18 theorems, 18 dilemmas dissolved, 5 trilemmas, 4 quadrilemmas |
 
-See [`DOCUMENTATION/`](DOCUMENTATION/) for all 99 papers.
+See [`DOCUMENTATION/`](DOCUMENTATION/) for all 138 papers.
 
 ---
 
 ## License
 
-MIT
+Libraries and tooling: MIT. Core protocol contracts: proprietary. See individual files for details.

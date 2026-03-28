@@ -84,6 +84,9 @@ contract VerifierCheckpointBridgeTest is Test {
     event ResultCheckpointed(bytes32 indexed computeId, bytes32 indexed source, bytes32 resultHash);
 
     function setUp() public {
+        // Warp forward so block.timestamp - 2 hours doesn't underflow
+        vm.warp(block.timestamp + 1 days);
+
         owner = address(this);
         alice = makeAddr("alice");
         bob = makeAddr("bob");

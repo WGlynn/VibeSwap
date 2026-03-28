@@ -161,7 +161,7 @@ contract PostQuantumShieldTest is Test {
         _registerIdentity(alice, MERKLE_ROOT, KEY_AGREEMENT_PUB_A, 64, SEC_256, false);
 
         (,,, uint8 secLevel,,) = shield.getIdentity(alice);
-        assertEq(secLevel, 256);
+        assertEq(secLevel, 255);
     }
 
     function test_registerIdentity_emitsEvent() public {
@@ -191,10 +191,10 @@ contract PostQuantumShieldTest is Test {
         shield.registerQuantumIdentity(MERKLE_ROOT, KEY_AGREEMENT_PUB_A, 256, 64, false);
     }
 
-    function test_registerIdentity_revert_invalidSecurityLevel_255() public {
+    function test_registerIdentity_revert_invalidSecurityLevel_254() public {
         vm.prank(alice);
         vm.expectRevert("Invalid level");
-        shield.registerQuantumIdentity(MERKLE_ROOT, KEY_AGREEMENT_PUB_A, 256, 255, false);
+        shield.registerQuantumIdentity(MERKLE_ROOT, KEY_AGREEMENT_PUB_A, 256, 254, false);
     }
 
     function test_registerIdentity_revert_zeroRoot() public {

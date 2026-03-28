@@ -45,8 +45,9 @@ contract VibeStateChainTest is Test {
     // ============ Helpers ============
 
     function _registerValidator(address who) internal {
+        uint256 minStake = chain.MIN_STAKE();
         vm.prank(who);
-        chain.registerValidator{value: chain.MIN_STAKE()}();
+        chain.registerValidator{value: minStake}();
     }
 
     function _proposeAndFinalizeBlock(address proposer, bytes32 stateRoot) internal {
@@ -123,17 +124,19 @@ contract VibeStateChainTest is Test {
     }
 
     function test_registerValidator_revert_insufficientStake() public {
+        uint256 minStake = chain.MIN_STAKE();
         vm.prank(alice);
         vm.expectRevert("Insufficient stake");
-        chain.registerValidator{value: chain.MIN_STAKE() - 1}();
+        chain.registerValidator{value: minStake - 1}();
     }
 
     function test_registerValidator_revert_alreadyRegistered() public {
         _registerValidator(alice);
 
+        uint256 minStake = chain.MIN_STAKE();
         vm.prank(alice);
         vm.expectRevert("Already registered");
-        chain.registerValidator{value: chain.MIN_STAKE()}();
+        chain.registerValidator{value: minStake}();
     }
 
     function test_addStake_succeeds() public {
@@ -747,14 +750,15 @@ contract VibeStateChainTest is Test {
     function testFuzz_multipleValidators_stakeAccumulates(uint8 n) public {
         vm.assume(n > 0 && n < 10);
 
+        uint256 minStake = chain.MIN_STAKE();
         for (uint256 i = 0; i < n; i++) {
             address v = makeAddr(string(abi.encode(i)));
             vm.deal(v, 1 ether);
             vm.prank(v);
-            chain.registerValidator{value: chain.MIN_STAKE()}();
+            chain.registerValidator{value: minStake}();
         }
 
-        assertEq(chain.totalStake(), uint256(n) * chain.MIN_STAKE());
+        assertEq(chain.totalStake(), uint256(n) * minStake);
         assertEq(chain.getValidatorCount(), n);
     }
 

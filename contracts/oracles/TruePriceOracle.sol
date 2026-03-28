@@ -241,6 +241,26 @@ contract TruePriceOracle is
     /**
      * @inheritdoc ITruePriceOracle
      */
+    /// @dev Validate signature auth + nonce + deadline (extracted to reduce stack depth)
+    function _validateAndAdvanceNonce(
+        bytes32 poolId,
+        uint256 price,
+        uint256 confidence,
+        int256 deviationZScore,
+        RegimeType regime,
+        uint256 manipulationProb,
+        bytes32 dataHash,
+        bytes calldata signature
+    ) internal {
+        (address signer, uint256 nonce, uint256 deadline) = _verifyPriceSignature(
+            poolId, price, confidence, deviationZScore, regime, manipulationProb, dataHash, signature
+        );
+        if (!authorizedSigners[signer]) revert UnauthorizedSigner();
+        if (nonce != signerNonces[signer]) revert InvalidNonce();
+        signerNonces[signer]++;
+        if (block.timestamp > deadline) revert ExpiredSignature();
+    }
+
     function updateTruePrice(
         bytes32 poolId,
         uint256 price,
@@ -251,37 +271,22 @@ contract TruePriceOracle is
         bytes32 dataHash,
         bytes calldata signature
     ) external override nonReentrant {
-        // Verify signature and extract signer, nonce, deadline
-        (address signer, uint256 nonce, uint256 deadline) = _verifyPriceSignature(
-            poolId, price, confidence, deviationZScore, regime, manipulationProb, dataHash, signature
-        );
-
-        // Validate signer authorization
-        if (!authorizedSigners[signer]) revert UnauthorizedSigner();
-
-        // Validate nonce
-        if (nonce != signerNonces[signer]) revert InvalidNonce();
-        signerNonces[signer]++;
-
-        // Validate deadline
-        if (block.timestamp > deadline) revert ExpiredSignature();
+        _validateAndAdvanceNonce(poolId, price, confidence, deviationZScore, regime, manipulationProb, dataHash, signature);
 
         // Validate price jump (if existing data)
-        TruePriceData memory existing = truePrices[poolId];
-        if (existing.timestamp > 0 && existing.price > 0) {
-            _validatePriceJump(existing.price, price);
+        if (truePrices[poolId].timestamp > 0 && truePrices[poolId].price > 0) {
+            _validatePriceJump(truePrices[poolId].price, price);
         }
 
         // Store new data
-        TruePriceData memory newData = TruePriceData({
-            price: price,
-            confidence: confidence,
-            deviationZScore: deviationZScore,
-            regime: regime,
-            manipulationProb: manipulationProb,
-            timestamp: uint64(block.timestamp),
-            dataHash: dataHash
-        });
+        TruePriceData memory newData;
+        newData.price = price;
+        newData.confidence = confidence;
+        newData.deviationZScore = deviationZScore;
+        newData.regime = regime;
+        newData.manipulationProb = manipulationProb;
+        newData.timestamp = uint64(block.timestamp);
+        newData.dataHash = dataHash;
 
         truePrices[poolId] = newData;
         _addToHistory(poolId, newData);

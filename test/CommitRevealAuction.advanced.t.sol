@@ -142,28 +142,30 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 bobSecret = keccak256("bob");
         bytes32 charlieSecret = keccak256("charlie");
 
-        bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret);
-        bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
-        bytes32 charlieHash = _generateCommitHash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret);
-
-        vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
-
-        vm.prank(bob);
-        bytes32 bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
-
-        vm.prank(charlie);
-        bytes32 charlieCommitId = auction.commitOrder{value: 0.01 ether}(charlieHash);
+        bytes32 aliceCommitId;
+        bytes32 bobCommitId;
+        bytes32 charlieCommitId;
+        {
+            bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret);
+            bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
+            bytes32 charlieHash = _generateCommitHash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret);
+            vm.prank(alice);
+            aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+            vm.prank(bob);
+            bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+            vm.prank(charlie);
+            charlieCommitId = auction.commitOrder{value: 0.01 ether}(charlieHash);
+        }
 
         vm.warp(block.timestamp + 9);
 
         // Alice pays highest priority bid
         vm.prank(alice);
-        auction.revealOrder{value: 1 ether}(aliceCommitId, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret, 1 ether);
+        _doReveal(aliceCommitId, aliceSecret, 1 ether);
 
         // Bob pays medium priority bid
         vm.prank(bob);
-        auction.revealOrder{value: 0.5 ether}(bobCommitId, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret, 0.5 ether);
+        _doReveal(bobCommitId, bobSecret, 0.5 ether);
 
         // Charlie pays no priority bid
         vm.prank(charlie);
@@ -343,10 +345,10 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         // Both pay priority bids
         vm.prank(alice);
-        auction.revealOrder{value: 0.5 ether}(aliceCommitId, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret, 0.5 ether);
+        _doReveal(aliceCommitId, aliceSecret, 0.5 ether);
 
         vm.prank(bob);
-        auction.revealOrder{value: 1 ether}(bobCommitId, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret, 1 ether);
+        _doReveal(bobCommitId, bobSecret, 1 ether);
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
@@ -416,30 +418,32 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 bobSecret = keccak256("bob");
         bytes32 charlieSecret = keccak256("charlie");
 
-        bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret);
-        bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
-        bytes32 charlieHash = _generateCommitHash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret);
-
-        vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
-
-        vm.prank(bob);
-        bytes32 bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
-
-        vm.prank(charlie);
-        bytes32 charlieCommitId = auction.commitOrder{value: 0.01 ether}(charlieHash);
+        bytes32 aliceCommitId;
+        bytes32 bobCommitId;
+        bytes32 charlieCommitId;
+        {
+            bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret);
+            bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
+            bytes32 charlieHash = _generateCommitHash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret);
+            vm.prank(alice);
+            aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+            vm.prank(bob);
+            bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+            vm.prank(charlie);
+            charlieCommitId = auction.commitOrder{value: 0.01 ether}(charlieHash);
+        }
 
         vm.warp(block.timestamp + 9);
 
         // All pay same priority bid, but reveal in order: Alice, Bob, Charlie
         vm.prank(alice);
-        auction.revealOrder{value: 0.5 ether}(aliceCommitId, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret, 0.5 ether);
+        _doReveal(aliceCommitId, aliceSecret, 0.5 ether);
 
         vm.prank(bob);
-        auction.revealOrder{value: 0.5 ether}(bobCommitId, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret, 0.5 ether);
+        _doReveal(bobCommitId, bobSecret, 0.5 ether);
 
         vm.prank(charlie);
-        auction.revealOrder{value: 0.5 ether}(charlieCommitId, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret, 0.5 ether);
+        _doReveal(charlieCommitId, charlieSecret, 0.5 ether);
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
@@ -616,6 +620,10 @@ contract CommitRevealAuctionAdvancedTest is Test {
     /**
      * @notice Fuzz test for priority bid ordering
      */
+    function _doReveal(bytes32 commitId, bytes32 secret, uint256 bid) internal {
+        auction.revealOrder{value: bid}(commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret, bid);
+    }
+
     function testFuzz_priorityBidOrdering(uint256 bid1, uint256 bid2) public {
         bid1 = bound(bid1, 0.01 ether, 10 ether);
         bid2 = bound(bid2, 0.01 ether, 10 ether);
@@ -624,22 +632,26 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 aliceSecret = keccak256("alice");
         bytes32 bobSecret = keccak256("bob");
 
-        bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret);
-        bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
+        bytes32 aliceCommitId;
+        bytes32 bobCommitId;
+        {
+            bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret);
+            bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
 
-        vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+            vm.prank(alice);
+            aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
 
-        vm.prank(bob);
-        bytes32 bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+            vm.prank(bob);
+            bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+        }
 
         vm.warp(block.timestamp + 9);
 
         vm.prank(alice);
-        auction.revealOrder{value: bid1}(aliceCommitId, tokenA, tokenB, 1 ether, 0.9 ether, aliceSecret, bid1);
+        _doReveal(aliceCommitId, aliceSecret, bid1);
 
         vm.prank(bob);
-        auction.revealOrder{value: bid2}(bobCommitId, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret, bid2);
+        _doReveal(bobCommitId, bobSecret, bid2);
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();

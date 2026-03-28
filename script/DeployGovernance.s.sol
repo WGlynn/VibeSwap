@@ -31,6 +31,54 @@ import "../contracts/governance/DisputeResolver.sol";
  *   FEDERATED_CONSENSUS      - FederatedConsensus address (from DeployCompliance, for DisputeResolver)
  */
 contract DeployGovernance is Script {
+    function _deployStabilizer(address owner, address vibeAMM, address daoTreasury, address volatilityOracle)
+        internal returns (address)
+    {
+        TreasuryStabilizer stabImpl = new TreasuryStabilizer();
+        ERC1967Proxy stabProxy = new ERC1967Proxy(
+            address(stabImpl),
+            abi.encodeCall(TreasuryStabilizer.initialize, (owner, vibeAMM, daoTreasury, volatilityOracle))
+        );
+        address addr = address(stabProxy);
+        console.log("TreasuryStabilizer:", addr);
+        return addr;
+    }
+
+    function _deployTimelock(address owner, address guardian, address jouleToken, address reputationOracle)
+        internal returns (address)
+    {
+        address[] memory proposers = new address[](1);
+        proposers[0] = owner;
+        address[] memory executors = new address[](1);
+        executors[0] = owner;
+        address[] memory cancellers = new address[](1);
+        cancellers[0] = guardian;
+        VibeTimelock timelock = new VibeTimelock(
+            2 days, jouleToken, reputationOracle, guardian, proposers, executors, cancellers
+        );
+        address addr = address(timelock);
+        console.log("VibeTimelock:", addr);
+        return addr;
+    }
+
+    function _deployKeeper(address jouleToken, address reputationOracle) internal returns (address) {
+        VibeKeeperNetwork keeper = new VibeKeeperNetwork(jouleToken, reputationOracle);
+        address addr = address(keeper);
+        console.log("VibeKeeperNetwork:", addr);
+        return addr;
+    }
+
+    function _deployDisputeResolver(address owner, address federatedConsensus) internal returns (address) {
+        DisputeResolver drImpl = new DisputeResolver();
+        ERC1967Proxy drProxy = new ERC1967Proxy(
+            address(drImpl),
+            abi.encodeCall(DisputeResolver.initialize, (owner, federatedConsensus))
+        );
+        address addr = address(drProxy);
+        console.log("DisputeResolver:", addr);
+        return addr;
+    }
+
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerKey);
@@ -38,88 +86,36 @@ contract DeployGovernance is Script {
         address owner = vm.envOr("OWNER_ADDRESS", deployer);
         address guardian = vm.envOr("GUARDIAN_ADDRESS", owner);
 
-        // Required dependencies
-        address vibeAMM = vm.envAddress("VIBE_AMM");
-        address daoTreasury = vm.envAddress("DAO_TREASURY");
-        address volatilityOracle = vm.envAddress("VOLATILITY_ORACLE");
-
-        // Optional dependencies (may not exist yet)
         address jouleToken = vm.envOr("JOULE_TOKEN", address(0));
         address reputationOracle = vm.envOr("REPUTATION_ORACLE", address(0));
         address federatedConsensus = vm.envOr("FEDERATED_CONSENSUS", address(0));
 
         vm.startBroadcast(deployerKey);
 
-        // ============ 1. TreasuryStabilizer (UUPS) ============
-
-        TreasuryStabilizer stabImpl = new TreasuryStabilizer();
-        ERC1967Proxy stabProxy = new ERC1967Proxy(
-            address(stabImpl),
-            abi.encodeCall(TreasuryStabilizer.initialize, (
-                owner,
-                vibeAMM,
-                daoTreasury,
-                volatilityOracle
-            ))
+        address treasuryStabilizer = _deployStabilizer(
+            owner,
+            vm.envAddress("VIBE_AMM"),
+            vm.envAddress("DAO_TREASURY"),
+            vm.envAddress("VOLATILITY_ORACLE")
         );
-        address treasuryStabilizer = address(stabProxy);
-        console.log("TreasuryStabilizer:", treasuryStabilizer);
-
-        // ============ 2. VibeTimelock (non-upgradeable) ============
 
         address vibeTimelock;
         if (jouleToken != address(0)) {
-            // Deployer starts as sole proposer/executor/canceller; transfer roles to governance later
-            address[] memory proposers = new address[](1);
-            proposers[0] = owner;
-            address[] memory executors = new address[](1);
-            executors[0] = owner;
-            address[] memory cancellers = new address[](1);
-            cancellers[0] = guardian;
-
-            VibeTimelock timelock = new VibeTimelock(
-                2 days,              // initial min delay
-                jouleToken,
-                reputationOracle,    // can be address(0) initially
-                guardian,
-                proposers,
-                executors,
-                cancellers
-            );
-            vibeTimelock = address(timelock);
-            console.log("VibeTimelock:", vibeTimelock);
+            vibeTimelock = _deployTimelock(owner, guardian, jouleToken, reputationOracle);
         } else {
             console.log("SKIP VibeTimelock (JOULE_TOKEN not provided - wire after DeployTokenomics)");
         }
 
-        // ============ 3. VibeKeeperNetwork (non-upgradeable) ============
-
         address vibeKeeperNetwork;
         if (jouleToken != address(0)) {
-            VibeKeeperNetwork keeper = new VibeKeeperNetwork(
-                jouleToken,
-                reputationOracle     // can be address(0) initially
-            );
-            vibeKeeperNetwork = address(keeper);
-            console.log("VibeKeeperNetwork:", vibeKeeperNetwork);
+            vibeKeeperNetwork = _deployKeeper(jouleToken, reputationOracle);
         } else {
             console.log("SKIP VibeKeeperNetwork (JOULE_TOKEN not provided - wire after DeployTokenomics)");
         }
 
-        // ============ 4. DisputeResolver (UUPS) ============
-
         address disputeResolver;
         if (federatedConsensus != address(0)) {
-            DisputeResolver drImpl = new DisputeResolver();
-            ERC1967Proxy drProxy = new ERC1967Proxy(
-                address(drImpl),
-                abi.encodeCall(DisputeResolver.initialize, (
-                    owner,
-                    federatedConsensus
-                ))
-            );
-            disputeResolver = address(drProxy);
-            console.log("DisputeResolver:", disputeResolver);
+            disputeResolver = _deployDisputeResolver(owner, federatedConsensus);
         } else {
             console.log("SKIP DisputeResolver (FEDERATED_CONSENSUS not provided - wire after DeployCompliance)");
         }

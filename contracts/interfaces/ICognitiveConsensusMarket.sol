@@ -43,4 +43,11 @@ interface ICognitiveConsensusMarket {
         uint256 totalStake,
         uint256 totalReputationWeight
     );
+
+    /// @notice Lightweight getter returning only claim state and verdict.
+    /// @dev Avoids 13-value tuple destructuring which causes stack-too-deep in callers.
+    function getClaimStateAndVerdict(uint256 claimId) external view returns (
+        ClaimState state,
+        Verdict verdict
+    );
 }

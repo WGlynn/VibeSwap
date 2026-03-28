@@ -43,7 +43,7 @@ contract VibeDCA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     // ============ State ============
 
-    mapping(uint256 => DCAOrder) public orders;
+    mapping(uint256 => DCAOrder) internal orders;
     uint256 public orderCount;
 
     /// @notice User's DCA orders
@@ -230,4 +230,5 @@ contract VibeDCA is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     }
 
     function getOrderCount() external view returns (uint256) { return orderCount; }
+    function getOrder(uint256 orderId) external view returns (DCAOrder memory) { return orders[orderId]; }
 }

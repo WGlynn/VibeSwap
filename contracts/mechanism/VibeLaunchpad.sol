@@ -58,9 +58,33 @@ contract VibeLaunchpad is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
         bool refunded;
     }
 
+    /// @notice Token and pricing params for createSale (split to avoid stack-too-deep from 15 calldata fields)
+    struct SaleTokenParams {
+        address token;
+        uint256 totalTokens;
+        uint256 pricePerToken;
+        uint256 endPricePerToken;
+        address paymentToken;
+        uint256 hardCap;
+        uint256 softCap;
+    }
+
+    /// @notice Timing and vesting params for createSale
+    struct SaleTimingParams {
+        uint256 minBuy;
+        uint256 maxBuy;
+        uint256 startTime;
+        uint256 duration;
+        SaleType saleType;
+        bool vestingEnabled;
+        uint256 vestingDuration;
+        uint256 vestingCliff;
+    }
+
     // ============ State ============
 
-    mapping(uint256 => Sale) public sales;
+    // Internal to avoid auto-generated getter returning 20-field struct (stack-too-deep)
+    mapping(uint256 => Sale) internal sales;
     uint256 public saleCount;
 
     /// @notice Participations: saleId => user => participation
@@ -100,53 +124,47 @@ contract VibeLaunchpad is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ Sale Creation ============
 
-    function createSale(
-        address token,
-        uint256 totalTokens,
-        uint256 pricePerToken,
-        uint256 endPricePerToken,
-        address paymentToken,
-        uint256 hardCap,
-        uint256 softCap,
-        uint256 minBuy,
-        uint256 maxBuy,
-        uint256 startTime,
-        uint256 duration,
-        SaleType saleType,
-        bool vestingEnabled,
-        uint256 vestingDuration,
-        uint256 vestingCliff
-    ) external returns (uint256) {
-        require(startTime >= block.timestamp, "Start in future");
-        require(hardCap > 0 && softCap <= hardCap, "Invalid caps");
+    function createSale(SaleTokenParams calldata tp, SaleTimingParams calldata sp) external returns (uint256) {
+        require(sp.startTime >= block.timestamp, "Start in future");
+        require(tp.hardCap > 0 && tp.softCap <= tp.hardCap, "Invalid caps");
 
         // Transfer tokens to launchpad
-        IERC20(token).safeTransferFrom(msg.sender, address(this), totalTokens);
+        IERC20(tp.token).safeTransferFrom(msg.sender, address(this), tp.totalTokens);
 
         saleCount++;
-        Sale storage sale = sales[saleCount];
-        sale.saleId = saleCount;
-        sale.creator = msg.sender;
-        sale.token = token;
-        sale.totalTokens = totalTokens;
-        sale.pricePerToken = pricePerToken;
-        sale.endPricePerToken = endPricePerToken;
-        sale.paymentToken = paymentToken;
-        sale.hardCap = hardCap;
-        sale.softCap = softCap;
-        sale.minBuy = minBuy;
-        sale.maxBuy = maxBuy;
-        sale.startTime = startTime;
-        sale.endTime = startTime + duration;
-        sale.saleType = saleType;
-        sale.status = SaleStatus.PENDING;
-        sale.vestingEnabled = vestingEnabled;
-        sale.vestingDuration = vestingDuration;
-        sale.vestingCliff = vestingCliff;
-
+        _initSaleToken(saleCount, tp);
+        _initSaleTiming(saleCount, sp);
         totalLaunches++;
-        emit SaleCreated(saleCount, msg.sender, token, saleType);
+        emit SaleCreated(saleCount, msg.sender, tp.token, sp.saleType);
         return saleCount;
+    }
+
+    /// @dev Separated to avoid stack-too-deep: token/pricing half
+    function _initSaleToken(uint256 id, SaleTokenParams calldata tp) internal {
+        Sale storage sale = sales[id];
+        sale.saleId = id;
+        sale.creator = msg.sender;
+        sale.token = tp.token;
+        sale.totalTokens = tp.totalTokens;
+        sale.pricePerToken = tp.pricePerToken;
+        sale.endPricePerToken = tp.endPricePerToken;
+        sale.paymentToken = tp.paymentToken;
+        sale.hardCap = tp.hardCap;
+        sale.softCap = tp.softCap;
+        sale.status = SaleStatus.PENDING;
+    }
+
+    /// @dev Separated to avoid stack-too-deep: timing/vesting half
+    function _initSaleTiming(uint256 id, SaleTimingParams calldata sp) internal {
+        Sale storage sale = sales[id];
+        sale.minBuy = sp.minBuy;
+        sale.maxBuy = sp.maxBuy;
+        sale.startTime = sp.startTime;
+        sale.endTime = sp.startTime + sp.duration;
+        sale.saleType = sp.saleType;
+        sale.vestingEnabled = sp.vestingEnabled;
+        sale.vestingDuration = sp.vestingDuration;
+        sale.vestingCliff = sp.vestingCliff;
     }
 
     // ============ Participation ============
@@ -270,6 +288,7 @@ contract VibeLaunchpad is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ View ============
 
+    function getSale(uint256 saleId) external view returns (Sale memory) { return sales[saleId]; }
     function getSaleCount() external view returns (uint256) { return saleCount; }
     function getTotalRaised() external view returns (uint256) { return totalRaised; }
 

@@ -57,9 +57,40 @@ contract ShapleyFormalSpecs is Test {
         distributor.setAuthorizedCreator(creator, true);
     }
 
+    struct TwoPlayerParams {
+        uint256 totalValue;
+        uint256 direct1; uint256 time1; uint256 scarcity1; uint256 stability1;
+        uint256 direct2; uint256 time2; uint256 scarcity2; uint256 stability2;
+    }
+
     // ============ SPEC 1: Conservation (Efficiency) ============
     // For any valid game, sum(shapleyValues) == totalValue.
     // This is the most important invariant — no value created or destroyed.
+
+    function _runTwoPlayerGame(TwoPlayerParams memory p) internal {
+        address alice = address(uint160(1));
+        address bob = address(uint160(2));
+
+        rewardToken.mint(address(distributor), p.totalValue);
+
+        ShapleyDistributor.Participant[] memory ps = new ShapleyDistributor.Participant[](2);
+        ps[0] = ShapleyDistributor.Participant(alice, p.direct1, p.time1, p.scarcity1, p.stability1);
+        ps[1] = ShapleyDistributor.Participant(bob, p.direct2, p.time2, p.scarcity2, p.stability2);
+
+        bytes32 gameId = keccak256(abi.encode(p.totalValue, p.direct1, p.direct2));
+
+        vm.prank(creator);
+        distributor.createGame(gameId, p.totalValue, address(rewardToken), ps);
+        distributor.computeShapleyValues(gameId);
+
+        _lastGameId = gameId;
+        _lastAlice = alice;
+        _lastBob = bob;
+    }
+
+    bytes32 private _lastGameId;
+    address private _lastAlice;
+    address private _lastBob;
 
     function testFuzz_conservation_twoPlayers(
         uint256 totalValue,
@@ -72,37 +103,23 @@ contract ShapleyFormalSpecs is Test {
         uint256 stability1,
         uint256 stability2
     ) public {
-        // Bound inputs to realistic ranges
-        totalValue = bound(totalValue, 1, 1000 * PRECISION);
-        direct1 = bound(direct1, 1, 1000 * PRECISION);
-        direct2 = bound(direct2, 1, 1000 * PRECISION);
-        time1 = bound(time1, 1 days, 365 days);
-        time2 = bound(time2, 1 days, 365 days);
-        scarcity1 = bound(scarcity1, 0, BPS);
-        scarcity2 = bound(scarcity2, 0, BPS);
-        stability1 = bound(stability1, 0, BPS);
-        stability2 = bound(stability2, 0, BPS);
+        TwoPlayerParams memory p;
+        p.totalValue = bound(totalValue, 1, 1000 * PRECISION);
+        p.direct1 = bound(direct1, 1, 1000 * PRECISION);
+        p.direct2 = bound(direct2, 1, 1000 * PRECISION);
+        p.time1 = bound(time1, 1 days, 365 days);
+        p.time2 = bound(time2, 1 days, 365 days);
+        p.scarcity1 = bound(scarcity1, 0, BPS);
+        p.scarcity2 = bound(scarcity2, 0, BPS);
+        p.stability1 = bound(stability1, 0, BPS);
+        p.stability2 = bound(stability2, 0, BPS);
 
-        address alice = address(uint160(1));
-        address bob = address(uint160(2));
-
-        rewardToken.mint(address(distributor), totalValue);
-
-        ShapleyDistributor.Participant[] memory ps = new ShapleyDistributor.Participant[](2);
-        ps[0] = ShapleyDistributor.Participant(alice, direct1, time1, scarcity1, stability1);
-        ps[1] = ShapleyDistributor.Participant(bob, direct2, time2, scarcity2, stability2);
-
-        bytes32 gameId = keccak256(abi.encode(totalValue, direct1, direct2));
-
-        vm.prank(creator);
-        distributor.createGame(gameId, totalValue, address(rewardToken), ps);
-        distributor.computeShapleyValues(gameId);
-
-        uint256 v1 = distributor.getShapleyValue(gameId, alice);
-        uint256 v2 = distributor.getShapleyValue(gameId, bob);
-
-        // LEMMA: conservation
-        assertEq(v1 + v2, totalValue, "CONSERVATION VIOLATED");
+        _runTwoPlayerGame(p);
+        assertEq(
+            distributor.getShapleyValue(_lastGameId, _lastAlice) + distributor.getShapleyValue(_lastGameId, _lastBob),
+            p.totalValue,
+            "CONSERVATION VIOLATED"
+        );
     }
 
     // ============ SPEC 2: Non-Negativity ============

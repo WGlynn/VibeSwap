@@ -134,7 +134,8 @@ contract VibePredictionEngine is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     // ============ State ============
 
     // --- Markets ---
-    mapping(uint256 => Market) public markets;
+    // Internal to avoid auto-generated getter returning 16-field struct (stack-too-deep)
+    mapping(uint256 => Market) internal markets;
     uint256 public marketCount;
 
     // --- Token Balances (ERC-20 compatible per-market) ---
@@ -154,14 +155,15 @@ contract VibePredictionEngine is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     mapping(uint256 => mapping(address => Position)) public positions;
 
     // --- Insurance ---
-    mapping(uint256 => InsurancePolicy) public policies;
+    // Internal to avoid auto-generated getters for large structs (stack-too-deep)
+    mapping(uint256 => InsurancePolicy) internal policies;
     uint256 public policyCount;
 
-    mapping(uint256 => RiskPool) public riskPools;
+    mapping(uint256 => RiskPool) internal riskPools;
     uint256 public riskPoolCount;
 
     // --- Resolution ---
-    mapping(uint256 => ResolutionRound) public resolutionRounds;
+    mapping(uint256 => ResolutionRound) internal resolutionRounds;
 
     // --- PsiNet Integration ---
     /// @notice Authorized AI agents (from AgentRegistry)
@@ -233,28 +235,24 @@ contract VibePredictionEngine is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
 
         marketCount++;
 
-        // Seed AMM pools with equal YES/NO
-        uint256 seedAmount = msg.value;
-
-        markets[marketCount] = Market({
-            marketId: marketCount,
-            creator: msg.sender,
-            agentId: agentId,
-            questionHash: questionHash,
-            contextAnchorId: contextAnchorId,
-            marketType: marketType,
-            phase: MarketPhase.OPEN,
-            resolution: resolution,
-            collateralPool: seedAmount,
-            yesPool: seedAmount,
-            noPool: seedAmount,
-            lockTime: lockTime,
-            resolutionDeadline: resolutionDeadline,
-            createdAt: block.timestamp,
-            resolvedOutcome: 0,
-            totalVolume: 0,
-            insurancePolicies: 0
-        });
+        // Field-by-field assignment avoids struct-literal stack pressure (17 fields)
+        {
+            Market storage m = markets[marketCount];
+            m.marketId = marketCount;
+            m.creator = msg.sender;
+            m.agentId = agentId;
+            m.questionHash = questionHash;
+            m.contextAnchorId = contextAnchorId;
+            m.marketType = marketType;
+            m.phase = MarketPhase.OPEN;
+            m.resolution = resolution;
+            m.collateralPool = msg.value;
+            m.yesPool = msg.value;
+            m.noPool = msg.value;
+            m.lockTime = lockTime;
+            m.resolutionDeadline = resolutionDeadline;
+            m.createdAt = block.timestamp;
+        }
 
         if (contextAnchorId != bytes32(0)) {
             marketContext[marketCount] = contextAnchorId;

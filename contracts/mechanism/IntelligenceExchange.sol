@@ -493,12 +493,12 @@ contract IntelligenceExchange is
         IntelligenceAsset storage asset = assets[assetId];
         if (asset.state != AssetState.EVALUATING) revert InvalidAssetState();
 
-        // Read the claim state from CognitiveConsensusMarket
-        (,,,,,,
+        // Read the claim state from CognitiveConsensusMarket via lightweight getter
+        // (avoids 13-value tuple destructuring which causes stack-too-deep)
+        (
             ICognitiveConsensusMarket.ClaimState claimState,
-            ICognitiveConsensusMarket.Verdict verdict,
-            ,,,,
-        ) = ICognitiveConsensusMarket(cognitiveConsensusMarket).claims(claimId);
+            ICognitiveConsensusMarket.Verdict verdict
+        ) = ICognitiveConsensusMarket(cognitiveConsensusMarket).getClaimStateAndVerdict(claimId);
 
         if (claimState == ICognitiveConsensusMarket.ClaimState.RESOLVED) {
             if (verdict == ICognitiveConsensusMarket.Verdict.TRUE) {

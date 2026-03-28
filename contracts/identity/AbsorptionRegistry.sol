@@ -148,12 +148,17 @@ contract AbsorptionRegistry is
      * @param developerUsernames Usernames of original developers
      * @return protocolId The protocol's unique identifier
      */
+    /// @notice Packed calldata params for absorbProtocol (reduces stack usage)
+    struct AbsorbParams {
+        string name;
+        string sourceRepo;
+        string license;
+        string modifications;
+    }
+
     function absorbProtocol(
-        string calldata name,
-        string calldata sourceRepo,
-        string calldata license,
+        AbsorbParams calldata p,
         string[] calldata filesAbsorbed,
-        string calldata modifications,
         string[] calldata developerPlatforms,
         string[] calldata developerUsernames
     ) external onlyOwner returns (bytes32 protocolId) {
@@ -162,50 +167,58 @@ contract AbsorptionRegistry is
             "Platform/username length mismatch"
         );
 
-        protocolId = keccak256(abi.encodePacked(name, sourceRepo));
-
+        protocolId = keccak256(abi.encodePacked(p.name, p.sourceRepo));
         if (protocols[protocolId].absorbedAt != 0) revert AlreadyAbsorbed();
 
-        // Register developers
-        bytes32[] memory devIds = new bytes32[](developerPlatforms.length);
-        for (uint256 i = 0; i < developerPlatforms.length; i++) {
-            bytes32 devId = keccak256(
-                abi.encodePacked(developerPlatforms[i], ":", developerUsernames[i])
-            );
-            devIds[i] = devId;
+        uint256 devCount = _registerDevelopers(protocolId, developerPlatforms, developerUsernames);
 
+        _storeProtocol(protocolId, p, filesAbsorbed);
+
+        allProtocols.push(protocolId);
+        emit ProtocolAbsorbed(protocolId, p.name, p.sourceRepo, devCount);
+    }
+
+    /// @dev Register developers and return count
+    function _registerDevelopers(
+        bytes32 protocolId,
+        string[] calldata developerPlatforms,
+        string[] calldata developerUsernames
+    ) internal returns (uint256) {
+        for (uint256 i = 0; i < developerPlatforms.length; i++) {
+            bytes32 devId = keccak256(abi.encodePacked(developerPlatforms[i], ":", developerUsernames[i]));
             if (developers[devId].identityHash == bytes32(0)) {
-                developers[devId] = Developer({
-                    identityHash: devId,
-                    platform: developerPlatforms[i],
-                    username: developerUsernames[i],
-                    protocols: new bytes32[](0)
-                });
+                Developer storage d = developers[devId];
+                d.identityHash = devId;
+                d.platform = developerPlatforms[i];
+                d.username = developerUsernames[i];
                 allDevelopers.push(devId);
             }
             developers[devId].protocols.push(protocolId);
-
+            // Store devId in protocol's developerIds array
+            protocols[protocolId].developerIds.push(devId);
             emit DeveloperCredited(protocolId, devId, developerPlatforms[i], developerUsernames[i]);
         }
+        return developerPlatforms.length;
+    }
 
-        protocols[protocolId] = AbsorbedProtocol({
-            protocolId: protocolId,
-            name: name,
-            sourceRepo: sourceRepo,
-            license: license,
-            filesAbsorbed: filesAbsorbed,
-            modifications: modifications,
-            developerIds: devIds,
-            absorbedAt: block.timestamp,
-            usageCount: 0,
-            valueGenerated: 0,
-            rewardsDistributed: 0,
-            active: true
-        });
-
-        allProtocols.push(protocolId);
-
-        emit ProtocolAbsorbed(protocolId, name, sourceRepo, devIds.length);
+    /// @dev Store protocol metadata (separated to reduce stack depth)
+    function _storeProtocol(
+        bytes32 protocolId,
+        AbsorbParams calldata p,
+        string[] calldata filesAbsorbed
+    ) internal {
+        AbsorbedProtocol storage ap = protocols[protocolId];
+        ap.protocolId = protocolId;
+        ap.name = p.name;
+        ap.sourceRepo = p.sourceRepo;
+        ap.license = p.license;
+        ap.modifications = p.modifications;
+        ap.absorbedAt = block.timestamp;
+        ap.active = true;
+        // Copy string[] calldata element-by-element (nested calldata->storage not supported in old codegen)
+        for (uint256 j = 0; j < filesAbsorbed.length; j++) {
+            ap.filesAbsorbed.push(filesAbsorbed[j]);
+        }
     }
 
     // ============ Usage Tracking ============

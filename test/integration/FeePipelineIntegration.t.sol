@@ -158,6 +158,10 @@ contract FeePipelineIntegrationTest is Test {
         assertEq(adapter.totalForwarded(address(tokenA)), accFees, "Adapter should track forwarded amount");
 
         // Step 4: Distribute through FeeRouter → 4 destinations
+        _assertDistribution(accFees);
+    }
+
+    function _assertDistribution(uint256 accFees) internal {
         uint256 treasuryBefore = tokenA.balanceOf(treasuryWallet);
         uint256 insuranceBefore = tokenA.balanceOf(insuranceWallet);
         uint256 revShareBefore = tokenA.balanceOf(revShareWallet);
@@ -170,15 +174,10 @@ contract FeePipelineIntegrationTest is Test {
         uint256 toRevShare = tokenA.balanceOf(revShareWallet) - revShareBefore;
         uint256 toBuyback = tokenA.balanceOf(address(buyback)) - buybackBefore;
 
-        // Default split: 40/20/30/10
         assertEq(toTreasury, (accFees * 4000) / 10000, "Treasury should get 40%");
         assertEq(toInsurance, (accFees * 2000) / 10000, "Insurance should get 20%");
         assertEq(toRevShare, (accFees * 3000) / 10000, "RevShare should get 30%");
-        // Buyback gets dust: pending - treasury - insurance - revShare
-        uint256 expectedBuyback = accFees - toTreasury - toInsurance - toRevShare;
-        assertEq(toBuyback, expectedBuyback, "Buyback should get remainder (~10%)");
-
-        // Total distributed should equal total collected
+        assertEq(toBuyback, accFees - toTreasury - toInsurance - toRevShare, "Buyback should get remainder (~10%)");
         assertEq(toTreasury + toInsurance + toRevShare + toBuyback, accFees, "All fees distributed");
     }
 

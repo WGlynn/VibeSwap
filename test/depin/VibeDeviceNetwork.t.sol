@@ -89,28 +89,13 @@ contract VibeDeviceNetworkTest is Test {
         assertEq(network.totalDevices(), 1);
         assertEq(network.totalActiveDevices(), 1);
 
-        (
-            bytes32 id,
-            address devOwner,
-            VibeDeviceNetwork.DeviceType devType,
-            ,
-            ,
-            ,
-            ,
-            ,
-            uint256 reputation,
-            ,
-            ,
-            bool active,
-            bool verified
-        ) = network.devices(deviceId);
-
-        assertEq(id, deviceId);
-        assertEq(devOwner, alice);
-        assertEq(uint8(devType), uint8(VibeDeviceNetwork.DeviceType.CAMERA));
-        assertEq(reputation, 5000); // Starts at 50%
-        assertTrue(active);
-        assertFalse(verified);
+        VibeDeviceNetwork.Device memory dev = network.getDevice(deviceId);
+        assertEq(dev.deviceId, deviceId);
+        assertEq(dev.owner, alice);
+        assertEq(uint8(dev.deviceType), uint8(VibeDeviceNetwork.DeviceType.CAMERA));
+        assertEq(dev.reputationScore, 5000); // Starts at 50%
+        assertTrue(dev.active);
+        assertFalse(dev.verified);
     }
 
     function test_registerDevice_emitsEvent() public {
@@ -171,8 +156,7 @@ contract VibeDeviceNetworkTest is Test {
         vm.prank(verifier);
         network.verifyDevice(deviceId);
 
-        (, , , , , , , , , , , , bool verified) = network.devices(deviceId);
-        assertTrue(verified);
+        assertTrue(network.getDevice(deviceId).verified);
     }
 
     function test_verifyDevice_revert_notVerifier() public {
@@ -193,9 +177,8 @@ contract VibeDeviceNetworkTest is Test {
         vm.prank(alice);
         network.heartbeat(deviceId);
 
-        (, , , , , , , uint256 lastHeartbeat, uint256 reputation, , , , ) = network.devices(deviceId);
-        assertEq(lastHeartbeat, block.timestamp);
-        assertEq(reputation, 5001); // 5000 + 1 bump
+        assertEq(network.getDevice(deviceId).lastHeartbeat, block.timestamp);
+        assertEq(network.getDevice(deviceId).reputationScore, 5001); // 5000 + 1 bump
     }
 
     function test_heartbeat_revert_notOwner() public {
@@ -228,8 +211,7 @@ contract VibeDeviceNetworkTest is Test {
             network.heartbeat(deviceId);
         }
 
-        (, , , , , , , , uint256 reputation, , , , ) = network.devices(deviceId);
-        assertEq(reputation, 10000);
+        assertEq(network.getDevice(deviceId).reputationScore, 10000);
     }
 
     // ============ Data Submission ============
@@ -240,8 +222,7 @@ contract VibeDeviceNetworkTest is Test {
         vm.prank(alice);
         network.submitData(deviceId, keccak256("data"), 100);
 
-        (, , , , , , , , , uint256 totalDataSubmissions, , , ) = network.devices(deviceId);
-        assertEq(totalDataSubmissions, 100);
+        assertEq(network.getDevice(deviceId).totalDataSubmissions, 100);
         assertEq(network.totalDataPoints(), 100);
     }
 
@@ -280,8 +261,7 @@ contract VibeDeviceNetworkTest is Test {
         network.submitData(deviceId, keccak256("data2"), 75);
         vm.stopPrank();
 
-        (, , , , , , , , , uint256 totalDataSubmissions, , , ) = network.devices(deviceId);
-        assertEq(totalDataSubmissions, 125);
+        assertEq(network.getDevice(deviceId).totalDataSubmissions, 125);
         assertEq(network.totalDataPoints(), 125);
     }
 
@@ -294,8 +274,7 @@ contract VibeDeviceNetworkTest is Test {
         vm.prank(bob);
         network.rewardDevice{value: 1 ether}(deviceId);
 
-        (, , , , , , , , , , uint256 totalRewards, , ) = network.devices(deviceId);
-        assertEq(totalRewards, 1 ether);
+        assertEq(network.getDevice(deviceId).totalRewardsEarned, 1 ether);
         assertEq(alice.balance, aliceBefore + 1 ether);
     }
 
@@ -326,8 +305,7 @@ contract VibeDeviceNetworkTest is Test {
         vm.prank(alice);
         network.deactivateDevice(deviceId);
 
-        (, , , , , , , , , , , bool active, ) = network.devices(deviceId);
-        assertFalse(active);
+        assertFalse(network.getDevice(deviceId).active);
         assertEq(network.totalActiveDevices(), 0);
     }
 
@@ -337,8 +315,7 @@ contract VibeDeviceNetworkTest is Test {
         // Contract owner (this) can also deactivate
         network.deactivateDevice(deviceId);
 
-        (, , , , , , , , , , , bool active, ) = network.devices(deviceId);
-        assertFalse(active);
+        assertFalse(network.getDevice(deviceId).active);
     }
 
     function test_deactivateDevice_revert_notAuthorized() public {
@@ -358,14 +335,12 @@ contract VibeDeviceNetworkTest is Test {
         assertEq(fleetId, 1);
         assertEq(network.fleetCount(), 1);
 
-        (uint256 id, address operator, string memory name, uint256 deviceCount, , bool active) =
-            network.fleets(1);
-
-        assertEq(id, 1);
-        assertEq(operator, alice);
-        assertEq(name, "Fleet Alpha");
-        assertEq(deviceCount, 0);
-        assertTrue(active);
+        VibeDeviceNetwork.Fleet memory fl = network.getFleet(1);
+        assertEq(fl.fleetId, 1);
+        assertEq(fl.operator, alice);
+        assertEq(fl.name, "Fleet Alpha");
+        assertEq(fl.deviceCount, 0);
+        assertTrue(fl.active);
     }
 
     function test_addDeviceToFleet() public {
@@ -379,8 +354,7 @@ contract VibeDeviceNetworkTest is Test {
 
         assertEq(network.deviceFleet(deviceId), fleetId);
 
-        (, , , uint256 deviceCount, , ) = network.fleets(fleetId);
-        assertEq(deviceCount, 1);
+        assertEq(network.getFleet(fleetId).deviceCount, 1);
 
         bytes32[] memory fleetDev = network.getFleetDevices(fleetId);
         assertEq(fleetDev.length, 1);
@@ -430,8 +404,7 @@ contract VibeDeviceNetworkTest is Test {
         vm.prank(alice);
         network.updateFirmware(deviceId, newFw);
 
-        (, , , , bytes32 firmwareHash, , , , , , , , ) = network.devices(deviceId);
-        assertEq(firmwareHash, newFw);
+        assertEq(network.getDevice(deviceId).firmwareHash, newFw);
     }
 
     function test_updateFirmware_revert_notOwner() public {

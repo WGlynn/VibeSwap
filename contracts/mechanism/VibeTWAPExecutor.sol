@@ -40,7 +40,8 @@ contract VibeTWAPExecutor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
 
     // ============ State ============
 
-    mapping(uint256 => TWAPOrder) public orders;
+    // Internal to avoid auto-generated getter returning 14-field struct (stack-too-deep)
+    mapping(uint256 => TWAPOrder) internal orders;
     uint256 public orderCount;
     mapping(address => uint256[]) public userOrders;
     mapping(address => bool) public keepers;
@@ -88,25 +89,19 @@ contract VibeTWAPExecutor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         uint256 chunkSize = msg.value / totalChunks;
         require(chunkSize > 0, "Chunk too small");
 
-        uint256 deviation = maxPriceDeviation > 0 ? maxPriceDeviation : DEFAULT_MAX_DEVIATION;
-
         uint256 id = orderCount++;
-        orders[id] = TWAPOrder({
-            user: msg.sender,
-            tokenIn: address(0),      // ETH
-            tokenOut: tokenOut,
-            totalAmount: msg.value,
-            chunkSize: chunkSize,
-            interval: interval,
-            maxPriceDeviation: deviation,
-            chunksExecuted: 0,
-            totalChunks: totalChunks,
-            totalReceived: 0,
-            lastExecution: 0,
-            referencePrice: 0,        // Set on first execution
-            createdAt: block.timestamp,
-            active: true
-        });
+        // Field-by-field to avoid struct-literal stack pressure (14 fields)
+        TWAPOrder storage o = orders[id];
+        o.user = msg.sender;
+        o.tokenIn = address(0);   // ETH
+        o.tokenOut = tokenOut;
+        o.totalAmount = msg.value;
+        o.chunkSize = chunkSize;
+        o.interval = interval;
+        o.maxPriceDeviation = maxPriceDeviation > 0 ? maxPriceDeviation : DEFAULT_MAX_DEVIATION;
+        o.totalChunks = totalChunks;
+        o.createdAt = block.timestamp;
+        o.active = true;
 
         userOrders[msg.sender].push(id);
         emit TWAPCreated(id, msg.sender, msg.value, totalChunks, interval);

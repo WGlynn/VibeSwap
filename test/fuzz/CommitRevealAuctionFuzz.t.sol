@@ -42,6 +42,10 @@ contract CommitRevealAuctionFuzzTest is Test {
         return keccak256(abi.encodePacked(trader, tknIn, tknOut, amtIn, minOut, secret));
     }
 
+    function _doReveal(bytes32 commitId, bytes32 secret, uint256 bid) internal {
+        auction.revealOrder{value: bid}(commitId, tokenA, tokenB, 1 ether, 0, secret, bid);
+    }
+
     function _doCommit(address trader, bytes32 secret, uint256 amountIn, uint256 deposit) internal returns (bytes32) {
         bytes32 commitHash = _generateCommitHash(trader, tokenA, tokenB, amountIn, 0, secret);
         vm.prank(trader);
@@ -191,10 +195,10 @@ contract CommitRevealAuctionFuzzTest is Test {
         vm.warp(block.timestamp + 9);
 
         vm.prank(t1);
-        auction.revealOrder{value: bid1}(c1, tokenA, tokenB, 1 ether, 0, s1, bid1);
+        _doReveal(c1, s1, bid1);
 
         vm.prank(t2);
-        auction.revealOrder{value: bid2}(c2, tokenA, tokenB, 1 ether, 0, s2, bid2);
+        _doReveal(c2, s2, bid2);
 
         ICommitRevealAuction.Batch memory b = auction.getBatch(1);
         assertEq(b.totalPriorityBids, bid1 + bid2, "Total priority bids = sum of individual bids");

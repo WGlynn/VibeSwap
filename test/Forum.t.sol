@@ -118,11 +118,11 @@ contract ForumTest is Test {
         assertEq(postId, 1);
         assertEq(forum.totalPosts(), 1);
 
-        (, uint256 categoryId, uint256 authorTokenId, address author, string memory title, , , , , , ) = forum.posts(1);
-        assertEq(categoryId, 1);
-        assertEq(authorTokenId, 1);
-        assertEq(author, poster1);
-        assertEq(title, "Hello World");
+        Forum.Post memory post = forum.getPost(1);
+        assertEq(post.categoryId, 1);
+        assertEq(post.authorTokenId, 1);
+        assertEq(post.author, poster1);
+        assertEq(post.title, "Hello World");
     }
 
     function test_createPost_incrementsCategoryPostCount() public {
@@ -206,8 +206,7 @@ contract ForumTest is Test {
         vm.prank(poster2);
         forum.createReply(1, keccak256("reply"), 0);
 
-        (, , , , , , , , uint256 replyCount, , ) = forum.posts(1);
-        assertEq(replyCount, 1);
+        assertEq(forum.getPost(1).replyCount, 1);
     }
 
     function test_createReply_invalidPost() public {
@@ -263,8 +262,7 @@ contract ForumTest is Test {
         vm.prank(moderator);
         forum.setPinned(1, true);
 
-        (, , , , , , , , , bool pinned, ) = forum.posts(1);
-        assertTrue(pinned);
+        assertTrue(forum.getPost(1).pinned);
     }
 
     function test_setLocked() public {
@@ -275,8 +273,7 @@ contract ForumTest is Test {
         vm.prank(moderator);
         forum.setLocked(1, true);
 
-        (, , , , , , , , , , bool locked) = forum.posts(1);
-        assertTrue(locked);
+        assertTrue(forum.getPost(1).locked);
     }
 
     function test_setModerator() public view {

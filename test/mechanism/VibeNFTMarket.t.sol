@@ -125,16 +125,14 @@ contract VibeNFTMarketTest is Test {
         assertEq(id, 1);
         assertEq(market.getListingCount(), 1);
 
-        // Access individual fields from the public mapping
-        (uint256 storedId, address lSeller, address lNftContract, uint256 lTokenId, , uint256 price, , , , VibeNFTMarket.ListingType lType, bool active, , ) = market.listings(id);
-
-        assertEq(storedId, 1);
-        assertEq(lSeller, seller);
-        assertEq(lNftContract, address(nft));
-        assertEq(lTokenId, nftId);
-        assertEq(price, 1 ether);
-        assertEq(uint8(lType), uint8(VibeNFTMarket.ListingType.FIXED));
-        assertTrue(active);
+        VibeNFTMarket.Listing memory lst = market.getListing(id);
+        assertEq(lst.listingId, 1);
+        assertEq(lst.seller, seller);
+        assertEq(lst.nftContract, address(nft));
+        assertEq(lst.tokenId, nftId);
+        assertEq(lst.price, 1 ether);
+        assertEq(uint8(lst.listingType), uint8(VibeNFTMarket.ListingType.FIXED));
+        assertTrue(lst.active);
     }
 
     // ============ Buy Fixed ============
@@ -164,8 +162,7 @@ contract VibeNFTMarketTest is Test {
         vm.prank(buyer);
         market.buyFixed{value: 1 ether}(1);
 
-        (, , , , , , , , , , bool active, ,) = market.listings(1);
-        assertFalse(active);
+        assertFalse(market.getListing(1).active);
     }
 
     function test_buyFixed_revertsWhenNotActive() public {
@@ -205,9 +202,8 @@ contract VibeNFTMarketTest is Test {
         vm.prank(buyer);
         market.placeBid{value: 1 ether}(id);
 
-        (, , , , , , , , , , , address highestBidder, uint256 highestBid) = market.listings(id);
-        assertEq(highestBidder, buyer);
-        assertEq(highestBid, 1 ether);
+        assertEq(market.getListing(id).highestBidder, buyer);
+        assertEq(market.getListing(id).highestBid, 1 ether);
     }
 
     function test_placeBid_refundsPreviousBidder() public {
@@ -348,8 +344,7 @@ contract VibeNFTMarketTest is Test {
         market.cancelListing(1);
 
         assertEq(nft.ownerOf(nftId), seller);
-        (, , , , , , , , , , bool active, ,) = market.listings(1);
-        assertFalse(active);
+        assertFalse(market.getListing(1).active);
     }
 
     function test_cancelListing_revertsNotSeller() public {

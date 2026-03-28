@@ -51,29 +51,13 @@ contract VibePerpetualTest is Test {
     // ============ Market Creation ============
 
     function test_createMarket() public view {
-        (
-            bytes32 marketId,
-            ,
-            ,
-            uint256 vammBaseReserve,
-            uint256 vammQuoteReserve,
-            uint256 indexPrice,
-            uint256 markPrice,
-            ,
-            ,
-            ,
-            ,
-            ,
-            ,
-            bool active
-        ) = perp.markets(ethMarket);
-
-        assertEq(marketId, ethMarket);
-        assertEq(indexPrice, INITIAL_PRICE);
-        assertEq(markPrice, INITIAL_PRICE);
-        assertEq(vammBaseReserve, VAMM_LIQUIDITY);
-        assertGt(vammQuoteReserve, 0);
-        assertTrue(active);
+        VibePerpetual.Market memory m = perp.getMarket(ethMarket);
+        assertEq(m.marketId, ethMarket);
+        assertEq(m.indexPrice, INITIAL_PRICE);
+        assertEq(m.markPrice, INITIAL_PRICE);
+        assertEq(m.vammBaseReserve, VAMM_LIQUIDITY);
+        assertGt(m.vammQuoteReserve, 0);
+        assertTrue(m.active);
         assertEq(perp.getMarketCount(), 1);
     }
 
@@ -120,60 +104,42 @@ contract VibePerpetualTest is Test {
 
     function test_openLong() public {
         vm.prank(alice);
-        bytes32 posId = perp.openPosition(ethMarket, 1e18, 10 ether); // 1 ETH long
-
-        (
-            ,
-            address trader,
-            int256 size,
-            uint256 margin,
-            uint256 entryPrice,
-            ,
-            ,
-            bool open
-        ) = perp.positions(posId);
-
-        assertEq(trader, alice);
-        assertGt(size, 0);
-        assertGt(margin, 0); // margin minus fee
-        assertGt(entryPrice, 0);
-        assertTrue(open);
+        bytes32 posId = perp.openPosition(ethMarket, 1e18, 10 ether);
+        VibePerpetual.Position memory pos = perp.getPosition(posId);
+        assertEq(pos.trader, alice);
+        assertGt(pos.size, 0);
+        assertGt(pos.margin, 0);
+        assertGt(pos.entryPrice, 0);
+        assertTrue(pos.open);
     }
 
     function test_openShort() public {
         vm.prank(alice);
         bytes32 posId = perp.openPosition(ethMarket, -1e18, 10 ether);
-
-        (, , int256 size, , , , , bool open) = perp.positions(posId);
-        assertLt(size, 0);
-        assertTrue(open);
+        VibePerpetual.Position memory pos = perp.getPosition(posId);
+        assertLt(pos.size, 0);
+        assertTrue(pos.open);
     }
 
     function test_openInterestUpdated() public {
         vm.prank(alice);
         perp.openPosition(ethMarket, 2e18, 10 ether);
-
-        (, , , , , , , , , , uint256 oiLong, , , ) = perp.markets(ethMarket);
-        assertEq(oiLong, 2e18);
+        assertEq(perp.getMarket(ethMarket).openInterestLong, 2e18);
     }
 
     function test_markPriceMovesOnTrade() public {
-        (, , , , , , uint256 markBefore, , , , , , , ) = perp.markets(ethMarket);
-
+        uint256 markBefore = perp.getMarket(ethMarket).markPrice;
         vm.prank(alice);
         perp.openPosition(ethMarket, 5e18, 20 ether);
-
-        (, , , , , , uint256 markAfter, , , , , , , ) = perp.markets(ethMarket);
+        uint256 markAfter = perp.getMarket(ethMarket).markPrice;
         assertGt(markAfter, markBefore, "Long should push mark price up");
     }
 
     function test_shortPushesMarkDown() public {
-        (, , , , , , uint256 markBefore, , , , , , , ) = perp.markets(ethMarket);
-
+        uint256 markBefore = perp.getMarket(ethMarket).markPrice;
         vm.prank(alice);
         perp.openPosition(ethMarket, -5e18, 20 ether);
-
-        (, , , , , , uint256 markAfter, , , , , , , ) = perp.markets(ethMarket);
+        uint256 markAfter = perp.getMarket(ethMarket).markPrice;
         assertLt(markAfter, markBefore, "Short should push mark price down");
     }
 
@@ -237,8 +203,7 @@ contract VibePerpetualTest is Test {
         vm.prank(alice);
         perp.closePosition(posId);
 
-        (, , , , , , , bool open) = perp.positions(posId);
-        assertFalse(open);
+        assertFalse(perp.getPosition(posId).open);
 
         // Collateral should be approximately restored (minus fees)
         assertGt(perp.collateral(alice), collateralBefore);
@@ -272,8 +237,7 @@ contract VibePerpetualTest is Test {
         vm.prank(alice);
         perp.closePosition(posId);
 
-        (, , , , , , , , , , uint256 oiLong, , , ) = perp.markets(ethMarket);
-        assertEq(oiLong, 0);
+        assertEq(perp.getMarket(ethMarket).openInterestLong, 0);
     }
 
     // ============ Liquidation ============
@@ -328,9 +292,9 @@ contract VibePerpetualTest is Test {
 
         perp.settleFunding(ethMarket);
 
-        (, , , , , , , int256 fundingRate, , , , , , ) = perp.markets(ethMarket);
         // Funding rate should be non-zero if mark != index
         // (mark moved up from the long, index stayed the same)
+        // int256 fundingRate = int256(perp.getMarket(ethMarket).fundingRate); // available if needed
     }
 
     function test_revertSettleFundingTooSoon() public {
@@ -348,13 +312,14 @@ contract VibePerpetualTest is Test {
         vm.warp(startTime + 9 hours);
         perp.settleFunding(ethMarket);
 
-        (, , , , , , , int256 rate1, int256 cumFunding1, , , , , ) = perp.markets(ethMarket);
+        int256 rate1 = perp.getMarket(ethMarket).fundingRate;
+        int256 cumFunding1 = perp.getMarket(ethMarket).cumulativeFunding;
 
         // Second settlement — absolute timestamp well past first
         vm.warp(startTime + 18 hours);
         perp.settleFunding(ethMarket);
 
-        (, , , , , , , , int256 cumFunding2, , , , , ) = perp.markets(ethMarket);
+        int256 cumFunding2 = perp.getMarket(ethMarket).cumulativeFunding;
         // Cumulative funding should accumulate
         if (rate1 != 0) {
             assertTrue(cumFunding2 != cumFunding1, "Cumulative funding should change");
@@ -363,8 +328,7 @@ contract VibePerpetualTest is Test {
 
     function test_updateIndexPrice() public {
         perp.updateIndexPrice(ethMarket, 2500e18);
-        (, , , , , uint256 indexPrice, , , , , , , , ) = perp.markets(ethMarket);
-        assertEq(indexPrice, 2500e18);
+        assertEq(perp.getMarket(ethMarket).indexPrice, 2500e18);
     }
 
     // ============ Position Health ============
@@ -387,14 +351,12 @@ contract VibePerpetualTest is Test {
         vm.prank(alice);
         perp.openPosition(ethMarket, 1e18, 5 ether);
 
-        (, , , , , , , , , , uint256 oiLong, , , ) = perp.markets(ethMarket);
-        assertEq(oiLong, 1e18);
+        assertEq(perp.getMarket(ethMarket).openInterestLong, 1e18);
 
         vm.prank(bob);
         perp.openPosition(ethMarket, -1e18, 5 ether);
 
-        (, , , , , , , , , , , uint256 oiShort, , ) = perp.markets(ethMarket);
-        assertEq(oiShort, 1e18);
+        assertEq(perp.getMarket(ethMarket).openInterestShort, 1e18);
 
         // NOTE: Closing the long here would trigger uint256 underflow in _calculatePnL
         // because Bob's short pushed mark below Alice's entry price.

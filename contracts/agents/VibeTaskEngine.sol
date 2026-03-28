@@ -59,10 +59,11 @@ contract VibeTaskEngine is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
 
     // ============ State ============
 
-    mapping(uint256 => Task) public tasks;
+    // Internal to avoid auto-generated getters for 25-field Task struct (stack-too-deep)
+    mapping(uint256 => Task) internal tasks;
     uint256 public taskCount;
 
-    mapping(uint256 => TaskTree) public taskTrees;
+    mapping(uint256 => TaskTree) internal taskTrees;
     uint256 public treeCount;
 
     /// @notice Task tree membership: taskId => treeId

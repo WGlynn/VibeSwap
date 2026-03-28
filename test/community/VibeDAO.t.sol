@@ -73,31 +73,16 @@ contract VibeDAOTest is Test {
         assertEq(daoId, 1);
         assertEq(dao.daoCount(), 1);
 
-        (
-            uint256 id,
-            string memory name,
-            string memory description,
-            address creator,
-            ,
-            uint256 memberCount,
-            ,
-            ,
-            VibeDAO.GovernanceType govType,
-            uint256 quorumBps,
-            uint256 votingPeriod,
-            ,
-            bool active,
-        ) = dao.daos(1);
-
-        assertEq(id, 1);
-        assertEq(name, "Test DAO");
-        assertEq(description, "A test DAO");
-        assertEq(creator, alice);
-        assertEq(memberCount, 1);
-        assertEq(uint8(govType), uint8(VibeDAO.GovernanceType.TOKEN_VOTING));
-        assertEq(quorumBps, 5000);
-        assertEq(votingPeriod, 1 hours);
-        assertTrue(active);
+        VibeDAO.SubDAO memory d = dao.getDAO(1);
+        assertEq(d.daoId, 1);
+        assertEq(d.name, "Test DAO");
+        assertEq(d.description, "A test DAO");
+        assertEq(d.creator, alice);
+        assertEq(d.memberCount, 1);
+        assertEq(uint8(d.govType), uint8(VibeDAO.GovernanceType.TOKEN_VOTING));
+        assertEq(d.quorumBps, 5000);
+        assertEq(d.votingPeriod, 1 hours);
+        assertTrue(d.active);
     }
 
     function test_createDAO_emitsEvent() public {
@@ -148,8 +133,7 @@ contract VibeDAOTest is Test {
 
         assertTrue(dao.isMember(daoId, bob));
 
-        (,,,,, uint256 memberCount,,,,,,,,) = dao.daos(daoId);
-        assertEq(memberCount, 2);
+        assertEq(dao.getDAO(daoId).memberCount, 2);
     }
 
     function test_joinDAO_revert_alreadyMember() public {
@@ -211,31 +195,16 @@ contract VibeDAOTest is Test {
 
         assertEq(propId, 1);
 
-        (
-            uint256 proposalId,
-            uint256 pDaoId,
-            address proposer,
-            string memory title,
-            ,
-            ,
-            ,
-            uint256 votesFor,
-            uint256 votesAgainst,
-            ,
-            uint256 endTime,
-            bool executed,
-            bool cancelled
-        ) = dao.proposals(daoId, propId);
-
-        assertEq(proposalId, 1);
-        assertEq(pDaoId, daoId);
-        assertEq(proposer, alice);
-        assertEq(title, "Proposal 1");
-        assertEq(votesFor, 0);
-        assertEq(votesAgainst, 0);
-        assertGt(endTime, block.timestamp);
-        assertFalse(executed);
-        assertFalse(cancelled);
+        VibeDAO.DAOProposal memory p = dao.getProposal(daoId, propId);
+        assertEq(p.proposalId, 1);
+        assertEq(p.daoId, daoId);
+        assertEq(p.proposer, alice);
+        assertEq(p.title, "Proposal 1");
+        assertEq(p.votesFor, 0);
+        assertEq(p.votesAgainst, 0);
+        assertGt(p.endTime, block.timestamp);
+        assertFalse(p.executed);
+        assertFalse(p.cancelled);
     }
 
     function test_createProposal_revert_notMember() public {
@@ -264,8 +233,7 @@ contract VibeDAOTest is Test {
         emit VoteCast(daoId, propId, bob, true);
         dao.vote(daoId, propId, true);
 
-        (,,,,,,, uint256 votesFor,,,,, ) = dao.proposals(daoId, propId);
-        assertEq(votesFor, 1);
+        assertEq(dao.getProposal(daoId, propId).votesFor, 1);
         assertTrue(dao.hasVoted(daoId, propId, bob));
     }
 
@@ -282,8 +250,7 @@ contract VibeDAOTest is Test {
         vm.prank(bob);
         dao.vote(daoId, propId, false);
 
-        (,,,,,,,, uint256 votesAgainst,,,, ) = dao.proposals(daoId, propId);
-        assertEq(votesAgainst, 1);
+        assertEq(dao.getProposal(daoId, propId).votesAgainst, 1);
     }
 
     function test_vote_revert_notMember() public {
@@ -361,8 +328,7 @@ contract VibeDAOTest is Test {
 
         assertEq(target.value(), 42);
 
-        (,,,,,,,,,,,bool executed,) = dao.proposals(daoId, propId);
-        assertTrue(executed);
+        assertTrue(dao.getProposal(daoId, propId).executed);
     }
 
     function test_executeProposal_noExecutionData() public {
@@ -470,8 +436,7 @@ contract VibeDAOTest is Test {
 
         assertEq(dao.daoTreasury(daoId), 1 ether);
 
-        (,,,,,, uint256 totalFunding,,,,,,,) = dao.daos(daoId);
-        assertEq(totalFunding, 1 ether);
+        assertEq(dao.getDAO(daoId).totalFunding, 1 ether);
     }
 
     function test_fundDAO_revert_daoNotActive() public {
@@ -519,8 +484,7 @@ contract VibeDAOTest is Test {
         quorumBps = bound(quorumBps, 0, 10000);
         vm.prank(alice);
         uint256 daoId = dao.createDAO("DAO", "", VibeDAO.GovernanceType.TOKEN_VOTING, quorumBps, 1 hours, 0);
-        (,,,,,,,,, uint256 actualQuorum,,,,) = dao.daos(daoId);
-        // Cannot destructure quorumBps directly — but verify daoId was created
+        assertEq(dao.getDAO(daoId).quorumBps, quorumBps);
         assertEq(daoId, 1);
     }
 
@@ -544,8 +508,7 @@ contract VibeDAOTest is Test {
             dao.vote(daoId, propId, true);
         }
 
-        (,,,,,,, uint256 votesFor,,,,, ) = dao.proposals(daoId, propId);
-        assertEq(votesFor, uint256(numVoters) + 1);
+        assertEq(dao.getProposal(daoId, propId).votesFor, uint256(numVoters) + 1);
     }
 
     // ============ Edge Cases ============

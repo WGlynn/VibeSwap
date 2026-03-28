@@ -194,10 +194,8 @@ contract VibeRealEstateTest is Test {
         vm.prank(buyerAddr);
         estate.depositToEscrow{value: 5 ether}(propertyId);
 
-        (, , , , , uint256 buyerDeposited, , , ) = estate.escrows(propertyId);
-        // earnest (0.3) + 5 = 5.3
         uint256 earnest = (10 ether * 300) / 10000;
-        assertEq(buyerDeposited, earnest + 5 ether);
+        assertEq(estate.getEscrow(propertyId).buyerDeposited, earnest + 5 ether);
     }
 
     function test_DepositToEscrow_RevertsNonBuyer() public {

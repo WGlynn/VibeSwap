@@ -194,28 +194,16 @@ contract CognitiveConsensusMarketTest is Test {
         assertEq(claimId, 1);
         assertEq(market.nextClaimId(), 2);
 
-        (
-            bytes32 claimHash,
-            address claimProposer,
-            uint256 bounty,
-            uint256 commitDeadline,
-            uint256 revealDeadline,
-            uint256 minEvaluators,
-            CognitiveConsensusMarket.ClaimState state,
-            CognitiveConsensusMarket.Verdict verdict,
-            , , ,
-            uint256 totalStake,
-        ) = market.claims(claimId);
-
-        assertEq(claimHash, CLAIM_HASH);
-        assertEq(claimProposer, proposer);
-        assertEq(bounty, BOUNTY);
-        assertEq(commitDeadline, block.timestamp + 1 days);
-        assertEq(revealDeadline, block.timestamp + 1 days + 12 hours);
-        assertEq(minEvaluators, 3);
-        assertEq(uint256(state), uint256(CognitiveConsensusMarket.ClaimState.OPEN));
-        assertEq(uint256(verdict), uint256(CognitiveConsensusMarket.Verdict.NONE));
-        assertEq(totalStake, 0);
+        CognitiveConsensusMarket.Claim memory cl = market.getClaim(claimId);
+        assertEq(cl.claimHash, CLAIM_HASH);
+        assertEq(cl.proposer, proposer);
+        assertEq(cl.bounty, BOUNTY);
+        assertEq(cl.commitDeadline, block.timestamp + 1 days);
+        assertEq(cl.revealDeadline, block.timestamp + 1 days + 12 hours);
+        assertEq(cl.minEvaluators, 3);
+        assertEq(uint256(cl.state), uint256(CognitiveConsensusMarket.ClaimState.OPEN));
+        assertEq(uint256(cl.verdict), uint256(CognitiveConsensusMarket.Verdict.NONE));
+        assertEq(cl.totalStake, 0);
     }
 
     function test_submitClaim_emitsEvent() public {
@@ -295,21 +283,12 @@ contract CognitiveConsensusMarketTest is Test {
         vm.prank(evaluator1);
         market.commitEvaluation(claimId, hash, STAKE);
 
-        (
-            bytes32 commitHash,
-            ,
-            ,
-            uint256 stake,
-            uint256 reputationWeight,
-            bool revealed,
-            bool rewarded
-        ) = market.evaluations(claimId, evaluator1);
-
-        assertEq(commitHash, hash);
-        assertEq(stake, STAKE);
-        assertGt(reputationWeight, 0);
-        assertFalse(revealed);
-        assertFalse(rewarded);
+        CognitiveConsensusMarket.Evaluation memory ev = market.getEvaluation(claimId, evaluator1);
+        assertEq(ev.commitHash, hash);
+        assertEq(ev.stake, STAKE);
+        assertGt(ev.reputationWeight, 0);
+        assertFalse(ev.revealed);
+        assertFalse(ev.rewarded);
     }
 
     function test_commitEvaluation_emitsEvent() public {
@@ -354,7 +333,7 @@ contract CognitiveConsensusMarketTest is Test {
         _commit(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, keccak256("s1"));
         _commit(claimId, evaluator2, CognitiveConsensusMarket.Verdict.FALSE, keccak256("s2"));
 
-        (, , , , , , , , , , , uint256 totalStake, ) = market.claims(claimId);
+        uint256 totalStake = market.getClaim(claimId).totalStake;
         assertEq(totalStake, 2 * STAKE);
     }
 
@@ -427,8 +406,7 @@ contract CognitiveConsensusMarketTest is Test {
         vm.prank(evaluator1);
         market.commitEvaluation(claimId, hash, MIN_STAKE);
 
-        (, , , uint256 stake, , , ) = market.evaluations(claimId, evaluator1);
-        assertEq(stake, MIN_STAKE);
+        assertEq(market.getEvaluation(claimId, evaluator1).stake, MIN_STAKE);
     }
 
     function test_commitEvaluation_reputationWeight_defaultEvaluator() public {
@@ -437,8 +415,7 @@ contract CognitiveConsensusMarketTest is Test {
         _commit(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, keccak256("s1"));
 
         // New evaluator with no history should use sqrt(BPS) = sqrt(10000) = 100
-        (, , , , uint256 reputationWeight, , ) = market.evaluations(claimId, evaluator1);
-        assertEq(reputationWeight, 100); // sqrt(10000) = 100
+        assertEq(market.getEvaluation(claimId, evaluator1).reputationWeight, 100); // sqrt(10000) = 100
     }
 
     function test_commitEvaluation_reverts_evaluatorLimitReached() public {
@@ -495,12 +472,10 @@ contract CognitiveConsensusMarketTest is Test {
 
         _reveal(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, salt);
 
-        (, CognitiveConsensusMarket.Verdict verdict, bytes32 reasoningHash, , , bool revealed, ) =
-            market.evaluations(claimId, evaluator1);
-
-        assertEq(uint256(verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
-        assertEq(reasoningHash, REASONING_HASH);
-        assertTrue(revealed);
+        CognitiveConsensusMarket.Evaluation memory evr = market.getEvaluation(claimId, evaluator1);
+        assertEq(uint256(evr.verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
+        assertEq(evr.reasoningHash, REASONING_HASH);
+        assertTrue(evr.revealed);
     }
 
     function test_revealEvaluation_emitsEvent() public {
@@ -535,13 +510,11 @@ contract CognitiveConsensusMarketTest is Test {
         _reveal(claimId, evaluator2, CognitiveConsensusMarket.Verdict.TRUE, salt2);
         _reveal(claimId, evaluator3, CognitiveConsensusMarket.Verdict.FALSE, salt3);
 
-        (, , , , , , , , uint256 trueVotes, uint256 falseVotes, uint256 uncertainVotes, , ) =
-            market.claims(claimId);
-
+        CognitiveConsensusMarket.Claim memory clV = market.getClaim(claimId);
         // Default reputation weight = sqrt(10000) = 100
-        assertEq(trueVotes, 200);   // 2 evaluators * 100 repWeight
-        assertEq(falseVotes, 100);   // 1 evaluator * 100 repWeight
-        assertEq(uncertainVotes, 0);
+        assertEq(clV.trueVotes, 200);   // 2 evaluators * 100 repWeight
+        assertEq(clV.falseVotes, 100);   // 1 evaluator * 100 repWeight
+        assertEq(clV.uncertainVotes, 0);
     }
 
     function test_revealEvaluation_talliesUncertainVotes() public {
@@ -560,8 +533,7 @@ contract CognitiveConsensusMarketTest is Test {
         _reveal(claimId, evaluator2, CognitiveConsensusMarket.Verdict.UNCERTAIN, salt2);
         _reveal(claimId, evaluator3, CognitiveConsensusMarket.Verdict.TRUE, salt3);
 
-        (, , , , , , , , , , uint256 uncertainVotes, , ) = market.claims(claimId);
-        assertEq(uncertainVotes, 200); // 2 * 100
+        assertEq(market.getClaim(claimId).uncertainVotes, 200); // 2 * 100
     }
 
     function test_revealEvaluation_transitionsToRevealState() public {
@@ -573,8 +545,7 @@ contract CognitiveConsensusMarketTest is Test {
         _commit(claimId, evaluator3, CognitiveConsensusMarket.Verdict.TRUE, keccak256("s3"));
 
         // Still OPEN
-        (, , , , , , CognitiveConsensusMarket.ClaimState stateBefore, , , , , , ) = market.claims(claimId);
-        assertEq(uint256(stateBefore), uint256(CognitiveConsensusMarket.ClaimState.OPEN));
+        assertEq(uint256(market.getClaim(claimId).state), uint256(CognitiveConsensusMarket.ClaimState.OPEN));
 
         // Advance past commit deadline
         vm.warp(block.timestamp + 1 days + 1);
@@ -582,8 +553,7 @@ contract CognitiveConsensusMarketTest is Test {
         // First reveal triggers state transition
         _reveal(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, salt);
 
-        (, , , , , , CognitiveConsensusMarket.ClaimState stateAfter, , , , , , ) = market.claims(claimId);
-        assertEq(uint256(stateAfter), uint256(CognitiveConsensusMarket.ClaimState.REVEAL));
+        assertEq(uint256(market.getClaim(claimId).state), uint256(CognitiveConsensusMarket.ClaimState.REVEAL));
     }
 
     function test_revealEvaluation_expiresIfNotEnoughEvaluators() public {
@@ -601,8 +571,7 @@ contract CognitiveConsensusMarketTest is Test {
         vm.prank(evaluator1);
         market.revealEvaluation(claimId, CognitiveConsensusMarket.Verdict.TRUE, REASONING_HASH, salt1);
 
-        (, , , , , , CognitiveConsensusMarket.ClaimState state, , , , , , ) = market.claims(claimId);
-        assertEq(uint256(state), uint256(CognitiveConsensusMarket.ClaimState.EXPIRED));
+        assertEq(uint256(market.getClaim(claimId).state), uint256(CognitiveConsensusMarket.ClaimState.EXPIRED));
     }
 
     function test_revealEvaluation_reverts_invalidReveal() public {
@@ -731,11 +700,9 @@ contract CognitiveConsensusMarketTest is Test {
     function test_resolveClaim_verdictTrue_unanimousTrue() public {
         uint256 claimId = _fullLifecycle_allTrue();
 
-        (, , , , , , CognitiveConsensusMarket.ClaimState state, CognitiveConsensusMarket.Verdict verdict,
-            , , , , ) = market.claims(claimId);
-
-        assertEq(uint256(state), uint256(CognitiveConsensusMarket.ClaimState.RESOLVED));
-        assertEq(uint256(verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
+        CognitiveConsensusMarket.Claim memory cl = market.getClaim(claimId);
+        assertEq(uint256(cl.state), uint256(CognitiveConsensusMarket.ClaimState.RESOLVED));
+        assertEq(uint256(cl.verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
     }
 
     function test_resolveClaim_verdictFalse_majorityFalse() public {
@@ -759,8 +726,7 @@ contract CognitiveConsensusMarketTest is Test {
 
         market.resolveClaim(claimId);
 
-        (, , , , , , , CognitiveConsensusMarket.Verdict verdict, , , , , ) = market.claims(claimId);
-        assertEq(uint256(verdict), uint256(CognitiveConsensusMarket.Verdict.FALSE));
+        assertEq(uint256(market.getClaim(claimId).verdict), uint256(CognitiveConsensusMarket.Verdict.FALSE));
     }
 
     function test_resolveClaim_verdictUncertain_tiedVotes() public {
@@ -785,9 +751,8 @@ contract CognitiveConsensusMarketTest is Test {
 
         market.resolveClaim(claimId);
 
-        (, , , , , , , CognitiveConsensusMarket.Verdict verdict, , , , , ) = market.claims(claimId);
         // All three have equal weight, all different — no clear majority, defaults to UNCERTAIN
-        assertEq(uint256(verdict), uint256(CognitiveConsensusMarket.Verdict.UNCERTAIN));
+        assertEq(uint256(market.getClaim(claimId).verdict), uint256(CognitiveConsensusMarket.Verdict.UNCERTAIN));
     }
 
     function test_resolveClaim_emitsEvent() public {
@@ -842,8 +807,7 @@ contract CognitiveConsensusMarketTest is Test {
 
         market.resolveClaim(claimId);
 
-        (, , , , , , CognitiveConsensusMarket.ClaimState state, , , , , , ) = market.claims(claimId);
-        assertEq(uint256(state), uint256(CognitiveConsensusMarket.ClaimState.EXPIRED));
+        assertEq(uint256(market.getClaim(claimId).state), uint256(CognitiveConsensusMarket.ClaimState.EXPIRED));
     }
 
     function test_resolveClaim_reverts_noVotesRevealed() public {
@@ -1213,8 +1177,7 @@ contract CognitiveConsensusMarketTest is Test {
 
         _commit(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, keccak256("s1"));
 
-        (, , , , uint256 repWeight, , ) = market.evaluations(claimId, evaluator1);
-        assertEq(repWeight, 100);
+        assertEq(market.getEvaluation(claimId, evaluator1).reputationWeight, 100);
     }
 
     function test_reputation_sqrtWeighting_afterRepChange() public {
@@ -1248,9 +1211,8 @@ contract CognitiveConsensusMarketTest is Test {
         bytes32 salt4 = keccak256("s4");
         _commit(claimId2, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, salt4);
 
-        (, , , , uint256 repWeight, , ) = market.evaluations(claimId2, evaluator1);
         // sqrt(1000) = 31 (integer math)
-        assertEq(repWeight, 31);
+        assertEq(market.getEvaluation(claimId2, evaluator1).reputationWeight, 31);
     }
 
     // ============ Access Control Tests ============
@@ -1349,11 +1311,8 @@ contract CognitiveConsensusMarketTest is Test {
         market.resolveClaim(claimId1);
         market.resolveClaim(claimId2);
 
-        (, , , , , , , CognitiveConsensusMarket.Verdict verdict1, , , , , ) = market.claims(claimId1);
-        (, , , , , , , CognitiveConsensusMarket.Verdict verdict2, , , , , ) = market.claims(claimId2);
-
-        assertEq(uint256(verdict1), uint256(CognitiveConsensusMarket.Verdict.TRUE));
-        assertEq(uint256(verdict2), uint256(CognitiveConsensusMarket.Verdict.FALSE));
+        assertEq(uint256(market.getClaim(claimId1).verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
+        assertEq(uint256(market.getClaim(claimId2).verdict), uint256(CognitiveConsensusMarket.Verdict.FALSE));
     }
 
     function test_edgeCase_differentStakeAmounts_affectRewardDistribution() public {
@@ -1428,23 +1387,20 @@ contract CognitiveConsensusMarketTest is Test {
         _commit(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, keccak256("s1"));
 
         // Verify the commit is stored
-        (bytes32 commitHash, , , , , , ) = market.evaluations(claimId, evaluator1);
-        assertNotEq(commitHash, bytes32(0));
+        assertNotEq(market.getEvaluation(claimId, evaluator1).commitHash, bytes32(0));
     }
 
     function test_edgeCase_commitExactlyAtDeadline() public {
         uint256 claimId = _submitClaim();
 
         // Warp to exactly the commit deadline (should still be valid since check is >)
-        (, , , uint256 commitDeadline, , , , , , , , , ) = market.claims(claimId);
-        vm.warp(commitDeadline);
+        vm.warp(market.getClaim(claimId).commitDeadline);
 
         bytes32 hash = _commitHash(CognitiveConsensusMarket.Verdict.TRUE, REASONING_HASH, keccak256("salt"));
         vm.prank(evaluator1);
         market.commitEvaluation(claimId, hash, STAKE);
 
-        (bytes32 stored, , , , , , ) = market.evaluations(claimId, evaluator1);
-        assertEq(stored, hash);
+        assertEq(market.getEvaluation(claimId, evaluator1).commitHash, hash);
     }
 
     function test_edgeCase_revealExactlyAtDeadline() public {
@@ -1462,13 +1418,11 @@ contract CognitiveConsensusMarketTest is Test {
         _reveal(claimId, evaluator2, CognitiveConsensusMarket.Verdict.TRUE, keccak256("s2"));
 
         // Warp to exactly the reveal deadline (should still be valid since check is >)
-        (, , , , uint256 revealDeadline, , , , , , , , ) = market.claims(claimId);
-        vm.warp(revealDeadline);
+        vm.warp(market.getClaim(claimId).revealDeadline);
 
         _reveal(claimId, evaluator1, CognitiveConsensusMarket.Verdict.TRUE, salt);
 
-        (, , , , , bool revealed, ) = market.evaluations(claimId, evaluator1);
-        assertTrue(revealed);
+        assertTrue(market.getEvaluation(claimId, evaluator1).revealed);
     }
 
     // ============ Full Lifecycle Integration Tests ============
@@ -1519,14 +1473,12 @@ contract CognitiveConsensusMarketTest is Test {
 
         market.resolveClaim(claimId);
 
-        (, , , , , , CognitiveConsensusMarket.ClaimState state, CognitiveConsensusMarket.Verdict verdict,
-            uint256 trueVotes, uint256 falseVotes, uint256 uncertainVotes, , ) = market.claims(claimId);
-
-        assertEq(uint256(state), uint256(CognitiveConsensusMarket.ClaimState.RESOLVED));
-        assertEq(uint256(verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
-        assertEq(trueVotes, 300);      // 3 * 100
-        assertEq(falseVotes, 100);     // 1 * 100
-        assertEq(uncertainVotes, 100); // 1 * 100
+        CognitiveConsensusMarket.Claim memory clV = market.getClaim(claimId);
+        assertEq(uint256(clV.state), uint256(CognitiveConsensusMarket.ClaimState.RESOLVED));
+        assertEq(uint256(clV.verdict), uint256(CognitiveConsensusMarket.Verdict.TRUE));
+        assertEq(clV.trueVotes, 300);      // 3 * 100
+        assertEq(clV.falseVotes, 100);     // 1 * 100
+        assertEq(clV.uncertainVotes, 100); // 1 * 100
     }
 
     function test_fullLifecycle_partialReveals_unrevealedSlashed() public {
@@ -1577,8 +1529,7 @@ contract CognitiveConsensusMarketTest is Test {
         // Resolve (triggers expiry)
         market.resolveClaim(claimId);
 
-        (, , , , , , CognitiveConsensusMarket.ClaimState state, , , , , , ) = market.claims(claimId);
-        assertEq(uint256(state), uint256(CognitiveConsensusMarket.ClaimState.EXPIRED));
+        assertEq(uint256(market.getClaim(claimId).state), uint256(CognitiveConsensusMarket.ClaimState.EXPIRED));
 
         // Refund
         market.refundExpired(claimId);

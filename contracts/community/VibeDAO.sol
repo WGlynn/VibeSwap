@@ -66,14 +66,15 @@ contract VibeDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     // ============ State ============
 
-    mapping(uint256 => SubDAO) public daos;
+    // Internal to avoid auto-generated getters for 14-field SubDAO struct (stack-too-deep)
+    mapping(uint256 => SubDAO) internal daos;
     uint256 public daoCount;
 
     /// @notice DAO members: daoId => member => data
-    mapping(uint256 => mapping(address => DAOMember)) public members;
+    mapping(uint256 => mapping(address => DAOMember)) internal members;
 
     /// @notice DAO proposals: daoId => proposalId => proposal
-    mapping(uint256 => mapping(uint256 => DAOProposal)) public proposals;
+    mapping(uint256 => mapping(uint256 => DAOProposal)) internal proposals;
 
     /// @notice Votes: daoId => proposalId => voter => voted
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public hasVoted;
@@ -82,7 +83,7 @@ contract VibeDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
     mapping(uint256 => uint256) public daoTreasury;
 
     /// @notice Templates
-    mapping(uint256 => SubDAO) public templates;
+    mapping(uint256 => SubDAO) internal templates;
     uint256 public templateCount;
 
 
@@ -272,6 +273,10 @@ contract VibeDAO is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradea
 
     // ============ View ============
 
+    function getDAO(uint256 daoId) external view returns (SubDAO memory) { return daos[daoId]; }
+    function getProposal(uint256 daoId, uint256 proposalId) external view returns (DAOProposal memory) { return proposals[daoId][proposalId]; }
+    function getMember(uint256 daoId, address user) external view returns (DAOMember memory) { return members[daoId][user]; }
+    function getTemplate(uint256 templateId) external view returns (SubDAO memory) { return templates[templateId]; }
     function getDAOCount() external view returns (uint256) { return daoCount; }
 
     function isMember(uint256 daoId, address user) external view returns (bool) {

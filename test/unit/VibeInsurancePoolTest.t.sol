@@ -243,9 +243,8 @@ contract VibeInsurancePoolTest is Test {
         vm.prank(voter2);
         pool.voteOnClaim(claimId, false);
 
-        (,,,,, uint256 votesFor, uint256 votesAgainst, , , ) = pool.claims(claimId);
-        assertEq(votesFor, 1);
-        assertEq(votesAgainst, 1);
+        assertEq(pool.getClaim(claimId).votesFor, 1);
+        assertEq(pool.getClaim(claimId).votesAgainst, 1);
     }
 
     function test_revertDoubleVote() public {
@@ -365,9 +364,8 @@ contract VibeInsurancePoolTest is Test {
         vm.warp(block.timestamp + 8 days);
         pool.resolveClaim(claimId);
 
-        (, , , , , , , bool active, bool claimed) = pool.policies(policyId);
-        assertFalse(active);
-        assertTrue(claimed);
+        assertFalse(pool.getPolicy(policyId).active);
+        assertTrue(pool.getPolicy(policyId).claimed);
     }
 
     function test_approvedClaimReducesCoverage() public {

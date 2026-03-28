@@ -972,29 +972,42 @@ contract VibeSwapCore is
         bool[] memory orderValid
     ) internal returns (uint256 totalVolume, uint256 lastClearingPrice) {
         for (uint256 p = 0; p < uniquePoolCount;) {
-            bytes32 poolId = poolIds[p];
-
-            // Build SwapOrder array and collect original indices
-            (
-                IVibeAMM.SwapOrder[] memory swapOrders,
-                uint256[] memory originalIndices,
-                uint256 count
-            ) = _buildPoolSwapOrders(batchId, orders, executionOrder, orderPoolIds, orderValid, poolId);
-
-            if (count == 0) { unchecked { ++p; } continue; }
-
-            // Execute ALL orders for this pool in one batch -> one uniform clearing price
-            IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, batchId, swapOrders);
-
-            // Post-execution accounting
-            if (result.totalTokenInSwapped > 0) {
-                totalVolume += result.totalTokenInSwapped;
-                lastClearingPrice = result.clearingPrice;
-                _settleExecutedOrders(batchId, orders, originalIndices, count, poolId, result);
-            } else {
-                _emitFailedOrders(batchId, orders, originalIndices, count);
+            (uint256 vol, uint256 price) = _executePoolIteration(
+                batchId, orders, executionOrder, orderPoolIds, orderValid, poolIds[p]
+            );
+            if (vol > 0) {
+                totalVolume += vol;
+                lastClearingPrice = price;
             }
             unchecked { ++p; }
+        }
+    }
+
+    /// @dev Loop body for _executePoolBatches — extracted to reduce stack depth.
+    function _executePoolIteration(
+        uint64 batchId,
+        ICommitRevealAuction.RevealedOrder[] memory orders,
+        uint256[] memory executionOrder,
+        bytes32[] memory orderPoolIds,
+        bool[] memory orderValid,
+        bytes32 poolId
+    ) internal returns (uint256 volAdded, uint256 clearingPrice) {
+        (
+            IVibeAMM.SwapOrder[] memory swapOrders,
+            uint256[] memory originalIndices,
+            uint256 count
+        ) = _buildPoolSwapOrders(batchId, orders, executionOrder, orderPoolIds, orderValid, poolId);
+
+        if (count == 0) return (0, 0);
+
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(poolId, batchId, swapOrders);
+
+        if (result.totalTokenInSwapped > 0) {
+            _settleExecutedOrders(batchId, orders, originalIndices, count, poolId, result);
+            return (result.totalTokenInSwapped, result.clearingPrice);
+        } else {
+            _emitFailedOrders(batchId, orders, originalIndices, count);
+            return (0, 0);
         }
     }
 

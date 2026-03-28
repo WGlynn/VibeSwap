@@ -104,10 +104,10 @@ contract CognitiveConsensusMarket is Ownable, ReentrancyGuard {
     IERC20 public stakeToken;
     uint256 public nextClaimId;
 
-    mapping(uint256 => Claim) public claims;
+    mapping(uint256 => Claim) internal claims;
     mapping(uint256 => address[]) public claimEvaluators;
-    mapping(uint256 => mapping(address => Evaluation)) public evaluations;
-    mapping(address => EvaluatorProfile) public profiles;
+    mapping(uint256 => mapping(address => Evaluation)) internal evaluations;
+    mapping(address => EvaluatorProfile) internal profiles;
 
     // Authorized evaluators (registered AI agents or verified humans)
     mapping(address => bool) public authorizedEvaluators;
@@ -449,11 +449,29 @@ contract CognitiveConsensusMarket is Ownable, ReentrancyGuard {
         return claimEvaluators[claimId];
     }
 
+    /// @notice Get the full Claim struct.
+    function getClaim(uint256 claimId) external view returns (Claim memory) { return claims[claimId]; }
+
+    /// @notice Get a specific Evaluation struct.
+    function getEvaluation(uint256 claimId, address evaluator) external view returns (Evaluation memory) {
+        return evaluations[claimId][evaluator];
+    }
+
     /// @notice Get the reputation profile of an evaluator.
     /// @param evaluator Address to query
     /// @return The EvaluatorProfile struct with accuracy and earnings data
     function getProfile(address evaluator) external view returns (EvaluatorProfile memory) {
         return profiles[evaluator];
+    }
+
+    /// @notice Lightweight getter returning only claim state and verdict.
+    /// @dev Avoids 13-value tuple destructuring which causes stack-too-deep in callers.
+    function getClaimStateAndVerdict(uint256 claimId) external view returns (
+        ClaimState state,
+        Verdict verdict
+    ) {
+        Claim storage c = claims[claimId];
+        return (c.state, c.verdict);
     }
 
     // ============ Internal ============

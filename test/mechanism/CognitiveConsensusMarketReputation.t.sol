@@ -99,7 +99,7 @@ contract CognitiveConsensusMarketReputationTest is Test {
         market.commitEvaluation(claimId, commitHash, STAKE);
 
         // Check the evaluation's reputation weight = sqrt(10000) = 100
-        (, , , , uint256 repWeight, , ) = market.evaluations(claimId, alice);
+        uint256 repWeight = market.getEvaluation(claimId, alice).reputationWeight;
         assertEq(repWeight, 100, "Default rep weight should be sqrt(10000) = 100");
     }
 
@@ -211,7 +211,7 @@ contract CognitiveConsensusMarketReputationTest is Test {
         vm.prank(alice);
         market.commitEvaluation(claimId, commitHash, STAKE);
 
-        (, , , , uint256 repWeight, , ) = market.evaluations(claimId, alice);
+        uint256 repWeight = market.getEvaluation(claimId, alice).reputationWeight;
         assertEq(repWeight, 100, "sqrt(10000) = 100");
     }
 
@@ -251,8 +251,8 @@ contract CognitiveConsensusMarketReputationTest is Test {
         vm.prank(carol);
         market.commitEvaluation(claimId, carolCommit, STAKE);
 
-        (, , , , uint256 aliceWeight, , ) = market.evaluations(claimId, alice);
-        (, , , , uint256 carolWeight, , ) = market.evaluations(claimId, carol);
+        uint256 aliceWeight = market.getEvaluation(claimId, alice).reputationWeight;
+        uint256 carolWeight = market.getEvaluation(claimId, carol).reputationWeight;
 
         // sqrt(10000) = 100, sqrt(1000) = 31
         assertEq(aliceWeight, 100, "Alice weight = sqrt(10000) = 100");
@@ -317,7 +317,8 @@ contract CognitiveConsensusMarketReputationTest is Test {
         market.revealEvaluation(claimId, vTrue, daveRH, daveSalt);
 
         // Check the tallied reputation-weighted votes
-        (, , , , , , , , uint256 trueVotes, uint256 falseVotes, , , ) = market.claims(claimId);
+        uint256 trueVotes = market.getClaim(claimId).trueVotes;
+        uint256 falseVotes = market.getClaim(claimId).falseVotes;
 
         // alice weight = sqrt(10000) = 100, dave weight = sqrt(10000) = 100 (default)
         // carol weight = sqrt(1000) = 31
@@ -356,9 +357,7 @@ contract CognitiveConsensusMarketReputationTest is Test {
         vm.prank(carol);
         market.commitEvaluation(claimId, commit, STAKE);
 
-        (, , , , uint256 carolWeight, , ) = market.evaluations(claimId, carol);
-        // sqrt(1000) = 31 (reduced from sqrt(10000) = 100 for a new evaluator)
-        assertEq(carolWeight, 31, "Slashed evaluator gets reduced weight sqrt(1000) = 31");
+        assertEq(market.getEvaluation(claimId, carol).reputationWeight, 31, "Slashed evaluator gets reduced weight sqrt(1000) = 31");
 
         // Compare with a fresh evaluator (eve, never evaluated)
         bytes32 eveSalt = keccak256("eve-fresh");
@@ -370,11 +369,10 @@ contract CognitiveConsensusMarketReputationTest is Test {
         vm.prank(eve);
         market.commitEvaluation(claimId, eveCommit, STAKE);
 
-        (, , , , uint256 eveWeight, , ) = market.evaluations(claimId, eve);
-        assertEq(eveWeight, 100, "Fresh evaluator gets default weight sqrt(10000) = 100");
+        assertEq(market.getEvaluation(claimId, eve).reputationWeight, 100, "Fresh evaluator gets default weight sqrt(10000) = 100");
 
         // Slashed evaluator has significantly less influence than a fresh one
-        assertTrue(carolWeight < eveWeight, "Slashed evaluator has less weight than fresh");
+        assertTrue(market.getEvaluation(claimId, carol).reputationWeight < market.getEvaluation(claimId, eve).reputationWeight, "Slashed evaluator has less weight than fresh");
     }
 
     function test_reputationRecoveryAfterCorrectEvals() public {

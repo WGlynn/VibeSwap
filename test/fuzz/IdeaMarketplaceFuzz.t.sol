@@ -80,6 +80,20 @@ contract IdeaMarketplaceFuzz is Test {
         return marketplace.submitIdea("Test Idea", keccak256("desc"), IIdeaMarketplace.IdeaCategory.UX);
     }
 
+    function _scoreThree(
+        uint256 ideaId,
+        uint8 f1, uint8 i1, uint8 n1,
+        uint8 f2, uint8 i2, uint8 n2,
+        uint8 f3, uint8 i3, uint8 n3
+    ) internal {
+        vm.prank(scorer1);
+        marketplace.scoreIdea(ideaId, f1, i1, n1);
+        vm.prank(scorer2);
+        marketplace.scoreIdea(ideaId, f2, i2, n2);
+        vm.prank(scorer3);
+        marketplace.scoreIdea(ideaId, f3, i3, n3);
+    }
+
     /// @notice Score an idea with high scores (auto-approve range) using all 3 scorers
     function _scoreHighAll(uint256 ideaId) internal {
         vm.prank(scorer1);
@@ -320,41 +334,37 @@ contract IdeaMarketplaceFuzz is Test {
         marketplace.submitWork(ideaId, keccak256("proof"));
     }
 
+    uint8 private _s_f1; uint8 private _s_i1; uint8 private _s_n1;
+    uint8 private _s_f2; uint8 private _s_i2; uint8 private _s_n2;
+    uint8 private _s_f3; uint8 private _s_i3; uint8 private _s_n3;
+
+    function _boundScores(
+        uint8 f1, uint8 i1, uint8 n1,
+        uint8 f2, uint8 i2, uint8 n2,
+        uint8 f3, uint8 i3, uint8 n3,
+        uint256 lo, uint256 hi
+    ) internal returns (uint256 avg) {
+        _s_f1 = uint8(bound(f1, lo, hi)); _s_i1 = uint8(bound(i1, lo, hi)); _s_n1 = uint8(bound(n1, lo, hi));
+        _s_f2 = uint8(bound(f2, lo, hi)); _s_i2 = uint8(bound(i2, lo, hi)); _s_n2 = uint8(bound(n2, lo, hi));
+        _s_f3 = uint8(bound(f3, lo, hi)); _s_i3 = uint8(bound(i3, lo, hi)); _s_n3 = uint8(bound(n3, lo, hi));
+        avg = (uint256(_s_f1)+uint256(_s_i1)+uint256(_s_n1)+uint256(_s_f2)+uint256(_s_i2)+uint256(_s_n2)+uint256(_s_f3)+uint256(_s_i3)+uint256(_s_n3)) / 3;
+    }
+
+    function _scoreStored(uint256 ideaId) internal {
+        _scoreThree(ideaId, _s_f1, _s_i1, _s_n1, _s_f2, _s_i2, _s_n2, _s_f3, _s_i3, _s_n3);
+    }
+
     /// @notice Three scorers with low scores should auto-reject (avg < 15)
     function testFuzz_autoReject_belowThreshold(
         uint8 f1, uint8 i1, uint8 n1,
         uint8 f2, uint8 i2, uint8 n2,
         uint8 f3, uint8 i3, uint8 n3
     ) public {
-        // Bound each dimension to 0-10
-        f1 = uint8(bound(f1, 0, 10));
-        i1 = uint8(bound(i1, 0, 10));
-        n1 = uint8(bound(n1, 0, 10));
-        f2 = uint8(bound(f2, 0, 10));
-        i2 = uint8(bound(i2, 0, 10));
-        n2 = uint8(bound(n2, 0, 10));
-        f3 = uint8(bound(f3, 0, 10));
-        i3 = uint8(bound(i3, 0, 10));
-        n3 = uint8(bound(n3, 0, 10));
-
-        // Compute totals and average
-        uint256 total1 = uint256(f1) + uint256(i1) + uint256(n1);
-        uint256 total2 = uint256(f2) + uint256(i2) + uint256(n2);
-        uint256 total3 = uint256(f3) + uint256(i3) + uint256(n3);
-        uint256 sum = total1 + total2 + total3;
-        uint256 avg = sum / 3;
-
-        // Only proceed if average is below AUTO_REJECT_THRESHOLD (15)
+        uint256 avg = _boundScores(f1, i1, n1, f2, i2, n2, f3, i3, n3, 0, 10);
         vm.assume(avg < 15);
 
         uint256 ideaId = _submitIdea();
-
-        vm.prank(scorer1);
-        marketplace.scoreIdea(ideaId, f1, i1, n1);
-        vm.prank(scorer2);
-        marketplace.scoreIdea(ideaId, f2, i2, n2);
-        vm.prank(scorer3);
-        marketplace.scoreIdea(ideaId, f3, i3, n3);
+        _scoreStored(ideaId);
 
         IIdeaMarketplace.Idea memory idea = marketplace.getIdea(ideaId);
         assertEq(uint8(idea.status), uint8(IIdeaMarketplace.IdeaStatus.REJECTED), "Should be auto-rejected");
@@ -363,34 +373,21 @@ contract IdeaMarketplaceFuzz is Test {
 
     /// @notice Three scorers with high scores should auto-approve (avg >= 24)
     function testFuzz_autoApprove_aboveThreshold(uint256 seed) public {
-        // Generate 9 scores in [8,10] range from seed to guarantee avg >= 24
-        // Each scorer total >= 24, so average >= 24
-        uint8 f1 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 i1 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 n1 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 f2 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 i2 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 n2 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 f3 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 i3 = uint8(8 + (seed % 3)); seed = seed / 3;
-        uint8 n3 = uint8(8 + (seed % 3));
+        _s_f1 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_i1 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_n1 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_f2 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_i2 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_n2 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_f3 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_i3 = uint8(8 + (seed % 3)); seed /= 3;
+        _s_n3 = uint8(8 + (seed % 3));
 
-        uint256 total1 = uint256(f1) + uint256(i1) + uint256(n1);
-        uint256 total2 = uint256(f2) + uint256(i2) + uint256(n2);
-        uint256 total3 = uint256(f3) + uint256(i3) + uint256(n3);
-        uint256 sum = total1 + total2 + total3;
-        uint256 avg = sum / 3;
+        uint256 avg = (uint256(_s_f1)+uint256(_s_i1)+uint256(_s_n1)+uint256(_s_f2)+uint256(_s_i2)+uint256(_s_n2)+uint256(_s_f3)+uint256(_s_i3)+uint256(_s_n3)) / 3;
 
         uint256 ideaId = _submitIdea();
+        _scoreStored(ideaId);
 
-        vm.prank(scorer1);
-        marketplace.scoreIdea(ideaId, f1, i1, n1);
-        vm.prank(scorer2);
-        marketplace.scoreIdea(ideaId, f2, i2, n2);
-        vm.prank(scorer3);
-        marketplace.scoreIdea(ideaId, f3, i3, n3);
-
-        // Auto-approve keeps status OPEN (idea is approved for claiming, not transitioned)
         IIdeaMarketplace.Idea memory idea = marketplace.getIdea(ideaId);
         assertEq(uint8(idea.status), uint8(IIdeaMarketplace.IdeaStatus.OPEN), "Should stay OPEN (auto-approved)");
         assertEq(idea.score, avg, "Score should be average");

@@ -558,101 +558,30 @@ contract ShapleyDistributor is
         // ABC Conservation Gate: no settlement when curve is under stress
         _requireABCHealthy(gameId);
 
+        // Step 1+2: Compute weights and proportional shares (scoped to free stack)
         Participant[] storage participants = gameParticipants[gameId];
         uint256 n = participants.length;
-
-        // Step 1: Calculate total weighted contributions
-        uint256[] memory weights = new uint256[](n);
-        uint256 totalWeight = 0;
-
-        for (uint256 i = 0; i < n; i++) {
-            weights[i] = _calculateWeightedContribution(participants[i], gameId);
-            totalWeight += weights[i];
-
-            // Store for pairwise verification (anyone can audit fairness on-chain)
-            weightedContributions[gameId][participants[i].participant] = weights[i];
-        }
-
-        // Guard: all participants have zero contribution → cannot distribute
-        if (totalWeight == 0) revert GameNotFound(); // No meaningful contributions to distribute
-
-        // Store total weight for pairwise verification tolerance
-        totalWeightedContrib[gameId] = totalWeight;
-
-        // Step 2: Distribute value proportional to weighted contribution
-        // This satisfies Efficiency, Pairwise Proportionality, and Time Neutrality
-        // See: docs/TIME_NEUTRAL_TOKENOMICS.md §3.1-3.3
-        uint256[] memory shares = new uint256[](n);
-        uint256 distributed = 0;
-
-        for (uint256 i = 0; i < n; i++) {
-            shares[i] = (game.totalValue * weights[i]) / totalWeight;
-            distributed += shares[i];
-        }
-
-        // Step 3: Enforce Lawson Fairness Floor (1% minimum for non-zero contributors)
-        // Named after Jayme Lawson — nobody who showed up and acted honestly walks away empty.
-        // Only applies to participants with non-zero weight (null players still get zero).
-        //
-        // SYBIL GUARD: When sybilGuard is configured, only participants with verified
-        // unique identity get the floor boost. Unverified participants still get their
-        // proportional Shapley reward, but can't exploit the 1% minimum by splitting
-        // into many accounts. (Found by adversarial search: 200/200 profitable sybil splits.)
-        uint256 floorAmount = (game.totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
-        uint256 floorDeficit = 0;
-        uint256 nonFloorWeight = 0;
-        bool hasSybilGuard = address(sybilGuard) != address(0);
-
-        for (uint256 i = 0; i < n; i++) {
-            bool eligibleForFloor = weights[i] > 0 && shares[i] < floorAmount;
-
-            // If sybil guard is active, only verified identities get floor boost
-            if (hasSybilGuard && eligibleForFloor) {
-                eligibleForFloor = sybilGuard.isUniqueIdentity(participants[i].participant);
-            }
-
-            if (eligibleForFloor) {
-                floorDeficit += floorAmount - shares[i];
-                shares[i] = floorAmount;
-            } else if (shares[i] > floorAmount) {
-                nonFloorWeight += weights[i];
-            }
-        }
-
-        // Redistribute deficit from above-floor participants proportionally
-        if (floorDeficit > 0 && nonFloorWeight > 0) {
+        uint256[] memory shares;
+        uint256[] memory weights;
+        {
+            weights = new uint256[](n);
+            uint256 totalWeight = 0;
             for (uint256 i = 0; i < n; i++) {
-                if (shares[i] > floorAmount && weights[i] > 0) {
-                    uint256 deduction = (floorDeficit * weights[i]) / nonFloorWeight;
-                    if (deduction < shares[i] - floorAmount) {
-                        shares[i] -= deduction;
-                    } else {
-                        shares[i] = floorAmount;
-                    }
-                }
+                weights[i] = _calculateWeightedContribution(participants[i], gameId);
+                totalWeight += weights[i];
+                weightedContributions[gameId][participants[i].participant] = weights[i];
+            }
+            if (totalWeight == 0) revert GameNotFound();
+            totalWeightedContrib[gameId] = totalWeight;
+
+            shares = new uint256[](n);
+            for (uint256 i = 0; i < n; i++) {
+                shares[i] = (game.totalValue * weights[i]) / totalWeight;
             }
         }
 
-        // Step 4: Force efficiency on last non-zero-weight participant.
-        // Preserves null player axiom: weight=0 => share=0.
-        // (Found by adversarial search: 92/500 random games violated null player
-        //  when zero-weight participant was last and received truncation dust.)
-        uint256 dustRecipient = n - 1;
-        for (uint256 i = n; i > 0; i--) {
-            if (weights[i - 1] > 0) {
-                dustRecipient = i - 1;
-                break;
-            }
-        }
-
-        // Sum all shares except dust recipient, then force efficiency
-        distributed = 0;
-        for (uint256 i = 0; i < n; i++) {
-            if (i != dustRecipient) {
-                distributed += shares[i];
-            }
-        }
-        shares[dustRecipient] = game.totalValue - distributed;
+        // Step 3: Enforce Lawson Fairness Floor + Step 4: Force efficiency
+        _applyFloorAndEfficiency(game.totalValue, participants, weights, shares);
 
         // Final assignment
         for (uint256 i = 0; i < n; i++) {
@@ -661,6 +590,65 @@ contract ShapleyDistributor is
         }
 
         game.settled = true;
+    }
+
+    /// @dev Steps 3-4 of computeShapleyValues: Lawson floor enforcement + dust efficiency.
+    /// Extracted to reduce stack depth in the parent function.
+    function _applyFloorAndEfficiency(
+        uint256 totalValue,
+        Participant[] storage participants,
+        uint256[] memory weights,
+        uint256[] memory shares
+    ) internal {
+        uint256 n = shares.length;
+        uint256 floorAmount = (totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
+
+        // Step 3: Enforce Lawson Fairness Floor (1% minimum for non-zero contributors)
+        // Named after Jayme Lawson — nobody who showed up and acted honestly walks away empty.
+        // SYBIL GUARD: only verified identities get the floor boost when guard is active.
+        {
+            uint256 floorDeficit = 0;
+            uint256 nonFloorWeight = 0;
+            bool hasSybilGuard = address(sybilGuard) != address(0);
+
+            for (uint256 i = 0; i < n; i++) {
+                bool eligibleForFloor = weights[i] > 0 && shares[i] < floorAmount;
+                if (hasSybilGuard && eligibleForFloor) {
+                    eligibleForFloor = sybilGuard.isUniqueIdentity(participants[i].participant);
+                }
+                if (eligibleForFloor) {
+                    floorDeficit += floorAmount - shares[i];
+                    shares[i] = floorAmount;
+                } else if (shares[i] > floorAmount) {
+                    nonFloorWeight += weights[i];
+                }
+            }
+
+            if (floorDeficit > 0 && nonFloorWeight > 0) {
+                for (uint256 i = 0; i < n; i++) {
+                    if (shares[i] > floorAmount && weights[i] > 0) {
+                        uint256 deduction = (floorDeficit * weights[i]) / nonFloorWeight;
+                        if (deduction < shares[i] - floorAmount) {
+                            shares[i] -= deduction;
+                        } else {
+                            shares[i] = floorAmount;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 4: Force efficiency on last non-zero-weight participant.
+        // Preserves null player axiom: weight=0 => share=0.
+        uint256 dustRecipient = n - 1;
+        for (uint256 i = n; i > 0; i--) {
+            if (weights[i - 1] > 0) { dustRecipient = i - 1; break; }
+        }
+        uint256 distributed = 0;
+        for (uint256 i = 0; i < n; i++) {
+            if (i != dustRecipient) distributed += shares[i];
+        }
+        shares[dustRecipient] = totalValue - distributed;
     }
 
     // ============ Settlement Layer Integration ============

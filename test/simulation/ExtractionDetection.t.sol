@@ -95,67 +95,88 @@ contract ExtractionDetectionTest is Test {
         }
     }
 
-    // ============ SCENARIO 1: Protocol Skims LP Fees ============
+    // Scratch state for ExtractionDetection scenario 1
+    uint256 private _s1_lp1Contribution;
+    uint256 private _s1_lp2Contribution;
+    uint256 private _s1_lp3Contribution;
+    uint256 private _s1_lp1Skimmed;
+    uint256 private _s1_lp2Skimmed;
+    uint256 private _s1_lp3Skimmed;
+    uint256 private _s1_protocolSkim;
+    uint256 private _s1_totalFees;
+    uint256 private _s1_lp1Fair;
+    uint256 private _s1_lp2Fair;
+    uint256 private _s1_lp3Fair;
 
-    function test_P001_DetectsProtocolFeeSkimming() public {
-        // Setup: 3 LPs contribute liquidity, protocol tries to skim 5%
+    function _computeSkimScenario() internal {
         uint256 lp1Contribution = 100_000e18;
         uint256 lp2Contribution = 50_000e18;
         uint256 lp3Contribution = 25_000e18;
         uint256 totalContributions = lp1Contribution + lp2Contribution + lp3Contribution;
+        uint256 totalFees = 1_000e18;
 
-        uint256 totalFees = 1_000e18; // Total fees generated
+        _s1_lp1Contribution = lp1Contribution;
+        _s1_lp2Contribution = lp2Contribution;
+        _s1_lp3Contribution = lp3Contribution;
+        _s1_totalFees = totalFees;
+        _s1_lp1Fair = calculateShapleyValue(lp1Contribution, totalContributions, totalFees);
+        _s1_lp2Fair = calculateShapleyValue(lp2Contribution, totalContributions, totalFees);
+        _s1_lp3Fair = calculateShapleyValue(lp3Contribution, totalContributions, totalFees);
 
-        // Fair Shapley allocation
-        uint256 lp1Fair = calculateShapleyValue(lp1Contribution, totalContributions, totalFees);
-        uint256 lp2Fair = calculateShapleyValue(lp2Contribution, totalContributions, totalFees);
-        uint256 lp3Fair = calculateShapleyValue(lp3Contribution, totalContributions, totalFees);
-
-        // Verify Shapley efficiency axiom: sum of values = total value
-        assertApproxEqAbs(lp1Fair + lp2Fair + lp3Fair, totalFees, 3, "Efficiency axiom violated");
-
-        // Now protocol skims 5%
-        uint256 protocolSkim = (totalFees * 500) / BPS; // 5%
+        uint256 protocolSkim = (totalFees * 500) / BPS;
         uint256 remainingForLPs = totalFees - protocolSkim;
+        _s1_protocolSkim = protocolSkim;
+        _s1_lp1Skimmed = calculateShapleyValue(lp1Contribution, totalContributions, remainingForLPs);
+        _s1_lp2Skimmed = calculateShapleyValue(lp2Contribution, totalContributions, remainingForLPs);
+        _s1_lp3Skimmed = calculateShapleyValue(lp3Contribution, totalContributions, remainingForLPs);
+    }
 
-        uint256 lp1Skimmed = calculateShapleyValue(lp1Contribution, totalContributions, remainingForLPs);
-        uint256 lp2Skimmed = calculateShapleyValue(lp2Contribution, totalContributions, remainingForLPs);
-        uint256 lp3Skimmed = calculateShapleyValue(lp3Contribution, totalContributions, remainingForLPs);
-
-        // DETECT: Each LP receives less than their Shapley value
-        assertTrue(lp1Skimmed < lp1Fair, "LP1 should receive less after skim");
-        assertTrue(lp2Skimmed < lp2Fair, "LP2 should receive less after skim");
-        assertTrue(lp3Skimmed < lp3Fair, "LP3 should receive less after skim");
-
-        // The protocol's "contribution" is 0 (it added no liquidity)
-        uint256 protocolShapley = calculateShapleyValue(0, totalContributions, totalFees);
-        assertEq(protocolShapley, 0, "Protocol Shapley value should be 0 (null player)");
-
-        // PROVE extraction: protocol took 50e18 but Shapley says it deserves 0
-        (bool isExtracting, uint256 extractionAmount) = detectExtraction(protocolShapley, protocolSkim);
-        assertTrue(isExtracting, "Protocol IS extracting");
-        assertEq(extractionAmount, protocolSkim, "Extraction = full skim amount");
-
-        // SELF-CORRECT: redistribute back to fair allocation
+    function _assertCorrectionStored() internal {
         uint256[] memory contributions = new uint256[](4);
-        contributions[0] = lp1Contribution;
-        contributions[1] = lp2Contribution;
-        contributions[2] = lp3Contribution;
-        contributions[3] = 0; // protocol contributed nothing
+        contributions[0] = _s1_lp1Contribution;
+        contributions[1] = _s1_lp2Contribution;
+        contributions[2] = _s1_lp3Contribution;
+        contributions[3] = 0;
 
         uint256[] memory skimmedAllocations = new uint256[](4);
-        skimmedAllocations[0] = lp1Skimmed;
-        skimmedAllocations[1] = lp2Skimmed;
-        skimmedAllocations[2] = lp3Skimmed;
-        skimmedAllocations[3] = protocolSkim;
+        skimmedAllocations[0] = _s1_lp1Skimmed;
+        skimmedAllocations[1] = _s1_lp2Skimmed;
+        skimmedAllocations[2] = _s1_lp3Skimmed;
+        skimmedAllocations[3] = _s1_protocolSkim;
 
-        uint256[] memory corrected = selfCorrect(contributions, skimmedAllocations, totalFees);
+        uint256[] memory corrected = selfCorrect(contributions, skimmedAllocations, _s1_totalFees);
 
-        // After correction: protocol gets 0, LPs get full fair share
         assertEq(corrected[3], 0, "Protocol allocation corrected to 0");
-        assertApproxEqAbs(corrected[0], lp1Fair, 1, "LP1 restored to fair share");
-        assertApproxEqAbs(corrected[1], lp2Fair, 1, "LP2 restored to fair share");
-        assertApproxEqAbs(corrected[2], lp3Fair, 1, "LP3 restored to fair share");
+        assertApproxEqAbs(corrected[0], _s1_lp1Fair, 1, "LP1 restored to fair share");
+        assertApproxEqAbs(corrected[1], _s1_lp2Fair, 1, "LP2 restored to fair share");
+        assertApproxEqAbs(corrected[2], _s1_lp3Fair, 1, "LP3 restored to fair share");
+    }
+
+    // ============ SCENARIO 1: Protocol Skims LP Fees ============
+
+    function test_P001_DetectsProtocolFeeSkimming() public {
+        _computeSkimScenario();
+
+        // Verify Shapley efficiency axiom: sum of values = total value
+        assertApproxEqAbs(_s1_lp1Fair + _s1_lp2Fair + _s1_lp3Fair, _s1_totalFees, 3, "Efficiency axiom violated");
+
+        // DETECT: Each LP receives less than their Shapley value
+        assertTrue(_s1_lp1Skimmed < _s1_lp1Fair, "LP1 should receive less after skim");
+        assertTrue(_s1_lp2Skimmed < _s1_lp2Fair, "LP2 should receive less after skim");
+        assertTrue(_s1_lp3Skimmed < _s1_lp3Fair, "LP3 should receive less after skim");
+
+        // The protocol's "contribution" is 0 (it added no liquidity)
+        uint256 totalContributions = _s1_lp1Contribution + _s1_lp2Contribution + _s1_lp3Contribution;
+        uint256 protocolShapley = calculateShapleyValue(0, totalContributions, _s1_totalFees);
+        assertEq(protocolShapley, 0, "Protocol Shapley value should be 0 (null player)");
+
+        // PROVE extraction: protocol took fees but Shapley says it deserves 0
+        (bool isExtracting, uint256 extractionAmount) = detectExtraction(protocolShapley, _s1_protocolSkim);
+        assertTrue(isExtracting, "Protocol IS extracting");
+        assertEq(extractionAmount, _s1_protocolSkim, "Extraction = full skim amount");
+
+        // SELF-CORRECT: redistribute back to fair allocation
+        _assertCorrectionStored();
     }
 
     // ============ SCENARIO 2: Whale Tries to Dominate ============

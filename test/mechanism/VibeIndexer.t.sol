@@ -93,24 +93,14 @@ contract VibeIndexerTest is Test {
         assertEq(id, 1);
         assertEq(indexer.subgraphCount(), 1);
 
-        (
-            uint256 subgraphId,
-            address creator,
-            string memory name,
-            ,
-            bytes32 manifestHash,
-            uint256 signalAmount,
-            uint256 queryCount,
-            bool active,
-        ) = indexer.subgraphs(1);
-
-        assertEq(subgraphId, 1);
-        assertEq(creator, alice);
-        assertEq(name, GRAPH_NAME);
-        assertEq(manifestHash, MANIFEST);
-        assertEq(signalAmount, 0);
-        assertEq(queryCount, 0);
-        assertTrue(active);
+        VibeIndexer.Subgraph memory sg = indexer.getSubgraph(1);
+        assertEq(sg.subgraphId, 1);
+        assertEq(sg.creator, alice);
+        assertEq(sg.name, GRAPH_NAME);
+        assertEq(sg.manifestHash, MANIFEST);
+        assertEq(sg.signalAmount, 0);
+        assertEq(sg.queryCount, 0);
+        assertTrue(sg.active);
     }
 
     function test_createSubgraph_incrementsCount() public {
@@ -134,8 +124,7 @@ contract VibeIndexerTest is Test {
         indexer.signal{value: amount}(id);
 
         assertEq(indexer.signals(id, bob), amount);
-        (,,,,,uint256 signalAmount,,,) = indexer.subgraphs(id);
-        assertEq(signalAmount, amount);
+        assertEq(indexer.getSubgraph(id).signalAmount, amount);
     }
 
     function test_signal_accumulates() public {
@@ -164,21 +153,13 @@ contract VibeIndexerTest is Test {
 
         _registerIndexer(alice);
 
-        (
-            address idxAddr,
-            uint256 stake,
-            uint256 allocatedStake,
-            uint256 queryFeesClaimed,
-            uint256 slashCount,
-            bool active,
-        ) = indexer.indexers(alice);
-
-        assertEq(idxAddr, alice);
-        assertEq(stake, MIN_STAKE);
-        assertEq(allocatedStake, 0);
-        assertEq(queryFeesClaimed, 0);
-        assertEq(slashCount, 0);
-        assertTrue(active);
+        VibeIndexer.Indexer memory idx = indexer.getIndexer(alice);
+        assertEq(idx.indexerAddress, alice);
+        assertEq(idx.stake, MIN_STAKE);
+        assertEq(idx.allocatedStake, 0);
+        assertEq(idx.queryFeesClaimed, 0);
+        assertEq(idx.slashCount, 0);
+        assertTrue(idx.active);
         assertEq(indexer.getIndexerCount(), 1);
     }
 
@@ -208,10 +189,10 @@ contract VibeIndexerTest is Test {
         vm.prank(alice);
         indexer.exitIndexer();
 
-        (,, uint256 allocatedStake,,, bool active,) = indexer.indexers(alice);
-        assertFalse(active);
+        VibeIndexer.Indexer memory idxAfterExit = indexer.getIndexer(alice);
+        assertFalse(idxAfterExit.active);
         assertEq(alice.balance, balBefore + MIN_STAKE);
-        assertEq(allocatedStake, 0);
+        assertEq(idxAfterExit.allocatedStake, 0);
     }
 
     function test_exitIndexer_revertsIfNotActive() public {
@@ -248,24 +229,14 @@ contract VibeIndexerTest is Test {
         assertEq(allocId, 1);
         assertEq(indexer.allocationCount(), 1);
 
-        (
-            uint256 allocationId,
-            address idxAddr,
-            uint256 subgraphId,
-            uint256 allocatedStake,
-            ,
-            ,
-            bool active
-        ) = indexer.allocations(1);
+        VibeIndexer.Allocation memory alloc = indexer.getAllocation(1);
+        assertEq(alloc.allocationId, 1);
+        assertEq(alloc.indexer, alice);
+        assertEq(alloc.subgraphId, subId);
+        assertEq(alloc.allocatedStake, allocStake);
+        assertTrue(alloc.active);
 
-        assertEq(allocationId, 1);
-        assertEq(idxAddr, alice);
-        assertEq(subgraphId, subId);
-        assertEq(allocatedStake, allocStake);
-        assertTrue(active);
-
-        (, , uint256 totalAllocated,,,,) = indexer.indexers(alice);
-        assertEq(totalAllocated, allocStake);
+        assertEq(indexer.getIndexer(alice).allocatedStake, allocStake);
     }
 
     function test_createAllocation_revertsIfInsufficientFreeStake() public {
@@ -296,11 +267,8 @@ contract VibeIndexerTest is Test {
         vm.prank(alice);
         indexer.closeAllocation(allocId);
 
-        (,,,,,, bool active) = indexer.allocations(allocId);
-        assertFalse(active);
-
-        (,, uint256 totalAllocated,,,,) = indexer.indexers(alice);
-        assertEq(totalAllocated, 0);
+        assertFalse(indexer.getAllocation(allocId).active);
+        assertEq(indexer.getIndexer(alice).allocatedStake, 0);
     }
 
     function test_closeAllocation_revertsIfNotOwner() public {
@@ -352,29 +320,17 @@ contract VibeIndexerTest is Test {
         assertEq(disputeId, 1);
         assertEq(indexer.getDisputeCount(), 1);
 
-        (
-            uint256 id,
-            address challenger,
-            address idxAddr,
-            uint256 sId,
-            bytes32 qHash,
-            bytes32 expResp,
-            bytes32 actResp,
-            uint256 stake,
-            bool resolved,
-            bool challengerWon
-        ) = indexer.disputes(1);
-
-        assertEq(id, 1);
-        assertEq(challenger, carol);
-        assertEq(idxAddr, alice);
-        assertEq(sId, subId);
-        assertEq(qHash, queryHash);
-        assertEq(expResp, expectedResp);
-        assertEq(actResp, actualResp);
-        assertEq(stake, disputeStake);
-        assertFalse(resolved);
-        assertFalse(challengerWon);
+        VibeIndexer.QueryDispute memory d = indexer.getDispute(1);
+        assertEq(d.disputeId, 1);
+        assertEq(d.challenger, carol);
+        assertEq(d.indexer, alice);
+        assertEq(d.subgraphId, subId);
+        assertEq(d.queryHash, queryHash);
+        assertEq(d.expectedResponse, expectedResp);
+        assertEq(d.actualResponse, actualResp);
+        assertEq(d.stake, disputeStake);
+        assertFalse(d.resolved);
+        assertFalse(d.challengerWon);
     }
 
     function test_createDispute_revertsOnLowStake() public {
@@ -399,7 +355,7 @@ contract VibeIndexerTest is Test {
         );
 
         uint256 carolBalBefore  = carol.balance;
-        (, uint256 aliceStakeBefore,,,,, ) = indexer.indexers(alice);
+        uint256 aliceStakeBefore = indexer.getIndexer(alice).stake;
         uint256 expectedSlash   = (aliceStakeBefore * SLASH_BPS) / 10000;
         uint256 expectedReward  = disputeStake + expectedSlash;
 
@@ -409,15 +365,15 @@ contract VibeIndexerTest is Test {
         vm.prank(owner);
         indexer.resolveDispute(disputeId, true);
 
-        (, uint256 aliceStakeAfter,,, uint256 slashCount,, ) = indexer.indexers(alice);
-        assertEq(aliceStakeAfter, aliceStakeBefore - expectedSlash);
-        assertEq(slashCount, 1);
+        VibeIndexer.Indexer memory aliceIdx = indexer.getIndexer(alice);
+        assertEq(aliceIdx.stake, aliceStakeBefore - expectedSlash);
+        assertEq(aliceIdx.slashCount, 1);
 
         assertEq(carol.balance, carolBalBefore + expectedReward);
 
-        (,,,,,,, , bool resolved, bool challengerWon) = indexer.disputes(disputeId);
-        assertTrue(resolved);
-        assertTrue(challengerWon);
+        VibeIndexer.QueryDispute memory resolvedD = indexer.getDispute(disputeId);
+        assertTrue(resolvedD.resolved);
+        assertTrue(resolvedD.challengerWon);
     }
 
     function test_resolveDispute_challengerLoses_refundsWithPenalty() public {
@@ -439,8 +395,7 @@ contract VibeIndexerTest is Test {
 
         assertEq(carol.balance, carolBalBefore + expectedRefund);
 
-        (,,,,,,,,, bool challengerWon) = indexer.disputes(disputeId);
-        assertFalse(challengerWon);
+        assertFalse(indexer.getDispute(disputeId).challengerWon);
     }
 
     function test_resolveDispute_revertsIfAlreadyResolved() public {
@@ -495,7 +450,6 @@ contract VibeIndexerTest is Test {
         vm.prank(alice);
         indexer.registerIndexer{value: stake}();
 
-        (, uint256 s,,,,, ) = indexer.indexers(alice);
-        assertEq(s, stake);
+        assertEq(indexer.getIndexer(alice).stake, stake);
     }
 }

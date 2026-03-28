@@ -316,53 +316,20 @@ contract RewardLedger is IRewardLedger, Ownable, ReentrancyGuard {
         uint256 value,
         address[] memory trustChain
     ) internal {
-        address actor = trustChain[trustChain.length - 1];
-
-        // Calculate raw shares (BPS scale)
         uint256 chainLen = trustChain.length;
+        address actor = trustChain[chainLen - 1];
+
         uint256 enablerCount = chainLen - 1;
+        if (enablerCount > MAX_REWARD_DEPTH) enablerCount = MAX_REWARD_DEPTH;
 
-        // Cap enablers at MAX_REWARD_DEPTH
-        if (enablerCount > MAX_REWARD_DEPTH) {
-            enablerCount = MAX_REWARD_DEPTH;
-        }
+        // Build weighted shares
+        uint256[] memory weightedShares = _buildWeightedShares(trustChain, chainLen, enablerCount);
 
-        // Build raw shares array: [actor, enabler_closest, enabler_next, ...]
-        uint256[] memory rawShares = new uint256[](enablerCount + 1);
-        rawShares[0] = ACTOR_BASE_SHARE; // Actor: 50%
-
-        // Enablers: decay from closest to actor (end of chain) backward
-        uint256 remaining = BPS - ACTOR_BASE_SHARE; // 5000 BPS
-        uint256 decayFactor = BPS; // starts at 1.0
-
-        for (uint256 i = 0; i < enablerCount; i++) {
-            decayFactor = (decayFactor * CHAIN_DECAY) / BPS;
-            uint256 share = (remaining * decayFactor * (BPS - CHAIN_DECAY)) / (BPS * BPS);
-            rawShares[i + 1] = share;
-        }
-
-        // Apply quality weights from ContributionDAG
-        uint256[] memory weightedShares = new uint256[](enablerCount + 1);
         uint256 totalWeighted = 0;
-
-        // Actor weight
-        uint256 actorWeight = _getQualityWeight(actor);
-        weightedShares[0] = (rawShares[0] * actorWeight) / PRECISION;
-        totalWeighted += weightedShares[0];
-
-        // Enabler weights (closest to actor first)
-        for (uint256 i = 0; i < enablerCount; i++) {
-            // enablers[i] = trustChain[chainLen - 2 - i] (closest first, walking backward)
-            uint256 chainIdx = chainLen - 2 - i;
-            address enabler = trustChain[chainIdx];
-            uint256 weight = _getQualityWeight(enabler);
-            weightedShares[i + 1] = (rawShares[i + 1] * weight) / PRECISION;
-            totalWeighted += weightedShares[i + 1];
-        }
+        for (uint256 i = 0; i <= enablerCount; i++) totalWeighted += weightedShares[i];
 
         // Normalize and distribute (efficiency: all value distributed)
         if (totalWeighted == 0) {
-            // Fallback: actor gets everything
             activeBalances[actor] += value;
             _eventDistributions[eventId][actor] = value;
             totalActiveDistributed += value;
@@ -370,6 +337,47 @@ contract RewardLedger is IRewardLedger, Ownable, ReentrancyGuard {
             return;
         }
 
+        _applyDistribution(eventId, value, trustChain, chainLen, enablerCount, weightedShares, totalWeighted);
+        totalActiveDistributed += value;
+        emit EventDistributed(eventId, value, chainLen);
+    }
+
+    /// @dev Build quality-weighted shares array (extracted to reduce stack depth)
+    function _buildWeightedShares(
+        address[] memory trustChain,
+        uint256 chainLen,
+        uint256 enablerCount
+    ) internal view returns (uint256[] memory weightedShares) {
+        weightedShares = new uint256[](enablerCount + 1);
+
+        // Actor (last in chain) weight
+        address actor = trustChain[chainLen - 1];
+        uint256 actorWeight = _getQualityWeight(actor);
+        weightedShares[0] = (ACTOR_BASE_SHARE * actorWeight) / PRECISION;
+
+        // Enabler weights with decay
+        uint256 remaining = BPS - ACTOR_BASE_SHARE;
+        uint256 decayFactor = BPS;
+        for (uint256 i = 0; i < enablerCount; i++) {
+            decayFactor = (decayFactor * CHAIN_DECAY) / BPS;
+            uint256 rawShare = (remaining * decayFactor * (BPS - CHAIN_DECAY)) / (BPS * BPS);
+            address enabler = trustChain[chainLen - 2 - i];
+            uint256 weight = _getQualityWeight(enabler);
+            weightedShares[i + 1] = (rawShare * weight) / PRECISION;
+        }
+    }
+
+    /// @dev Apply weighted distribution to balances (extracted to reduce stack depth)
+    function _applyDistribution(
+        bytes32 eventId,
+        uint256 value,
+        address[] memory trustChain,
+        uint256 chainLen,
+        uint256 enablerCount,
+        uint256[] memory weightedShares,
+        uint256 totalWeighted
+    ) internal {
+        address actor = trustChain[chainLen - 1];
         uint256 distributed = 0;
 
         // Actor share
@@ -380,24 +388,17 @@ contract RewardLedger is IRewardLedger, Ownable, ReentrancyGuard {
 
         // Enabler shares
         for (uint256 i = 0; i < enablerCount; i++) {
-            uint256 chainIdx = chainLen - 2 - i;
-            address enabler = trustChain[chainIdx];
-
+            address enabler = trustChain[chainLen - 2 - i];
             uint256 amount;
             if (i == enablerCount - 1) {
-                // Last enabler gets remainder (prevents dust)
                 amount = value - distributed;
             } else {
                 amount = (value * weightedShares[i + 1]) / totalWeighted;
             }
-
             activeBalances[enabler] += amount;
             _eventDistributions[eventId][enabler] += amount;
             distributed += amount;
         }
-
-        totalActiveDistributed += value;
-        emit EventDistributed(eventId, value, chainLen);
     }
 
     /**

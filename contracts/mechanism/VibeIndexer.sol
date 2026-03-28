@@ -65,16 +65,16 @@ contract VibeIndexer is OwnableUpgradeable, UUPSUpgradeable {
 
     // ============ State ============
 
-    mapping(uint256 => Subgraph) public subgraphs;
+    mapping(uint256 => Subgraph) internal subgraphs;
     uint256 public subgraphCount;
 
-    mapping(address => Indexer) public indexers;
+    mapping(address => Indexer) internal indexers;
     address[] public indexerList;
 
-    mapping(uint256 => Allocation) public allocations;
+    mapping(uint256 => Allocation) internal allocations;
     uint256 public allocationCount;
 
-    mapping(uint256 => QueryDispute) public disputes;
+    mapping(uint256 => QueryDispute) internal disputes;
     uint256 public disputeCount;
 
     /// @notice Signal: subgraphId => signaler => amount
@@ -291,6 +291,10 @@ contract VibeIndexer is OwnableUpgradeable, UUPSUpgradeable {
     function getSubgraphCount() external view returns (uint256) { return subgraphCount; }
     function getIndexerCount() external view returns (uint256) { return indexerList.length; }
     function getDisputeCount() external view returns (uint256) { return disputeCount; }
+    function getSubgraph(uint256 id) external view returns (Subgraph memory) { return subgraphs[id]; }
+    function getIndexer(address addr) external view returns (Indexer memory) { return indexers[addr]; }
+    function getAllocation(uint256 id) external view returns (Allocation memory) { return allocations[id]; }
+    function getDispute(uint256 id) external view returns (QueryDispute memory) { return disputes[id]; }
 
     receive() external payable {}
 }

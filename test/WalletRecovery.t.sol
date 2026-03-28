@@ -271,21 +271,14 @@ contract WalletRecoveryTest is Test {
         );
         vm.stopPrank();
 
-        (
-            uint256 guardianThreshold,
-            uint256 timelockDuration,
-            uint256 deadmanTimeout,
-            address deadmanBeneficiary,
-            bytes32 quantumBackupHash,
-            bool arbitrationEnabled
-        ) = wr.configs(TOKEN_ID);
+        WalletRecovery.RecoveryConfig memory cfg = wr.getConfig(TOKEN_ID);
 
-        assertEq(guardianThreshold, 2);
-        assertEq(timelockDuration, TIMELOCK_DURATION);
-        assertEq(deadmanTimeout, DEADMAN_TIMEOUT);
-        assertEq(deadmanBeneficiary, eve);
-        assertEq(quantumBackupHash, quantumHash);
-        assertTrue(arbitrationEnabled);
+        assertEq(cfg.guardianThreshold, 2);
+        assertEq(cfg.timelockDuration, TIMELOCK_DURATION);
+        assertEq(cfg.deadmanTimeout, DEADMAN_TIMEOUT);
+        assertEq(cfg.deadmanBeneficiary, eve);
+        assertEq(cfg.quantumBackupHash, quantumHash);
+        assertTrue(cfg.arbitrationEnabled);
     }
 
     function test_configureRecovery_invalidTimelock() public {

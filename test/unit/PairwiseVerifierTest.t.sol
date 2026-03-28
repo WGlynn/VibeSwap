@@ -1607,9 +1607,11 @@ contract PairwiseVerifierTest is Test {
         assertEq(sub1.winsCount, 1);
     }
 
-    function test_settle_ThreeWorkers_ComplexComparisons() public {
-        bytes32 taskId = _createDefaultTask();
+    bytes32 private _3w_subId1;
+    bytes32 private _3w_subId2;
+    bytes32 private _3w_subId3;
 
+    function _threeWorkerSubmitAndReveal(bytes32 taskId) internal {
         bytes32 wh1 = keccak256("work1");
         bytes32 ws1 = keccak256("secret1");
         bytes32 wh2 = keccak256("work2");
@@ -1617,29 +1619,29 @@ contract PairwiseVerifierTest is Test {
         bytes32 wh3 = keccak256("work3");
         bytes32 ws3 = keccak256("secret3");
 
-        bytes32 subId1 = _commitWork(taskId, worker1, wh1, ws1);
-        bytes32 subId2 = _commitWork(taskId, worker2, wh2, ws2);
-        bytes32 subId3 = _commitWork(taskId, worker3, wh3, ws3);
+        _3w_subId1 = _commitWork(taskId, worker1, wh1, ws1);
+        _3w_subId2 = _commitWork(taskId, worker2, wh2, ws2);
+        _3w_subId3 = _commitWork(taskId, worker3, wh3, ws3);
 
         _advancePastWorkCommit();
         verifier.advancePhase(taskId);
 
-        _revealWork(taskId, subId1, worker1, wh1, ws1);
-        _revealWork(taskId, subId2, worker2, wh2, ws2);
-        _revealWork(taskId, subId3, worker3, wh3, ws3);
+        _revealWork(taskId, _3w_subId1, worker1, wh1, ws1);
+        _revealWork(taskId, _3w_subId2, worker2, wh2, ws2);
+        _revealWork(taskId, _3w_subId3, worker3, wh3, ws3);
+    }
 
+    function _threeWorkerCompareAndSettle(bytes32 taskId) internal {
         _advancePastWorkReveal();
         verifier.advancePhase(taskId);
 
-        // Compare pairs: (1,2) → FIRST, (1,3) → FIRST, (2,3) → FIRST
-        // Worker1 > Worker2, Worker1 > Worker3, Worker2 > Worker3
         bytes32 vs1 = keccak256("vs1");
         bytes32 vs2 = keccak256("vs2");
         bytes32 vs3 = keccak256("vs3");
 
-        bytes32 cId1 = _commitComparison(taskId, subId1, subId2, validator1, IPairwiseVerifier.CompareChoice.FIRST, vs1);
-        bytes32 cId2 = _commitComparison(taskId, subId1, subId3, validator1, IPairwiseVerifier.CompareChoice.FIRST, vs2);
-        bytes32 cId3 = _commitComparison(taskId, subId2, subId3, validator1, IPairwiseVerifier.CompareChoice.FIRST, vs3);
+        bytes32 cId1 = _commitComparison(taskId, _3w_subId1, _3w_subId2, validator1, IPairwiseVerifier.CompareChoice.FIRST, vs1);
+        bytes32 cId2 = _commitComparison(taskId, _3w_subId1, _3w_subId3, validator1, IPairwiseVerifier.CompareChoice.FIRST, vs2);
+        bytes32 cId3 = _commitComparison(taskId, _3w_subId2, _3w_subId3, validator1, IPairwiseVerifier.CompareChoice.FIRST, vs3);
 
         _advancePastCompareCommit();
         verifier.advancePhase(taskId);
@@ -1651,13 +1653,20 @@ contract PairwiseVerifierTest is Test {
         _advancePastCompareReveal();
         verifier.advancePhase(taskId);
         verifier.settle(taskId);
+    }
+
+    function test_settle_ThreeWorkers_ComplexComparisons() public {
+        bytes32 taskId = _createDefaultTask();
+
+        _threeWorkerSubmitAndReveal(taskId);
+        _threeWorkerCompareAndSettle(taskId);
 
         // Worker1: 2 wins, 0 losses
         // Worker2: 1 win, 1 loss
         // Worker3: 0 wins, 2 losses
-        IPairwiseVerifier.WorkSubmission memory sub1 = verifier.getSubmission(subId1);
-        IPairwiseVerifier.WorkSubmission memory sub2 = verifier.getSubmission(subId2);
-        IPairwiseVerifier.WorkSubmission memory sub3 = verifier.getSubmission(subId3);
+        IPairwiseVerifier.WorkSubmission memory sub1 = verifier.getSubmission(_3w_subId1);
+        IPairwiseVerifier.WorkSubmission memory sub2 = verifier.getSubmission(_3w_subId2);
+        IPairwiseVerifier.WorkSubmission memory sub3 = verifier.getSubmission(_3w_subId3);
 
         assertEq(sub1.winsCount, 2);
         assertEq(sub1.lossCount, 0);

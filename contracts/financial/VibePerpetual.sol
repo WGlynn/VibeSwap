@@ -62,11 +62,12 @@ contract VibePerpetual is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ State ============
 
-    mapping(bytes32 => Market) public markets;
+    // Internal to avoid auto-generated getters for 14-field Market/8-field Position structs (stack-too-deep)
+    mapping(bytes32 => Market) internal markets;
     bytes32[] public marketList;
 
     /// @notice Positions: positionId => Position
-    mapping(bytes32 => Position) public positions;
+    mapping(bytes32 => Position) internal positions;
 
     /// @notice Trader positions: trader => positionIds
     mapping(address => bytes32[]) public traderPositions;
@@ -395,6 +396,8 @@ contract VibePerpetual is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ View ============
 
+    function getMarket(bytes32 marketId) external view returns (Market memory) { return markets[marketId]; }
+    function getPosition(bytes32 posId) external view returns (Position memory) { return positions[posId]; }
     function getMarketCount() external view returns (uint256) { return marketList.length; }
     function getTraderPositions(address trader) external view returns (bytes32[] memory) { return traderPositions[trader]; }
 

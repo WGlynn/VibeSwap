@@ -138,8 +138,8 @@ contract VibeGovernanceHub is
     /// @dev govType => config
     mapping(GovernanceType => GovernanceConfig) public govConfigs;
 
-    /// @dev proposalId => Proposal
-    mapping(uint256 => Proposal) public proposals;
+    /// @dev proposalId => Proposal (internal: 19-field struct causes stack-too-deep in auto-getter)
+    mapping(uint256 => Proposal) internal proposals;
 
     /// @dev proposalId => voter => weight voted (prevents double voting)
     mapping(uint256 => mapping(address => uint256)) public hasVoted;
@@ -336,19 +336,24 @@ contract VibeGovernanceHub is
 
         proposalId = ++proposalCount;
 
-        uint256 quorum = emergency ? EMERGENCY_QUORUM_BPS : config.quorumBps;
-
-        Proposal storage p = proposals[proposalId];
-        p.id = proposalId;
-        p.proposer = msg.sender;
-        p.govType = govType;
-        p.title = title;
-        p.targets = targets;
-        p.values = values;
-        p.calldatas = calldatas;
-        p.createdAt = block.timestamp;
-        p.quorumBps = quorum;
-        p.emergency = emergency;
+        // Scoped to free stack before emit (6 params + return var + locals = stack pressure)
+        {
+            uint256 quorum = emergency ? EMERGENCY_QUORUM_BPS : config.quorumBps;
+            Proposal storage p = proposals[proposalId];
+            p.id = proposalId;
+            p.proposer = msg.sender;
+            p.govType = govType;
+            p.title = title;
+            p.targets = targets;
+            p.values = values;
+            // Copy bytes[] calldata element-by-element (nested calldata->storage not supported in old codegen)
+            for (uint256 i = 0; i < calldatas.length; i++) {
+                p.calldatas.push(calldatas[i]);
+            }
+            p.createdAt = block.timestamp;
+            p.quorumBps = quorum;
+            p.emergency = emergency;
+        }
 
         emit ProposalCreated(proposalId, msg.sender, govType, title, emergency);
     }
@@ -787,8 +792,13 @@ contract VibeGovernanceHub is
         return block.timestamp <= deployedAt + VETO_SUNSET_DURATION;
     }
 
+    /// @notice Get full proposal struct.
+    function getProposal(uint256 proposalId) external view returns (Proposal memory) {
+        return proposals[proposalId];
+    }
+
     /**
-     * @notice Get proposal details.
+     * @notice Get proposal executable actions.
      * @param proposalId Proposal to query
      * @return targets    Target addresses
      * @return values     ETH values

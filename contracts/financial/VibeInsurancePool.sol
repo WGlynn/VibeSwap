@@ -61,11 +61,11 @@ contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     // ============ State ============
 
     /// @notice Coverage policies
-    mapping(uint256 => CoveragePolicy) public policies;
+    mapping(uint256 => CoveragePolicy) internal policies;
     uint256 public policyCount;
 
     /// @notice Claims
-    mapping(uint256 => Claim) public claims;
+    mapping(uint256 => Claim) internal claims;
     uint256 public claimCount;
     mapping(uint256 => mapping(address => bool)) public hasVotedOnClaim;
 
@@ -344,6 +344,9 @@ contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
         if (totalShares == 0) return 0;
         return (underwriters[underwriter].shares * totalUnderwritten) / totalShares;
     }
+
+    function getPolicy(uint256 id) external view returns (CoveragePolicy memory) { return policies[id]; }
+    function getClaim(uint256 id) external view returns (Claim memory) { return claims[id]; }
 
     receive() external payable {
         totalUnderwritten += msg.value;

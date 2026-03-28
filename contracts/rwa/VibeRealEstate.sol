@@ -94,16 +94,17 @@ contract VibeRealEstate is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
 
     // ============ State ============
 
-    mapping(bytes32 => Property) public properties;
+    // Internal to avoid auto-generated getters for 16-field Property struct (stack-too-deep)
+    mapping(bytes32 => Property) internal properties;
     bytes32[] public propertyList;
 
-    mapping(uint256 => Offer) public offers;
+    mapping(uint256 => Offer) internal offers;
     uint256 public offerCount;
 
-    mapping(bytes32 => EscrowAccount) public escrows;
+    mapping(bytes32 => EscrowAccount) internal escrows;
 
     /// @notice Fraction holdings: propertyId => holder => FractionHolder
-    mapping(bytes32 => mapping(address => FractionHolder)) public fractionHolders;
+    mapping(bytes32 => mapping(address => FractionHolder)) internal fractionHolders;
 
     /// @notice Rental income pool: propertyId => monthId => totalIncome
     mapping(bytes32 => mapping(uint256 => uint256)) public rentalIncome;
@@ -412,6 +413,9 @@ contract VibeRealEstate is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardU
     // ============ View ============
 
     function getProperty(bytes32 id) external view returns (Property memory) { return properties[id]; }
+    function getOffer(uint256 offerId) external view returns (Offer memory) { return offers[offerId]; }
+    function getEscrow(bytes32 propertyId) external view returns (EscrowAccount memory) { return escrows[propertyId]; }
+    function getFractionHolder(bytes32 propertyId, address holder) external view returns (FractionHolder memory) { return fractionHolders[propertyId][holder]; }
     function getPropertyCount() external view returns (uint256) { return propertyList.length; }
     function getHolding(bytes32 id, address h) external view returns (uint256) { return fractionHolders[id][h].fractions; }
 

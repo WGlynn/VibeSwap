@@ -108,10 +108,10 @@ contract GPUComputeMarket is
     uint256 public providerCount;
 
     /// @notice Provider data by address
-    mapping(address => GPUProvider) public providers;
+    mapping(address => GPUProvider) internal providers;
 
     /// @notice Job data by job ID
-    mapping(bytes32 => ComputeJob) public jobs;
+    mapping(bytes32 => ComputeJob) internal jobs;
 
     /// @notice All open job IDs (for auto-matching)
     bytes32[] public openJobs;
@@ -619,6 +619,9 @@ contract GPUComputeMarket is
         openJobs.pop();
         delete _openJobIndex[jobId];
     }
+
+    function getProvider(address providerAddr) external view returns (GPUProvider memory) { return providers[providerAddr]; }
+    function getJob(bytes32 jobId) external view returns (ComputeJob memory) { return jobs[jobId]; }
 
     // ============ UUPS ============
 

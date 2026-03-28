@@ -115,24 +115,15 @@ contract GPUComputeMarketTest is Test {
 
         _registerProvider();
 
-        (
-            address p,
-            uint256 stake,
-            uint256 vram,
-            uint256 tflops,
-            uint256 price,
-            uint256 rep,
-            , , bool avail, bool active
-        ) = market.providers(providerAddr);
-
-        assertEq(p, providerAddr);
-        assertEq(stake, MIN_STAKE);
-        assertEq(vram, VRAM_GB);
-        assertEq(tflops, TFLOPS);
-        assertEq(price, PRICE_PER_HR);
-        assertEq(rep, market.INITIAL_REPUTATION());
-        assertTrue(avail);
-        assertTrue(active);
+        GPUComputeMarket.GPUProvider memory prov = market.getProvider(providerAddr);
+        assertEq(prov.provider, providerAddr);
+        assertEq(prov.stake, MIN_STAKE);
+        assertEq(prov.vramGB, VRAM_GB);
+        assertEq(prov.tflops, TFLOPS);
+        assertEq(prov.pricePerHour, PRICE_PER_HR);
+        assertEq(prov.reputation, market.INITIAL_REPUTATION());
+        assertTrue(prov.available);
+        assertTrue(prov.active);
         assertEq(vibe.balanceOf(providerAddr), balBefore - MIN_STAKE);
         assertEq(market.providerCount(), 1);
     }
@@ -155,9 +146,8 @@ contract GPUComputeMarketTest is Test {
         vm.prank(providerAddr);
         market.updateProvider(newPrice, false);
 
-        (, , , , uint256 price, , , , bool avail, ) = market.providers(providerAddr);
-        assertEq(price, newPrice);
-        assertFalse(avail);
+        assertEq(market.getProvider(providerAddr).pricePerHour, newPrice);
+        assertFalse(market.getProvider(providerAddr).available);
     }
 
     function test_updateProvider_revertsNotRegistered() public {
@@ -177,8 +167,7 @@ contract GPUComputeMarketTest is Test {
         vm.prank(providerAddr);
         market.requestUnstake();
 
-        (, , , , , , , , bool avail, ) = market.providers(providerAddr);
-        assertFalse(avail);
+        assertFalse(market.getProvider(providerAddr).available);
         assertGt(market.unstakeRequestedAt(providerAddr), 0);
     }
 
@@ -198,8 +187,7 @@ contract GPUComputeMarketTest is Test {
         vm.prank(providerAddr);
         market.unregisterProvider();
 
-        (, , , , , , , , , bool active) = market.providers(providerAddr);
-        assertFalse(active);
+        assertFalse(market.getProvider(providerAddr).active);
         assertEq(vibe.balanceOf(providerAddr), balBefore + MIN_STAKE);
     }
 
@@ -237,23 +225,13 @@ contract GPUComputeMarketTest is Test {
         vm.prank(requester);
         bytes32 jobId = market.postJob{value: JOB_BUDGET}(VRAM_GB, TFLOPS, MAX_HOURS, INPUT_HASH);
 
-        (
-            bytes32 id,
-            address req,
-            address prov,
-            uint256 budget,
-            , , , ,
-            bytes32 resultHash,
-            GPUComputeMarket.JobStatus status,
-            , ,
-        ) = market.jobs(jobId);
-
-        assertEq(id, jobId);
-        assertEq(req, requester);
-        assertEq(prov, address(0));
-        assertEq(budget, JOB_BUDGET);
-        assertEq(resultHash, bytes32(0));
-        assertEq(uint8(status), uint8(GPUComputeMarket.JobStatus.OPEN));
+        GPUComputeMarket.ComputeJob memory j = market.getJob(jobId);
+        assertEq(j.jobId, jobId);
+        assertEq(j.requester, requester);
+        assertEq(j.provider, address(0));
+        assertEq(j.budget, JOB_BUDGET);
+        assertEq(j.resultHash, bytes32(0));
+        assertEq(uint8(j.status), uint8(GPUComputeMarket.JobStatus.OPEN));
         assertEq(market.openJobCount(), 1);
     }
 
@@ -275,9 +253,8 @@ contract GPUComputeMarketTest is Test {
         vm.prank(providerAddr);
         market.acceptJob(jobId);
 
-        (, , address prov, , , , , , , GPUComputeMarket.JobStatus status, , , ) = market.jobs(jobId);
-        assertEq(prov, providerAddr);
-        assertEq(uint8(status), uint8(GPUComputeMarket.JobStatus.ASSIGNED));
+        assertEq(market.getJob(jobId).provider, providerAddr);
+        assertEq(uint8(market.getJob(jobId).status), uint8(GPUComputeMarket.JobStatus.ASSIGNED));
         assertEq(market.openJobCount(), 0); // removed from open jobs
     }
 
@@ -329,9 +306,8 @@ contract GPUComputeMarketTest is Test {
         vm.prank(providerAddr);
         market.submitResult(jobId, RESULT_HASH);
 
-        (, , , , , , , , bytes32 rh, GPUComputeMarket.JobStatus status, , , ) = market.jobs(jobId);
-        assertEq(rh, RESULT_HASH);
-        assertEq(uint8(status), uint8(GPUComputeMarket.JobStatus.RESULT_SUBMITTED));
+        assertEq(market.getJob(jobId).resultHash, RESULT_HASH);
+        assertEq(uint8(market.getJob(jobId).status), uint8(GPUComputeMarket.JobStatus.RESULT_SUBMITTED));
     }
 
     function test_submitResult_revertsNotProvider() public {
@@ -361,8 +337,7 @@ contract GPUComputeMarketTest is Test {
         vm.prank(requester);
         market.challengeResult(jobId);
 
-        (, , , , , , , , , GPUComputeMarket.JobStatus status, , , ) = market.jobs(jobId);
-        assertEq(uint8(status), uint8(GPUComputeMarket.JobStatus.CHALLENGED));
+        assertEq(uint8(market.getJob(jobId).status), uint8(GPUComputeMarket.JobStatus.CHALLENGED));
     }
 
     function test_challengeResult_revertsAfterDeadline() public {
@@ -411,11 +386,11 @@ contract GPUComputeMarketTest is Test {
         assertEq(vibe.balanceOf(treasury),     treasBefore + expectedProtocol);
         assertEq(vibe.balanceOf(insurance),    insBefore + expectedInsurance);
 
-        (, uint256 stake, , , , uint256 rep, uint256 completed, uint256 earned, , ) = market.providers(providerAddr);
-        assertEq(completed, 1);
-        assertEq(earned, expectedProvider);
-        assertEq(rep, market.INITIAL_REPUTATION() + market.REPUTATION_GAIN());
-        assertGt(stake, 0); // stake unchanged for good job
+        GPUComputeMarket.GPUProvider memory pFin = market.getProvider(providerAddr);
+        assertEq(pFin.jobsCompleted, 1);
+        assertEq(pFin.totalEarned, expectedProvider);
+        assertEq(pFin.reputation, market.INITIAL_REPUTATION() + market.REPUTATION_GAIN());
+        assertGt(pFin.stake, 0); // stake unchanged for good job
 
         assertEq(market.totalProtocolFees(), expectedProtocol);
         assertEq(market.totalInsuranceFees(), expectedInsurance);
@@ -486,7 +461,8 @@ contract GPUComputeMarketTest is Test {
         vm.prank(requester);
         market.challengeResult(jobId);
 
-        (, uint256 stakeBefore, , , , uint256 repBefore, , , , ) = market.providers(providerAddr);
+        uint256 stakeBefore = market.getProvider(providerAddr).stake;
+        uint256 repBefore = market.getProvider(providerAddr).reputation;
         uint256 expectedSlash = (stakeBefore * 50) / 100;
 
         vm.expectEmit(true, false, false, false);
@@ -498,9 +474,8 @@ contract GPUComputeMarketTest is Test {
         vm.prank(owner);
         market.slashProvider(jobId);
 
-        (, uint256 stakeAfter, , , , uint256 repAfter, , , , ) = market.providers(providerAddr);
-        assertEq(stakeAfter, stakeBefore - expectedSlash);
-        assertEq(repAfter,   repBefore > market.REPUTATION_LOSS()
+        assertEq(market.getProvider(providerAddr).stake, stakeBefore - expectedSlash);
+        assertEq(market.getProvider(providerAddr).reputation, repBefore > market.REPUTATION_LOSS()
             ? repBefore - market.REPUTATION_LOSS()
             : 0
         );

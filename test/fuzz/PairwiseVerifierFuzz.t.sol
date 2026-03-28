@@ -222,17 +222,18 @@ contract PairwiseVerifierFuzz is Test {
         vm.warp(block.timestamp + 30 minutes + 1);
         verifier.settle(taskId);
 
-        // Worker1 should get more than worker2
+        _assertRewardsDistributed(taskId, reward);
+    }
+
+    function _assertRewardsDistributed(bytes32 taskId, uint256 reward) internal view {
         uint256 w1Reward = verifier.getWorkerReward(taskId, worker1);
         uint256 w2Reward = verifier.getWorkerReward(taskId, worker2);
         assertGt(w1Reward, w2Reward, "Winner should get more");
 
-        // Total rewards should not exceed pool
         uint256 totalDistributed = w1Reward + w2Reward;
-        for (uint256 i = 0; i < 3; i++) {
-            address val = i == 0 ? validator1 : (i == 1 ? validator2 : validator3);
-            totalDistributed += verifier.getValidatorReward(taskId, val);
-        }
+        totalDistributed += verifier.getValidatorReward(taskId, validator1);
+        totalDistributed += verifier.getValidatorReward(taskId, validator2);
+        totalDistributed += verifier.getValidatorReward(taskId, validator3);
         assertLe(totalDistributed, reward, "Cannot exceed reward pool");
     }
 

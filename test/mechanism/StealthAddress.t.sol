@@ -60,9 +60,9 @@ contract StealthAddressTest is Test {
     address public stealthAddr; // simulated one-time stealth address
 
     // Valid 33-byte compressed secp256k1 public keys
-    bytes constant SPEND_KEY = hex"02f8b00e7fd6d1b40a1e94b2baae6c6073c4a77e3a2e8d9f1c5b4a3d2e1f0c9b";
-    bytes constant VIEW_KEY  = hex"03a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1";
-    bytes constant EPHEM_KEY = hex"02d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4";
+    bytes constant SPEND_KEY = hex"02f8b00e7fd6d1b40a1e94b2baae6c6073c4a77e3a2e8d9f1c5b4a3d2e1f0c9b8a";
+    bytes constant VIEW_KEY  = hex"03a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2";
+    bytes constant EPHEM_KEY = hex"02d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5";
 
     // ============ setUp ============
 

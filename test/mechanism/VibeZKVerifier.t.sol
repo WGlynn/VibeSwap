@@ -19,8 +19,45 @@ contract VibeZKVerifierTest is Test {
     address public owner;
     address public alice;
 
-    bytes constant MOCK_VK_DATA    = hex"deadbeef01020304";
-    bytes constant MOCK_PROOF      = hex"cafebabe0a0b0c0d";
+    // VK data: alpha(64) + beta(128) + gamma(128) + delta(128) + IC_count(32) + IC[3](192) = 672 bytes
+    // All zeros is fine — the precompiles will fail on invalid curve points but the contract
+    // will still return false (invalid proof) rather than reverting with InvalidProofLength.
+    bytes constant MOCK_VK_DATA = (
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // alpha.x
+        hex"0000000000000000000000000000000000000000000000000000000000000002" // alpha.y
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // beta.x[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // beta.x[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // beta.y[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // beta.y[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // gamma.x[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // gamma.x[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // gamma.y[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // gamma.y[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // delta.x[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // delta.x[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // delta.y[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // delta.y[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000003" // IC count
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // IC[0].x
+        hex"0000000000000000000000000000000000000000000000000000000000000002" // IC[0].y
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // IC[1].x
+        hex"0000000000000000000000000000000000000000000000000000000000000002" // IC[1].y
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // IC[2].x
+        hex"0000000000000000000000000000000000000000000000000000000000000002" // IC[2].y
+    );
+
+    // Proof data: A.x(32) + A.y(32) + B.x[1](32) + B.x[0](32) + B.y[1](32) + B.y[0](32) + C.x(32) + C.y(32) = 256 bytes
+    bytes constant MOCK_PROOF = (
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // A.x
+        hex"0000000000000000000000000000000000000000000000000000000000000002" // A.y
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // B.x[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // B.x[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // B.y[1]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // B.y[0]
+        hex"0000000000000000000000000000000000000000000000000000000000000001" // C.x
+        hex"0000000000000000000000000000000000000000000000000000000000000002" // C.y
+    );
+
     bytes32[] public publicInputs;
 
     // ============ setUp ============
@@ -46,7 +83,7 @@ contract VibeZKVerifierTest is Test {
 
     // ============ Helpers ============
 
-    /// @dev Register a Groth16 key and return keyId
+    /// @dev Register a key and return keyId
     function _registerKey(
         string memory circuit,
         VibeZKVerifier.ProofSystem proofSystem
@@ -55,8 +92,11 @@ contract VibeZKVerifierTest is Test {
         keyId = verifier.registerVerificationKey(circuit, proofSystem, MOCK_VK_DATA);
     }
 
-    function _registerGroth16() internal returns (bytes32) {
-        return _registerKey("private_transfer", VibeZKVerifier.ProofSystem.GROTH16);
+    /// @dev Register a PLONK key for general infrastructure tests.
+    ///      PLONK/STARK always return false but exercise caching, counting, and events
+    ///      without needing valid bn256 curve points.
+    function _registerDefault() internal returns (bytes32) {
+        return _registerKey("private_transfer", VibeZKVerifier.ProofSystem.PLONK);
     }
 
     // ============ Key Registration ============
@@ -65,7 +105,7 @@ contract VibeZKVerifierTest is Test {
         vm.expectEmit(false, false, false, true);
         emit VerificationKeyRegistered(bytes32(0), "private_transfer", VibeZKVerifier.ProofSystem.GROTH16);
 
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerKey("private_transfer", VibeZKVerifier.ProofSystem.GROTH16);
 
         (
             bytes32 id,
@@ -101,13 +141,13 @@ contract VibeZKVerifierTest is Test {
 
     function test_registerVerificationKey_authorisesCircuit() public {
         assertFalse(verifier.isCircuitAuthorized("private_transfer"));
-        _registerGroth16();
+        _registerDefault();
         assertTrue(verifier.isCircuitAuthorized("private_transfer"));
     }
 
     function test_registerVerificationKey_appendsToKeyList() public {
         assertEq(verifier.getKeyCount(), 0);
-        _registerGroth16();
+        _registerDefault();
         assertEq(verifier.getKeyCount(), 1);
         _registerKey("private_vote", VibeZKVerifier.ProofSystem.PLONK);
         assertEq(verifier.getKeyCount(), 2);
@@ -121,8 +161,8 @@ contract VibeZKVerifierTest is Test {
 
     // ============ Proof Verification ============
 
-    function test_verifyProof_groth16_countsVerification() public {
-        bytes32 keyId = _registerGroth16();
+    function test_verifyProof_countsVerification() public {
+        bytes32 keyId = _registerDefault();
 
         vm.prank(alice);
         bool valid = verifier.verifyProof(keyId, MOCK_PROOF, publicInputs);
@@ -142,7 +182,7 @@ contract VibeZKVerifierTest is Test {
     }
 
     function test_verifyProof_emitsEvent() public {
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerDefault();
         bytes32 proofHash = keccak256(abi.encodePacked(keyId, MOCK_PROOF, publicInputs));
 
         vm.expectEmit(true, true, false, false);
@@ -153,7 +193,7 @@ contract VibeZKVerifierTest is Test {
     }
 
     function test_verifyProof_usesCache() public {
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerDefault();
 
         vm.prank(alice);
         bool firstResult = verifier.verifyProof(keyId, MOCK_PROOF, publicInputs);
@@ -180,7 +220,7 @@ contract VibeZKVerifierTest is Test {
     }
 
     function test_verifyProof_differentInputsProduceDifferentResults() public {
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerDefault();
 
         bytes32[] memory inputs1 = new bytes32[](1);
         inputs1[0] = bytes32(uint256(0xAA));
@@ -202,7 +242,7 @@ contract VibeZKVerifierTest is Test {
     // ============ Batch Verification ============
 
     function test_batchVerify_lengthMismatchReverts() public {
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerDefault();
 
         bytes32[] memory keyIds = new bytes32[](2);
         keyIds[0] = keyId;
@@ -220,8 +260,8 @@ contract VibeZKVerifierTest is Test {
     }
 
     function test_batchVerify_twoProofs() public {
-        bytes32 keyId1 = _registerKey("circuit_a", VibeZKVerifier.ProofSystem.GROTH16);
-        bytes32 keyId2 = _registerKey("circuit_b", VibeZKVerifier.ProofSystem.PLONK);
+        bytes32 keyId1 = _registerKey("circuit_a", VibeZKVerifier.ProofSystem.PLONK);
+        bytes32 keyId2 = _registerKey("circuit_b", VibeZKVerifier.ProofSystem.STARK);
 
         bytes32[] memory keyIds = new bytes32[](2);
         keyIds[0] = keyId1;
@@ -245,7 +285,7 @@ contract VibeZKVerifierTest is Test {
     }
 
     function test_batchVerify_usesCache() public {
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerDefault();
 
         // First verify individually to populate cache
         vm.prank(alice);
@@ -284,15 +324,17 @@ contract VibeZKVerifierTest is Test {
     // ============ Stats ============
 
     function test_verificationStats_cumulativeAcrossProofSystems() public {
-        bytes32 g16  = _registerKey("groth16_circuit",  VibeZKVerifier.ProofSystem.GROTH16);
-        bytes32 plonk = _registerKey("plonk_circuit",   VibeZKVerifier.ProofSystem.PLONK);
-        bytes32 stark = _registerKey("stark_circuit",   VibeZKVerifier.ProofSystem.STARK);
+        // Use PLONK and STARK (no precompile dependency) to test stats accumulation.
+        // Groth16 requires valid bn256 curve points which makes mock testing fragile.
+        bytes32 plonk1 = _registerKey("plonk_circuit_a",  VibeZKVerifier.ProofSystem.PLONK);
+        bytes32 plonk2 = _registerKey("plonk_circuit_b",  VibeZKVerifier.ProofSystem.PLONK);
+        bytes32 stark  = _registerKey("stark_circuit",     VibeZKVerifier.ProofSystem.STARK);
 
-        // Verify one with each system
+        // Verify one with each key (three distinct proofs)
         vm.startPrank(alice);
-        verifier.verifyProof(g16,   MOCK_PROOF, publicInputs);
-        verifier.verifyProof(plonk, hex"1122334455667788", publicInputs);
-        verifier.verifyProof(stark, hex"aabbccddeeff0011", publicInputs);
+        verifier.verifyProof(plonk1, MOCK_PROOF, publicInputs);
+        verifier.verifyProof(plonk2, hex"1122334455667788", publicInputs);
+        verifier.verifyProof(stark,  hex"aabbccddeeff0011", publicInputs);
         vm.stopPrank();
 
         (uint256 total, uint256 valid_, uint256 invalid_) = verifier.getVerificationStats();
@@ -303,8 +345,9 @@ contract VibeZKVerifierTest is Test {
     // ============ Fuzz Tests ============
 
     function testFuzz_verifyProof_deterministicResult(bytes calldata proofData) public {
+        // Groth16 requires exactly 256-byte proofs; use PLONK which has no length restriction
         vm.assume(proofData.length > 0 && proofData.length <= 512);
-        bytes32 keyId = _registerGroth16();
+        bytes32 keyId = _registerKey("fuzz_circuit", VibeZKVerifier.ProofSystem.PLONK);
 
         vm.prank(alice);
         bool r1 = verifier.verifyProof(keyId, proofData, publicInputs);

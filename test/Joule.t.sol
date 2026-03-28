@@ -100,7 +100,7 @@ contract JouleTest is Test {
     // ============ Mining Tests ============
 
     function test_mine_validProof() public {
-        bytes32 nonce = _findValidNonce();
+        bytes32 nonce = _findValidNonceFor(alice);
 
         vm.prank(alice);
         uint256 reward = joule.mine(nonce);
@@ -119,7 +119,7 @@ contract JouleTest is Test {
 
     function test_mine_invalidProof_reverts() public {
         // First find a VALID nonce to confirm mining works
-        bytes32 validNonce = _findValidNonce();
+        bytes32 validNonce = _findValidNonceFor(alice);
 
         // Now mine it to advance the state
         vm.prank(alice);
@@ -128,7 +128,9 @@ contract JouleTest is Test {
         // The valid nonce from the OLD challenge won't work with the NEW challenge
         // (blocksMined changed from 0→1, so challenge changed)
         // But it also won't match the usedProofs since challenge is different
-        // We need a nonce that genuinely fails the difficulty check on the new challenge
+        // We need a nonce that genuinely fails the difficulty check on the new challenge.
+        // Challenge includes msg.sender, so we must fetch it from alice's perspective.
+        vm.prank(alice);
         bytes32 newChallenge = joule.getCurrentChallenge();
         uint128 difficulty = joule.getCurrentEpoch().difficulty;
         uint256 threshold = type(uint256).max / difficulty;
@@ -149,9 +151,11 @@ contract JouleTest is Test {
     }
 
     function test_mine_proofHashRecorded() public {
-        // Test that the proof hash is recorded (replay prevention mechanism)
-        bytes32 nonce = _findValidNonce();
+        // Test that the proof hash is recorded (replay prevention mechanism).
+        // Challenge includes msg.sender, so we must retrieve it from alice's perspective.
+        vm.prank(alice);
         bytes32 challenge = joule.getCurrentChallenge();
+        bytes32 nonce = _findValidNonceFor(alice);
         bytes32 expectedProofHash = keccak256(abi.encodePacked(challenge, nonce));
 
         // Before mining, proof is unused
@@ -178,7 +182,7 @@ contract JouleTest is Test {
         IJoule.Epoch memory ep = joule.getCurrentEpoch();
         assertEq(ep.blocksMined, 0);
 
-        bytes32 nonce = _findValidNonce();
+        bytes32 nonce = _findValidNonceFor(alice);
         vm.prank(alice);
         joule.mine(nonce);
 
@@ -532,7 +536,7 @@ contract JouleTest is Test {
         // We can't mine 144 blocks in a test (too much gas for nonce search)
         // Instead test the mechanism indirectly: mine a few blocks fast,
         // then verify epoch tracking works
-        bytes32 nonce = _findValidNonce();
+        bytes32 nonce = _findValidNonceFor(alice);
         vm.prank(alice);
         joule.mine(nonce);
         vm.roll(block.number + 1);
@@ -590,7 +594,7 @@ contract JouleTest is Test {
     // ============ Proof Replay Prevention ============
 
     function test_mine_replayProof_reverts() public {
-        bytes32 nonce = _findValidNonce();
+        bytes32 nonce = _findValidNonceFor(alice);
 
         vm.prank(alice);
         joule.mine(nonce);
@@ -685,7 +689,7 @@ contract JouleTest is Test {
     event OracleUpdated(IJoule.OracleType oracleType, address indexed oracle);
 
     function test_event_blockMined() public {
-        bytes32 nonce = _findValidNonce();
+        bytes32 nonce = _findValidNonceFor(alice);
         uint256 expectedReward = joule.getCurrentReward();
         uint128 expectedDifficulty = joule.getCurrentEpoch().difficulty;
 
@@ -748,16 +752,32 @@ contract JouleTest is Test {
 
     // ============ Helpers ============
 
-    function _findValidNonce() internal view returns (bytes32 nonce) {
+    /// @dev Find a valid nonce for a specific miner.
+    /// IMPORTANT: The challenge includes msg.sender (H-07 anti-merge-mining fix),
+    /// so the nonce search MUST use the same address that will call mine().
+    function _findValidNonce() internal returns (bytes32 nonce) {
+        return _findValidNonceFor(address(this));
+    }
+
+    function _findValidNonceFor(address miner) internal returns (bytes32 nonce) {
+        // Retrieve the challenge as it will appear when `miner` calls mine()
+        vm.prank(miner);
         bytes32 challenge = joule.getCurrentChallenge();
+
         uint128 difficulty = joule.getCurrentEpoch().difficulty;
         uint256 threshold = type(uint256).max / difficulty;
 
+        // Use a fixed 64-byte buffer in memory to avoid quadratic memory expansion.
+        // abi.encodePacked inside a loop allocates fresh memory each iteration,
+        // causing EVM MemoryOOG at ~128K iterations due to cumulative expansion cost.
+        bytes memory buf = new bytes(64);
+        assembly { mstore(add(buf, 32), challenge) } // bytes [0..31] = challenge
+
         for (uint256 i = 1; i < 1_000_000; i++) {
-            nonce = bytes32(i);
-            bytes32 hash = sha256(abi.encodePacked(challenge, nonce));
+            assembly { mstore(add(buf, 64), i) } // bytes [32..63] = nonce (i)
+            bytes32 hash = sha256(buf);
             if (uint256(hash) < threshold) {
-                return nonce;
+                return bytes32(i);
             }
         }
         revert("Could not find valid nonce in 1M attempts");
@@ -765,7 +785,7 @@ contract JouleTest is Test {
 
     function _mineTokens(address miner, uint256 count) internal {
         for (uint256 i = 0; i < count; i++) {
-            bytes32 nonce = _findValidNonce();
+            bytes32 nonce = _findValidNonceFor(miner);
             vm.prank(miner);
             joule.mine(nonce);
             vm.roll(block.number + 1);

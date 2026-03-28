@@ -37,10 +37,14 @@ contract VibeRegistryTest is Test {
         owner = makeAddr("owner");
         alice = makeAddr("alice");
 
-        vm.prank(owner);
+        // Both deployments must run as `owner` so that when the proxy constructor
+        // executes initialize() the msg.sender is `owner` (becomes Ownable owner).
+        vm.startPrank(owner);
         VibeRegistry impl = new VibeRegistry();
         bytes memory initData = abi.encodeCall(VibeRegistry.initialize, ());
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        vm.stopPrank();
+
         registry = VibeRegistry(address(proxy));
     }
 

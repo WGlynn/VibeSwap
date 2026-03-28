@@ -293,12 +293,11 @@ contract MoneyPathAdversarial is Test {
         }
         vm.stopPrank();
 
-        // Even medium-small deposits that pass initial liquidity check:
+        // Even medium-small deposits that pass M-02 minimum (>= 1e15 each):
         // Donation attack is caught by _checkDonationAttack
         vm.startPrank(attacker);
-        // Need enough for sqrt to exceed MINIMUM_LIQUIDITY (10000)
-        // sqrt(10001 * 10001) = 10001 > 10000 ✓
-        uint256 initAmount = 100_000; // 100k wei each
+        // Must exceed both M-02 minimum (1e15 per token) and MINIMUM_LIQUIDITY (10000)
+        uint256 initAmount = 1e15; // minimum allowed by M-02
         if (t0 == address(tokenA)) {
             amm.addLiquidity(freshPoolId, initAmount, initAmount, 0, 0);
         } else {
@@ -640,8 +639,8 @@ contract MoneyPathAdversarial is Test {
     /**
      * @notice Attack: Owner queues to address A. Attacker calls executeWithdrawal
      *         hoping funds go to msg.sender instead.
-     * @dev Defense: Recipient is set at queue time and is immutable. executeWithdrawal
-     *      is permissionless but always sends to the queued recipient.
+     * @dev Defense: H-02 dissolved — only owner/backstop can execute (attacker blocked).
+     *      Recipient is set at queue time and is immutable regardless.
      */
     function test_adversarial_withdrawalGoesToQueuedRecipient() public {
         vm.deal(address(treasury), 10 ether);
@@ -651,12 +650,15 @@ contract MoneyPathAdversarial is Test {
 
         vm.warp(block.timestamp + 2 days + 1);
 
-        // Attacker calls executeWithdrawal
-        uint256 attackerBefore = attacker.balance;
+        // Attacker cannot execute (onlyOwnerOrBackstopOperator)
         vm.prank(attacker);
+        vm.expectRevert("Not authorized");
         treasury.executeWithdrawal(requestId);
 
-        // Funds go to honestRecipient, NOT attacker
+        // Owner executes — funds go to honestRecipient
+        uint256 attackerBefore = attacker.balance;
+        treasury.executeWithdrawal(requestId);
+
         assertEq(honestRecipient.balance, 5 ether, "Funds must go to queued recipient");
         assertEq(attacker.balance, attackerBefore, "Attacker balance must not change");
     }

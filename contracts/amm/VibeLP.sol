@@ -51,7 +51,7 @@ contract VibeLP is ERC20, Ownable {
     function mint(address to, uint256 amount) external onlyOwner {
         // Lock minimum liquidity on first mint
         if (!minimumLiquidityLocked && totalSupply() == 0) {
-            require(amount > MINIMUM_LIQUIDITY, "Insufficient initial liquidity");
+            require(amount >= MINIMUM_LIQUIDITY, "Insufficient initial liquidity");
             _mint(address(0xdead), MINIMUM_LIQUIDITY);
             minimumLiquidityLocked = true;
             _mint(to, amount - MINIMUM_LIQUIDITY);

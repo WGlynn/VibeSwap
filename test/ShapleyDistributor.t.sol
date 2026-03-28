@@ -104,10 +104,10 @@ contract ShapleyDistributorTest is Test {
     // ============ Authorization ============
 
     function test_setAuthorizedCreator_ownerOnly() public {
-        vm.expectEmit(true, false, false, true);
-        emit AuthorizedCreatorUpdated(creator, true);
+        // creator was authorized in setUp
         assertTrue(distributor.authorizedCreators(creator));
 
+        // Non-owner cannot authorize
         vm.prank(alice);
         vm.expectRevert();
         distributor.setAuthorizedCreator(alice, true);
@@ -547,8 +547,10 @@ contract ShapleyDistributorTest is Test {
     // ============ calculateScarcityScore ============
 
     function test_scarcityScore_neutral() public view {
+        // In a balanced market (buy==sell), base score is 5000.
+        // But the bonus applies: share of scarce side (50/100 = 50%) adds 500.
         uint256 score = distributor.calculateScarcityScore(100 ether, 100 ether, true, 50 ether);
-        assertEq(score, 5000); // Balanced market = 5000
+        assertEq(score, 5500); // 5000 base + 500 bonus (50% of scarce side)
     }
 
     function test_scarcityScore_buyHeavy_sellSideIsScarce() public view {

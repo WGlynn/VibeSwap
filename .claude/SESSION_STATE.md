@@ -1,66 +1,58 @@
-# Session Tip — 2026-03-26
+# Session Tip — 2026-03-27
 
 ## Block Header
-- **Session**: Print Lexicon feature (Rosetta Page professor handouts)
-- **Parent**: `88de120e`
-- **Branch**: `master` @ `e6ae19d1`
-- **Status**: Print Lexicon feature complete + build passing
+- **Session**: Stack-too-deep compilation fix sprint + CI pipeline repair + test coverage
+- **Parent**: `e6ae19d1`
+- **Branch**: `master` @ `92322a09`
+- **Status**: CI pipeline repaired, 8 contracts fixed, waiting on via_ir build (~40min)
 
 ## What Exists Now
 
-### New Protocols (invented this session)
-- **Anti-Amnesia Protocol**: `docs/ANTI_AMNESIA_PROTOCOL.md` + `.claude/WAL.md` — three-layer persistence. Crash recovery. Session start Step 0.
-- **Mitosis Constant (k=1.3)**: Agent pool self-replication rate. Bounded superlinear growth. In AAP spec + memory.
-- **Agent Efficiency Tiers**: `.claude/AGENT_CONTEXT.md` — haiku/sonnet/opus model selection. 3-4x cost reduction.
+### Compilation Fixes (8 contracts)
+- `VibeAMM.sol` — scoped 4 functions, extracted `_trackProtocolFees` helper
+- `VibeAMMLite.sol` — extracted `_swapInternal` helper
+- `BatchMath.sol` — scoped `findPriceBounds` results
+- `CommitRevealAuction.sol` — extracted `_verifyPoW`, `_storeRevealedOrder`, `_revealWithPoW`
+- `HoneypotDefense.sol` — split `getTotalRecycled` string return
+- `VibeRWA.sol` — field-by-field struct population (14 fields)
+- `FractalShapley.sol` — scoped BFS credit allocation blocks
+- `VibeTaskEngine.sol` — split `getTask()` into `getTaskCore()` + `getTaskMeta()` (15-field struct)
 
-### SIE Phase 2 Complete
-- ISIEShapleyAdapter interface + IntelligenceExchange wiring + SIEShapleyAdapter implementation + tests
+### CI/CD Configuration
+- `ci.yml` + `security.yml` — use `FOUNDRY_PROFILE=ci` (via_ir=true, optimizer_runs=1)
+- Build timeout: 60 min (via_ir on 991 files takes ~35-40 min)
+- Test timeout: 60 min
+- `foundry.toml` ci profile: optimizer_runs=1 (was 200)
+- Fast profile: unchanged (via_ir=false, for local dev iteration)
 
-### Test Coverage Explosion (~3,000+ new tests)
-- Every contract directory now has coverage: core, amm, mechanism, financial, governance, incentives, agents, identity, settlement, security, quantum, community, depin, rwa, naming, libraries, oracles, cross-chain, compliance
-- Agent subsystem: 0 → 230+ tests
-- Mechanism directory: dozens of previously untested contracts now covered
+### New Test Coverage (agent-written)
+- `test/ShapleyDistributor.t.sol` — 37 tests (ETH/ERC20 lifecycle, Lawson Floor, halving, scarcity)
+- `test/VibeAMMSecurity.t.sol` — 16 tests (flash loan, slippage, auth, edge cases)
 
-### Gas Optimization
-- ~3-5K gas saved per swap lifecycle on hot path (CommitRevealAuction, VibeAMM, VibeSwapCore)
-
-### Deploy Scripts
-- DeploySIE.s.sol updated (Phase 2)
-- DeployFinancialV2.s.sol (NEW)
-- DeployCoreSecurity.s.sol (NEW)
-- DeployAgents.s.sol (NEW — 15 contracts)
-- ConfigurePeers.s.sol updated (BSC + Base Sepolia)
-
-### CI/CD
-- 5 bugs fixed. Jarvis bot 6h hang → 15s. Node 22 everywhere. Docker fixed.
-
-### Documentation
-- Contracts catalogue: 290 contracts documented
-- Coverage matrix updated
-- Duplicate contracts resolved (2 pairs deprecated)
-- Stealth remote refs purged (12 files)
-
-### Content
-- ethresear.ch Post 9: Citation-Weighted Bonding Curves
-- ethresear.ch Post 10: Proof of Mind
-- LinkedIn x2: bonding curves + PoM (both posted)
-- Credits proposal: `docs/claude-credits-proposal.md` + Desktop docx
-
-### Economitra
-- Read-through complete. 7 substantive issues flagged for Will's review.
+### All Non-Contract CI Jobs GREEN
+- Frontend: builds clean (27s)
+- Backend: 21/21 tests pass (10s)
+- Oracle: 136/136 tests pass (30s)
+- Jarvis Bot: 225/225 tests pass (13s)
+- Docker: builds clean (51s)
+- Security Checks: pass
+- Primitive Gate: pass
+- Deploy Jarvis: pass
 
 ## Key Changes This Session
-- `.claude/WAL.md` — new file (Anti-Amnesia Protocol)
-- `.claude/AGENT_CONTEXT.md` — new file (agent efficiency)
-- Session Start Protocol: Step 0 = check WAL
-- CLAUDE.md: stealth refs removed, session state section updated, push to origin only
-- Mitosis Constant in AAP spec
+- Root cause of CI failure: legacy ABI encoder can't handle 15-field struct returns without via_ir
+- Multiple contracts had stack-too-deep from 10+ function params or complex struct operations
+- Starship prompt: already disabled in .bashrc (commented out)
+- Claude Code upgrade research completed (Agent Teams, Sparse Worktrees, Plan Mode, Custom Skills)
+
+## Manual Queue (Will does these)
+- Review Economitra 7 substantive issues
+- Conference applications (Consensus Miami, EthDC)
+- Credits proposal follow-up
 
 ## Next Session
-1. Check WAL — recover any in-flight sonnet agents (T47, T48, T49)
-2. Review Economitra substantive issues (7 flagged)
-3. Deploy frontend to Vercel
-4. Conference applications (Consensus Miami, EthDC)
-5. Continue test coverage push (aim for 60%+)
-6. Smart contract CI job will pass once commit storm settles
-7. Credits proposal — follow up with dad
+1. Verify CI contracts job passes with 60-min timeout
+2. Run tests locally with ci profile once build passes
+3. Continue test coverage push (ShapleyDistributor + VibeAMM now covered, identify next gaps)
+4. Consider Agent Teams experimental feature for parallel audits
+5. Deploy frontend to Vercel if all CI green

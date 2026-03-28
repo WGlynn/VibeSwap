@@ -22,6 +22,9 @@ contract VibeVestingTest is Test {
 
     // ============ Setup ============
 
+    // Allow test contract to receive ETH (needed for revoke returning unvested funds to owner)
+    receive() external payable {}
+
     function setUp() public {
         owner = address(this);
         alice = makeAddr("alice");

@@ -2,51 +2,82 @@
 
 ---
 
-## SESSION START PROTOCOL
+## PROTOCOL CHAIN (auto-triggering dispatch — never invoke manually)
 
-**On EVERY new session or after context compression:**
+Every protocol chains into the next. No searching, no manual calls. Follow the arrows.
 
+### BOOT (every session / context compression)
 ```
-0. Check .claude/WAL.md                → If ACTIVE: crash recovery FIRST (AAP)
-1. Read .claude/JarvisxWill_CKB.md     → Core alignment primitives
-2. Read CLAUDE.md (this file)          → Project context
-3. Read .claude/SESSION_STATE.md       → Block header (recent work state)
-4. git pull origin master              → Latest code
-5. Resume work (or recovery)
-```
-
-**Step 0 (Anti-Amnesia)**: If WAL status is ACTIVE, a crash happened mid-execution (PC failure, OOM, user closed terminal, ANY unclean exit). Run recovery protocol before anything else. See `docs/ANTI_AMNESIA_PROTOCOL.md`.
-
-**Common Knowledge Base**: `.claude/JarvisxWill_CKB.md` (GitHub synced)
-**WAL Location**: `.claude/WAL.md` (crash recovery log, synced via git)
-
-## SESSION END PROTOCOL (MANDATORY)
-
-**Before ending ANY session, write block header to `.claude/SESSION_STATE.md`:**
-
-```markdown
-# Session Tip — YYYY-MM-DD
-
-## Block Header
-- **Session**: [topic]
-- **Parent**: [previous session's HEAD hash]
-- **Branch**: `master` @ `[current HEAD hash]`
-- **Status**: [one-line summary]
-
-## What Exists Now
-[Artifacts created/modified — relative paths]
-
-## Manual Queue (Will does these)
-[Human-in-the-loop tasks only Will can do]
-
-## Key Changes This Session
-[Non-obvious: config, .gitignore, build, architecture decisions]
-
-## Next Session
-[What to pick up, blockers, pending verifications]
+WAL.md check ──→ [ACTIVE?] ──YES──→ AAP Recovery ──→ Auto-Commit Orphans ──→ BOOT:3
+                     │NO                              (docs/ANTI_AMNESIA_PROTOCOL.md)
+                     ▼
+Read CKB_CISC ──→ Read CLAUDE.md ──→ Read SESSION_STATE.md ──→ git pull ──→ READY
+                    (JarvisxWill_CKB_CISC.md = full expansion, always on fresh boot)
+                    (JarvisxWill_CKB.md = RISC glyphs, use after context compression)
 ```
 
-Then commit and push to origin. This is the chain tip — like a block header, it enables full state reconstruction without storing the full state.
+### WORK (every task, every cycle)
+```
+READY ──→ PCP Gate ──→ [Expensive op?] ──YES──→ STOP/DIAGNOSE/DECIDE/EXECUTE
+               │NO                                (docs/PREVENTATIVE_CARE_PROTOCOL.md)
+               ▼
+          Execute ──→ [Asserting link?] ──→ AHP (BECAUSE/DIRECTION/REMOVAL)
+               │      [Testing?] ──→ TTT (--match-path, by cluster, never full suite)
+               │      [Bug found?] ──→ Fruit of Poisoned Tree (sweep siblings)
+               │      [Status claim?] ──→ Anti-Stale Feed (verify current state first)
+               ▼
+          Verify ──→ Commit ──→ Push ──→ Next Task
+```
+
+### AUTOPILOT (triggered by: "Run IT", "autopilot", "full send")
+```
+Instant start (no ceremony) ──→ Pull ──→ SESSION_STATE ──→ Scan gaps
+    ──→ BIG-SMALL rotation loop:
+        Pick task ──→ WORK chain ──→ Commit ──→ Pattern doc ──→ Knowledge extract
+        ──→ [Every 3-5 tasks] Checkpoint WAL
+        ──→ [50% context?] ──→ REBOOT chain
+        ──→ Next task (loop)
+```
+
+### REBOOT (triggered by: ~50% context remaining)
+```
+Commit all ──→ Write SESSION_STATE block header ──→ Push ──→ Fresh session ──→ BOOT chain
+Note: Fresh session BOOT loads CKB_CISC (full). After compression mid-session, use CKB RISC.
+```
+
+### END (every session exit — MANDATORY)
+```
+Write block header to SESSION_STATE.md:
+  {session, parent hash, branch@HEAD, status, artifacts, manual queue, next session}
+──→ Commit ──→ Push to origin
+```
+
+### CRASH (triggered by: WAL.md status==ACTIVE on next boot)
+```
+Read WAL manifest ──→ Cross-ref git log ──→ Mark DONE/ORPHANED/LOST
+──→ Auto-commit orphaned files ──→ Present recovery report ──→ BOOT chain (resume)
+```
+
+### AGENT SPAWN (triggered by: parallel work needed)
+```
+[Mitosis k=1.3, cap=5] ──→ Agent tier select (haiku/sonnet/opus by complexity)
+──→ Max 3 concurrent forge processes ──→ Each agent follows WORK chain independently
+```
+
+### NAMING (triggered by: Will names something)
+```
+Will names X ──→ Auto-create: docs/<X>.md (full spec) + memory/primitive_<x>.md + MEMORY.md entry
+──→ No asking, no feedback-then-upgrade. Straight to primitive.
+```
+
+### ALWAYS-ON (background, every response)
+```
+Token efficiency (12 rules) ──→ Internalize own protocols ("cells within cells")
+──→ Frank/human communication ──→ No tips, no farming ──→ Discretion in public docs
+──→ Local constraints stay local (never commit hardware limits to repo)
+```
+
+**Files**: CKB_CISC=`.claude/JarvisxWill_CKB_CISC.md` (full, load on fresh boot) | CKB_RISC=`.claude/JarvisxWill_CKB.md` (glyphs, load after compression) | WAL=`.claude/WAL.md` | State=`.claude/SESSION_STATE.md`
 
 ---
 
@@ -184,10 +215,10 @@ vibeswap/
 
 ### Common Commands
 ```bash
-# Contracts
+# Contracts (default profile = no via_ir, fast)
 forge build
-forge test -vvv
-forge script script/Deploy.s.sol --rpc-url $RPC --broadcast
+forge test --match-path test/SomeTest.t.sol -vvv    # ALWAYS target specific tests
+FOUNDRY_PROFILE=full forge build                     # via_ir only for deploy validation
 
 # Frontend
 cd frontend && npm run dev    # Port 3000
@@ -196,6 +227,15 @@ cd frontend && npm run dev    # Port 3000
 pip install -e oracle/
 python -m oracle.main
 ```
+
+### Foundry Profiles
+- **Default** (`via_ir: false`): Fast dev iteration. Use for all building/testing.
+- **`full`** (`via_ir: true`, `out-full/`): Final validation, bytecode size checks.
+- **`ci`** (`via_ir: true`, `out-ci/`): GitHub Actions (optimizer_runs=1).
+- **`deploy`** (`via_ir: true`, `out-deploy/`): Production deploy (smallest bytecode).
+- **`focused-*`**: Scoped test dirs (`focused-core`, `focused-incentives`, `focused-libraries`).
+
+Use `--match-path` or `--match-contract` to target specific tests rather than running the full suite.
 
 ### Key Contracts
 - `CommitRevealAuction.sol` - Batch auction mechanism

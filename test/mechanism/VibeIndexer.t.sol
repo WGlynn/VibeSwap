@@ -34,10 +34,13 @@ contract VibeIndexerTest is Test {
     string  constant SCHEMA          = "ipfs://QmSchema";
     bytes32 constant MANIFEST        = keccak256("manifest-v1");
 
+    // Allow test contract (= owner) to receive ETH from slashing / dispute resolution
+    receive() external payable {}
+
     // ============ setUp ============
 
     function setUp() public {
-        owner = makeAddr("owner");
+        owner = address(this); // test contract is the proxy owner (initialize sets msg.sender)
         alice = makeAddr("alice");
         bob   = makeAddr("bob");
         carol = makeAddr("carol");
@@ -46,13 +49,12 @@ contract VibeIndexerTest is Test {
         vm.deal(bob,   100 ether);
         vm.deal(carol, 100 ether);
 
-        vm.prank(owner);
         VibeIndexer impl = new VibeIndexer();
         bytes memory initData = abi.encodeCall(VibeIndexer.initialize, ());
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         indexer = VibeIndexer(payable(address(proxy)));
 
-        // Fund owner for dispute resolution payouts
+        // Fund indexer for dispute resolution payouts
         vm.deal(address(indexer), 10 ether);
     }
 

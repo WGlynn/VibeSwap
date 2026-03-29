@@ -34,6 +34,9 @@ contract VibeLiquidityLockerTest is Test {
     event LockExtended(uint256 indexed lockId, uint256 newVestingEnd);
     event LockTransferred(uint256 indexed lockId, address indexed from, address indexed to);
 
+    // Allow test contract (= owner) to receive ETH from withdrawFees
+    receive() external payable {}
+
     // ============ Setup ============
 
     function setUp() public {
@@ -284,10 +287,11 @@ contract VibeLiquidityLockerTest is Test {
 
         // Claim at 25% through vesting
         vm.warp(block.timestamp + CLIFF_1W + VESTING_4W / 4);
+        uint256 aliceBeforeFirst = lpToken.balanceOf(alice);
         vm.prank(alice);
         locker.claimVested(lockId);
 
-        uint256 firstClaim = 1000 ether - lpToken.balanceOf(alice) + 1_000_000 ether;
+        uint256 firstClaim = lpToken.balanceOf(alice) - aliceBeforeFirst;
         // firstClaim should be ~250 ether
         assertApproxEqAbs(firstClaim, 250 ether, 1e15);
 

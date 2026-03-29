@@ -358,11 +358,13 @@ contract CommitRevealAuction is
         // Validate user against pool ACCESS requirements
         _validateUserForPool(config, msg.sender, estimatedTradeValue);
 
-        // Flash loan protection - ALWAYS ON (protocol constant)
-        if (lastInteractionBlock[msg.sender] == block.number) {
-            revert FlashLoanDetected();
+        // Flash loan protection - skip for authorized settlers (they batch commits for multiple traders)
+        if (!authorizedSettlers[msg.sender]) {
+            if (lastInteractionBlock[msg.sender] == block.number) {
+                revert FlashLoanDetected();
+            }
+            lastInteractionBlock[msg.sender] = block.number;
         }
-        lastInteractionBlock[msg.sender] = block.number;
 
         // Calculate required deposit using PROTOCOL CONSTANTS
         uint256 collateralRequired = (estimatedTradeValue * COLLATERAL_BPS) / 10000;

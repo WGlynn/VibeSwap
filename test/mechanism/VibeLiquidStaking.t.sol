@@ -21,6 +21,9 @@ contract VibeLiquidStakingTest is Test {
     event RewardsDistributed(uint256 rewards, uint256 protocolFee);
     event BufferReplenished(uint256 amount);
 
+    // Allow test contract (= owner) to receive ETH from withdrawProtocolFees / unstake
+    receive() external payable {}
+
     // ============ Setup ============
 
     function setUp() public {
@@ -47,6 +50,15 @@ contract VibeLiquidStakingTest is Test {
 
     function _warpPastHold() internal {
         vm.warp(block.timestamp + 1 days + 1);
+    }
+
+    /// @dev Replenish buffer so full unstakes are possible (buffer only holds 5% from stake)
+    function _fillBuffer() internal {
+        uint256 pooled = staking.totalPooledEth();
+        uint256 buf = staking.liquidityBuffer();
+        if (pooled > buf) {
+            staking.replenishBuffer{value: pooled - buf}();
+        }
     }
 
     // ============ Initialization ============
@@ -123,6 +135,7 @@ contract VibeLiquidStakingTest is Test {
 
     function test_unstake_returnsEth() public {
         _stakeAs(alice, 1 ether);
+        _fillBuffer();
         _warpPastHold();
 
         uint256 aliceBefore = alice.balance;
@@ -136,6 +149,7 @@ contract VibeLiquidStakingTest is Test {
 
     function test_unstake_burnsVsEth() public {
         _stakeAs(alice, 1 ether);
+        _fillBuffer();
         _warpPastHold();
 
         uint256 vsEthAmount = staking.vsEthBalance(alice);
@@ -148,16 +162,19 @@ contract VibeLiquidStakingTest is Test {
 
     function test_unstake_decreasesStakerCount() public {
         _stakeAs(alice, 1 ether);
+        _fillBuffer();
         _warpPastHold();
 
         assertEq(staking.stakerCount(), 1);
+        uint256 bal = staking.vsEthBalance(alice);
         vm.prank(alice);
-        staking.unstake(staking.vsEthBalance(alice));
+        staking.unstake(bal);
         assertEq(staking.stakerCount(), 0);
     }
 
     function test_unstake_emitsEvent() public {
         _stakeAs(alice, 1 ether);
+        _fillBuffer();
         _warpPastHold();
 
         uint256 vsEthAmount = staking.vsEthBalance(alice);
@@ -173,9 +190,10 @@ contract VibeLiquidStakingTest is Test {
         _stakeAs(alice, 1 ether);
         // No time warp — still in hold period
 
+        uint256 bal = staking.vsEthBalance(alice);
         vm.prank(alice);
         vm.expectRevert("Hold period active");
-        staking.unstake(staking.vsEthBalance(alice));
+        staking.unstake(bal);
     }
 
     function test_unstake_zeroAmount_reverts() public {
@@ -191,9 +209,10 @@ contract VibeLiquidStakingTest is Test {
         _stakeAs(alice, 1 ether);
         _warpPastHold();
 
+        uint256 bal = staking.vsEthBalance(alice);
         vm.prank(alice);
         vm.expectRevert("Insufficient vsETH");
-        staking.unstake(staking.vsEthBalance(alice) + 1);
+        staking.unstake(bal + 1);
     }
 
     function test_unstake_insufficientLiquidity_reverts() public {
@@ -204,9 +223,10 @@ contract VibeLiquidStakingTest is Test {
         // Try to unstake more than buffer holds
         // alice has 1 vsETH = 1 ETH, but buffer = 0.05 ETH
         // Partial unstake within buffer
+        uint256 bal = staking.vsEthBalance(alice);
         vm.prank(alice);
         vm.expectRevert("Insufficient liquidity");
-        staking.unstake(staking.vsEthBalance(alice)); // 1 ETH > 0.05 ETH buffer
+        staking.unstake(bal); // 1 ETH > 0.05 ETH buffer
     }
 
     function test_unstake_withinBuffer_succeeds() public {

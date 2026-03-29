@@ -1,52 +1,67 @@
-# Session Tip — 2026-03-28
+# Session Tip — 2026-03-29
 
 ## Block Header
-- **Session**: Stack-too-deep fix sprint + CI pipeline repair + disk cleanup
-- **Parent**: `e6ae19d1`
-- **Branch**: `master` @ `e6560152`
-- **Status**: Build passes, CI 96% green, 8706/9090 tests pass (384 failing)
+- **Session**: Test fix sprint (199→24), Arabic Economitra, LinkedIn Post 12, Upwork profile, grant research
+- **Parent**: `ac6e3420`
+- **Branch**: `master` @ `ac6e3420`
+- **Status**: Build passes, 9206/9230 non-fuzz tests pass (24 failing)
 
-## What Exists Now
+## What Changed This Session
 
-### Compilation Fixes (8+ contracts)
-- `VibeAMM.sol` — scoped 4 functions, extracted `_trackProtocolFees`
-- `VibeAMMLite.sol` — extracted `_swapInternal`
-- `BatchMath.sol` — scoped `findPriceBounds`
-- `CommitRevealAuction.sol` — extracted `_verifyPoW`, `_storeRevealedOrder`, `_revealWithPoW`
-- `HoneypotDefense.sol` — split `getTotalRecycled` string return
-- `VibeRWA.sol` — field-by-field struct, internal mappings + explicit getters
-- `FractalShapley.sol` — BFS → BFSState struct + `_seedBFS` + `_processBFSNode`
-- `VibeTaskEngine.sol` — split `getTask()` → `getTaskCore()` + `getTaskMeta()`, internal mappings
-- Build fixer agent also fixed: VibeIndexer, VibeInsurancePool, CognitiveConsensusMarket tests, ExtractionDetection test, PairwiseVerifier test
+### Test Fixes (175 failures resolved)
+- **VibeAgentTrading**: drawdown underflow when currentValue > highWaterMark (contract bug)
+- **CommitRevealAuction**: exempt authorized settlers from per-block flash loan guard (contract fix)
+- **ProofOfMind**: PoW difficulty 20→8 for tests (MemoryOOG)
+- **CommitRevealAuctionTRP**: TRP-R1-F03 depositor check now reverts, not slashes
+- **FlashLoanProtection**: test same-block guard directly (flash loan can't repay)
+- **VibePaymaster**: dailyBudget must exceed gasCost (tx.gasprice * gasleft ≈ 18B ETH in Foundry)
+- **VibeLiquidStaking**: replenish 5% buffer, cache vsEthBalance before vm.prank
+- **VibeAMMLite**: fuzz bounds, proxy initialize pattern
+- **BuybackEngine**: error selector changed
+- **VibeRWA**: buyer ETH balance < value sent
+- **16 mechanism tests**: fixed by sonnet agent (LiquidityGauge, Indexer, LendingPool, etc.)
+- **~25 root-level tests**: fixed by sonnet agent before rejection (WalletRecovery, VIBEToken, etc.)
+- **Recurring pattern**: vm.expectRevert/vm.prank consumed by external call in argument position
 
-### Bug Fix
-- `VibeLP.sol` — off-by-one: `amount > MINIMUM_LIQUIDITY` → `amount >= MINIMUM_LIQUIDITY`
+### Documents
+- `docs/papers/ECONOMITRA_AR.md` — Full Arabic translation of Economítra V1.2
+- `docs/linkedin-post-12-it-ends.md` — "It Ends" vs "It Begins" (FEATURED on LinkedIn for MIT)
 
-### CI/CD
-- Unit tests on every push (~10 min), fuzz/invariant nightly or with `[fuzz]` in commit msg
-- Fast profile (via_ir=false) — build passes clean
-- 8706 tests pass, 384 fail (96% pass rate)
+### Upwork
+- Profile draft at `C:\Users\Will\Desktop\UPWORK_PROFILE.md`
+- Three gig listings: Security Audit ($500+), Custom DeFi ($2K+), Cross-Chain ($1.5K+)
+- Profile created on platform, skills set (Solidity, Smart Contract Dev, Blockchain)
 
-### Disk Cleanup
-- Removed: CoD (115GB), CoD MW (87GB), Overwatch (26GB), Steam (19GB), Diablo III (16GB)
-- Cleaned: npm cache (2.9GB), ms-playwright (1.2GB), FortniteGame cache
-- Result: 372MB → 268GB free (43% usage)
-- Kept: Riot Games (Valorant)
+### Grant Research
+- ESP: rejected (sucks)
+- LayerZero: rejected (acquisition risk)
+- PBS Foundation: only credibly neutral option ($1M pool for PBS/MEV research)
+- Best path: freelance revenue + hackathon prizes
 
-### New Tests
-- `test/ShapleyDistributor.t.sol` — 45 tests (all pass)
-- `test/VibeAMMSecurity.t.sol` — 16 tests (needs rerun after VibeLP fix)
+## Remaining — 24 Failures
+ALL are integration/settlement tests. Root cause: `settleBatch` doesn't transfer output tokens to traders after batch settlement. Files:
+- test/integration/PartialBatchFailure.t.sol (5)
+- test/integration/MoneyFlowTest.t.sol (3)
+- test/integration/FullIncentivePipeline.t.sol (3)
+- test/wBAR.t.sol (3)
+- test/integration/VibeSwap.t.sol (2)
+- test/integration/SIEShapleyIntegration.t.sol (2)
+- test/integration/RosettaShapleyIntegration.t.sol (2)
+- test/integration/IntelligenceExchangeIntegration.t.sol (2)
+- test/integration/FeePipelineIntegration.t.sol (1)
+- test/community/VibeDAO.t.sol (1)
+
+Plus ~24 fuzz test failures (separate category).
 
 ## Manual Queue
-- Review Economitra 7 substantive issues
-- Conference apps (Consensus Miami, EthDC)
-- Credits proposal follow-up
+- Fix settlement flow (24 integration tests)
+- Fix fuzz tests (~24)
+- MIT hackathon confirmation email sent
+- Upwork gig listings (profile done, listings pending)
+- Frontend improvements for MIT presentation
+- PBS Foundation grant application
 
-## Next Session — CRITICAL: MIT DEADLINE APRIL 10-12
-1. **FIX 384 FAILING TESTS → 0** (must be done before MIT, ~30/day pace)
-   - Triage by root cause cluster (LiquidityGauge:6, wBAR:3, etc.)
-   - Fix cluster roots first for max throughput
-   - Use parallel agents on independent clusters
-2. Verify fuzz nightly job triggers correctly
-3. Deploy frontend to Vercel once CI fully green
-4. Consider test profiles to isolate known-broken from regressions
+## Next Session
+1. Debug settleBatch output token transfer (root cause for all 24 remaining)
+2. Frontend cleanup
+3. Fuzz test fixes

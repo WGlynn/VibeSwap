@@ -18,6 +18,8 @@ contract ProofOfMindTest is Test {
 
     function setUp() public {
         pom = new ProofOfMind();
+        // Lower PoW difficulty for tests: slot 7 = currentDifficulty, 8 = ~256 avg iterations
+        vm.store(address(pom), bytes32(uint256(7)), bytes32(uint256(8)));
         vm.deal(node1, 100 ether);
         vm.deal(node2, 100 ether);
         vm.deal(node3, 100 ether);
@@ -302,7 +304,7 @@ contract ProofOfMindTest is Test {
         uint256 difficulty = pom.currentDifficulty();
         uint256 threshold = type(uint256).max >> difficulty;
 
-        for (uint256 nonce = 0; nonce < 100_000; nonce++) {
+        for (uint256 nonce = 0; nonce < 2_000_000; nonce++) {
             bytes32 h = keccak256(abi.encodePacked(node, roundId, value, nonce, block.chainid));
             if (uint256(h) <= threshold) return nonce;
         }

@@ -199,9 +199,10 @@ contract VibeAgentTradingTest is Test {
 
     function test_Deposit_RejectsBelowMinimum() public {
         uint256 vaultId = _createVault();
+        uint256 minDeposit = trading.MIN_DEPOSIT();
         vm.prank(depositor1);
         vm.expectRevert("Below minimum");
-        trading.deposit{value: trading.MIN_DEPOSIT() - 1}(vaultId);
+        trading.deposit{value: minDeposit - 1}(vaultId);
     }
 
     function test_Deposit_RejectsInactiveVault() public {
@@ -406,10 +407,11 @@ contract VibeAgentTradingTest is Test {
 
     function test_OpenCopyPosition_RejectsBelowMinDeposit() public {
         uint256 vaultId = _createVault();
+        uint256 minDeposit = trading.MIN_DEPOSIT();
 
         vm.prank(follower);
         vm.expectRevert("Below minimum");
-        trading.openCopyPosition{value: trading.MIN_DEPOSIT() - 1}(vaultId, 100);
+        trading.openCopyPosition{value: minDeposit - 1}(vaultId, 100);
     }
 
     function test_OpenCopyPosition_RejectsInactiveVault() public {

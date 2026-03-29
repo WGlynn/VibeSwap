@@ -428,9 +428,10 @@ contract VibeAgentMarketplaceTest is Test {
         vm.prank(creator1);
         marketplace.completeTask(taskId);
 
+        uint256 maxRating = marketplace.MAX_RATING();
         vm.prank(requester1);
         vm.expectRevert(VibeAgentMarketplace.InvalidRating.selector);
-        marketplace.rateAgent(taskId, marketplace.MAX_RATING() + 1, REVIEW_HASH);
+        marketplace.rateAgent(taskId, maxRating + 1, REVIEW_HASH);
     }
 
     function test_RateAgent_RejectsNonRequester() public {

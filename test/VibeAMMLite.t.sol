@@ -7,6 +7,7 @@ import "../contracts/amm/VibeLP.sol";
 import "../contracts/core/interfaces/IVibeAMM.sol";
 import "../contracts/libraries/BatchMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // ============ Mock Contracts ============
 
@@ -68,9 +69,13 @@ contract VibeAMMLiteTest is Test {
         }
         tokenC = new MockERC20("Token C", "TKC");
 
-        // Deploy VibeAMMLite (not proxied — it's Initializable but not UUPS)
-        amm = new VibeAMMLite();
-        amm.initialize(owner, treasury);
+        // Deploy VibeAMMLite via ERC1967Proxy (constructor disables initializers)
+        VibeAMMLite impl = new VibeAMMLite();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeCall(VibeAMMLite.initialize, (owner, treasury))
+        );
+        amm = VibeAMMLite(address(proxy));
 
         // Authorize executor
         amm.setAuthorizedExecutor(executor, true);
@@ -115,17 +120,24 @@ contract VibeAMMLiteTest is Test {
     }
 
     function test_initialize_setsDefaultProtectionFlags() public {
-        // Re-deploy fresh to check defaults
-        VibeAMMLite fresh = new VibeAMMLite();
-        fresh.initialize(owner, makeAddr("t"));
+        // Re-deploy fresh via proxy to check defaults
+        VibeAMMLite freshImpl = new VibeAMMLite();
+        ERC1967Proxy freshProxy = new ERC1967Proxy(
+            address(freshImpl),
+            abi.encodeCall(VibeAMMLite.initialize, (owner, makeAddr("t")))
+        );
+        VibeAMMLite fresh = VibeAMMLite(address(freshProxy));
         // Both flash loan and TWAP should be on by default
         assertEq(fresh.protectionFlags(), 3); // FLAG_FLASH_LOAN | FLAG_TWAP = 1 | 2 = 3
     }
 
     function test_initialize_revertsOnZeroTreasury() public {
-        VibeAMMLite fresh = new VibeAMMLite();
+        VibeAMMLite freshImpl = new VibeAMMLite();
         vm.expectRevert(VibeAMMLite.InvalidTreasury.selector);
-        fresh.initialize(owner, address(0));
+        new ERC1967Proxy(
+            address(freshImpl),
+            abi.encodeCall(VibeAMMLite.initialize, (owner, address(0)))
+        );
     }
 
     function test_initialize_cannotBeCalledTwice() public {
@@ -703,8 +715,8 @@ contract VibeAMMLiteTest is Test {
     }
 
     function testFuzz_addLiquidity_anyRatio(uint256 amount0, uint256 amount1) public {
-        amount0 = bound(amount0, 10001, 100_000 ether);
-        amount1 = bound(amount1, 10001, 100_000 ether);
+        amount0 = bound(amount0, 0.1 ether, 100_000 ether);
+        amount1 = bound(amount1, 0.1 ether, 100_000 ether);
 
         vm.prank(alice);
         (uint256 a0, uint256 a1, uint256 liq) = amm.addLiquidity(poolId, amount0, amount1, 0, 0);

@@ -181,9 +181,9 @@ contract VibeRWATest is Test {
     function test_PurchaseShares_RevertsInsufficientShares() public {
         bytes32 assetId = _registerAndActivate();
 
-        vm.prank(buyer);
         vm.expectRevert("Insufficient shares");
-        rwa.purchaseShares{value: 200 ether}(assetId, 1001); // Only 1000 total
+        vm.prank(buyer);
+        rwa.purchaseShares{value: 100 ether}(assetId, 1001); // Only 1000 total
     }
 
     function test_PurchaseShares_RevertsInsufficientPayment() public {

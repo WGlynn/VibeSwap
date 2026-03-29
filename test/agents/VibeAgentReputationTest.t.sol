@@ -214,8 +214,8 @@ contract VibeAgentReputationTest is Test {
     function test_tier_masterThreshold() public {
         _initAgent(agent1);
 
-        // Push all scores to 7500+
-        for (uint256 i = 0; i < 200; i++) {
+        // Push scores into MASTER range (7500-8999) — 50 iterations lands ~8180
+        for (uint256 i = 0; i < 50; i++) {
             for (uint256 d = 0; d <= 5; d++) {
                 rep.updateScore(agent1, d, 10000);
             }
@@ -223,6 +223,7 @@ contract VibeAgentReputationTest is Test {
 
         VibeAgentReputation.AgentReputation memory r = rep.getReputation(agent1);
         assertGe(r.compositeScore, 7500);
+        assertLt(r.compositeScore, 9000);
         assertEq(uint8(r.tier), uint8(VibeAgentReputation.ReputationTier.MASTER));
     }
 

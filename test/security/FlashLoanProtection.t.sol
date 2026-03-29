@@ -108,12 +108,15 @@ contract FlashLoanBorrower {
         bytes32 commitHash1,
         bytes32 commitHash2
     ) external payable {
+        // Use contract balance (borrowed funds) — flash loan call may not forward value
+        uint256 half = address(this).balance / 2;
+
         // Commit with borrowed funds
-        auction.commitOrder{value: msg.value / 2}(commitHash1);
+        auction.commitOrder{value: half}(commitHash1);
         commitSucceeded = true;
 
         // Try second commit — should be blocked by same-block guard
-        try auction.commitOrder{value: msg.value / 2}(commitHash2) {
+        try auction.commitOrder{value: half}(commitHash2) {
             secondActionBlocked = false; // BAD
         } catch {
             secondActionBlocked = true; // GOOD: flash loan attack mitigated
@@ -178,6 +181,8 @@ contract RapidFireAttacker {
  *      - Contract-based batch manipulation
  */
 contract FlashLoanProtectionTest is Test {
+    receive() external payable {}
+
     CommitRevealAuction public auction;
 
     address public owner;
@@ -348,10 +353,11 @@ contract FlashLoanProtectionTest is Test {
     ///         to a borrower contract, which commits to the auction. The borrower
     ///         then tries a second commit (or any follow-up action) but is blocked.
     function test_flashLoanAttack_secondCommitBlocked() public {
-        FlashLoanSimulator flashLender = new FlashLoanSimulator();
+        // Test same-block guard directly: a funded attacker can only commit once per block.
+        // (Flash loan wrapper can't be used here because the first commit locks ETH,
+        //  making repayment impossible — that's tested separately in test_flashLoanAttacker_fundsLocked.)
         FlashLoanBorrower borrower = new FlashLoanBorrower(address(auction));
-
-        vm.deal(address(flashLender), 100 ether);
+        vm.deal(address(borrower), 10 ether);
 
         bytes32 secret1 = keccak256("secret1");
         bytes32 secret2 = keccak256("secret2");
@@ -362,19 +368,9 @@ contract FlashLoanProtectionTest is Test {
             address(borrower), tokenA, tokenB, 2 ether, 1.8 ether, secret2
         );
 
-        // Execute the flash loan attack
-        bytes memory attackCalldata = abi.encodeWithSelector(
-            FlashLoanBorrower.attackCommitTwice.selector,
-            commitHash1,
-            commitHash2
-        );
+        borrower.attackCommitTwice(commitHash1, commitHash2);
 
-        flashLender.executeFlashLoanAttack{value: 10 ether}(
-            payable(address(borrower)),
-            attackCalldata
-        );
-
-        // Verify: first commit worked, second was blocked
+        // Verify: first commit worked, second was blocked by same-block guard
         assertTrue(borrower.commitSucceeded(), "First commit should succeed");
         assertTrue(borrower.secondActionBlocked(), "Second action in same block must be blocked");
 

@@ -264,7 +264,7 @@ contract VibeAgentTrading is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
         vault.lastRebalanceAt = block.timestamp;
 
         // Check drawdown
-        if (vault.highWaterMark > 0) {
+        if (vault.highWaterMark > 0 && vault.currentValue < vault.highWaterMark) {
             uint256 drawdown = ((vault.highWaterMark - vault.currentValue) * 10000) / vault.highWaterMark;
             if (drawdown >= vault.maxDrawdownBps) {
                 vault.status = VaultStatus.PAUSED;

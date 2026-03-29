@@ -714,18 +714,17 @@ contract CommitRevealAuctionTRP is Test {
     }
 
     /// @notice Cross-chain reveal with wrong depositor hash -> slash
-    function test_crossChain_wrongDepositorSlashes() public {
+    function test_crossChain_wrongDepositorReverts() public {
         bytes32 secret = keccak256("xchain");
         (bytes32 commitId, ) = _commit(alice, secret);
 
         vm.warp(block.timestamp + 9);
 
-        uint256 treasuryBal = treasury.balance;
-
-        // Use bob as originalDepositor but commit was made by alice -> hash mismatch -> slash
+        // TRP-R1-F03: wrong depositor now reverts early (more secure than slashing)
+        vm.expectRevert(CommitRevealAuction.NotOwner.selector);
         auction.revealOrderCrossChain(
             commitId,
-            bob, // Wrong depositor
+            bob, // Wrong depositor — contract rejects before hash check
             tokenA,
             tokenB,
             1 ether,
@@ -733,9 +732,6 @@ contract CommitRevealAuctionTRP is Test {
             secret,
             0
         );
-
-        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
-        assertEq(uint256(c.status), uint256(ICommitRevealAuction.CommitStatus.SLASHED));
     }
 
     /// @notice Cross-chain reveal with priority bid

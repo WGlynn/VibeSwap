@@ -396,7 +396,8 @@ contract VibeGovernorTest is Test {
         _closeVoting(id);
         gov.execute(id);
 
-        vm.expectRevert("Already executed");
+        // After execution state is EXECUTED (not SUCCEEDED), so the first check fires
+        vm.expectRevert("Not succeeded");
         gov.execute(id);
     }
 

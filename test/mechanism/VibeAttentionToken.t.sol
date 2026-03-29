@@ -45,6 +45,9 @@ contract VibeAttentionTokenTest is Test {
     uint256 constant PRICE_PER_ATTENTION = 0.001 ether;
     uint256 constant MIN_ENGAGEMENT = 3;
 
+    // Allow test contract (= owner) to receive ETH from withdrawProtocolRevenue
+    receive() external payable {}
+
     function setUp() public {
         owner = makeAddr("owner");
         advertiser = makeAddr("advertiser");
@@ -275,12 +278,12 @@ contract VibeAttentionTokenTest is Test {
     }
 
     function test_submitProof_revert_budgetExhausted() public {
-        // Campaign with exactly one reward worth of budget
+        // Campaign with exactly one reward worth of budget (must meet MIN_CAMPAIGN_BUDGET)
         vm.prank(advertiser);
-        vat.createCampaign{value: PRICE_PER_ATTENTION}(
+        vat.createCampaign{value: MIN_BUDGET}(
             VibeAttentionToken.CampaignType.DISPLAY,
             bytes32("hash"),
-            PRICE_PER_ATTENTION,
+            MIN_BUDGET,
             1,
             MIN_ENGAGEMENT
         );
@@ -536,12 +539,12 @@ contract VibeAttentionTokenTest is Test {
     }
 
     function test_endCampaign_noRefundIfFullySpent() public {
-        // Create campaign with budget exactly one reward
+        // Create campaign with budget exactly one reward (must meet MIN_CAMPAIGN_BUDGET)
         vm.prank(advertiser);
-        vat.createCampaign{value: PRICE_PER_ATTENTION}(
+        vat.createCampaign{value: MIN_BUDGET}(
             VibeAttentionToken.CampaignType.DISPLAY,
             bytes32("hash"),
-            PRICE_PER_ATTENTION,
+            MIN_BUDGET,
             1,
             MIN_ENGAGEMENT
         );

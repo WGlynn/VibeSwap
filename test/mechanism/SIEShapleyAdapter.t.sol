@@ -403,7 +403,8 @@ contract SIEShapleyAdapterTest is Test {
     }
 
     function testFuzz_trueUpRoundIdUnique(uint256 ts1, uint256 ts2) public {
-        ts1 = bound(ts1, 1, type(uint128).max);
+        // Bound ts1 to [1, max-1] so ts1+1 never overflows and stays within uint128 range
+        ts1 = bound(ts1, 1, type(uint128).max - 1);
         ts2 = bound(ts2, ts1 + 1, type(uint128).max);
 
         vm.warp(ts1);

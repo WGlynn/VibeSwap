@@ -301,10 +301,17 @@ contract VibeInsurancePoolTest is Test {
         _purchaseBasic(alice, 5 ether);
         uint256 claimId = _fileClaim(alice, 1 ether);
 
+        // First two denials — threshold not yet reached
+        vm.prank(auditor1);
+        pool.reviewClaim(claimId, false);
+        vm.prank(auditor2);
+        pool.reviewClaim(claimId, false);
+
+        // Third denial — threshold hit, ClaimDenied emitted
         vm.expectEmit(true, false, false, true);
         emit ClaimDenied(claimId);
-
-        _denyClaimUnanimously(claimId);
+        vm.prank(auditor3);
+        pool.reviewClaim(claimId, false);
 
         VibeInsurancePool.Claim memory c = pool.getClaim(claimId);
         assertEq(uint8(c.status), uint8(VibeInsurancePool.ClaimStatus.DENIED));

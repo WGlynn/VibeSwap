@@ -36,6 +36,9 @@ contract VibePredictionEngineTest is Test {
     event ResolutionEvidenceSubmitted(uint256 indexed marketId, bytes32 evidenceHash, address indexed validator);
     event MarketDisputed(uint256 indexed marketId, address indexed disputer);
 
+    // Allow test contract (= owner) to receive ETH from withdrawProtocolRevenue
+    receive() external payable {}
+
     // ============ Setup ============
 
     function setUp() public {
@@ -438,8 +441,8 @@ contract VibePredictionEngineTest is Test {
         uint256 yesPrice = engine.getPrice(id, true);
         uint256 noPrice  = engine.getPrice(id, false);
 
-        // Sum must be exactly PRECISION (y/total + x/total = (y+x)/total = 1)
-        assertEq(yesPrice + noPrice, engine.PRECISION(), "Prices must sum to PRECISION");
+        // Sum must be PRECISION (integer division may cause off-by-one rounding)
+        assertApproxEqAbs(yesPrice + noPrice, engine.PRECISION(), 1, "Prices must sum to PRECISION");
     }
 
     // ============ resolveMarket ============
@@ -1009,7 +1012,7 @@ contract VibePredictionEngineTest is Test {
         uint256 yesPrice = engine.getPrice(id, true);
         uint256 noPrice  = engine.getPrice(id, false);
 
-        assertEq(yesPrice + noPrice, engine.PRECISION(), "Prices must always sum to 1");
+        assertApproxEqAbs(yesPrice + noPrice, engine.PRECISION(), 1, "Prices must always sum to 1");
     }
 
     function testFuzz_mintBurn_isNeutral(uint256 amount) public {

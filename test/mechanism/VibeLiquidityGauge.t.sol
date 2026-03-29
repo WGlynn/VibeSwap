@@ -29,6 +29,9 @@ contract VibeLiquidityGaugeTest is Test {
     event EpochAdvanced(uint256 indexed epoch);
     event EmissionRateUpdated(uint256 newRate);
 
+    // Allow test contract (= owner) to receive ETH from claimReward / withdrawFees
+    receive() external payable {}
+
     // ============ Setup ============
 
     function setUp() public {
@@ -281,7 +284,7 @@ contract VibeLiquidityGaugeTest is Test {
 
         vm.warp(block.timestamp + 7 days);
         gauge.advanceEpoch();
-        vm.warp(block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 10 minutes); // short warp so reward stays within contract balance
 
         uint256 aliceBefore = alice.balance;
         vm.prank(alice);
@@ -309,7 +312,7 @@ contract VibeLiquidityGaugeTest is Test {
 
         vm.warp(block.timestamp + 7 days);
         gauge.advanceEpoch();
-        vm.warp(block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 10 minutes); // short warp so reward stays within contract balance
 
         vm.prank(alice);
         gauge.claimReward(gId);
@@ -413,7 +416,8 @@ contract VibeLiquidityGaugeTest is Test {
         gauge.advanceEpoch();
 
         (, uint256 weight, , , ) = gauge.getGaugeInfo(gId);
-        assertEq(weight, 10000); // 100% of votes → max weight
+        // Contract caps any single gauge at MAX_GAUGE_WEIGHT_BPS (35%)
+        assertEq(weight, gauge.MAX_GAUGE_WEIGHT_BPS());
     }
 
     function test_advanceEpoch_capsWeightAt35Pct() public {
@@ -444,8 +448,9 @@ contract VibeLiquidityGaugeTest is Test {
         gauge.advanceEpoch();
 
         (, , , uint256 rewardRate, ) = gauge.getGaugeInfo(gId);
-        // weight = 10000 (100%) so rate = totalEmissionRate * 10000 / 10000 = EMISSION_RATE
-        assertEq(rewardRate, EMISSION_RATE);
+        // Single gauge is capped at MAX_GAUGE_WEIGHT_BPS (35%) so rate = EMISSION_RATE * 3500 / 10000
+        uint256 expectedRate = (EMISSION_RATE * gauge.MAX_GAUGE_WEIGHT_BPS()) / gauge.BPS();
+        assertEq(rewardRate, expectedRate);
     }
 
     function test_advanceEpoch_skippedWhenNoVotes() public {

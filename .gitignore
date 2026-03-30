@@ -22,6 +22,14 @@ coverage/
 # Node modules (if using npm for anything)
 node_modules/
 
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
 # OS files
 .DS_Store
 Thumbs.db

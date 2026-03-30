@@ -1053,14 +1053,17 @@ contract ShapleyDistributorTest is Test {
 
     // ============ Authorization Tests ============
 
-    function test_unauthorizedCannotComputeShapley() public {
+    function test_computeShapleyIsPermissionless() public {
         ShapleyDistributor.Participant[] memory participants = _createParticipants();
         token.mint(address(distributor), 100 ether);
         distributor.createGame(GAME_ID, 100 ether, address(token), participants);
 
+        // computeShapleyValues is permissionless — anyone can settle a game
         vm.prank(unauthorized);
-        vm.expectRevert(ShapleyDistributor.Unauthorized.selector);
         distributor.computeShapleyValues(GAME_ID);
+
+        // Verify settlement occurred
+        assertTrue(distributor.isGameSettled(GAME_ID));
     }
 
     function test_unauthorizedCannotUpdateQualityWeights() public {

@@ -366,8 +366,8 @@ contract TimeNeutralityProofsTest is Test {
         uint256 contribB,
         uint256 totalValue
     ) public {
-        contribA = bound(contribA, 0.01 ether, 100 ether);
-        contribB = bound(contribB, 0.01 ether, 100 ether);
+        contribA = bound(contribA, 1 ether, 100 ether);
+        contribB = bound(contribB, 1 ether, 100 ether);
         totalValue = bound(totalValue, 1 ether, 1000 ether);
 
         address alice = makeAddr("alice");

@@ -47,6 +47,9 @@ contract VibeContentMarketTest is Test {
     uint256 constant ARTICLE_PRICE = 0.01 ether;
     uint256 constant SUB_PRICE     = 0.05 ether;
 
+    // Allow test contract (= owner) to receive ETH from withdrawProtocolRevenue
+    receive() external payable {}
+
     function setUp() public {
         owner = makeAddr("owner");
         alice = makeAddr("alice");

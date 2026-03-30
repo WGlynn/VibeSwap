@@ -1,5 +1,5 @@
-# Default profile: full compilation (optimizer + via_ir)
-# Use FOUNDRY_PROFILE=fast for rapid iteration during development
+# Default profile: fast iteration (no via_ir = 2-5x faster, 2-3x less RAM)
+# Use FOUNDRY_PROFILE=full for via_ir compilation when needed
 [profile.default]
 src = "contracts"
 out = "out"
@@ -8,7 +8,7 @@ test = "test"
 solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
-via_ir = true
+via_ir = false
 ffi = false
 verbosity = 3
 
@@ -20,11 +20,32 @@ max_test_rejects = 65536
 runs = 256
 depth = 500
 
+# Full profile: via_ir enabled (use for final validation, bytecode size checks)
+[profile.full]
+src = "contracts"
+out = "out-full"
+libs = ["lib"]
+test = "test"
+solc = "0.8.20"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+ffi = false
+verbosity = 3
+
+[profile.full.fuzz]
+runs = 256
+max_test_rejects = 65536
+
+[profile.full.invariant]
+runs = 256
+depth = 500
+
 # CI profile: via_ir with low optimizer runs (needed for 988-file ABI encoding,
 # optimizer_runs=1 keeps compile time under 15 min on GitHub Actions 7GB runner)
 [profile.ci]
 src = "contracts"
-out = "out"
+out = "out-ci"
 libs = ["lib"]
 solc = "0.8.20"
 optimizer = true
@@ -41,29 +62,10 @@ max_test_rejects = 65536
 runs = 256
 depth = 500
 
-# Fast profile: no via_ir for rapid iteration (2-5x faster compile, lower memory)
-[profile.fast]
-src = "contracts"
-out = "out"
-libs = ["lib"]
-solc = "0.8.20"
-optimizer = true
-optimizer_runs = 200
-via_ir = false
-ffi = false
-
-[profile.fast.fuzz]
-runs = 256
-max_test_rejects = 65536
-
-[profile.fast.invariant]
-runs = 256
-depth = 500
-
 # Deploy profile: optimizer_runs=1 for smallest bytecode
 [profile.deploy]
 src = "contracts"
-out = "out"
+out = "out-deploy"
 libs = ["lib"]
 solc = "0.8.20"
 optimizer = true
@@ -71,7 +73,7 @@ optimizer_runs = 1
 via_ir = true
 ffi = false
 
-# Focused test profile: only compile specific test files
+# Focused test profiles: scoped test dirs, no via_ir for speed
 [profile.focused]
 src = "contracts"
 out = "out"
@@ -80,10 +82,9 @@ test = "test"
 solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
-via_ir = true
+via_ir = false
 ffi = false
 
-# focused-incentives: only test/incentives (FractalShapley etc)
 [profile.focused-incentives]
 src = "contracts"
 out = "out"
@@ -92,10 +93,9 @@ test = "test/incentives"
 solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
-via_ir = true
+via_ir = false
 ffi = false
 
-# focused-core: only test/core (VSOSKernel etc)
 [profile.focused-core]
 src = "contracts"
 out = "out"
@@ -104,10 +104,9 @@ test = "test/core"
 solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
-via_ir = true
+via_ir = false
 ffi = false
 
-# focused-libraries: only test/libraries (Groth16Verifier etc)
 [profile.focused-libraries]
 src = "contracts"
 out = "out"
@@ -116,7 +115,7 @@ test = "test/libraries"
 solc = "0.8.20"
 optimizer = true
 optimizer_runs = 200
-via_ir = true
+via_ir = false
 ffi = false
 
 [rpc_endpoints]

@@ -408,6 +408,9 @@ contract VibeSecurityOracleTest is Test {
     function test_verifyFinding_reputationCappedAt10000() public {
         _registerAuditor(auditor1, true);
 
+        // Fund requester for 60 audits at 10 ether each
+        vm.deal(auditRequester, 700 ether);
+
         // Submit and verify 60 findings to push reputation past 10000
         for (uint256 i = 0; i < 60; i++) {
             uint256 auditId = _requestAudit(10 ether, 30);

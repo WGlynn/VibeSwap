@@ -40,6 +40,9 @@ contract VibeRealEstateTest is Test {
         vm.deal(seller, 100 ether);
         vm.deal(buyerAddr, 100 ether);
         vm.deal(buyer2Addr, 100 ether);
+
+        // Warp so that block.timestamp / 30 days > 0 (needed for rental claim logic)
+        vm.warp(31 days);
     }
 
     // ============ Helpers ============
@@ -342,6 +345,7 @@ contract VibeRealEstateTest is Test {
     function test_BuyFractions_RevertsNotEnoughFractions() public {
         bytes32 propertyId = _listFractionalProperty();
 
+        vm.deal(buyerAddr, 200 ether);
         vm.prank(buyerAddr);
         vm.expectRevert("Not enough fractions");
         estate.buyFractions{value: 200 ether}(propertyId, 1001);

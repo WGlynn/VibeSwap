@@ -66,7 +66,9 @@ contract VIBETokenTest is Test {
     }
 
     function test_ownerCanMint() public {
-        vm.prank(owner);
+        // Owner is not a minter — only authorized minters can create VIBE (disintermediation)
+        // This test verifies that an authorized minter (shapleyDistributor) can mint
+        vm.prank(shapleyDistributor);
         vibe.mint(alice, 500e18);
 
         assertEq(vibe.balanceOf(alice), 500e18);
@@ -146,15 +148,15 @@ contract VIBETokenTest is Test {
         vm.prank(alice);
         vibe.burn(1_000_000e18);
 
-        // totalSupply is now 20M, but we can mint 1M more since supply < cap
+        // totalSupply is now 20M, but burns do NOT restore mintable supply
+        // totalMinted is still 21M — the hard cap is absolute, never re-mintable
         assertEq(vibe.totalSupply(), 20_000_000e18);
-        assertEq(vibe.mintableSupply(), 1_000_000e18);
+        assertEq(vibe.mintableSupply(), 0);
 
-        // Mint the burned amount back
+        // Attempting to mint any more reverts
         vm.prank(shapleyDistributor);
-        vibe.mint(bob, 1_000_000e18);
-
-        assertEq(vibe.totalSupply(), 21_000_000e18);
+        vm.expectRevert(VIBEToken.ExceedsMaxSupply.selector);
+        vibe.mint(bob, 1e18);
     }
 
     function test_revertBurnZeroAmount() public {
@@ -414,7 +416,7 @@ contract VIBETokenTest is Test {
         vm.prank(liquidityGauge);
         vibe.mint(bob, 10_000_000e18);
 
-        vm.prank(owner);
+        vm.prank(shapleyDistributor);
         vibe.mint(carol, 999_999e18);
 
         assertEq(vibe.totalSupply(), 20_999_999e18);

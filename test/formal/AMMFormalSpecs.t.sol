@@ -48,8 +48,9 @@ contract AMMFormalSpecs is Test {
         amm.setFlashLoanProtection(false);
 
         // Create pool with initial liquidity
-        token0.mint(address(this), 10000 ether);
-        token1.mint(address(this), 20000000 ether);
+        // Mint enough of both tokens regardless of pool token ordering
+        token0.mint(address(this), 2000000 ether);
+        token1.mint(address(this), 2000000 ether);
         token0.approve(address(amm), type(uint256).max);
         token1.approve(address(amm), type(uint256).max);
 

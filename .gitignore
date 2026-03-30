@@ -1,6 +1,9 @@
 # Compiler files
 cache/
 out/
+out-full/
+out-ci/
+out-deploy/
 
 # Ignores development broadcast logs
 broadcast/

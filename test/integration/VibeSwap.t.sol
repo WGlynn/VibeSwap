@@ -386,14 +386,16 @@ contract VibeSwapIntegrationTest is Test {
         uint256 treasuryBefore = address(treasury).balance;
 
         // Reveal with wrong parameters (directly to auction to test slashing)
-        // Use revealOrderCrossChain since VibeSwapCore is an authorized settler
+        // Use revealOrderCrossChain since VibeSwapCore is an authorized settler.
+        // commitment.depositor = address(core) because core called auction.commitOrder.
+        // Pass wrong amount to trigger hash mismatch → slash.
         vm.prank(address(core));
         auction.revealOrderCrossChain(
             commitId,
-            trader1, // Original depositor
+            address(core), // Core contract is the actual depositor
             address(weth),
             address(usdc),
-            2 ether, // Wrong amount - should cause hash mismatch
+            2 ether, // Wrong amount - should cause hash mismatch → slash
             0,
             secret,
             0

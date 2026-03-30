@@ -196,20 +196,19 @@ contract EmissionControllerTest is Test {
     }
 
     function testDripCrossEra() public {
-        // Warp to 10 seconds before era boundary
-        vm.warp(block.timestamp + ERA_DURATION - 10);
-        ec.drip();
+        // drip() caps accrual to MAX_DRIP_DELTA (1 day) per call to prevent timestamp manipulation.
+        // Warp far ahead (crosses era boundary), but a single drip only mints 1 day at era 0 rate.
+        vm.warp(block.timestamp + ERA_DURATION + 20);
 
-        // Warp 20 seconds (crosses era boundary)
-        vm.warp(block.timestamp + 20);
-        uint256 pending = ec.pendingEmissions();
-
-        // 10 seconds at era 0 rate + 10 seconds at era 1 rate
-        uint256 expected = BASE_RATE * 10 + (BASE_RATE >> 1) * 10;
-        assertEq(pending, expected);
-
+        // Single drip is capped at MAX_DRIP_DELTA = 86400 seconds at era 0 rate
+        uint256 expected = BASE_RATE * 1 days;
         uint256 minted = ec.drip();
         assertEq(minted, expected);
+
+        // After the drip, lastDripTime = genesis + 1 day
+        // pendingEmissions() now reflects time since that last drip
+        uint256 pending = ec.pendingEmissions();
+        assertTrue(pending > 0);
     }
 
     function testDripMultipleEras() public {
@@ -568,15 +567,18 @@ contract EmissionControllerTest is Test {
     // ============ Long Time Gap ============
 
     function testDripAfterLongTime() public {
-        // 10 years — crosses many eras
+        // 10 years — crosses many eras. Due to MAX_DRIP_DELTA, drip() only mints 1 day at a time.
         vm.warp(block.timestamp + 10 * ERA_DURATION);
 
         uint256 pending = ec.pendingEmissions();
         assertTrue(pending > 0);
 
+        // A single drip is capped at MAX_DRIP_DELTA (1 day) — minted < pending
         uint256 minted = ec.drip();
-        assertEq(minted, pending);
-        assertEq(ec.totalEmitted(), pending);
+        assertTrue(minted > 0);
+        assertEq(ec.totalEmitted(), minted);
+        // pendingEmissions() still has remaining (~10 years - 1 day worth)
+        assertTrue(ec.pendingEmissions() > 0);
     }
 
     // ============ Accounting Invariant ============

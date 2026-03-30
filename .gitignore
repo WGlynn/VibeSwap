@@ -30,6 +30,9 @@ node_modules/
 *.fls
 *.fdb_latexmk
 
+# Research repos (cloned, too large for main repo)
+research/
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -323,6 +323,9 @@ contract VibeReputationTest is Test {
     // ============ Fuzz Tests ============
 
     function testFuzz_reportScore_arbitraryValue(uint256 score) public {
+        // Bound to prevent overflow in weighted total calculation (score * weight)
+        score = bound(score, 0, type(uint256).max / 10000);
+
         vm.prank(reporter);
         rep.reportScore(alice, "governance", score);
 

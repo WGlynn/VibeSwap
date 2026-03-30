@@ -218,10 +218,16 @@ contract VerifiedComputeTest is Test {
         _bondSubmitter(submitter);
         bytes32 resultHash = _defaultResultHash();
 
+        // Set expected root BEFORE expectEmit, since setExpectedRoot is a
+        // separate call that shouldn't be captured by the event matcher.
+        (bytes32 root, bytes32[] memory proof) = _buildMerkleLeaf(COMPUTE_ID, resultHash);
+        vc.setExpectedRoot(COMPUTE_ID, root);
+
         vm.expectEmit(true, false, false, true);
         emit ResultSubmitted(COMPUTE_ID, resultHash, submitter);
 
-        _submitResult(submitter, COMPUTE_ID, resultHash);
+        vm.prank(submitter);
+        vc.submitResult(COMPUTE_ID, resultHash, proof);
 
         assertTrue(vc.isPending(COMPUTE_ID));
         assertFalse(vc.isFinalized(COMPUTE_ID));
@@ -254,8 +260,15 @@ contract VerifiedComputeTest is Test {
         _bondSubmitter(submitter);
         _submitResult(submitter, COMPUTE_ID, _defaultResultHash());
 
+        // Don't use _submitResult helper since it calls setExpectedRoot first,
+        // which would succeed before the revert. Call submitResult directly.
+        bytes32 differentHash = keccak256("different");
+        (bytes32 root, bytes32[] memory proof) = _buildMerkleLeaf(COMPUTE_ID, differentHash);
+        vc.setExpectedRoot(COMPUTE_ID, root);
+
         vm.expectRevert(VerifiedCompute.ResultAlreadyExists.selector);
-        _submitResult(submitter, COMPUTE_ID, keccak256("different"));
+        vm.prank(submitter);
+        vc.submitResult(COMPUTE_ID, differentHash, proof);
     }
 
     function test_submitResult_revert_invalidProof() public {

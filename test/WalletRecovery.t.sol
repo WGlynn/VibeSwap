@@ -135,6 +135,9 @@ contract WalletRecoveryTest is Test {
         );
         wr.recordActivity(TOKEN_ID);
         vm.stopPrank();
+
+        // Guardians must wait GUARDIAN_ACTIVATION_DELAY (48h) before participating in recovery
+        vm.warp(block.timestamp + 48 hours + 1);
     }
 
     /// @dev Register N jurors starting from a seed address offset

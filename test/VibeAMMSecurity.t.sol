@@ -178,7 +178,7 @@ contract VibeAMMSecurityTest is Test {
     }
 
     function test_setProtocolFeeShare_exceedsMaxReverts() public {
-        vm.expectRevert(VibeAMM.FeeTooHigh.selector);
+        vm.expectRevert("Fee share too high");
         amm.setProtocolFeeShare(2501);
     }
 

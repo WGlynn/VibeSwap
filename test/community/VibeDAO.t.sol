@@ -365,16 +365,20 @@ contract VibeDAOTest is Test {
         vm.prank(alice);
         uint256 daoId = dao.createDAO("DAO", "", VibeDAO.GovernanceType.TOKEN_VOTING, 5000, 1 hours, 0);
 
-        // Add more members but don't have them vote
+        // Add 3 more members (total 4: alice + bob + charlie + dave)
+        // quorumNeeded = floor(4 * 5000 / 10000) = 2, but only alice votes (1 vote) => quorum not met
         vm.prank(bob);
         dao.joinDAO(daoId);
         vm.prank(charlie);
+        dao.joinDAO(daoId);
+        address dave = makeAddr("dave_quorum");
+        vm.prank(dave);
         dao.joinDAO(daoId);
 
         vm.prank(alice);
         uint256 propId = dao.createProposal(daoId, "Prop", "", address(0), "");
 
-        // Only alice votes (1 out of 3) — quorum is 50% so need at least 1.5 => 2 votes
+        // Only alice votes (1 out of 4) — quorum is 50% so need 2 votes, but only 1 cast
         vm.prank(alice);
         dao.vote(daoId, propId, true);
 

@@ -370,7 +370,7 @@ contract VibeProtocolTreasuryTest is Test {
     }
 
     function test_executeSpending_sendsTokens() public {
-        uint256 proposalId = _proposeTokenSpending(1000 ether);
+        uint256 proposalId = _proposeTokenSpending(50 ether); // within Development monthly limit (100 ether)
         _approveProposal(proposalId, council2);
         _approveProposal(proposalId, council3);
 
@@ -379,7 +379,7 @@ contract VibeProtocolTreasuryTest is Test {
         vm.prank(council1);
         treasury.executeSpending(proposalId);
 
-        assertEq(token.balanceOf(recipient), recipientBefore + 1000 ether);
+        assertEq(token.balanceOf(recipient), recipientBefore + 50 ether);
     }
 
     function test_executeSpending_revertsInsufficientApprovals() public {
@@ -642,7 +642,7 @@ contract VibeProtocolTreasuryTest is Test {
     }
 
     function test_fullLifecycle_proposeApproveExecuteToken() public {
-        uint256 proposalId = _proposeTokenSpending(500 ether);
+        uint256 proposalId = _proposeTokenSpending(75 ether); // within Development monthly limit (100 ether)
         _approveProposal(proposalId, council2);
         _approveProposal(proposalId, council3);
 
@@ -650,7 +650,7 @@ contract VibeProtocolTreasuryTest is Test {
         vm.prank(council1);
         treasury.executeSpending(proposalId);
 
-        assertEq(token.balanceOf(recipient), recipientBefore + 500 ether);
+        assertEq(token.balanceOf(recipient), recipientBefore + 75 ether);
     }
 
     // ============ Fuzz Tests ============

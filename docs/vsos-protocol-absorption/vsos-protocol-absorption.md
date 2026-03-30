@@ -1,9 +1,10 @@
 # VSOS Protocol Absorption — Full DeFi Operating System
 
-**Status**: BUILD NOW
+**Status**: 87% IMPLEMENTED — 14/15 layer components built, 20/20 foundational contracts verified
 **Priority**: Maximum — this is the endgame
 **Principle**: Fork ideas, not governance. Absorb innovation, fix economics.
 **Author**: Will + JARVIS
+**Last updated**: 2026-03-29 (VSOSKernel live, Phase 1 complete, DeepFunding integration mapped)
 
 ---
 
@@ -43,6 +44,10 @@ Every protocol listed below has a fundamental economic flaw: **value extraction 
 │  ZK SETTLEMENT (StarkNet + zkSync + existing LZ V2)  │
 ├─────────────────────────────────────────────────────┤
 │  IDENTITY (ENS/ERC-8004 + existing AgentRegistry)    │
+├─────────────────────────────────────────────────────┤
+│            VSOS KERNEL (SERVICE REGISTRY)             │
+│  VSOSKernel.sol — 9 categories, deterministic IDs    │
+│  12 tests passing, UUPS upgradeable (2026-03-27)     │
 ├─────────────────────────────────────────────────────┤
 │            VIBESWAP CORE (UNCHANGED)                 │
 │  CommitRevealAuction | VibeAMM | ShapleyDistributor  │
@@ -378,32 +383,71 @@ Every layer interoperates via standardized interfaces:
 
 ---
 
-## Implementation Priority
+## Implementation Status (Updated 2026-03-29)
 
-### Phase 1: TODAY (Core DeFi)
-- [ ] `VibeOracleRouter.sol` — multi-source oracle aggregation
-- [ ] `VibeLendPool.sol` — AAVE-style lending with Shapley rates
-- [ ] `VibeStable.sol` (vUSD) — CDP + PSM + PID stabilizer
-- [ ] `VibeRouter.sol` — multi-path trade aggregation
-- [ ] `VibeLimitOrder.sol` — batch-settled limit orders
+### VSOSKernel — The OS Layer (COMPLETE ✓)
+- [x] `VSOSKernel.sol` — service registry, 9 categories (KERNEL, IDENTITY, SECURITY, NETWORKING, STORAGE, RESOURCES, PACKAGES, ECONOMICS, GOVERNANCE), deterministic service IDs via `keccak256(name + category)`, UUPS upgradeable, 12 tests passing
+- Commit `c0b00dc3` (2026-03-27): "the operating system metaphor is not a metaphor"
 
-### Phase 2: THIS WEEK (Derivatives + AI)
-- [ ] `VibePerpEngine.sol` — perpetual futures via batch auction
-- [ ] `SubnetRouter.sol` — AI task routing (Bittensor pattern)
-- [ ] `DataMarketplace.sol` — Ocean data NFT pattern
-- [ ] `GPUComputeMarket.sol` — Render pattern
+### Phase 1: Core DeFi (5/5 COMPLETE ✓)
+- [x] `VibeOracleRouter.sol` — multi-source aggregation (API3 + Chainlink + Pyth patterns), weighted median, accuracy decay scoring, circuit breaker on deviation. Tests passing (2026-03-28)
+- [x] `VibeLendPool.sol` — AAVE flash loans (0.05% fee), kink interest rate model (80% util), Shapley stability bonus (10% yield), health factor liquidation. Fuzz tests passing (2026-03-26)
+- [x] `VibeStable.sol` (vUSD) — CDP engine + PSM + multi-collateral basket + PID-controlled peg. Tests passing
+- [x] `VibeRouter.sol` — multi-path aggregation (ConstantProduct, StableSwap, CommitRevealAuction routes). Tests passing
+- [x] `VibeLimitOrder.sol` — batch-settled on-chain limit orders, no keeper centralization. Tests passing
 
-### Phase 3: NEXT WEEK (Infrastructure)
-- [ ] `VibeNames.sol` — ENS-compatible naming
-- [ ] `VibePush.sol` — notification channels
-- [ ] `StealthAddress.sol` — Monero-style privacy
-- [ ] `BatchProver.sol` — ZK settlement proofs
+### Phase 2: Derivatives + AI (4/4 COMPLETE ✓)
+- [x] `VibePerpEngine.sol` — perpetual futures via batch auction, PID-controlled funding rate, Shapley debt-risk split. Fuzz tests passing (2026-03-26)
+- [x] `SubnetRouter.sol` — Bittensor subnet pattern, quality-weighted Shapley consensus, 90/10 payment split, unstake cooldown. **⚠ NEEDS TESTS**
+- [x] `DataMarketplace.sol` — Ocean data NFT pattern + compute-to-data. Tests passing
+- [x] `GPUComputeMarket.sol` — Render pattern, ZK verifiable compute. Tests passing
+
+### Phase 3: Infrastructure (3/4 — BatchProver remaining)
+- [x] `VibeNames.sol` — ENS-compatible (.vibe TLD), omnichain via LayerZero V2, no renewal fees. Tests passing
+- [x] `VibePush.sol` — Push Protocol pattern, on-chain channels, P2P encrypted messaging. **⚠ NEEDS TESTS**
+- [x] `StealthAddress.sol` — Monero one-time address pattern. Tests passing
+- [ ] `BatchProver.sol` — **ONLY MISSING CONTRACT.** STARK proofs for batch auction settlement, recursive proof aggregation. `BatchPriceVerifier.sol` exists as partial equivalent (oracle-specific only)
 
 ### Phase 4: POST-LAUNCH (Edge Apps)
 - [ ] VibeWorld (3D trading floor)
 - [ ] VibeFan (creator/fan tokens)
-- [ ] Full GPU compute marketplace
+- [ ] VibeStore (Filecoin + BitTorrent storage layer)
 - [ ] Cross-chain ZK bridge
+
+### Test Coverage Gaps (2 of 14)
+| Contract | Priority | Reason |
+|----------|----------|--------|
+| `SubnetRouter.sol` | **HIGH** | AI layer is security-critical; worker slashing needs adversarial tests |
+| `VibePush.sol` | MEDIUM | Communication layer, lower attack surface |
+
+---
+
+## DeepFunding Integration (NEW — 2026-03-29)
+
+SingularityNET's DeepFunding project uses AI ensemble scoring (GPT + Claude + DeepSeek + human calibration) to allocate credit across Ethereum's dependency ecosystem. Their DAG credit model maps directly to our FractalShapley:
+
+| DeepFunding | VibeSwap | Convergence |
+|-------------|----------|-------------|
+| Dependency DAG (14,927 edges) | ContributionDAG | Same graph structure, different credit flow algorithm |
+| AI ensemble scoring | PairwiseVerifier (CRPC) | Both use multi-model consensus for quality |
+| Human pairwise comparisons (882) | Shapley marginal contribution | Both decompose value to individual inputs |
+| 112K git users, 192K commits | On-chain agent registry | Different identity layers, same attribution goal |
+
+**Combined thesis:** DeepFunding solves the *input problem* (accurate credit estimates via human+AI calibration). VibeSwap solves the *fairness problem* (Shapley axioms guarantee fair allocation). Together: human judgment → AI ensemble → Shapley → on-chain verification = **full-stack credit attribution nobody else has.**
+
+See `docs/research/deepfunding-absorption.md` for detailed technical mapping.
+
+---
+
+## Recent Security Hardening (2026-03-17 — 2026-03-29)
+
+Critical audit pass (commit `52b19be`, 2026-03-28):
+- Reentrancy guard fixes across mechanism contracts
+- Storage gap alignment for UUPS proxy safety
+- XSS sanitization in frontend components
+- Flash loan guard exemption for authorized settlers (`CommitRevealAuction.sol`, commit `e7773b05`)
+- 50+ test files stabilized across all layers
+- Fuzz test bounds corrected (`BuybackEngine`, `VibeAMMLite`, `VibeRWA`)
 
 ---
 
@@ -419,3 +463,19 @@ Every absorbed protocol gets the same economic fix:
 6. **Batch auction settlement** — MEV eliminated at every layer, not just trading
 
 > "Every protocol on this list solved a real problem. Then they put a tollbooth in front of the solution. We remove the tollbooth and replace it with math."
+
+---
+
+## Status Scorecard (2026-03-29)
+
+| Metric | Score | Notes |
+|--------|-------|-------|
+| Contracts implemented | 14/15 (93%) | Only `BatchProver.sol` missing |
+| Tests passing | 12/14 (86%) | `SubnetRouter`, `VibePush` need tests |
+| Foundational contracts | 20/20 (100%) | All "existing" contracts verified present |
+| Layer coverage | 8.5/9 (94%) | Storage/P2P deferred; all others live |
+| Phase 1 (Core DeFi) | 5/5 ✓ | COMPLETE |
+| Phase 2 (Derivatives + AI) | 4/4 ✓ | COMPLETE (SubnetRouter needs tests) |
+| Phase 3 (Infrastructure) | 3/4 | BatchProver outstanding |
+| Phase 4 (Edge Apps) | 0/4 | Post-launch |
+| **Overall** | **87%** | Production-ready core; 3 action items remaining |

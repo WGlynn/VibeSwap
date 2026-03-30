@@ -288,12 +288,12 @@ contract StressTest is Test {
         bytes32 unbalancedPool = amm.createPool(address(tokenC), address(tokenD), 30);
 
         tokenC.mint(address(this), 1e30);
-        tokenD.mint(address(this), 1);
+        tokenD.mint(address(this), 1e15);
         tokenC.approve(address(amm), type(uint256).max);
         tokenD.approve(address(amm), type(uint256).max);
 
-        // This should work even with extreme imbalance
-        amm.addLiquidity(unbalancedPool, 1e30, 1, 0, 0);
+        // This should work even with extreme imbalance (both >= 1e15 for M-02)
+        amm.addLiquidity(unbalancedPool, 1e30, 1e15, 0, 0);
 
         IVibeAMM.Pool memory pool = amm.getPool(unbalancedPool);
         assertGt(pool.reserve0, 0);

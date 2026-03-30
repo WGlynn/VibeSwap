@@ -174,6 +174,11 @@ contract VibeNamesTest is Test {
         vm.prank(alice);
         names.setPrice(tokenId, 5 ether);
 
+        // Top up tax deposit so it covers the full year at 5 ether valuation
+        uint256 neededDeposit = _computeTax(5 ether, 365 days) + 1 ether;
+        vm.prank(alice);
+        names.depositTax{value: neededDeposit}(tokenId);
+
         vm.warp(block.timestamp + 365 days);
         uint256 owed = names.taxOwed(tokenId);
         uint256 expected = _computeTax(5 ether, 365 days);

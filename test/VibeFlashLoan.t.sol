@@ -399,9 +399,11 @@ contract VibeFlashLoanTest is Test {
         assertEq(flashLoan.maxFlashLoan(address(tokenB)), POOL_LIQUIDITY);
     }
 
-    function test_maxFlashLoan_unregisteredToken() public view {
-        address randomToken = address(0xbeef1234);
-        assertEq(flashLoan.maxFlashLoan(randomToken), 0);
+    function test_maxFlashLoan_unregisteredToken() public {
+        // Deploy a real token contract that is NOT registered as a pool in flashLoan
+        // maxFlashLoan returns balanceOf(this) — for an unregistered token the balance is 0
+        MockFlashToken unregistered = new MockFlashToken("Unregistered", "UNR");
+        assertEq(flashLoan.maxFlashLoan(address(unregistered)), 0);
     }
 
     function test_maxFlashLoan_decreasesAfterLoan() public {

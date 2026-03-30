@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "alias": ["vibeswap-app.vercel.app"],
+  "alias": ["frontend-jade-five-87.vercel.app"],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",

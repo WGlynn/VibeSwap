@@ -88,7 +88,7 @@ contract VibeLPTest is Test {
 
     function test_firstMint_insufficientInitialLiquidity() public {
         vm.expectRevert("Insufficient initial liquidity");
-        lp.mint(user1, 10000); // Exactly MINIMUM_LIQUIDITY, not enough
+        lp.mint(user1, 9999); // Below MINIMUM_LIQUIDITY, not enough
     }
 
     function test_firstMint_barelyAboveMinimum() public {
@@ -149,7 +149,7 @@ contract VibeLPTest is Test {
     // ============ ERC20 Standard ============
 
     function test_transfer() public {
-        lp.mint(user1, 10_000);
+        lp.mint(user1, 20_000);
         uint256 user1Bal = lp.balanceOf(user1);
 
         vm.prank(user1);
@@ -160,7 +160,7 @@ contract VibeLPTest is Test {
     }
 
     function test_approve_and_transferFrom() public {
-        lp.mint(user1, 10_000);
+        lp.mint(user1, 20_000);
         uint256 user1Bal = lp.balanceOf(user1);
 
         vm.prank(user1);

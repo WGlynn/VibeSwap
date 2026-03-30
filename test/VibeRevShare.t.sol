@@ -402,6 +402,9 @@ contract VibeRevShareTest is Test {
         rev.requestUnstake(STAKE_AMOUNT);
         assertEq(rev.stakedBalanceOf(alice), 0);
 
+        // Must wait 1 day before cancelling unstake (anti-MEV: prevents claim-sandwich)
+        vm.warp(block.timestamp + 1 days + 1);
+
         vm.prank(alice);
         rev.cancelUnstake();
         assertEq(rev.stakedBalanceOf(alice), STAKE_AMOUNT);
@@ -622,18 +625,11 @@ contract VibeRevShareTest is Test {
         assertEq(rev.earned(bob), REVENUE / 2);
     }
 
-    function test_noStakers_revenueAccumulates() public {
-        // Revenue deposited with no stakers
+    function test_noStakers_revenueReverts() public {
+        // Revenue deposited with no stakers reverts to prevent permanently locked funds
+        // (accumulator cannot update with zero totalStaked, revenue would be stuck)
         vm.prank(charlie);
+        vm.expectRevert("No stakers to distribute to");
         rev.depositRevenue(REVENUE);
-
-        // Nobody earns (no stakers)
-        // Revenue is in the contract but not distributed via accumulator
-        assertEq(rev.totalRevenueDeposited(), REVENUE);
-
-        // Alice stakes — but doesn't retroactively earn
-        vm.prank(alice);
-        rev.stake(STAKE_AMOUNT);
-        assertEq(rev.earned(alice), 0);
     }
 }

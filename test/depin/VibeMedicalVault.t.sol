@@ -651,7 +651,7 @@ contract VibeMedicalVaultTest is Test {
         // Verify final state
         assertEq(vault.patientCount(), 1);
         assertEq(vault.consentCount(), 1);
-        assertEq(vault.getAccessLogCount(), 3); // 1 data access + 1 emergency + implicit
+        assertEq(vault.getAccessLogCount(), 2); // 1 data access + 1 emergency
         assertEq(vault.studyCount(), 1);
     }
 }

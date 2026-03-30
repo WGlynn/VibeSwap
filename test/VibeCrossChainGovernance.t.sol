@@ -173,7 +173,8 @@ contract VibeCrossChainGovernanceTest is Test {
         (uint256 vFor, uint256 vAgainst, bool finalized) = gov.getChainVotes(pid, CHAIN_1);
         assertEq(vFor, 800);
         assertEq(vAgainst, 100);
-        assertFalse(finalized); // only 1 attestation, need 1 to finalize... wait, minAttestations=1 so it should finalize
+        // minAttestations=1, so a single attestation immediately finalizes the chain votes
+        assertTrue(finalized);
     }
 
     function test_submitChainVotes_finalizesOnceThresholdMet() public {

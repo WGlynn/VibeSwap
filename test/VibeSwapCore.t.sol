@@ -452,13 +452,17 @@ contract VibeSwapCoreTest is Test {
         vm.prank(trader);
         core.commitSwap(address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s1"));
 
-        // Immediately try again
+        // Advance batch so M-06 (one-per-batch) doesn't fire before cooldown check
+        auction.setBatchId(2);
+
+        // Immediately try again — cooldown not elapsed
         vm.prank(trader);
         vm.expectRevert(VibeSwapCore.CommitCooldownActive.selector);
         core.commitSwap(address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s2"));
 
-        // After cooldown
+        // After cooldown, advance to a new batch
         vm.warp(block.timestamp + 11);
+        auction.setBatchId(3);
         vm.prank(trader);
         core.commitSwap(address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s3"));
         assertEq(core.deposits(trader, address(tokenA)), 200e18);
@@ -481,10 +485,11 @@ contract VibeSwapCoreTest is Test {
         vm.prank(trader);
         core.commitSwap(address(tokenA), address(tokenB), 100_000e18, 0, keccak256("s1"));
 
-        // Advance past 1 hour window
+        // Advance past 1 hour window AND advance batch (M-06: one commit per batch per trader)
         vm.warp(block.timestamp + 1 hours + 1);
+        auction.setBatchId(2);
 
-        // Should work again
+        // Should work again since rate limit window reset
         vm.prank(trader);
         core.commitSwap(address(tokenA), address(tokenB), 50_000e18, 0, keccak256("s2"));
         assertEq(core.deposits(trader, address(tokenA)), 150_000e18);

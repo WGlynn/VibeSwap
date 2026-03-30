@@ -701,7 +701,10 @@ contract VibeGovernanceHubTest is Test {
         uint256 proposalId = _createTokenProposal(true); // emergency = true
         _activateProposal(proposalId);
 
-        vibe.mint(voter1, 1_000_000 ether); // Need 60% quorum for emergency
+        // Emergency proposals require 60% quorum. Mint enough so voter1 holds >60% of total supply.
+        // Total before extra mint: deployer(1M) + voter1(10K) + voter2(10K) + voter3(10K) = 1.03M
+        // After minting 2M to voter1: voter1=2.01M, total=3.03M → 60% of 3.03M = 1.818M, voter1 has 2.01M > 1.818M
+        vibe.mint(voter1, 2_000_000 ether);
         vm.prank(voter1);
         hub.castVote(proposalId, true);
 
@@ -918,16 +921,15 @@ contract VibeGovernanceHubTest is Test {
         _activateProposal(proposalId);
         assertEq(uint8(hub.state(proposalId)), uint8(VibeGovernanceHub.ProposalState.ACTIVE));
 
-        // 3. Vote (ensure quorum)
+        // 3. Vote (ensure quorum — voter1 gets extra to meet 10% quorum of total supply)
         vibe.mint(voter1, 200_000 ether);
         vm.prank(voter1);
         hub.castVote(proposalId, true);
         vm.prank(voter2);
         hub.castVote(proposalId, true);
 
-        // 4. Finalize
+        // 4. Warp past voting period — state auto-derives to PASSED (no explicit finalizeVoting needed)
         vm.warp(block.timestamp + 7 days + 1);
-        hub.finalizeVoting(proposalId);
         assertEq(uint8(hub.state(proposalId)), uint8(VibeGovernanceHub.ProposalState.PASSED));
 
         // 5. Queue

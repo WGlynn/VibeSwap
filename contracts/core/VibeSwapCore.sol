@@ -182,8 +182,15 @@ contract VibeSwapCore is
     /// @notice Queue of failed incentive/compliance executions for retry
     FailedExecution[] public failedExecutions;
 
+    /// @notice Maps (batchId, orderIndex) → actual depositor address
+    /// @dev Needed because auction records core as trader, but deposits are keyed by user
+    mapping(uint64 => mapping(uint256 => address)) private _orderDepositors;
+
+    /// @notice Order count per batch (for indexing _orderDepositors during reveal)
+    mapping(uint64 => uint256) private _orderRevealCount;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[46] private __gap;
+    uint256[44] private __gap;
 
     // ============ Events ============
 
@@ -420,8 +427,12 @@ contract VibeSwapCore is
         _checkAndUpdateRateLimit(msg.sender, amountIn);
 
         // Generate commitment hash
+        // Use address(this) as the depositor identity because VibeSwapCore is msg.sender
+        // when calling auction.commitOrder, so commitment.depositor = address(this).
+        // revealSwap passes address(this) as originalDepositor to satisfy the depositor check,
+        // and the hash is verified with address(this) as well.
         bytes32 commitHash = keccak256(abi.encodePacked(
-            msg.sender,
+            address(this),
             tokenIn,
             tokenOut,
             amountIn,
@@ -490,10 +501,17 @@ contract VibeSwapCore is
         params.priorityBid = priorityBid;
 
         // Reveal to auction - use cross-chain variant since we're acting on behalf of user
-        // This passes the original trader address for hash verification
+        // Pass address(this) as originalDepositor because VibeSwapCore is the depositor
+        // in the auction (commitment.depositor = address(this)), and commitHash was
+        // generated with address(this) as the identity in commitSwap.
+        // Record actual depositor before reveal (auction records core as trader)
+        uint64 currentBatchId = auction.getCurrentBatchId();
+        _orderDepositors[currentBatchId][_orderRevealCount[currentBatchId]] = msg.sender;
+        _orderRevealCount[currentBatchId]++;
+
         auction.revealOrderCrossChain{value: msg.value}(
             commitId,
-            msg.sender, // Original trader (commit owner)
+            address(this), // Core contract is the depositor in the auction commitment
             params.tokenIn,
             params.tokenOut,
             params.amountIn,
@@ -855,6 +873,13 @@ contract VibeSwapCore is
         IERC20(token).safeTransfer(to, amount);
     }
 
+    /// @notice Resolve actual depositor for an order in a batch
+    /// @dev Auction records core as trader; this maps back to the user who called commitSwap
+    function _getDepositor(uint64 batchId, uint256 orderIdx, address fallbackTrader) internal view returns (address) {
+        address depositor = _orderDepositors[batchId][orderIdx];
+        return depositor != address(0) ? depositor : fallbackTrader;
+    }
+
     // ============ Internal Functions ============
 
     /**
@@ -917,13 +942,16 @@ contract VibeSwapCore is
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
-            // O(1) cumulative lookup via storage mapping keyed on keccak256(trader, tokenIn)
-            bytes32 pairKey = keccak256(abi.encodePacked(order.trader, order.tokenIn));
+            // Resolve actual depositor (auction records core as trader)
+            address depositor = _getDepositor(batchId, idx, order.trader);
+
+            // O(1) cumulative lookup via storage mapping keyed on keccak256(depositor, tokenIn)
+            bytes32 pairKey = keccak256(abi.encodePacked(depositor, order.tokenIn));
             uint256 cumulativeAmount = _cumulativeValidated[pairKey] + order.amountIn;
 
             // Verify cumulative deposit does not exceed available balance
-            if (deposits[order.trader][order.tokenIn] < cumulativeAmount) {
-                emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Insufficient deposit");
+            if (deposits[depositor][order.tokenIn] < cumulativeAmount) {
+                emit OrderFailed(batchId, depositor, order.tokenIn, order.tokenOut, order.amountIn, "Insufficient deposit");
                 unchecked { ++i; }
                 continue;
             }
@@ -1042,7 +1070,8 @@ contract VibeSwapCore is
 
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
-            address recipient = _resolveRecipient(batchId, order.trader);
+            address depositor = _getDepositor(batchId, idx, order.trader);
+            address recipient = _resolveRecipient(batchId, depositor);
 
             IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
 
@@ -1109,9 +1138,6 @@ contract VibeSwapCore is
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
             // SEC-1: Skip failed orders within a partial batch — don't decrement their deposits.
-            // The AMM already returned their tokens to VibeSwapCore. The user can reclaim
-            // via withdrawDeposit(). We identify failures by replicating the AMM's output
-            // calculation: clearing price -> gross output -> fee deduction -> check minAmountOut.
             if (hasFailures) {
                 bool isToken0 = order.tokenIn == pool.token0;
                 uint256 grossOut;
@@ -1122,15 +1148,11 @@ contract VibeSwapCore is
                         ? (order.amountIn * 1e18) / result.clearingPrice
                         : 0;
                 }
-                // Use pool base fee rate as conservative lower bound. If actual fee is higher
-                // (True Price surcharge), netOut is even lower — so this check is conservative:
-                // it correctly identifies all slippage failures, and may also catch surcharge failures.
                 uint256 netOut = (grossOut * (10000 - pool.feeRate)) / 10000;
 
                 if (netOut < order.minAmountOut) {
-                    // This order failed in the AMM — tokens already returned to VibeSwapCore
                     emit OrderRefunded(
-                        batchId, order.trader, order.tokenIn, order.amountIn,
+                        batchId, _getDepositor(batchId, idx, order.trader), order.tokenIn, order.amountIn,
                         "Partial batch: slippage or liquidity failure"
                     );
                     unchecked { ++k; }
@@ -1138,18 +1160,18 @@ contract VibeSwapCore is
                 }
             }
 
-            // Clear deposit (only for successfully executed orders)
-            deposits[order.trader][order.tokenIn] -= order.amountIn;
-
-            // Pro-rata share of total output based on input contribution
-            // NOTE: totalTokenInSwapped only includes successful orders, so pro-rata is accurate
             uint256 estimatedOut = 0;
-            if (result.clearingPrice > 0 && result.totalTokenInSwapped > 0) {
-                estimatedOut = (order.amountIn * result.totalTokenOutSwapped) / result.totalTokenInSwapped;
-            }
+            {
+                // Scoped to avoid stack-too-deep
+                address depositor = _getDepositor(batchId, idx, order.trader);
+                deposits[depositor][order.tokenIn] -= order.amountIn;
 
-            // Settle wBAR position
-            _settleWBAR(batchId, order.trader, estimatedOut);
+                if (result.clearingPrice > 0 && result.totalTokenInSwapped > 0) {
+                    estimatedOut = (order.amountIn * result.totalTokenOutSwapped) / result.totalTokenInSwapped;
+                }
+
+                _settleWBAR(batchId, depositor, estimatedOut);
+            }
 
             // Record execution + compliance
             _recordExecution(poolId, order, estimatedOut);
@@ -1234,7 +1256,8 @@ contract VibeSwapCore is
         for (uint256 k = 0; k < count;) {
             uint256 idx = originalIndices[k];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
-            emit OrderFailed(batchId, order.trader, order.tokenIn, order.tokenOut, order.amountIn, "Swap execution failed");
+            address depositor = _getDepositor(batchId, idx, order.trader);
+            emit OrderFailed(batchId, depositor, order.tokenIn, order.tokenOut, order.amountIn, "Swap execution failed");
             unchecked { ++k; }
         }
     }

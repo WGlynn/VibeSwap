@@ -163,7 +163,7 @@ contract FullIncentivePipelineTest is Test {
         CrossChainRouter routerImpl = new CrossChainRouter();
         router = CrossChainRouter(payable(address(new ERC1967Proxy(
             address(routerImpl),
-            abi.encodeCall(CrossChainRouter.initialize, (owner, address(lzEndpoint), address(auction)))
+            abi.encodeCall(CrossChainRouter.initialize, (owner, address(lzEndpoint), address(auction), uint32(1)))
         ))));
 
         // Deploy Core

@@ -56,7 +56,8 @@ contract CrossChainRouterFuzzTest is Test {
             CrossChainRouter.initialize.selector,
             owner,
             address(endpoint),
-            address(auction)
+            address(auction),
+            uint32(1)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         router = CrossChainRouter(payable(address(proxy)));
@@ -111,9 +112,10 @@ contract CrossChainRouterFuzzTest is Test {
 
         vm.prank(caller);
         vm.expectRevert(CrossChainRouter.Unauthorized.selector);
-        router.sendCommit{value: 0.1 ether}(
+        router.sendCommit{value: 0.01 ether}(
             CHAIN_B,
             keccak256("commit"),
+            0.1 ether,
             bytes("")
         );
     }
@@ -126,9 +128,10 @@ contract CrossChainRouterFuzzTest is Test {
 
         vm.prank(authorized);
         vm.expectRevert(CrossChainRouter.InvalidPeer.selector);
-        router.sendCommit{value: 0.1 ether}(
+        router.sendCommit{value: 0.01 ether}(
             chainId,
             keccak256("commit"),
+            0.1 ether,
             bytes("")
         );
     }

@@ -233,7 +233,7 @@ contract ReentrancyHardeningTests is Test {
         CrossChainRouter routerImpl = new CrossChainRouter();
         ERC1967Proxy routerProxy = new ERC1967Proxy(
             address(routerImpl),
-            abi.encodeCall(CrossChainRouter.initialize, (owner, address(endpoint), address(auction)))
+            abi.encodeCall(CrossChainRouter.initialize, (owner, address(endpoint), address(auction), uint32(1)))
         );
 
         // --- Deploy DAOTreasury ---

@@ -228,9 +228,20 @@ contract CrossChainRouter is
      * @param commitHash Commitment hash
      * @param options LayerZero options
      */
+    /**
+     * @notice Send order commitment to another chain
+     * @param dstEid Destination chain endpoint ID
+     * @param commitHash Commitment hash
+     * @param depositAmount The deposit amount committed on source chain (for bookkeeping on dst)
+     * @param options LayerZero options
+     * @dev TRP-R22-H03: msg.value is ONLY the LZ messaging fee. depositAmount is separate.
+     *      The actual deposit stays on the source chain auction contract.
+     *      The destination chain uses depositAmount for bridged deposit bookkeeping.
+     */
     function sendCommit(
         uint32 dstEid,
         bytes32 commitHash,
+        uint256 depositAmount,
         bytes calldata options
     ) external payable nonReentrant onlyAuthorized {
         bytes32 peer = peers[dstEid];
@@ -250,8 +261,8 @@ contract CrossChainRouter is
         CrossChainCommit memory commit = CrossChainCommit({
             commitHash: commitHash,
             depositor: msg.sender,
-            depositAmount: msg.value,
-            srcChainId: localEid,  // TRP-R21-H01: Use LZ eid, not block.chainid
+            depositAmount: depositAmount,  // TRP-R22-H03: Explicit deposit, not msg.value
+            srcChainId: localEid,
             dstChainId: dstEid,
             srcTimestamp: srcTimestamp
         });
@@ -265,7 +276,7 @@ contract CrossChainRouter is
             abi.encode(commit)
         );
 
-        // Send via LayerZero
+        // Send via LayerZero — msg.value is purely the LZ messaging fee
         MessagingParams memory params = MessagingParams({
             dstEid: dstEid,
             receiver: peer,
@@ -330,7 +341,15 @@ contract CrossChainRouter is
             abi.encode(result)
         );
 
-        uint256 feePerChain = msg.value / dstEids.length;
+        // TRP-R22-M04: Count valid peers first, then divide fees only among reachable chains
+        uint256 validPeerCount;
+        for (uint256 i = 0; i < dstEids.length; i++) {
+            if (peers[dstEids[i]] != bytes32(0)) validPeerCount++;
+        }
+        require(validPeerCount > 0, "No valid peers");
+
+        uint256 feePerChain = msg.value / validPeerCount;
+        uint256 spent;
 
         for (uint256 i = 0; i < dstEids.length; i++) {
             bytes32 peer = peers[dstEids[i]];
@@ -345,14 +364,15 @@ contract CrossChainRouter is
             });
 
             _lzSend(params, feePerChain);
+            spent += feePerChain;
 
             emit BatchResultSent(result.batchId, dstEids[i]);
         }
 
-        // Refund fee remainder from integer division
-        uint256 remainder = msg.value - (feePerChain * dstEids.length);
-        if (remainder > 0) {
-            (bool success, ) = msg.sender.call{value: remainder}("");
+        // Refund unspent ETH (integer division remainder + skipped peerless chains)
+        uint256 refund = msg.value - spent;
+        if (refund > 0) {
+            (bool success, ) = msg.sender.call{value: refund}("");
             require(success, "Fee refund failed");
         }
     }
@@ -376,7 +396,15 @@ contract CrossChainRouter is
             abi.encode(sync)
         );
 
-        uint256 feePerChain = msg.value / dstEids.length;
+        // TRP-R22-M04: Same fix as broadcastBatchResult — only charge for valid peers
+        uint256 validPeerCount;
+        for (uint256 i = 0; i < dstEids.length; i++) {
+            if (peers[dstEids[i]] != bytes32(0)) validPeerCount++;
+        }
+        require(validPeerCount > 0, "No valid peers");
+
+        uint256 feePerChain = msg.value / validPeerCount;
+        uint256 spent;
 
         for (uint256 i = 0; i < dstEids.length; i++) {
             bytes32 peer = peers[dstEids[i]];
@@ -391,12 +419,13 @@ contract CrossChainRouter is
             });
 
             _lzSend(params, feePerChain);
+            spent += feePerChain;
         }
 
-        // Refund fee remainder from integer division
-        uint256 remainder = msg.value - (feePerChain * dstEids.length);
-        if (remainder > 0) {
-            (bool success, ) = msg.sender.call{value: remainder}("");
+        // Refund unspent ETH
+        uint256 refund = msg.value - spent;
+        if (refund > 0) {
+            (bool success, ) = msg.sender.call{value: refund}("");
             require(success, "Fee refund failed");
         }
     }
@@ -542,11 +571,13 @@ contract CrossChainRouter is
         emit CrossChainRevealReceived(reveal.commitId, srcEid);
     }
 
+    /// @dev TRP-R22-M05: STUB — decodes and emits but does not execute settlement.
+    ///      Production implementation must: (1) verify batch result against local state,
+    ///      (2) trigger asset transfers back to source chains via OFT/bridge,
+    ///      (3) update local fill records. Without this, cross-chain orders settle
+    ///      on the hub chain but source-chain users never receive their tokens.
     function _handleBatchResult(bytes memory payload, uint32 srcEid) internal {
         BatchResult memory result = abi.decode(payload, (BatchResult));
-
-        // Process fills for cross-chain orders
-        // In production, this would trigger asset transfers back to source chains
 
         emit BatchResultReceived(result.batchId, srcEid);
     }
@@ -585,14 +616,15 @@ contract CrossChainRouter is
 
     // ============ Rate Limiting ============
 
-    // L-04: Sliding window rate limit — dissolves hour-boundary doubling attack.
-    // Previous fixed-window design allowed 2x throughput across the hour boundary.
-    // Sliding window: limit applies to any rolling 1-hour period.
+    // TRP-R22-M01: Fixed-window rate limit with lazy reset.
+    // Resets counter when >1hr since last reset. Not a true sliding window —
+    // a burst of 2x messages is possible across the hour boundary.
+    // Acceptable for DoS mitigation; not suitable for precise throughput control.
     function _checkRateLimit(uint32 srcEid) internal {
         uint256 currentTime = block.timestamp;
         uint256 lastReset = lastResetTime[srcEid];
 
-        // If more than 1 hour since last reset, clear the counter
+        // Lazy reset: if more than 1 hour since last reset, clear counter
         if (currentTime > lastReset + 1 hours) {
             messageCount[srcEid] = 0;
             lastResetTime[srcEid] = currentTime;
@@ -637,8 +669,48 @@ contract CrossChainRouter is
 
     // ============ Admin Functions ============
 
+    // ============ Emergency Recovery (TRP-R22-H02) ============
+
+    event EmergencyWithdrawETH(address indexed to, uint256 amount);
+    event EmergencyWithdrawERC20(address indexed token, address indexed to, uint256 amount);
+
+    /**
+     * @notice Emergency withdraw ETH not earmarked for bridged deposits
+     * @dev Only withdraws surplus ETH — bridged deposits remain protected
+     * @param to Recipient address
+     */
+    function emergencyWithdrawETH(address to) external onlyOwner nonReentrant {
+        require(to != address(0), "Invalid recipient");
+        uint256 surplus = address(this).balance > totalBridgedDeposits
+            ? address(this).balance - totalBridgedDeposits
+            : 0;
+        require(surplus > 0, "No surplus ETH");
+
+        (bool success, ) = to.call{value: surplus}("");
+        require(success, "ETH transfer failed");
+        emit EmergencyWithdrawETH(to, surplus);
+    }
+
+    /**
+     * @notice Emergency withdraw ERC20 tokens accidentally sent to this contract
+     * @param token Token address
+     * @param to Recipient address
+     */
+    function emergencyWithdrawERC20(address token, address to) external onlyOwner nonReentrant {
+        require(to != address(0), "Invalid recipient");
+        require(token != address(0), "Invalid token");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        require(balance > 0, "No token balance");
+
+        IERC20(token).safeTransfer(to, balance);
+        emit EmergencyWithdrawERC20(token, to, balance);
+    }
+
+    // ============ Peer & Access Management ============
+
     /**
      * @notice Set peer contract on another chain
+     * @dev TRP-R22-M03: Zero address explicitly deletes the peer
      */
     function setPeer(uint32 eid, bytes32 peer) external onlyOwner {
         peers[eid] = peer;

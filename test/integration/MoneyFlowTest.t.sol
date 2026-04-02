@@ -103,7 +103,7 @@ contract MoneyFlowTest is Test {
 
         CrossChainRouter routerImpl = new CrossChainRouter();
         bytes memory routerInit = abi.encodeWithSelector(
-            CrossChainRouter.initialize.selector, owner, address(endpoint), address(auction)
+            CrossChainRouter.initialize.selector, owner, address(endpoint), address(auction), uint32(1)
         );
         ERC1967Proxy routerProxy = new ERC1967Proxy(address(routerImpl), routerInit);
         router = CrossChainRouter(payable(address(routerProxy)));

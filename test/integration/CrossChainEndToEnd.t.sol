@@ -113,11 +113,11 @@ contract CrossChainEndToEnd is Test {
 
         // Deploy Chain A infrastructure
         endpointA = new MockLZEndpointE2E();
-        (routerA, auctionA) = _deployChain(endpointA);
+        (routerA, auctionA) = _deployChain(endpointA, EID_CHAIN_A);
 
         // Deploy Chain B infrastructure
         endpointB = new MockLZEndpointE2E();
-        (routerB, auctionB) = _deployChain(endpointB);
+        (routerB, auctionB) = _deployChain(endpointB, EID_CHAIN_B);
 
         // Cross-peer: A knows B, B knows A
         routerA.setPeer(EID_CHAIN_B, bytes32(uint256(uint160(address(routerB)))));
@@ -131,7 +131,7 @@ contract CrossChainEndToEnd is Test {
         vm.deal(address(routerB), 10 ether);
     }
 
-    function _deployChain(MockLZEndpointE2E endpoint)
+    function _deployChain(MockLZEndpointE2E endpoint, uint32 localEid)
         internal
         returns (CrossChainRouter router, CommitRevealAuction auction)
     {
@@ -146,13 +146,14 @@ contract CrossChainEndToEnd is Test {
         ERC1967Proxy auctionProxy = new ERC1967Proxy(address(auctionImpl), auctionInit);
         auction = CommitRevealAuction(payable(address(auctionProxy)));
 
-        // Deploy router
+        // Deploy router with correct chain eid
         CrossChainRouter routerImpl = new CrossChainRouter();
         bytes memory routerInit = abi.encodeWithSelector(
             CrossChainRouter.initialize.selector,
             owner,
             address(endpoint),
-            address(auction)
+            address(auction),
+            localEid
         );
         ERC1967Proxy routerProxy = new ERC1967Proxy(address(routerImpl), routerInit);
         router = CrossChainRouter(payable(address(routerProxy)));
@@ -215,7 +216,7 @@ contract CrossChainEndToEnd is Test {
 
         // Step 1: Alice sends commit from Chain A to Chain B
         vm.prank(alice);
-        routerA.sendCommit{value: 1.1 ether}(EID_CHAIN_B, commitHash, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHash, 1.1 ether, "");
 
         // Verify message was captured in Chain A's outbox
         assertEq(endpointA.outboxLength(), 1, "Should have 1 outbound message");
@@ -268,10 +269,10 @@ contract CrossChainEndToEnd is Test {
         // ---- PHASE 1: Commit on Chain A ----
         uint256 aliceBalBefore = alice.balance;
         vm.prank(alice);
-        routerA.sendCommit{value: depositAmount + lzFee}(EID_CHAIN_B, commitHash, "");
+        routerA.sendCommit{value: lzFee}(EID_CHAIN_B, commitHash, depositAmount, "");
 
         assertEq(endpointA.outboxLength(), 1, "Commit message in outbox");
-        assertEq(alice.balance, aliceBalBefore - depositAmount - lzFee, "Alice charged");
+        assertEq(alice.balance, aliceBalBefore - lzFee, "Alice charged LZ fee");
 
         // ---- PHASE 2: Relay commit to Chain B ----
         vm.chainId(EID_CHAIN_B);
@@ -355,7 +356,7 @@ contract CrossChainEndToEnd is Test {
         // Deploy a third chain (Arbitrum — EID 30110)
         uint32 EID_CHAIN_C = 30110;
         MockLZEndpointE2E endpointC = new MockLZEndpointE2E();
-        (CrossChainRouter routerC, ) = _deployChain(endpointC);
+        (CrossChainRouter routerC, ) = _deployChain(endpointC, EID_CHAIN_C);
 
         // Wire up peers: A↔C, B↔C
         routerA.setPeer(EID_CHAIN_C, bytes32(uint256(uint160(address(routerC)))));
@@ -431,7 +432,7 @@ contract CrossChainEndToEnd is Test {
         bytes32 commitHash = keccak256(abi.encodePacked(alice, secret));
 
         vm.prank(alice);
-        routerA.sendCommit{value: 0.5 ether}(EID_CHAIN_B, commitHash, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHash, 0.5 ether, "");
 
         // Get the message from outbox
         MockLZEndpointE2E.CapturedMessage memory captured = endpointA.getOutboxMessage(0);
@@ -461,7 +462,7 @@ contract CrossChainEndToEnd is Test {
         bytes32 commitHash = keccak256(abi.encodePacked(alice, secret));
 
         vm.prank(alice);
-        routerA.sendCommit{value: 0.5 ether}(EID_CHAIN_B, commitHash, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHash, 0.5 ether, "");
 
         MockLZEndpointE2E.CapturedMessage memory captured = endpointA.getOutboxMessage(0);
 
@@ -488,7 +489,7 @@ contract CrossChainEndToEnd is Test {
         for (uint256 i = 0; i < 6; i++) {
             bytes32 commitHash = keccak256(abi.encodePacked(alice, i));
             vm.prank(alice);
-            routerA.sendCommit{value: 0.5 ether}(EID_CHAIN_B, commitHash, "");
+            routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHash, 0.5 ether, "");
         }
 
         assertEq(endpointA.outboxLength(), 6, "6 messages in outbox");
@@ -536,7 +537,7 @@ contract CrossChainEndToEnd is Test {
         bytes32 commitHash = keccak256("expiry_test");
 
         vm.prank(alice);
-        routerA.sendCommit{value: 1 ether}(EID_CHAIN_B, commitHash, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHash, 1 ether, "");
 
         // Relay to Chain B
         vm.chainId(EID_CHAIN_B);
@@ -613,10 +614,10 @@ contract CrossChainEndToEnd is Test {
         bytes32 commitHashBob = keccak256("bob_concurrent");
 
         vm.prank(alice);
-        routerA.sendCommit{value: 2 ether}(EID_CHAIN_B, commitHashAlice, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHashAlice, 2 ether, "");
 
         vm.prank(bob);
-        routerA.sendCommit{value: 3 ether}(EID_CHAIN_B, commitHashBob, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHashBob, 3 ether, "");
 
         assertEq(endpointA.outboxLength(), 2, "Two concurrent commits");
 
@@ -650,7 +651,7 @@ contract CrossChainEndToEnd is Test {
         // Deploy third chain for 3-way split
         uint32 EID_CHAIN_C = 30110;
         MockLZEndpointE2E endpointC = new MockLZEndpointE2E();
-        (CrossChainRouter routerC, ) = _deployChain(endpointC);
+        (CrossChainRouter routerC, ) = _deployChain(endpointC, EID_CHAIN_C);
         routerA.setPeer(EID_CHAIN_C, bytes32(uint256(uint160(address(routerC)))));
 
         uint32[] memory dstEids = new uint32[](3);
@@ -705,7 +706,7 @@ contract CrossChainEndToEnd is Test {
         // Step 2: Cross-chain commit A→B
         bytes32 commitHash = keccak256("lifecycle_test");
         vm.prank(alice);
-        routerA.sendCommit{value: 1 ether}(EID_CHAIN_B, commitHash, "");
+        routerA.sendCommit{value: 0.01 ether}(EID_CHAIN_B, commitHash, 1 ether, "");
 
         vm.chainId(EID_CHAIN_B);
         _relayMessages(endpointA, routerB, EID_CHAIN_A);

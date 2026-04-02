@@ -67,7 +67,8 @@ contract CrossChainRouterTest is Test {
             CrossChainRouter.initialize.selector,
             owner,
             address(endpoint),
-            address(auction)
+            address(auction),
+            uint32(1)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         router = CrossChainRouter(payable(address(proxy)));
@@ -116,7 +117,7 @@ contract CrossChainRouterTest is Test {
         bytes memory options = "";
 
         vm.prank(authorized);
-        router.sendCommit{value: 0.1 ether}(CHAIN_B, commitHash, options);
+        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, options);
 
         // Verify pending commit stored (commitId includes dstEid and srcTimestamp)
         bytes32 commitId = keccak256(abi.encodePacked(
@@ -140,7 +141,7 @@ contract CrossChainRouterTest is Test {
 
         vm.prank(authorized);
         vm.expectRevert(CrossChainRouter.InvalidPeer.selector);
-        router.sendCommit{value: 0.1 ether}(99, commitHash, ""); // Non-existent chain
+        router.sendCommit{value: 0.01 ether}(99, commitHash, 0.1 ether, ""); // Non-existent chain
     }
 
     function test_sendCommit_unauthorized() public {
@@ -149,7 +150,7 @@ contract CrossChainRouterTest is Test {
         vm.deal(treasury, 1 ether);
         vm.prank(treasury);
         vm.expectRevert(CrossChainRouter.Unauthorized.selector);
-        router.sendCommit{value: 0.1 ether}(CHAIN_B, commitHash, "");
+        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, "");
     }
 
     // ============ Cross-Chain Reveal Tests ============
@@ -228,7 +229,7 @@ contract CrossChainRouterTest is Test {
             depositor: authorized,
             depositAmount: 0.01 ether,
             srcChainId: CHAIN_B,
-            dstChainId: uint32(block.chainid),
+            dstChainId: CHAIN_A,  // Must match localEid
             srcTimestamp: block.timestamp
         });
 
@@ -259,7 +260,7 @@ contract CrossChainRouterTest is Test {
             depositor: authorized,
             depositAmount: 0.01 ether,
             srcChainId: CHAIN_B,
-            dstChainId: uint32(block.chainid),
+            dstChainId: CHAIN_A,  // Must match localEid
             srcTimestamp: block.timestamp
         });
 
@@ -485,7 +486,7 @@ contract CrossChainRouterTest is Test {
             depositor: authorized,
             depositAmount: 1 ether,
             srcChainId: CHAIN_B,
-            dstChainId: uint32(block.chainid),
+            dstChainId: CHAIN_A,  // Must match localEid
             srcTimestamp: block.timestamp
         });
 
@@ -541,7 +542,7 @@ contract CrossChainRouterTest is Test {
             depositor: authorized,
             depositAmount: 1 ether,
             srcChainId: CHAIN_B,
-            dstChainId: uint32(block.chainid),
+            dstChainId: CHAIN_A,  // Must match localEid
             srcTimestamp: block.timestamp
         });
 

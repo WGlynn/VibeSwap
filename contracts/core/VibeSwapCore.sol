@@ -648,7 +648,8 @@ contract VibeSwapCore is
         });
 
         // Send via router
-        router.sendCommit{value: msg.value}(dstChainId, commitHash, options);
+        // TRP-R22-H03: msg.value is the LZ fee. depositAmount passed explicitly.
+        router.sendCommit{value: msg.value}(dstChainId, commitHash, amountIn, options);
 
         emit CrossChainOrderCreated(commitHash, msg.sender, dstChainId, tokenIn, amountIn);
     }

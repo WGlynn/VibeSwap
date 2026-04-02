@@ -131,7 +131,7 @@ contract MoneyPathAdversarial is Test {
 
         // Router proxy
         bytes memory routerInit = abi.encodeWithSelector(
-            CrossChainRouter.initialize.selector, owner, address(endpoint), address(auction)
+            CrossChainRouter.initialize.selector, owner, address(endpoint), address(auction), uint32(1)
         );
         router = CrossChainRouter(payable(address(new ERC1967Proxy(address(routerImpl), routerInit))));
 

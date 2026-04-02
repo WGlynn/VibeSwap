@@ -597,7 +597,7 @@ contract ShapleyDistributorTest is Test {
         vm.prank(creator);
         distributor.createGame(GAME_1, value, address(0), ps);
 
-        assertEq(distributor.totalCommittedBalance(), value);
+        assertEq(distributor.totalCommittedBalance(address(0)), value);
 
         distributor.computeShapleyValues(GAME_1);
 
@@ -605,7 +605,7 @@ contract ShapleyDistributorTest is Test {
         vm.prank(alice);
         distributor.claimReward(GAME_1);
 
-        assertEq(distributor.totalCommittedBalance(), value - aliceVal);
+        assertEq(distributor.totalCommittedBalance(address(0)), value - aliceVal);
     }
 
     function test_concurrentGames_preventOverdraw() public {

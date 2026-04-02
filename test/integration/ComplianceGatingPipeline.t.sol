@@ -148,7 +148,7 @@ contract ComplianceGatingPipelineTest is Test {
         CrossChainRouter routerImpl = new CrossChainRouter();
         ERC1967Proxy routerProxy = new ERC1967Proxy(
             address(routerImpl),
-            abi.encodeWithSelector(CrossChainRouter.initialize.selector, owner, address(endpoint), address(auction))
+            abi.encodeWithSelector(CrossChainRouter.initialize.selector, owner, address(endpoint), address(auction), uint32(1))
         );
         router = CrossChainRouter(payable(address(routerProxy)));
 

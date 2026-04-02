@@ -136,6 +136,10 @@ contract CrossChainRouter is
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
 
+    /// @notice This chain's LayerZero endpoint ID
+    /// @dev TRP-R21-H01: block.chainid != LayerZero eid. Must use eid for cross-chain checks.
+    uint32 public localEid;
+
 
     /// @dev Reserved storage gap for future upgrades
     uint256[50] private __gap;
@@ -199,16 +203,19 @@ contract CrossChainRouter is
     function initialize(
         address _owner,
         address _lzEndpoint,
-        address _auction
+        address _auction,
+        uint32 _localEid
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
 
         require(_lzEndpoint != address(0), "Invalid endpoint");
         require(_auction != address(0), "Invalid auction");
+        require(_localEid > 0, "Invalid local eid");
 
         lzEndpoint = _lzEndpoint;
         auction = _auction;
+        localEid = _localEid;  // TRP-R21-H01: Store LZ eid for chain identity
         maxMessagesPerHour = 1000; // Default rate limit
         bridgedDepositExpiry = 24 hours; // Default: deposits expire after 24h
     }
@@ -244,8 +251,8 @@ contract CrossChainRouter is
             commitHash: commitHash,
             depositor: msg.sender,
             depositAmount: msg.value,
-            srcChainId: uint32(block.chainid),
-            dstChainId: dstEid,  // FIX #1: Include destination chain
+            srcChainId: localEid,  // TRP-R21-H01: Use LZ eid, not block.chainid
+            dstChainId: dstEid,
             srcTimestamp: srcTimestamp
         });
 
@@ -446,8 +453,8 @@ contract CrossChainRouter is
             commit.srcTimestamp
         ));
 
-        // FIX #1: Verify this message is intended for THIS chain
-        require(commit.dstChainId == uint32(block.chainid), "Wrong destination chain");
+        // TRP-R21-H01: Verify destination using LZ eid, not block.chainid
+        require(commit.dstChainId == localEid, "Wrong destination chain");
 
         // Store for local processing
         pendingCommits[commitId] = commit;
@@ -648,7 +655,9 @@ contract CrossChainRouter is
     /**
      * @notice Update rate limit
      */
+    /// @dev TRP-R21-M02: Added minimum 1 to prevent permanent DOS of all inbound messages.
     function setMaxMessagesPerHour(uint256 max) external onlyOwner {
+        require(max >= 1, "Min 1 message per hour");
         maxMessagesPerHour = max;
     }
 

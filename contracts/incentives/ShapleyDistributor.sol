@@ -693,6 +693,17 @@ contract ShapleyDistributor is
         Participant[] storage gamePs = gameParticipants[gameId];
         if (participants.length != gamePs.length) revert VerifierParticipantMismatch();
 
+        // TRP-R19-F06: Verify that sum of verifier values matches game totalValue.
+        // Without this, a verifier with a different totalPool could over-distribute
+        // (draining other games' funds) or under-distribute (locking funds).
+        {
+            uint256 valueSum;
+            for (uint256 j = 0; j < values.length; j++) {
+                valueSum += values[j];
+            }
+            require(valueSum == game.totalValue, "TRP-R19-F06: Verifier total mismatch");
+        }
+
         // TRP-R19-F01: Verify that verifier-returned addresses match stored participants.
         // Without this, a compromised verifier could redirect all rewards to arbitrary addresses.
         // Assign verified Shapley values directly.
@@ -1114,6 +1125,36 @@ contract ShapleyDistributor is
         return gameScopeId[gameId];
     }
 
+    // ============ Game Cancellation ============
+
+    /// @notice Cancel an unsettled game and release committed balance
+    /// @dev TRP-R19-F07: Without this, unsettled games (e.g., ABC health gate blocks
+    ///      settlement) permanently lock funds in totalCommittedBalance, eventually
+    ///      bricking new game creation. Owner-only until governance transition.
+    ///      DISINTERMEDIATION: Grade C → Target Grade B (TimelockController).
+    function cancelStaleGame(bytes32 gameId) external onlyOwner {
+        CooperativeGame storage game = games[gameId];
+        require(game.totalValue > 0, "Game not found");
+        require(!game.settled, "Game already settled");
+
+        uint256 releasedValue = game.totalValue;
+        address token = game.token;
+
+        // Release committed balance
+        if (totalCommittedBalance[token] >= releasedValue) {
+            totalCommittedBalance[token] -= releasedValue;
+        }
+
+        // Mark as settled to prevent re-cancellation
+        game.settled = true;
+        game.totalValue = 0;
+
+        emit GameCancelled(gameId, releasedValue, token);
+    }
+
+    /// @dev Emitted when a stale game is cancelled by owner
+    event GameCancelled(bytes32 indexed gameId, uint256 releasedValue, address token);
+
     // ============ Admin Functions ============
 
     /// @notice DISINTERMEDIATION: KEEP — controls which contracts can create games with
@@ -1126,7 +1167,10 @@ contract ShapleyDistributor is
 
     /// @notice DISINTERMEDIATION: Grade C -> Target Grade B. Governance-appropriate.
     /// Participant limits are safety bounds — too low breaks games, too high causes OOG.
+    /// @dev TRP-R19-F03: Added bounds validation. min=0 allows empty games,
+    ///      max>500 risks OOG on computeShapleyValues O(n) loops.
     function setParticipantLimits(uint256 _min, uint256 _max) external onlyOwner {
+        require(_min >= 2 && _max >= _min && _max <= 500, "Invalid limits: min>=2, max>=min, max<=500");
         minParticipants = _min;
         maxParticipants = _max;
         emit ParticipantLimitsUpdated(_min, _max);

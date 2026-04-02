@@ -1264,11 +1264,14 @@ contract VibeSwapCore is
 
     /**
      * @notice Forward priority bids to DAO treasury
+     * @dev Pulls ETH from CommitRevealAuction first (where priority bids accumulate),
+     *      then forwards to treasury. Prior to TRP-R16-F01 fix, this checked
+     *      address(this).balance which was always 0 — ETH lived in CRA, not Core.
      */
     function _forwardPriorityBids(uint64 batchId) internal {
-        ICommitRevealAuction.Batch memory batch = auction.getBatch(batchId);
-        if (batch.totalPriorityBids > 0 && address(this).balance >= batch.totalPriorityBids) {
-            treasury.receiveAuctionProceeds{value: batch.totalPriorityBids}(batchId);
+        uint256 amount = auction.withdrawPriorityBids(batchId);
+        if (amount > 0) {
+            treasury.receiveAuctionProceeds{value: amount}(batchId);
         }
     }
 

@@ -12,11 +12,15 @@ import "./interfaces/IBuybackEngine.sol";
  * @notice Automated buyback-and-burn for protocol token value accrual.
  * @dev Part of VSOS (VibeSwap Operating System) DeFi/DeFAI layer.
  *
- *      Revenue flow: FeeRouter (10% buyback) → BuybackEngine → VibeAMM swap → burn
+ *      NOTE: FeeRouter currently sends 100% of fees to LPs via ShapleyDistributor.
+ *      This contract is NOT actively receiving funds from FeeRouter. It is designed
+ *      for a future fee split if governance ever votes to allocate a portion to buyback.
+ *      Until FeeRouter is updated with a split mechanism, this contract is dormant.
  *
- *      Set this contract as FeeRouter's buyback target address. When FeeRouter distributes,
- *      various tokens accumulate here. Anyone can call executeBuyback() to swap accumulated
- *      tokens for the protocol token via VibeAMM and burn them.
+ *      Intended flow (requires FeeRouter split): FeeRouter → BuybackEngine → VibeAMM swap → burn
+ *
+ *      If activated, set this contract as FeeRouter's buyback target. Accumulated
+ *      tokens can be swapped for the protocol token via VibeAMM and burned.
  *
  *      Cooperative capitalism:
  *        - Keeper-friendly: anyone can trigger buyback (gas incentive via gas rebate optional)

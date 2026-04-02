@@ -119,11 +119,11 @@ contract CrossChainRouterTest is Test {
         vm.prank(authorized);
         router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, options);
 
-        // Verify pending commit stored (commitId includes dstEid and srcTimestamp)
+        // Verify pending commit stored (commitId uses localEid, not block.chainid)
         bytes32 commitId = keccak256(abi.encodePacked(
             authorized,
             commitHash,
-            block.chainid,
+            CHAIN_A,        // localEid (TRP-R22-NEW02 fix)
             CHAIN_B,        // dstEid
             block.timestamp // srcTimestamp
         ));

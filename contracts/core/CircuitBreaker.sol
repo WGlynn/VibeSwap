@@ -163,12 +163,18 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
      * @param cooldownPeriod How long breaker stays active
      * @param windowDuration Rolling window for accumulation
      */
+    /// @dev TRP-R24-CB03: Added validation. threshold=0 causes instant permanent trip.
+    ///      cooldownPeriod=0 causes _checkBreaker to revert "Breaker not configured".
     function configureBreaker(
         bytes32 breakerType,
         uint256 threshold,
         uint256 cooldownPeriod,
         uint256 windowDuration
     ) external onlyOwner {
+        require(threshold > 0, "Threshold must be > 0");
+        require(cooldownPeriod > 0, "Cooldown must be > 0");
+        require(windowDuration > 0, "Window must be > 0");
+
         breakerConfigs[breakerType] = BreakerConfig({
             enabled: true,
             threshold: threshold,
@@ -182,8 +188,10 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     /**
      * @notice Disable a circuit breaker
      */
+    /// @dev TRP-R24-CB07: Also clear state to prevent stale tripped state on re-enable.
     function disableBreaker(bytes32 breakerType) external onlyOwner {
         breakerConfigs[breakerType].enabled = false;
+        delete breakerStates[breakerType];
         emit BreakerDisabled(breakerType);
     }
 
@@ -223,7 +231,22 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         BreakerState storage state = breakerStates[breakerType];
 
         if (!config.enabled) return false;
-        if (state.tripped) return true; // Already tripped
+
+        // TRP-R24-CB01: Auto-reset tripped state after cooldown expires.
+        // Previously, _updateBreaker returned true permanently after first trip
+        // because it never checked cooldown. The tripped flag was only clearable
+        // via manual resetBreaker() call.
+        if (state.tripped) {
+            if (block.timestamp >= state.trippedAt + config.cooldownPeriod) {
+                // Cooldown expired — auto-reset and continue to accumulation
+                state.tripped = false;
+                state.trippedAt = 0;
+                state.windowStart = block.timestamp;
+                state.windowValue = 0;
+            } else {
+                return true; // Still in cooldown
+            }
+        }
 
         // Reset window if expired
         if (block.timestamp >= state.windowStart + config.windowDuration) {

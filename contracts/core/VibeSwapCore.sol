@@ -12,8 +12,9 @@ import "./interfaces/ICommitRevealAuction.sol";
 import "./interfaces/IVibeAMM.sol";
 import "./interfaces/IDAOTreasury.sol";
 import "./interfaces/IwBAR.sol";
-// TRP-R24-CB09: Removed dead CircuitBreaker import. VibeSwapCore does not inherit CircuitBreaker.
-// Circuit breaker protection is in VibeAMM. See CB-02 for integration analysis.
+// TRP-R32-CB02: VibeSwapCore now inherits CircuitBreaker (CB-02 fix).
+// commitSwap and revealSwap are protected by VOLUME_BREAKER.
+import "./CircuitBreaker.sol";
 import "../messaging/CrossChainRouter.sol";
 import "../libraries/SecurityLib.sol";
 import "../compliance/ClawbackRegistry.sol";
@@ -34,7 +35,8 @@ contract VibeSwapCore is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    UUPSUpgradeable
+    UUPSUpgradeable,
+    CircuitBreaker
 {
     using SafeERC20 for IERC20;
 
@@ -296,7 +298,7 @@ contract VibeSwapCore is
     error RateLimitExceededError();
     error NotEOA();
     error CommitCooldownActive();
-    error NotGuardian();
+    // NotGuardian() inherited from CircuitBreaker
     error WalletTainted();
     error NotGovernance();
     error CrossChainOrderNotExpired();
@@ -393,6 +395,23 @@ contract VibeSwapCore is
         requireEOA = true; // Enable flash loan protection
         commitCooldown = 1; // 1 second minimum between commits
         guardian = _owner;
+
+        // TRP-R32-CB02: Configure circuit breakers for commit/reveal protection.
+        _configureDefaultBreakers();
+    }
+
+    /**
+     * @notice Configure default circuit breakers for VibeSwapCore
+     * @dev Called once during initialize. VOLUME_BREAKER guards commitSwap and revealSwap.
+     */
+    function _configureDefaultBreakers() internal {
+        // Volume breaker: trips if >10M token volume in 1 hour window
+        breakerConfigs[VOLUME_BREAKER] = BreakerConfig({
+            enabled: true,
+            threshold: 10_000_000 * 1e18,
+            cooldownPeriod: 1 hours,
+            windowDuration: 1 hours
+        });
     }
 
     // ============ User Functions ============
@@ -412,7 +431,7 @@ contract VibeSwapCore is
         uint256 amountIn,
         uint256 minAmountOut,
         bytes32 secret
-    ) external payable whenNotPaused nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
+    ) external payable whenNotPaused whenNotGloballyPaused whenBreakerNotTripped(VOLUME_BREAKER) nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
       onlySupported(tokenIn) onlySupported(tokenOut) returns (bytes32 commitId) {
         require(amountIn > 0, "Zero amount");
         require(tokenIn != tokenOut, "Same token");
@@ -446,8 +465,10 @@ contract VibeSwapCore is
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         deposits[msg.sender][tokenIn] += amountIn;
 
-        // Submit to auction
-        commitId = auction.commitOrder{value: msg.value}(commitHash);
+        // Submit to auction — pass amountIn as estimatedTradeValue for proper collateral sizing.
+        // TRP-R38: Previously called 1-arg commitOrder which passed estimatedTradeValue=0,
+        // allowing MIN_DEPOSIT bypass. commitSwap knows the exact trade size, so pass it directly.
+        commitId = auction.commitOrderToPool{value: msg.value}(bytes32(0), commitHash, amountIn);
 
         // Store swap params for reveal
         pendingSwaps[commitId] = SwapParams({
@@ -492,7 +513,7 @@ contract VibeSwapCore is
     function revealSwap(
         bytes32 commitId,
         uint256 priorityBid
-    ) external payable whenNotPaused nonReentrant {
+    ) external payable whenNotPaused whenNotGloballyPaused whenBreakerNotTripped(VOLUME_BREAKER) nonReentrant {
         SwapParams storage params = pendingSwaps[commitId];
         require(params.amountIn > 0, "Invalid commit");
 
@@ -607,7 +628,7 @@ contract VibeSwapCore is
         uint256 minAmountOut,
         bytes32 secret,
         bytes calldata options
-    ) external payable whenNotPaused nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
+    ) external payable whenNotPaused whenNotGloballyPaused whenBreakerNotTripped(VOLUME_BREAKER) nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
       onlySupported(tokenIn) onlySupported(tokenOut) {
         require(amountIn > 0, "Zero amount");
         require(tokenIn != tokenOut, "Same token");

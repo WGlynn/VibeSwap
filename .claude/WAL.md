@@ -1,16 +1,15 @@
-# Write-Ahead Log — CLEAN
+# Write-Ahead Log — ACTIVE
 
 ## Epoch
 - **Started**: 2026-04-02
-- **Ended**: 2026-04-02 (session limit — reboot requested)
-- **Intent**: TRP 6 rounds, Tier 21 → 27
-- **Parent Commit**: `a6c8543c`
-- **Tasks**: 6/6 rounds complete
+- **Intent**: TRP reboot — R30-R43 (11 rounds, 3 batches of 5/5/1)
+- **Parent Commit**: `a30ad07f`
 - **Branch**: master
 
-## Final Summary
-- R22-R27 completed. 16 fixes applied, 38 findings discovered.
-- 2 R1 subagents (VibeAMM, CommitRevealAuction) may still be running — check output files.
+## In-Flight
+- Batch 1: R30 (PoW virtual value), R34 (NEW-01 phantom deposits), R35 (NEW-03 router as depositor), R36 (NEW-04 wrong chain recovery), R37 (AMM-07 fee standardization)
+- Batch 2: R38 (collateral underpricing), R39 (CB-04 withdrawal griefing), R40 (CB-05 stale window re-trip), R41 (AMM-05 TWAP self-reference), R42 (AMM-06 cross-pool flash)
+- Batch 3: R43 (N02 stale Shapley cleanup)
 
 ## Recovery Notes
-_CLEAN session end. No in-flight work._
+_Rebooting from 9-agent OOM crash. R28 complete. R30-R43 partial changes in working tree committed as crash recovery._

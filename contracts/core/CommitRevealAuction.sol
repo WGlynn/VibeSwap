@@ -68,6 +68,7 @@ contract CommitRevealAuction is
     error NotRevealed();
     error TransferFailed();
     error NotSlashable();
+    error InsufficientCollateral();
     error InvalidTreasury();
     error PoolNotFound();
     error PoolAlreadyExists();
@@ -240,6 +241,7 @@ contract CommitRevealAuction is
             phase: BatchPhase.COMMIT,
             shuffleSeed: bytes32(0),
             totalPriorityBids: 0,
+            totalVirtualPriorityBids: 0,
             orderCount: 0,
             isSettled: false
         });
@@ -400,6 +402,52 @@ contract CommitRevealAuction is
     }
 
     /**
+     * @notice Commit an order on behalf of another address (for cross-chain router use)
+     * @dev TRP-R35-NEW03: Fixes router-as-depositor bug. Only authorized settlers (e.g. CrossChainRouter)
+     *      can call this. Stores the original trader as depositor so they can reveal via revealOrderCrossChain.
+     * @param commitHash Hash of (depositor, tokenIn, tokenOut, amountIn, minAmountOut, secret)
+     * @param depositor The original trader address to record as depositor
+     * @return commitId Unique identifier for this commitment
+     */
+    function commitOrderOnBehalf(
+        bytes32 commitHash,
+        address depositor
+    ) external payable nonReentrant onlyAuthorizedSettler inPhase(BatchPhase.COMMIT) returns (bytes32 commitId) {
+        if (commitHash == bytes32(0)) revert InvalidHash();
+        require(depositor != address(0), "Invalid depositor");
+
+        // Minimum deposit check (no collateral calc — cross-chain deposits are pre-validated)
+        if (msg.value < MIN_DEPOSIT) revert InsufficientDeposit();
+
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+
+        // Generate unique commit ID (uses depositor, not msg.sender)
+        commitId = keccak256(abi.encodePacked(
+            depositor,
+            commitHash,
+            bytes32(0),        // default pool
+            _currentBatchId,
+            block.timestamp
+        ));
+
+        if (commitments[commitId].status != CommitStatus.NONE) revert AlreadyCommitted();
+
+        commitments[commitId] = OrderCommitment({
+            commitHash: commitHash,
+            poolId: bytes32(0),
+            batchId: _currentBatchId,
+            depositAmount: msg.value,
+            depositor: depositor,        // Original trader, NOT msg.sender
+            status: CommitStatus.COMMITTED
+        });
+
+        batches[_currentBatchId].orderCount++;
+
+        emit OrderCommitted(commitId, depositor, _currentBatchId, msg.value);
+    }
+
+    /**
      * @notice Reveal a previously committed order
      * @param commitId The commitment ID from commitOrder
      * @param tokenIn Token being sold
@@ -444,6 +492,9 @@ contract CommitRevealAuction is
             _slashCommitment(commitId);
             return;
         }
+
+        // TRP-R38: Verify deposit covers the revealed trade size at COLLATERAL_BPS (5%).
+        _checkCollateral(commitment.depositAmount, amountIn);
 
         // Verify priority bid payment
         if (priorityBid > 0) {
@@ -543,11 +594,16 @@ contract CommitRevealAuction is
                 msg.sender, tokenIn, tokenOut, amountIn, minAmountOut, secret
             ));
             if (expectedHash != commitment.commitHash) { _slashCommitment(commitId); return; }
+            // TRP-R38: Verify deposit covers the revealed trade size at COLLATERAL_BPS (5%).
+            _checkCollateral(commitment.depositAmount, amountIn);
             if (priorityBid > 0 && msg.value < priorityBid) revert InsufficientPriorityBid();
             commitment.status = CommitStatus.REVEALED;
         }
 
         // Step 2: PoW + store (separate stack frame via _storeRevealedOrder)
+        // R1-F04 FIX: _storeRevealedOrder adds effectivePriority (real+virtual) to totalPriorityBids.
+        // Immediately correct: move the PoW virtual portion out of totalPriorityBids into
+        // totalVirtualPriorityBids so the ETH-backed accumulator is never inflated by virtual value.
         {
             uint256 powValue = _verifyPoW(commitId, _currentBatchId, powNonce, powAlgorithm, claimedDifficulty);
             _storeRevealedOrder(
@@ -555,6 +611,10 @@ contract CommitRevealAuction is
                 tokenIn, tokenOut, amountIn, minAmountOut,
                 secret, priorityBid + powValue
             );
+            if (powValue > 0) {
+                batches[_currentBatchId].totalPriorityBids -= powValue;
+                batches[_currentBatchId].totalVirtualPriorityBids += powValue;
+            }
         }
 
         // Step 3: Refund excess ETH
@@ -698,6 +758,7 @@ contract CommitRevealAuction is
             _currentBatchId,
             revealedOrders[_currentBatchId].length,
             batch.totalPriorityBids,
+            batch.totalVirtualPriorityBids,
             batch.shuffleSeed
         );
 
@@ -848,6 +909,9 @@ contract CommitRevealAuction is
             _slashCommitment(commitId);
             return;
         }
+
+        // TRP-R38: Verify deposit covers the revealed trade size at COLLATERAL_BPS (5%).
+        _checkCollateral(commitment.depositAmount, amountIn);
 
         commitment.status = CommitStatus.REVEALED;
 
@@ -1289,9 +1353,24 @@ contract CommitRevealAuction is
             phase: BatchPhase.COMMIT,
             shuffleSeed: bytes32(0),
             totalPriorityBids: 0,
+            totalVirtualPriorityBids: 0,
             orderCount: 0,
             isSettled: false
         });
+    }
+
+    /**
+     * @notice Validate that a committed deposit is sufficient for the revealed trade size.
+     * @dev TRP-R38: Closes the gap where a user commits with MIN_DEPOSIT and reveals a massive trade.
+     *      Uses PROTOCOL CONSTANT COLLATERAL_BPS (5%). Trades whose 5% requirement is below
+     *      MIN_DEPOSIT are exempt -- the MIN_DEPOSIT already provides adequate skin-in-the-game.
+     *      Extracted as a helper to avoid adding stack variables in the already-deep revealOrder frame.
+     */
+    function _checkCollateral(uint256 depositAmount, uint256 amountIn) internal pure {
+        uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+        if (requiredCollateral > MIN_DEPOSIT && depositAmount < requiredCollateral) {
+            revert InsufficientCollateral();
+        }
     }
 
     /**

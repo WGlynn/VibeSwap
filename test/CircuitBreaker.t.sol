@@ -8,6 +8,9 @@ import "../contracts/core/CircuitBreaker.sol";
 contract ConcreteCircuitBreaker is CircuitBreaker {
     bool public actionCalled;
 
+    /// @notice CB-04: small-LP threshold in bps (mirrors VibeAMM.SMALL_WITHDRAWAL_BPS_THRESHOLD)
+    uint256 public constant SMALL_WITHDRAWAL_BPS_THRESHOLD = 100; // 1%
+
     function initialize(address _owner) external initializer {
         __Ownable_init(_owner);
     }
@@ -30,6 +33,17 @@ contract ConcreteCircuitBreaker is CircuitBreaker {
     /// @notice Expose _updateBreaker for testing
     function updateBreaker(bytes32 breakerType, uint256 value) external returns (bool) {
         return _updateBreaker(breakerType, value);
+    }
+
+    /// @notice CB-04: withdrawal action with small-LP exemption logic (mirrors VibeAMM.removeLiquidity)
+    /// @param withdrawalBps This withdrawal's share of total pool liquidity in basis points
+    function withdrawalWithExemption(uint256 withdrawalBps) external returns (bool blocked) {
+        bool breakerTripped = _updateBreaker(WITHDRAWAL_BREAKER, withdrawalBps);
+        if (breakerTripped && withdrawalBps >= SMALL_WITHDRAWAL_BPS_THRESHOLD) {
+            return true; // would revert in VibeAMM; return true here so tests can assert
+        }
+        actionCalled = true;
+        return false;
     }
 
     /// @notice Expose _logAnomaly for testing
@@ -429,5 +443,90 @@ contract CircuitBreakerTest is Test {
 
         // Price breaker still allows its action
         cb.breakerGatedAction(price);
+    }
+
+    // ============ CB-04: Whale LP Griefing Fix ============
+
+    // Configure WITHDRAWAL_BREAKER with a 25% threshold (2500 bps), 2h cooldown, 1h window —
+    // matching VibeAMM's production config.
+    function _setupWithdrawalBreaker() internal {
+        cb.configureBreaker(cb.WITHDRAWAL_BREAKER(), 2500, 2 hours, 1 hours);
+    }
+
+    /// A large withdrawal (>= 1% of pool) that trips the breaker is blocked.
+    function test_cb04_largeWithdrawal_tripsAndBlocks() public {
+        _setupWithdrawalBreaker();
+
+        // 2500 bps (25%) trips the breaker; withdrawal is also >= 100 bps so it should be blocked
+        bool blocked = cb.withdrawalWithExemption(2500);
+        assertTrue(blocked, "Large withdrawal that trips breaker should be blocked");
+        assertFalse(cb.actionCalled(), "actionCalled must be false when blocked");
+    }
+
+    /// A small withdrawal (< 1% of pool) is exempt even when the breaker is tripped.
+    function test_cb04_smallWithdrawal_exemptWhenBreakerTripped() public {
+        _setupWithdrawalBreaker();
+
+        // First: whale trips breaker with a 2500 bps withdrawal
+        cb.withdrawalWithExemption(2500);
+
+        // Verify breaker is tripped
+        (, bool tripped,,,) = cb.getBreakerStatus(cb.WITHDRAWAL_BREAKER());
+        assertTrue(tripped, "Breaker must be tripped after whale withdrawal");
+
+        // Now: small LP withdraws 50 bps (0.5% of pool) — below the 100 bps threshold
+        bool blocked = cb.withdrawalWithExemption(50);
+        assertFalse(blocked, "Small withdrawal must not be blocked even when breaker is tripped");
+        assertTrue(cb.actionCalled(), "actionCalled must be true - small LP succeeded");
+    }
+
+    /// A withdrawal exactly at the threshold (100 bps) is NOT exempt — boundary check.
+    function test_cb04_atThreshold_notExempt() public {
+        _setupWithdrawalBreaker();
+
+        // Trip the breaker first
+        cb.withdrawalWithExemption(2500);
+
+        // 100 bps exactly equals SMALL_WITHDRAWAL_BPS_THRESHOLD → not exempt
+        bool blocked = cb.withdrawalWithExemption(100);
+        assertTrue(blocked, "Withdrawal at threshold boundary should be blocked");
+    }
+
+    /// A withdrawal one bps below the threshold (99 bps) IS exempt — other boundary check.
+    function test_cb04_belowThreshold_exempt() public {
+        _setupWithdrawalBreaker();
+
+        // Trip the breaker
+        cb.withdrawalWithExemption(2500);
+
+        // 99 bps is below 100 bps threshold → exempt
+        bool blocked = cb.withdrawalWithExemption(99);
+        assertFalse(blocked, "Withdrawal just below threshold should pass through");
+    }
+
+    /// After cooldown expires, all withdrawals work normally again.
+    function test_cb04_afterCooldown_largeWithdrawalsResume() public {
+        _setupWithdrawalBreaker();
+
+        // Trip breaker
+        cb.withdrawalWithExemption(2500);
+
+        // Advance past cooldown
+        vm.warp(block.timestamp + 2 hours + 1);
+
+        // Large withdrawal should now succeed (breaker auto-resets via _updateBreaker)
+        bool blocked = cb.withdrawalWithExemption(500);
+        assertFalse(blocked, "Large withdrawal should succeed after cooldown expires");
+        assertTrue(cb.actionCalled());
+    }
+
+    /// Without breaker tripped, large withdrawals proceed normally (no false positives).
+    function test_cb04_noFalsePositive_largeBelowThreshold() public {
+        _setupWithdrawalBreaker();
+
+        // 500 bps (5%) — well below 2500 bps trip threshold, breaker not tripped
+        bool blocked = cb.withdrawalWithExemption(500);
+        assertFalse(blocked, "Large withdrawal that doesn't trip breaker should not be blocked");
+        assertTrue(cb.actionCalled());
     }
 }

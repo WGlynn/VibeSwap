@@ -358,8 +358,15 @@ contract VibeIntentRouter is IVibeIntentRouter, Ownable, ReentrancyGuard {
         ));
 
         // Send commit to auction (requires ETH deposit)
+        // TRP-R38: Use commitOrderToPool with amountIn as estimatedTradeValue for proper
+        // collateral sizing. Previously called 1-arg commitOrder which passed 0.
         (bool success, bytes memory data) = auction.call{value: msg.value}(
-            abi.encodeWithSignature("commitOrder(bytes32)", commitHash)
+            abi.encodeWithSignature(
+                "commitOrderToPool(bytes32,bytes32,uint256)",
+                bytes32(0),
+                commitHash,
+                intent.amountIn
+            )
         );
         require(success, "Auction commit failed");
         bytes32 commitId = abi.decode(data, (bytes32));

@@ -415,7 +415,7 @@ contract VibeSwapCoreTest is Test {
         vm.prank(owner);
         core.setContractWhitelist(address(caller), true);
 
-        // Should succeed now — whitelisted bypasses EOA check
+        // Should succeed now â€” whitelisted bypasses EOA check
         caller.tryCommit(address(tokenA), address(tokenB), 100e18);
         assertEq(core.deposits(address(caller), address(tokenA)), 100e18);
     }
@@ -455,7 +455,7 @@ contract VibeSwapCoreTest is Test {
         // Advance batch so M-06 (one-per-batch) doesn't fire before cooldown check
         auction.setBatchId(2);
 
-        // Immediately try again — cooldown not elapsed
+        // Immediately try again â€” cooldown not elapsed
         vm.prank(trader);
         vm.expectRevert(VibeSwapCore.CommitCooldownActive.selector);
         core.commitSwap(address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s2"));
@@ -700,7 +700,7 @@ contract VibeSwapCoreTest is Test {
         core.setGuardian(guardian);
 
         vm.prank(trader);
-        vm.expectRevert(VibeSwapCore.NotGuardian.selector);
+        vm.expectRevert(bytes4(keccak256("NotGuardian()")));
         core.emergencyPause();
     }
 
@@ -886,6 +886,54 @@ contract VibeSwapCoreTest is Test {
         (bool success,) = address(core).call{value: 1 ether}("");
         assertTrue(success);
         assertEq(address(core).balance, 1 ether);
+    }
+
+    // ============ CircuitBreaker Integration (TRP-R32-CB02) ============
+
+    /// @notice VOLUME_BREAKER is configured during initialize â€” enabled, not tripped, 10M threshold
+    function test_cb02_breakerConfiguredOnInit() public view {
+        bytes32 volBreaker = keccak256("VOLUME_BREAKER");
+        // Access public breakerConfigs mapping from inherited CircuitBreaker
+        (bool enabled, uint256 threshold, uint256 cooldownPeriod, ) = core.breakerConfigs(volBreaker);
+        assertTrue(enabled, "VOLUME_BREAKER must be enabled after initialize");
+        assertEq(threshold, 10_000_000 * 1e18, "Default threshold is 10M tokens");
+        assertGt(cooldownPeriod, 0, "Cooldown must be set");
+    }
+
+    /// @notice globalPause (CircuitBreaker.setGlobalPause) blocks commitSwap
+    function test_cb02_commitSwap_blockedByGlobalPause() public {
+        vm.prank(owner);
+        core.setGlobalPause(true);
+
+        vm.prank(trader);
+        vm.expectRevert(bytes4(keccak256("GloballyPaused()")));
+        core.commitSwap(address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s1"));
+    }
+
+    /// @notice globalPause (CircuitBreaker.setGlobalPause) blocks revealSwap
+    function test_cb02_revealSwap_blockedByGlobalPause() public {
+        vm.prank(trader);
+        bytes32 commitId = core.commitSwap(
+            address(tokenA), address(tokenB), 100e18, 90e18, keccak256("secret")
+        );
+
+        vm.prank(owner);
+        core.setGlobalPause(true);
+
+        vm.prank(trader);
+        vm.expectRevert(bytes4(keccak256("GloballyPaused()")));
+        core.revealSwap(commitId, 0);
+    }
+
+    /// @notice Owner can reconfigure VOLUME_BREAKER threshold via inherited configureBreaker
+    function test_cb02_ownerCanReconfigureBreaker() public {
+        bytes32 volBreaker = keccak256("VOLUME_BREAKER");
+        vm.prank(owner);
+        core.configureBreaker(volBreaker, 5_000_000 * 1e18, 30 minutes, 30 minutes);
+
+        // Verify via public mapping accessor
+        (, uint256 threshold, , ) = core.breakerConfigs(volBreaker);
+        assertEq(threshold, 5_000_000 * 1e18, "Owner can lower the threshold");
     }
 }
 

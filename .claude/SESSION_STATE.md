@@ -1,61 +1,49 @@
-# Session Tip — 2026-04-02
+# Session Tip — 2026-04-02 (Session 2)
 
 ## Block Header
-- **Session**: GEV launch day, fee architecture refactor, FeeController, Nerf Files, vibeswap-core repo
-- **Parent**: `9a5ca3cb`
-- **Branch**: `master` @ `737bda93`
-- **Status**: Build passes. FeeRouter 34/34, FeeController 24/24, fuzz+invariant all green.
+- **Session**: TRP Tier 15, fee architecture Q&A
+- **Parent**: `737bda93`
+- **Branch**: `master`
+- **Status**: No code changes. TRP research-only cycle.
 
 ## What Changed This Session
 
-### GEV Public Launch (LinkedIn)
-- GEV concept post published (first public naming of Generalized Extractable Value)
-- Recursion/base case/detective archetype post published
-- GEV ELI5 saved for 2026-04-03 post at `Desktop/Press Releases/GEV_ELI5_LinkedIn.md`
-- GEV architecture package delivered to Ashwin (DeepFunding confidant)
+### TRP Cycle — TIER 15 Reached (Grade S)
+Target: Core mechanism (CommitRevealAuction + VibeSwapCore)
 
-### FeeRouter Refactor (`60111080`)
-- Stripped 4-bucket split (treasury/insurance/revShare/buyback) → single LP passthrough
-- 100% of swap fees to LPs via ShapleyDistributor FEE_DISTRIBUTION track
-- Fee agnostic: fees stay in native token, VIBE never touches fee pipeline
-- Buyback-and-burn removed at protocol level
-- All tests updated: unit, fuzz (512 runs), invariant, integration
-- Deploy scripts updated: DeployProduction, DeployFinancial, DeployIncentives
+**R0 (Compression)**: MEMORY.md at 45/200 lines (22.5%). 117/177 memory files orphaned (not in index). No compression needed — under-indexing is the problem, not bloat.
 
-### FeeController (`737bda93`)
-- NEW: `contracts/libraries/ILMeasurement.sol` — IL formula, reserve-based IL, EWMA smoothing
-- NEW: `contracts/amm/FeeController.sol` — PID-tuned fee auto-adjustment per pool
-- VibeAMM wired: `_getBaseFee()` reads from controller on swap/batch/PoW paths
-- Floor 1 BPS, ceiling 50 BPS, stable pairs converge toward gas cost
-- 24 tests including fuzz (256 runs per test)
+**R1 (Adversarial) — 16 findings**:
+- HIGH: Collateral underpricing via zero `estimatedTradeValue` (slashing deterrent gutted — commitOrder always passes 0)
+- HIGH: `commitOwners` storage layout risk in UUPS proxy (declared after first use)
+- HIGH: Priority bid ETH stuck in CommitRevealAuction (never reaches treasury via VibeSwapCore)
+- MEDIUM x5: Settler flash loan bypass, cross-chain hash identity mismatch, unbounded bubble sort gas grief, slash refund external call, treasury grief post-disintermediation
+- LOW x5, INFO x3
 
-### Nerf Files (`Desktop/Nerf Files/`)
-- Strategy.md — trojan horse playbook (show batch auction, ship full VSOS dormant)
-- Pitch_Template.md — nerfed technical pitch
-- Whitepaper_Nerfed.md — 7-section paper, ~2500 words, zero internal terminology
-- Arbitrum_Application_Draft.md — grant app referencing live Base mainnet deployment
-- Arbitrum_Grant_Intel.md — Audit Program ($10M ARB) is priority #1 target
-- One_Pager.md — quick-share summary
-- Competitive_Positioning.md — messaging rules + FAQ prep
-- Nerfed_README.md — public-facing README
+**R2 (Knowledge) — 11 gaps**:
+- HIGH: BuybackEngine not tombstoned (contradicts P-001), 3 competing FeeRouters (no canonical in CKB), FeeController absent from CKB/whitepapers, contracts-catalogue 42 days stale
+- MEDIUM-HIGH: PoW priority no primitive, priority-first+uniform clearing coupling not formalized
+- MEDIUM: wBAR absent from KB, PoolComplianceConfig undocumented, ClawbackRegistry no disintermediation grade, CLAUDE.md stale session state
+- LOW-MED: FeeController not in Atomized Shapley map
 
-### vibeswap-core Clean Repo
-- Live at github.com/WGlynn/vibeswap-core
-- 14 contracts, sanitized comments, zero leaks (Shapley/GEV/VSOS/disintermediation)
-- Compiles standalone with own OZ dependencies
-- Deploy script for any EVM chain included
+**R3 (Capability) — 8 test gaps, 13 invariants, 5 infra improvements**:
+- CRITICAL: _executeOrders settlement pipeline has zero end-to-end coverage through VibeSwapCore
+- HIGH: Cross-chain refund/settle lifecycle zero tests, C-02 duplicate order griefing defense zero tests
+- MEDIUM: Invariant handler never reveals, retryFailedExecution zero tests, wBAR routing zero tests, timelock/governance path zero tests
 
-### Memories Updated
-- NEW: user_ashwin-deepfunding.md, user_gotham-framing.md, user_photographic-memory.md
-- NEW: user_tadija-tg-model-intel.md
-- NEW: feedback_defend-reasoning-when-wrong.md, feedback_no-hedging-language.md
-- NEW: project_fee-architecture-refactor.md
-- UPDATED: primitive_gev-resistance.md (GEV is now primary positioning, confirmed 2026-04-01)
-- UPDATED: project_marketing-rollout-mar2025.md (GEV launch + nerf strategy)
+**Loop Integration**: R1↔R3 (3 direct mappings), R2↔R1 (2 connections), R0↔R2 (orphan→stale link)
+
+### Fee Architecture Q&A
+Confirmed: Two parallel LP reward streams, no contradiction.
+1. Swap fees in native tokens via FEE_DISTRIBUTION track (time-neutral, no halving)
+2. VIBE via TOKEN_EMISSION track (Bitcoin-style halving, 32 eras)
+Same Shapley weights govern both. "VIBE never touches fee pipeline" = VIBE isn't bought/burned/redirected in fee flow.
 
 ## Pending / Next Session
-- TRP run (context was too hot this session — reboot first)
-- Submit Arbitrum Audit Program application (Tally form ready)
+- **R1 HIGHs to fix**: Collateral underpricing (most urgent), priority bid ETH stuck, commitOwners storage verify
+- **R3 CRITICAL**: Build settlement pipeline integration test
+- **R2 knowledge debt**: Tombstone BuybackEngine, update contracts-catalogue, add FeeController to CKB
+- **R0 maintenance**: Triage 117 orphaned memory files
+- Submit Arbitrum Audit Program application
 - Post GEV ELI5 to LinkedIn (saved for 2026-04-03)
-- Testnet deployment blocked on faucet ETH — pivot to referencing Base mainnet
-- Wire FeeController.measureAndUpdate() into batch settlement flow (keeper/hook integration)
+- Wire FeeController.measureAndUpdate() into batch settlement

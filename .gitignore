@@ -65,8 +65,7 @@ __pycache__/
 *.pem
 .cold-wallet
 
-# Working context files (session memory, not for public repo)
-.claude/
+# Session chain archive
 .session-chain/
 
 # Video files (too large for git)

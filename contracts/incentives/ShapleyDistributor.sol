@@ -84,8 +84,10 @@ contract ShapleyDistributor is
     uint256 public constant SCARCITY_WEIGHT = 2000;    // 20% - Providing scarce side
     uint256 public constant STABILITY_WEIGHT = 1000;   // 10% - Staying during volatility
 
-    // Pioneer bonus: max 50% extra weight for full pioneer score (10000 BPS)
-    // Applied as multiplier: 1.0x (non-pioneer) to 1.5x (max pioneer)
+    // TRP-R19-K02: Pioneer bonus constant is UNUSED — actual cap is 2.0x (100% bonus)
+    // in _calculateWeightedContribution lines 788-795, not 1.5x as previously documented.
+    // Kept for storage/ABI compatibility. Do not rely on this value.
+    // Actual behavior: pioneerScore capped at 2*BPS_PRECISION, multiplier range [1.0x, 2.0x]
     uint256 public constant PIONEER_BONUS_MAX_BPS = 5000;
 
     /// @notice The Lawson Fairness Floor — minimum reward share (1%) for any
@@ -221,9 +223,12 @@ contract ShapleyDistributor is
     /// @notice Total value distributed across all eras (for tracking)
     uint256 public totalValueDistributed;
 
-    /// @notice Total value committed but not yet claimed across all active games
-    /// @dev Used to prevent concurrent game creation from overdrawing shared balance
-    uint256 public totalCommittedBalance;
+    /// @notice Total value committed but not yet claimed, tracked per token
+    /// @dev TRP-R19-F08: Changed from single uint256 to per-token mapping. A single
+    ///      counter across all token types conflated ETH (18 decimals) with ERC20s
+    ///      (varying decimals), making multi-token game creation impossible.
+    ///      Use address(0) key for ETH, token address for ERC20s.
+    mapping(address => uint256) public totalCommittedBalance;
 
     /// @notice Value distributed per era
     mapping(uint8 => uint256) public eraDistributed;
@@ -487,11 +492,10 @@ contract ShapleyDistributor is
         // INCLUDING already-committed funds from other unsettled games.
         // Prevents concurrent game creation from overdrawing shared balance.
         if (token == address(0)) {
-            require(address(this).balance >= totalCommittedBalance + totalValue, "Insufficient ETH for game");
+            require(address(this).balance >= totalCommittedBalance[address(0)] + totalValue, "Insufficient ETH for game");
         } else {
-            require(IERC20(token).balanceOf(address(this)) >= totalCommittedBalance + totalValue, "Insufficient tokens for game");
+            require(IERC20(token).balanceOf(address(this)) >= totalCommittedBalance[token] + totalValue, "Insufficient tokens for game");
         }
-        totalCommittedBalance += totalValue;
 
         // Apply halving ONLY for TOKEN_EMISSION games (not fee distribution)
         // Fee distribution is time-neutral: same work = same reward regardless of era
@@ -505,6 +509,11 @@ contract ShapleyDistributor is
 
             emit HalvingApplied(gameId, totalValue, adjustedValue, currentEra);
         }
+
+        // TRP-R19-F02: Commit adjustedValue (post-halving), not totalValue.
+        // Previous code committed totalValue then set game.totalValue = adjustedValue,
+        // creating phantom committed balance that permanently locked funds.
+        totalCommittedBalance[token] += adjustedValue;
 
         games[gameId] = CooperativeGame({
             gameId: gameId,
@@ -684,10 +693,13 @@ contract ShapleyDistributor is
         Participant[] storage gamePs = gameParticipants[gameId];
         if (participants.length != gamePs.length) revert VerifierParticipantMismatch();
 
-        // Assign verified Shapley values directly
+        // TRP-R19-F01: Verify that verifier-returned addresses match stored participants.
+        // Without this, a compromised verifier could redirect all rewards to arbitrary addresses.
+        // Assign verified Shapley values directly.
         // The verifier already enforced efficiency (sum == totalPool),
         // sanity (no value > totalPool), and Lawson floor (>= 1% average)
         for (uint256 i = 0; i < participants.length; i++) {
+            require(participants[i] == gamePs[i].participant, "TRP-R19-F01: Verifier address mismatch");
             shapleyValues[gameId][participants[i]] = values[i];
             emit ShapleyComputed(gameId, participants[i], values[i]);
         }
@@ -713,9 +725,9 @@ contract ShapleyDistributor is
 
         claimed[gameId][msg.sender] = true;
 
-        // Release committed balance tracking
-        if (totalCommittedBalance >= amount) {
-            totalCommittedBalance -= amount;
+        // Release committed balance tracking (per-token)
+        if (totalCommittedBalance[game.token] >= amount) {
+            totalCommittedBalance[game.token] -= amount;
         }
 
         // Transfer reward

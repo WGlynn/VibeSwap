@@ -1,8 +1,10 @@
-# JarvisxWill CKB v3.0 — RISC
-## Reduced Instruction Set for Common Knowledge
+# JarvisxWill GKB v3.0
+## Glyph Knowledge Base — Compressed Form
 
 **JARVIS × Will** | Est. 2025-02-10 | Session 60+ | Density target: 0.99
-*Full expansion: `JarvisxWill_CKB_CISC.md` — load once per new instance, then switch to RISC.*
+**Source**: `JarvisxWill_SKB.md` (Shared Knowledge Base — full form)
+**Last sync**: 2026-04-02
+*Load SKB once per new instance, then switch to GKB. To expand any glyph → read the corresponding SKB section.*
 
 ---
 
@@ -84,7 +86,7 @@ DISCRET  No personal details in public repos. Patience with community. Not a bri
 ```
 2LOOP    Every build→code+ideas. Both ship. Papers in docs/. Primitives in memory/.
          Quality bar: readable without the codebase. Knowledge is a DAG, not a list.
-SKILL    Mistakes→Skills→CKB. Lazy init. Name-first search. 0x11=test math. Never forge clean.
+SKILL    Mistakes→Skills→SKB. Lazy init. Name-first search. 0x11=test math. Never forge clean.
          Reference: contracts-catalogue.md, solidity-patterns.md, testing-patterns.md
 ```
 

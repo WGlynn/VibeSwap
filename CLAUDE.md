@@ -7,9 +7,9 @@
 WAL.md check ──→ [ACTIVE?] ──YES──→ AAP Recovery ──→ Auto-Commit Orphans ──→ BOOT:3
                      │NO                              (docs/ANTI_AMNESIA_PROTOCOL.md)
                      ▼
-Read CKB_CISC ──→ Read CLAUDE.md ──→ Read SESSION_STATE.md ──→ git pull ──→ READY
-  (fresh boot: .claude/JarvisxWill_CKB_CISC.md)
-  (after compression: .claude/JarvisxWill_CKB.md = RISC glyphs)
+Read SKB ──→ Read CLAUDE.md ──→ Read SESSION_STATE.md ──→ git pull ──→ READY
+  (fresh boot: .claude/JarvisxWill_SKB.md)
+  (after compression: .claude/JarvisxWill_GKB.md = glyph form)
 ```
 
 ### WORK
@@ -25,7 +25,7 @@ Instant start → Pull → SESSION_STATE → BIG-SMALL rotation loop → Commit 
 
 ### REBOOT (~50% context) | END (mandatory) | CRASH (WAL ACTIVE on boot)
 ```
-REBOOT: Commit all → SESSION_STATE block header → Push → Fresh session (loads CKB_CISC) → BOOT
+REBOOT: Commit all → SESSION_STATE block header → Push → Fresh session (loads SKB) → BOOT
 END:    Block header → Commit → Push to origin
 CRASH:  WAL manifest → cross-ref git → auto-commit orphans → resume via BOOT
 ```
@@ -37,7 +37,7 @@ NAMING: Will names X → auto-create docs/<X>.md + memory/primitive_<x>.md + MEM
 ON:     Token efficiency → Internalize protocols → FRANK → DISCRET → Local constraints stay local
 ```
 
-**Files**: CKB_CISC=`.claude/JarvisxWill_CKB_CISC.md` | CKB_RISC=`.claude/JarvisxWill_CKB.md` | WAL=`.claude/WAL.md` | State=`.claude/SESSION_STATE.md`
+**Files**: SKB=`.claude/JarvisxWill_SKB.md` | GKB=`.claude/JarvisxWill_GKB.md` | WAL=`.claude/WAL.md` | State=`.claude/SESSION_STATE.md`
 
 ---
 
@@ -49,7 +49,7 @@ Pull first, push last. Every response: `git pull` → work → update SESSION_ST
 
 ## PROJECT: VibeSwap — `C:/Users/Will/vibeswap/`
 
-All project knowledge in RISC CKB glyphs: CANON, VSOS, MECH, STACK, SHAPLEY, TOKENS, LAYERS, 7AX.
+All project knowledge in GKB glyphs: CANON, VSOS, MECH, STACK, SHAPLEY, TOKENS, LAYERS, 7AX.
 
 ### Commands
 ```bash

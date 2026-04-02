@@ -198,9 +198,14 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     // ============ Internal Functions ============
 
     /**
-     * @notice Check if breaker is tripped
+     * @notice Check if breaker is tripped, auto-reset stale state after cooldown
      */
-    function _checkBreaker(bytes32 breakerType) internal view {
+    /// @dev TRP-R40-CB05: Changed from view to state-mutating so that stale
+    ///      windowValue is cleared when cooldown expires. Without this, a
+    ///      modifier-only gate would let the tx through but leave windowValue
+    ///      at its pre-trip level, causing the next _updateBreaker call to
+    ///      immediately re-trip on a small addition.
+    function _checkBreaker(bytes32 breakerType) internal {
         BreakerState storage state = breakerStates[breakerType];
         BreakerConfig storage config = breakerConfigs[breakerType];
 
@@ -214,6 +219,11 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
             if (block.timestamp < state.trippedAt + config.cooldownPeriod) {
                 revert BreakerTrippedError(breakerType);
             }
+            // Cooldown expired — auto-reset state so windowValue is fresh
+            state.tripped = false;
+            state.trippedAt = 0;
+            state.windowStart = block.timestamp;
+            state.windowValue = 0;
         }
     }
 

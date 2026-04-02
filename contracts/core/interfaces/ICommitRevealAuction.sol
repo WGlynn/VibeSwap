@@ -50,7 +50,8 @@ interface ICommitRevealAuction {
         uint64 startTimestamp;
         BatchPhase phase;
         bytes32 shuffleSeed;
-        uint256 totalPriorityBids;
+        uint256 totalPriorityBids;        // Real ETH-backed priority bids only
+        uint256 totalVirtualPriorityBids; // PoW-derived virtual priority (no ETH backing)
         uint256 orderCount;
         bool isSettled;
     }
@@ -84,6 +85,7 @@ interface ICommitRevealAuction {
         uint64 indexed batchId,
         uint256 orderCount,
         uint256 totalPriorityBids,
+        uint256 totalVirtualPriorityBids,
         bytes32 shuffleSeed
     );
 

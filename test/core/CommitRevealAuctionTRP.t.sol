@@ -1819,6 +1819,55 @@ contract CommitRevealAuctionTRP is Test {
     }
 
     // ============================================================
+    // R1-F04 FIX: PoW Virtual Value Must Not Inflate ETH Accounting
+    // ============================================================
+
+    /// @notice PoW virtual value is tracked separately from real ETH priority bids.
+    ///         totalPriorityBids reflects only actual ETH held, so withdrawPriorityBids
+    ///         never attempts to send more ETH than exists.
+    function test_r1f04_realBidWithNoPoW_onlyCountsAsRealETH() public {
+        bytes32 secret = keccak256("r1f04_a");
+        (bytes32 commitId, ) = _commit(alice, secret);
+        vm.warp(block.timestamp + 9);
+
+        uint256 realBid = 0.1 ether;
+        vm.prank(alice);
+        // revealOrderWithPoW with zero nonce = no PoW path, only real ETH bid
+        auction.revealOrderWithPoW{value: realBid}(
+            commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret,
+            realBid, bytes32(0), 0, 0
+        );
+
+        ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
+        assertEq(batch.totalPriorityBids, realBid, "R1-F04: real ETH bid in totalPriorityBids");
+        assertEq(batch.totalVirtualPriorityBids, 0, "R1-F04: no virtual bids without PoW");
+        assertGe(address(auction).balance, batch.totalPriorityBids, "R1-F04: ETH solvency");
+    }
+
+    /// @notice Two plain revealOrder calls: totalPriorityBids = sum of real bids,
+    ///         totalVirtualPriorityBids stays zero. Verifies standard path is unaffected
+    ///         by the PoW accounting split.
+    function test_r1f04_twoPlainReveals_splitAccountingZeroVirtual() public {
+        bytes32 s1 = keccak256("r1f04_b1");
+        bytes32 s2 = keccak256("r1f04_b2");
+        (bytes32 c1, ) = _commit(alice, s1);
+        (bytes32 c2, ) = _commit(bob, s2);
+        vm.warp(block.timestamp + 9);
+
+        uint256 bid1 = 0.2 ether;
+        uint256 bid2 = 0.05 ether;
+        vm.prank(alice);
+        auction.revealOrder{value: bid1}(c1, tokenA, tokenB, 1 ether, 0.9 ether, s1, bid1);
+        vm.prank(bob);
+        auction.revealOrder{value: bid2}(c2, tokenA, tokenB, 1 ether, 0.9 ether, s2, bid2);
+
+        ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
+        assertEq(batch.totalPriorityBids, bid1 + bid2, "R1-F04: sum of real ETH bids");
+        assertEq(batch.totalVirtualPriorityBids, 0, "R1-F04: no virtual bids in plain reveal path");
+        assertGe(address(auction).balance, batch.totalPriorityBids, "R1-F04: ETH solvency invariant");
+    }
+
+    // ============================================================
     // 22. RECEIVE FUNCTION
     // ============================================================
 

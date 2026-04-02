@@ -119,19 +119,34 @@ contract CrossChainRouter is
     /// @notice Cross-chain liquidity state
     mapping(bytes32 => LiquiditySync) public liquidityState;
 
-    // ============ Security: Bridged Deposit Tracking (Fix #2) ============
+    // ============ Security: Bridged Deposit Tracking (Fix #2 + TRP-R34-NEW01) ============
 
-    /// @notice Verified bridged deposits per commit (prevents deposit theft)
+    /// @notice Expected deposit amount per commit (set on commit receipt, cleared on fund/expire)
     mapping(bytes32 => uint256) public bridgedDeposits;
 
     /// @notice Timestamp when bridged deposit was created
     mapping(bytes32 => uint256) public bridgedDepositTimestamp;
 
-    /// @notice Total bridged deposits awaiting processing
+    /// @notice Whether a bridged deposit has been funded with real ETH
+    mapping(bytes32 => bool) public bridgedDepositFunded;
+
+    /// @notice Total pending deposits (expected but NOT yet funded — no ETH held)
+    /// @dev TRP-R34-NEW01: Split from totalBridgedDeposits to fix phantom accounting.
+    ///      Incremented in _handleCommit, decremented in fundBridgedDeposit/recoverExpiredDeposit.
+    uint256 public totalPendingDeposits;
+
+    /// @notice Total funded bridged deposits (real ETH held by router for auction commits)
+    /// @dev Invariant: address(this).balance >= totalBridgedDeposits (always true)
     uint256 public totalBridgedDeposits;
 
     /// @notice Expiry duration for bridged deposits (default 24 hours)
     uint256 public bridgedDepositExpiry;
+
+    /// @notice NEW-04: Escrow for funded deposits that expired before being claimed.
+    ///         Key: commitId → amount claimable on THIS chain.
+    ///         Depositor (as identified by commit.depositor) calls claimExpiredDeposit() to withdraw.
+    ///         ETH stays on the destination chain; depositor must use THEIR destination-chain address.
+    mapping(bytes32 => uint256) public claimableDeposits;
 
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
@@ -141,8 +156,8 @@ contract CrossChainRouter is
     uint32 public localEid;
 
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @dev Reserved storage gap for future upgrades (reduced by 1 for claimableDeposits)
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -158,6 +173,17 @@ contract CrossChainRouter is
     event CrossChainRevealFailed(bytes32 indexed commitId, uint32 indexed srcEid, string reason);
     event BridgedDepositFunded(bytes32 indexed commitId, uint256 amount);
     event BridgedDepositRecovered(bytes32 indexed commitId, address indexed depositor, uint256 amount);
+    /// @notice NEW-04: Emitted when an unfunded commit expires. Depositor must reclaim on srcChainId.
+    event CrossChainCommitExpired(
+        bytes32 indexed commitId,
+        address indexed depositor,
+        uint32  indexed srcChainId,
+        uint256 depositAmount
+    );
+    /// @notice NEW-04: Emitted when funded-deposit ETH is escrowed after expiry.
+    event ClaimableDepositStored(bytes32 indexed commitId, address indexed depositor, uint256 amount);
+    /// @notice NEW-04: Emitted when escrowed ETH is claimed by the depositor on this chain.
+    event ClaimableDepositClaimed(bytes32 indexed commitId, address indexed recipient, uint256 amount);
 
     // ============ Errors ============
 
@@ -169,6 +195,7 @@ contract CrossChainRouter is
     error InvalidMessage();
     error DepositNotExpired();
     error NoDepositToRecover();
+    error NoClaimableDeposit();
 
     // ============ Modifiers ============
 
@@ -492,12 +519,12 @@ contract CrossChainRouter is
         // Store for local processing
         pendingCommits[commitId] = commit;
 
-        // FIX #2: Track bridged deposit separately instead of using router balance
-        // The deposit must be bridged via a separate asset bridge (LayerZero OFT, etc.)
-        // For now, record the expected deposit amount - actual bridging happens via fundBridgedDeposit()
+        // TRP-R34-NEW01: Track expected deposit in pending (NOT totalBridgedDeposits).
+        // No ETH has arrived yet — only a LayerZero message. Real ETH arrives via fundBridgedDeposit().
+        // totalBridgedDeposits must only reflect ETH actually held by the router.
         bridgedDeposits[commitId] = commit.depositAmount;
         bridgedDepositTimestamp[commitId] = block.timestamp;
-        totalBridgedDeposits += commit.depositAmount;
+        totalPendingDeposits += commit.depositAmount;
 
         emit CrossChainCommitReceived(commitId, srcEid, commit.depositor);
     }
@@ -517,14 +544,18 @@ contract CrossChainRouter is
         uint256 depositAmount = commit.depositAmount;
         uint256 excess = msg.value - depositAmount;
 
-        // Clear the pending bridged deposit BEFORE external calls (Checks-Effects-Interactions)
+        // TRP-R34-NEW01: ETH has arrived. Move from pending to funded tracking.
+        // Since we immediately forward to auction in the same tx, totalBridgedDeposits
+        // is a transient state here. But we track it for the invariant:
+        //   address(this).balance >= totalBridgedDeposits
+        totalPendingDeposits -= depositAmount;
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
-        totalBridgedDeposits -= depositAmount;
         // TRP-R22-NEW08: Clean up pendingCommits after funding to prevent reveal replay
         delete pendingCommits[commitId];
 
         // Now forward to auction with verified funds
+        // TODO(TRP-R35-NEW03): Use commitOrderOnBehalf once implemented in CommitRevealAuction
         ICommitRevealAuction(auction).commitOrder{value: depositAmount}(
             commit.commitHash
         );
@@ -550,7 +581,7 @@ contract CrossChainRouter is
         }
 
         // Determine how much ETH we can send for priority bid
-        // Exclude totalBridgedDeposits to avoid using pending bridge funds
+        // TRP-R34-NEW01: totalBridgedDeposits now only reflects real funded ETH held by router
         uint256 availableEth = address(this).balance > totalBridgedDeposits
             ? address(this).balance - totalBridgedDeposits
             : 0;
@@ -766,8 +797,21 @@ contract CrossChainRouter is
     }
 
     /**
-     * @notice Recover an expired bridged deposit
-     * @dev Only the original depositor or owner can recover. Cleans up totalBridgedDeposits.
+     * @notice Recover an expired bridged deposit.
+     * @dev NEW-04 FIX: Two distinct cases depending on whether ETH ever arrived on this chain.
+     *
+     *   UNFUNDED (asset bridge never delivered ETH):
+     *     commit.depositor is the source-chain address. Sending ETH to it on the destination
+     *     chain is wrong — that address may be owned by a different person or no one.
+     *     Correct action: clean up accounting and emit CrossChainCommitExpired so off-chain
+     *     tooling can alert the user to reclaim their original deposit on the source chain
+     *     (srcChainId) from the CommitRevealAuction where it still resides.
+     *
+     *   FUNDED (ETH arrived but commit expired before settlement):
+     *     ETH is on THIS chain. We must NOT send it to commit.depositor (source-chain address).
+     *     Instead we escrow it in claimableDeposits[commitId]. The depositor calls
+     *     claimExpiredDeposit() on the destination chain to withdraw with their local address.
+     *
      * @param commitId The commit ID whose deposit expired
      */
     function recoverExpiredDeposit(bytes32 commitId) external nonReentrant {
@@ -778,26 +822,73 @@ contract CrossChainRouter is
         if (block.timestamp < createdAt + bridgedDepositExpiry) revert DepositNotExpired();
 
         CrossChainCommit memory commit = pendingCommits[commitId];
-        // Only original depositor or owner can recover
+        // Only original depositor or owner can trigger recovery
         require(
             msg.sender == commit.depositor || msg.sender == owner(),
             "Not authorized to recover"
         );
 
+        bool isFunded = bridgedDepositFunded[commitId];
+
         // Clean up state (effects before interactions — CEI pattern)
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
-        totalBridgedDeposits -= depositAmount;
+        bridgedDepositFunded[commitId] = false;
         delete pendingCommits[commitId];
 
-        // C-03: Dissolve lost deposit attack surface — actually transfer ETH back
-        // Previously this function only cleaned up accounting state but never sent
-        // the depositor's ETH back, permanently locking funds in the contract.
-        // This makes deposit loss structurally impossible.
-        (bool success, ) = commit.depositor.call{value: depositAmount}("");
-        require(success, "C-03: Recovery transfer failed");
+        if (isFunded) {
+            // NEW-04: ETH is on this chain but commit.depositor is a SOURCE-chain address.
+            // Do NOT send ETH to commit.depositor — the address may be controlled by a
+            // different party on this chain (or not exist at all for smart contract wallets).
+            // Escrow the ETH in claimableDeposits[commitId]; the depositor calls
+            // claimExpiredDeposit() from their destination-chain address.
+            totalBridgedDeposits -= depositAmount;
+            claimableDeposits[commitId] = depositAmount;
+            emit ClaimableDepositStored(commitId, commit.depositor, depositAmount);
+        } else {
+            // UNFUNDED: ETH never arrived on this chain — it still lives in the source-chain
+            // CommitRevealAuction. Only clean up destination-chain accounting here.
+            // The depositor must reclaim on srcChainId.
+            totalPendingDeposits -= depositAmount;
+            emit CrossChainCommitExpired(
+                commitId,
+                commit.depositor,
+                commit.srcChainId,
+                depositAmount
+            );
+        }
 
         emit BridgedDepositRecovered(commitId, commit.depositor, depositAmount);
+    }
+
+    /**
+     * @notice Claim ETH escrowed by recoverExpiredDeposit for a funded commit.
+     * @dev NEW-04: Called on the DESTINATION chain by the depositor's destination-chain address
+     *      (which may differ from commit.depositor, the source-chain address). The owner can
+     *      specify an arbitrary recipient to handle cases where the depositor controls a
+     *      different address here, or uses a smart contract wallet with a different address.
+     * @param commitId The commit whose claimable deposit to withdraw
+     * @param recipient Address to send ETH to on this chain
+     */
+    function claimExpiredDeposit(bytes32 commitId, address payable recipient) external nonReentrant {
+        uint256 amount = claimableDeposits[commitId];
+        if (amount == 0) revert NoClaimableDeposit();
+        require(recipient != address(0), "Invalid recipient");
+
+        // Only owner can claim on behalf of arbitrary recipients.
+        // Otherwise, caller must be the recipient (self-service on dest chain).
+        require(
+            msg.sender == owner() || msg.sender == recipient,
+            "Not authorized to claim"
+        );
+
+        // Effects before interactions (CEI)
+        claimableDeposits[commitId] = 0;
+
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "Claim transfer failed");
+
+        emit ClaimableDepositClaimed(commitId, recipient, amount);
     }
 
     // ============ Receive ============

@@ -473,8 +473,14 @@ contract CrossChainRouterTest is Test {
         router.setBridgedDepositExpiry(30 minutes);
     }
 
-    function test_recoverExpiredDeposit() public {
-        // Simulate receiving a commit from chain B
+    // ============ NEW-04: recoverExpiredDeposit — correct chain routing ============
+
+    /// @notice Helper: receive a commit from Chain B and return its commitId
+    function _receiveCommit(
+        bytes32 commitHash,
+        uint256 depositAmount,
+        bytes32 guid
+    ) internal returns (bytes32 commitId) {
         CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
             srcEid: CHAIN_B,
             sender: PEER_B,
@@ -482,11 +488,11 @@ contract CrossChainRouterTest is Test {
         });
 
         CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
-            commitHash: keccak256("order"),
+            commitHash: commitHash,
             depositor: authorized,
-            depositAmount: 1 ether,
+            depositAmount: depositAmount,
             srcChainId: CHAIN_B,
-            dstChainId: CHAIN_A,  // Must match localEid
+            dstChainId: CHAIN_A,
             srcTimestamp: block.timestamp
         });
 
@@ -495,74 +501,172 @@ contract CrossChainRouterTest is Test {
             abi.encode(commit)
         );
 
-        // Receive the commit (creates bridged deposit)
         vm.prank(address(endpoint));
-        router.lzReceive(origin, keccak256("guid-expire"), message, address(0), "");
+        router.lzReceive(origin, guid, message, address(0), "");
 
-        // Compute commitId
-        bytes32 commitId = keccak256(abi.encodePacked(
+        commitId = keccak256(abi.encodePacked(
             commit.depositor,
             commit.commitHash,
             commit.srcChainId,
             commit.dstChainId,
             commit.srcTimestamp
         ));
+    }
 
-        // Verify deposit exists
+    /// @notice NEW-04: Unfunded commit expiry → no ETH sent to source-chain address.
+    ///         Must emit CrossChainCommitExpired so depositor reclaims on source chain.
+    function test_recoverExpiredDeposit_unfunded_noEthTransfer() public {
+        bytes32 commitId = _receiveCommit(keccak256("order-unfunded"), 1 ether, keccak256("guid-unfunded"));
+
+        // Unfunded path: totalPendingDeposits (not totalBridgedDeposits) was incremented
         assertEq(router.bridgedDeposits(commitId), 1 ether);
-        assertEq(router.totalBridgedDeposits(), 1 ether);
+        assertEq(router.totalPendingDeposits(), 1 ether);
+        assertEq(router.totalBridgedDeposits(), 0); // No real ETH arrived
 
-        // Try to recover before expiry - should fail
+        // Before expiry: reverts
         vm.prank(authorized);
         vm.expectRevert(CrossChainRouter.DepositNotExpired.selector);
         router.recoverExpiredDeposit(commitId);
 
-        // Warp past expiry
         vm.warp(block.timestamp + 24 hours + 1);
 
-        // Recover as depositor
+        uint256 routerBalanceBefore = address(router).balance;
+
+        // Depositor triggers recovery — no ETH should leave the router
         vm.prank(authorized);
         router.recoverExpiredDeposit(commitId);
 
-        // Verify cleanup
+        // Accounting cleaned up
         assertEq(router.bridgedDeposits(commitId), 0);
+        assertEq(router.totalPendingDeposits(), 0);
+        assertEq(router.totalBridgedDeposits(), 0);
+
+        // NEW-04: No ETH transferred to authorized (source-chain address)
+        // Router balance unchanged — funds were never bridged here
+        assertEq(address(router).balance, routerBalanceBefore);
+
+        // Nothing claimable either (unfunded path doesn't escrow)
+        assertEq(router.claimableDeposits(commitId), 0);
+    }
+
+    /// @notice NEW-04: Funded commit expiry → ETH escrowed in claimableDeposits, NOT sent to source-chain address.
+    function test_recoverExpiredDeposit_funded_escrowed() public {
+        bytes32 commitId = _receiveCommit(keccak256("order-funded"), 1 ether, keccak256("guid-funded"));
+
+        // Manually mark as funded (simulates a scenario where ETH arrived but was not forwarded)
+        // We use vm.store to set bridgedDepositFunded[commitId] = true and totalBridgedDeposits
+        // For simplicity, directly call a cheatcode on the mapping slot.
+        // mapping slot = keccak256(abi.encode(commitId, storageSlot))
+        // bridgedDepositFunded is at slot 9 (0-indexed from state layout)
+        // State order: lzEndpoint(0), auction(1), peers(2), processedMessages(3),
+        //   messageCount(4), lastResetTime(5), maxMessagesPerHour(6), pendingCommits(7),
+        //   liquidityState(8), bridgedDeposits(9), bridgedDepositTimestamp(10),
+        //   bridgedDepositFunded(11), totalPendingDeposits(12), totalBridgedDeposits(13),
+        //   bridgedDepositExpiry(14), claimableDeposits(15), authorized(16), localEid(17)
+        // (Proxy adds 2 slots for OZ proxy; we store directly)
+        bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
+        vm.store(address(router), fundedSlot, bytes32(uint256(1)));
+        // Also set totalBridgedDeposits to 1 ether (slot 13)
+        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+        // Ensure router has the ETH (setUp already gave it 10 ether)
+
+        assertTrue(router.bridgedDepositFunded(commitId));
+        assertEq(router.totalBridgedDeposits(), 1 ether);
+
+        vm.warp(block.timestamp + 24 hours + 1);
+
+        uint256 authorizedBalanceBefore = authorized.balance;
+        uint256 routerBalanceBefore = address(router).balance;
+
+        // Recovery should NOT send ETH to authorized (source-chain address)
+        vm.prank(authorized);
+        router.recoverExpiredDeposit(commitId);
+
+        // NEW-04: No direct ETH transfer to the source-chain depositor address
+        assertEq(authorized.balance, authorizedBalanceBefore);
+
+        // ETH escrowed, not sent
+        assertEq(router.claimableDeposits(commitId), 1 ether);
+        assertEq(address(router).balance, routerBalanceBefore); // Router still holds it
+
+        // totalBridgedDeposits decremented
         assertEq(router.totalBridgedDeposits(), 0);
     }
 
+    /// @notice NEW-04: claimExpiredDeposit — depositor claims on dest chain with their local address.
+    function test_claimExpiredDeposit_self() public {
+        bytes32 commitId = _receiveCommit(keccak256("order-claim"), 1 ether, keccak256("guid-claim"));
+
+        // Force funded state
+        bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
+        vm.store(address(router), fundedSlot, bytes32(uint256(1)));
+        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+
+        vm.warp(block.timestamp + 24 hours + 1);
+        vm.prank(authorized);
+        router.recoverExpiredDeposit(commitId);
+        assertEq(router.claimableDeposits(commitId), 1 ether);
+
+        // Depositor claims using their dest-chain address (msg.sender == recipient)
+        address payable destRecipient = payable(authorized);
+        uint256 balBefore = destRecipient.balance;
+
+        vm.prank(authorized);
+        router.claimExpiredDeposit(commitId, destRecipient);
+
+        assertEq(destRecipient.balance, balBefore + 1 ether);
+        assertEq(router.claimableDeposits(commitId), 0);
+    }
+
+    /// @notice NEW-04: Owner can route claimable ETH to a different address (e.g., smart wallet).
+    function test_claimExpiredDeposit_ownerRedirect() public {
+        bytes32 commitId = _receiveCommit(keccak256("order-redirect"), 1 ether, keccak256("guid-redirect"));
+
+        bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
+        vm.store(address(router), fundedSlot, bytes32(uint256(1)));
+        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+
+        vm.warp(block.timestamp + 24 hours + 1);
+        vm.prank(authorized);
+        router.recoverExpiredDeposit(commitId);
+
+        address payable altAddress = payable(makeAddr("altAddress"));
+        uint256 balBefore = altAddress.balance;
+
+        // Owner redirects to altAddress
+        router.claimExpiredDeposit(commitId, altAddress);
+
+        assertEq(altAddress.balance, balBefore + 1 ether);
+        assertEq(router.claimableDeposits(commitId), 0);
+    }
+
+    /// @notice NEW-04: Non-owner non-recipient cannot claim someone else's escrow.
+    function test_claimExpiredDeposit_unauthorized() public {
+        bytes32 commitId = _receiveCommit(keccak256("order-unauth"), 1 ether, keccak256("guid-unauth"));
+
+        bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
+        vm.store(address(router), fundedSlot, bytes32(uint256(1)));
+        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+
+        vm.warp(block.timestamp + 24 hours + 1);
+        vm.prank(authorized);
+        router.recoverExpiredDeposit(commitId);
+
+        address attacker = makeAddr("attacker");
+        vm.prank(attacker);
+        vm.expectRevert("Not authorized to claim");
+        router.claimExpiredDeposit(commitId, payable(attacker));
+    }
+
+    /// @notice NEW-04: Claim fails if nothing is claimable.
+    function test_claimExpiredDeposit_noDeposit() public {
+        vm.expectRevert(CrossChainRouter.NoClaimableDeposit.selector);
+        router.claimExpiredDeposit(keccak256("nonexistent"), payable(authorized));
+    }
+
     function test_recoverExpiredDeposit_onlyDepositorOrOwner() public {
-        // Simulate receiving a commit
-        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
-            srcEid: CHAIN_B,
-            sender: PEER_B,
-            nonce: 1
-        });
+        bytes32 commitId = _receiveCommit(keccak256("order-auth"), 1 ether, keccak256("guid-auth2"));
 
-        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
-            commitHash: keccak256("order2"),
-            depositor: authorized,
-            depositAmount: 1 ether,
-            srcChainId: CHAIN_B,
-            dstChainId: CHAIN_A,  // Must match localEid
-            srcTimestamp: block.timestamp
-        });
-
-        bytes memory message = abi.encode(
-            CrossChainRouter.MessageType.ORDER_COMMIT,
-            abi.encode(commit)
-        );
-
-        vm.prank(address(endpoint));
-        router.lzReceive(origin, keccak256("guid-auth"), message, address(0), "");
-
-        bytes32 commitId = keccak256(abi.encodePacked(
-            commit.depositor,
-            commit.commitHash,
-            commit.srcChainId,
-            commit.dstChainId,
-            commit.srcTimestamp
-        ));
-
-        // Warp past expiry
         vm.warp(block.timestamp + 24 hours + 1);
 
         // Random address cannot recover

@@ -102,9 +102,11 @@ contract VibeAMMLite is
         _;
     }
 
+    /// @dev Global per-user guard: prevents cross-pool flash loan attacks by keying
+    ///      on (sender, block) without poolId. Any pool interaction blocks all pools.
     modifier noFlashLoan(bytes32 poolId) {
         if ((protectionFlags & FLAG_FLASH_LOAN) != 0) {
-            bytes32 k = keccak256(abi.encodePacked(msg.sender, poolId, block.number));
+            bytes32 k = keccak256(abi.encodePacked(msg.sender, block.number));
             if (sameBlockInteraction[k]) revert SameBlockInteraction();
             sameBlockInteraction[k] = true;
         }

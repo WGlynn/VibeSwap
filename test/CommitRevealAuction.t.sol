@@ -38,6 +38,7 @@ contract CommitRevealAuctionTest is Test {
         uint64 indexed batchId,
         uint256 orderCount,
         uint256 totalPriorityBids,
+        uint256 totalVirtualPriorityBids,
         bytes32 shuffleSeed
     );
 

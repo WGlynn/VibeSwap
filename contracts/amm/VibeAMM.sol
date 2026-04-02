@@ -514,6 +514,10 @@ contract VibeAMM is
         uint256 amount1,
         uint256 liquidity
     ) {
+        // TRP-R24-CB06: Block liquidity adds during price anomalies.
+        // Inline check instead of modifier to avoid stack-too-deep.
+        _checkBreaker(PRICE_BREAKER);
+
         Pool storage pool = pools[poolId];
 
         // Scoped to free stack slots after token transfers complete

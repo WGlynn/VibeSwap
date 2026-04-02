@@ -22,6 +22,7 @@ import "../oracles/interfaces/ITruePriceOracle.sol";
 import "../incentives/IPriorityRegistry.sol";
 import "../incentives/interfaces/IIncentiveController.sol";
 import "../incentives/interfaces/IVolatilityOracle.sol";
+import "./FeeController.sol";
 
 /**
  * @title VibeAMM
@@ -231,8 +232,13 @@ contract VibeAMM is
     ///      High vol + normal regime = organic volatility (don't over-dampen)
     IVolatilityOracle public volatilityOracle;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @notice PID-tuned fee controller — auto-adjusts fees based on measured impermanent loss
+    /// @dev When set, _getBaseFee() reads from controller instead of pool.feeRate.
+    ///      When address(0), falls back to static pool.feeRate (backwards compatible).
+    FeeController public feeController;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 1 for feeController)
+    uint256[49] private __gap;
 
     // ============ Security Events ============
 
@@ -252,6 +258,7 @@ contract VibeAMM is
     event FibonacciFeeApplied(bytes32 indexed poolId, uint256 baseFee, uint256 fibFee, uint8 tier);
     event PoWFeeDiscountApplied(bytes32 indexed poolId, address indexed user, uint8 difficulty, uint256 discountBps);
     event IncentiveControllerUpdated(address indexed controller);
+    event FeeControllerUpdated(address indexed controller);
     event VolatilityFeeRouted(bytes32 indexed poolId, address token, uint256 amount);
     event TruePriceFeeSurcharge(bytes32 indexed poolId, uint256 baseFee, uint256 effectiveFee);
     event VolatilityOracleUpdated(address indexed oracle);
@@ -752,9 +759,10 @@ contract VibeAMM is
         // ============ True Price Fee Surcharge ============
         // When True Price detects adverse conditions, increase fees to penalize
         // extractive behavior. Honest traders face normal fees. Manipulators pay more.
-        uint256 batchFeeRate = pool.feeRate;
+        uint256 baseFee = _getBaseFee(poolId, pool);
+        uint256 batchFeeRate = baseFee;
         if ((protectionFlags & FLAG_TRUE_PRICE) != 0 && address(truePriceOracle) != address(0)) {
-            batchFeeRate = _computeTruePriceFeeSurcharge(poolId, pool.feeRate);
+            batchFeeRate = _computeTruePriceFeeSurcharge(poolId, baseFee);
         }
 
         // Execute each order at clearing price
@@ -821,13 +829,23 @@ contract VibeAMM is
         return _executeSwap(SwapParams(poolId, tokenIn, amountIn, minAmountOut, recipient));
     }
 
+    /// @notice Get effective base fee for a pool — reads from FeeController if set, else static
+    /// @dev This is where "the fee is a measurement, not a parameter" lives.
+    function _getBaseFee(bytes32 poolId, Pool storage pool) internal view returns (uint256) {
+        if (address(feeController) != address(0)) {
+            uint256 controllerFee = feeController.getFee(poolId);
+            if (controllerFee > 0) return controllerFee;
+        }
+        return pool.feeRate;
+    }
+
     /// @dev Internal swap implementation to avoid stack-too-deep
     function _executeSwap(SwapParams memory p) internal returns (uint256 amountOut) {
         Pool storage pool = pools[p.poolId];
         if (p.tokenIn != pool.token0 && p.tokenIn != pool.token1) revert InvalidToken();
 
         bool isToken0 = p.tokenIn == pool.token0;
-        uint256 feeRate = pool.feeRate;
+        uint256 feeRate = _getBaseFee(p.poolId, pool);
 
         // Calculate output with protections
         {
@@ -896,7 +914,7 @@ contract VibeAMM is
         if (p.tokenIn != pool.token0 && p.tokenIn != pool.token1) revert InvalidToken();
 
         bool isToken0 = p.tokenIn == pool.token0;
-        uint256 adjustedFeeRate = pool.feeRate;
+        uint256 adjustedFeeRate = _getBaseFee(p.poolId, pool);
 
         // Apply PoW discount
         if (p.claimedDifficulty > 0 && p.powNonce != bytes32(0)) {
@@ -962,21 +980,17 @@ contract VibeAMM is
     ) internal {
         // Gas: cache token address from storage to avoid repeated SLOAD
         address tokenOut = isToken0 ? pool.token1 : pool.token0;
-        uint256 _feeRate = pool.feeRate; // Cache base fee rate for comparison
+        uint256 _feeRate = pool.feeRate; // Static base rate for surcharge comparison
 
         // Calculate and track fees
         (uint256 protocolFee, ) = BatchMath.calculateFees(amountIn, feeRate, protocolFeeShare);
 
         // Route volatility fee surplus to IncentiveController for insurance pool
-        // When dynamic fee > base fee, the protocol's share of the surplus goes to
-        // VolatilityInsurancePool instead of the general treasury fee accumulator.
-        // LP base fees remain untouched (they're in reserves via x*y=k).
         uint256 volatilitySurplus;
         if (address(incentiveController) != address(0) && feeRate > _feeRate && protocolFee > 0) {
             (uint256 basePFee, ) = BatchMath.calculateFees(amountIn, _feeRate, protocolFeeShare);
             volatilitySurplus = protocolFee > basePFee ? protocolFee - basePFee : 0;
             if (volatilitySurplus > 0) {
-                // Base portion accumulates normally; surplus routes to incentive layer
                 accumulatedFees[tokenIn] += protocolFee - volatilitySurplus;
                 IERC20(tokenIn).safeTransfer(address(incentiveController), volatilitySurplus);
                 try incentiveController.routeVolatilityFee(poolId, tokenIn, volatilitySurplus) {} catch {}
@@ -1239,6 +1253,20 @@ contract VibeAMM is
     function setVolatilityOracle(address _oracle) external onlyOwner {
         volatilityOracle = IVolatilityOracle(_oracle);
         emit VolatilityOracleUpdated(_oracle);
+    }
+
+    /**
+     * @notice Set FeeController for PID-tuned auto-adjusting fees
+     * @dev When set, _getBaseFee() reads from controller instead of static pool.feeRate.
+     *      Set to address(0) to revert to static fees.
+     *
+     * DISINTERMEDIATION: Grade C → Target Grade A.
+     * Once PID params are tuned and stable, FeeController runs without human input.
+     * The fee becomes a measurement, not a parameter.
+     */
+    function setFeeController(address _controller) external onlyOwner {
+        feeController = FeeController(_controller);
+        emit FeeControllerUpdated(_controller);
     }
 
     /**

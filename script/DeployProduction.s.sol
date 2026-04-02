@@ -267,17 +267,13 @@ contract DeployProduction is Script {
     }
 
     function _deployFeePipeline() internal {
-        // FeeRouter needs 4 destination addresses.
-        // Treasury wallet = DAOTreasury proxy (already deployed).
-        // Insurance + RevShare = owner for now (governance can update).
-        // BuybackEngine address unknown yet — deploy router, then engine, then update.
+        // FeeRouter forwards 100% of swap fees to LPs via ShapleyDistributor.
+        // No split. No treasury cut. No buyback. No extraction.
+        // LP distributor = owner for now (governance updates to ShapleyDistributor later).
 
         // Deploy FeeRouter
         feeRouter = address(new FeeRouter(
-            treasury,         // 40% to DAOTreasury
-            owner,            // 20% insurance (governance updates to insurance pool later)
-            owner,            // 30% revShare  (governance updates to revshare contract later)
-            address(0xDEAD)   // 10% buyback — placeholder, updated below
+            owner             // LP distributor — update to ShapleyDistributor post-deploy
         ));
         console.log("  FeeRouter:", feeRouter);
 
@@ -287,18 +283,6 @@ contract DeployProduction is Script {
         console.log("  ProtocolFeeAdapter:", feeAdapter);
 
         // Deploy BuybackEngine (swaps + burns via VibeAMM)
-        buybackEngine = address(new BuybackEngine(
-            amm,
-            address(0xDEAD),  // placeholder protocolToken — update via setProtocolToken() when JUL deployed
-            500,              // 5% slippage tolerance
-            1 hours           // 1 hour cooldown between buybacks
-        ));
-        console.log("  BuybackEngine:", buybackEngine);
-
-        // Wire up: FeeRouter buyback target -> BuybackEngine
-        FeeRouter(feeRouter).setBuybackTarget(buybackEngine);
-        console.log("  FeeRouter buyback target -> BuybackEngine");
-
         // Wire up: Authorize ProtocolFeeAdapter as FeeRouter source
         FeeRouter(feeRouter).authorizeSource(feeAdapter);
         console.log("  ProtocolFeeAdapter authorized as FeeRouter source");

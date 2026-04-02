@@ -546,12 +546,9 @@ contract StrategyVaultTest is Test {
     }
 
     function test_harvest_routesThroughFeeRouter() public {
-        // Setup FeeRouter
-        address treasury = address(0x1111);
-        address insurance = address(0x2222);
-        address revShareAddr = address(0x3333);
-        address buybackAddr = address(0x4444);
-        FeeRouter router = new FeeRouter(treasury, insurance, revShareAddr, buybackAddr);
+        // Setup FeeRouter (100% to LPs)
+        address lpDist = address(0x1111);
+        FeeRouter router = new FeeRouter(lpDist);
         router.authorizeSource(address(vault));
 
         // Wire vault to router
@@ -578,11 +575,8 @@ contract StrategyVaultTest is Test {
         // Direct feeRecipient should NOT have received tokens
         assertEq(token.balanceOf(feeRecipient), 0);
 
-        // Distribute and verify
+        // Distribute and verify 100% to LP distributor
         router.distribute(address(token));
-        assertGt(token.balanceOf(treasury), 0);
-        assertGt(token.balanceOf(insurance), 0);
-        assertGt(token.balanceOf(revShareAddr), 0);
-        assertGt(token.balanceOf(buybackAddr), 0);
+        assertGt(token.balanceOf(lpDist), 0);
     }
 }

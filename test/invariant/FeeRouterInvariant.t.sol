@@ -57,72 +57,54 @@ contract FeeRouterHandler is Test {
 }
 
 // ============ Invariant Tests ============
+// Core invariant: totalCollected = totalDistributed + pending
+// And: 100% of distributed fees end up at lpDistributor
 
 contract FeeRouterInvariantTest is StdInvariant, Test {
-    MockFeeInvToken token;
     FeeRouter router;
+    MockFeeInvToken token;
     FeeRouterHandler handler;
 
-    address treasury = makeAddr("treasury");
-    address insurance = makeAddr("insurance");
-    address revShare = makeAddr("revShare");
-    address buyback = makeAddr("buyback");
+    address lpDistributor = makeAddr("lpDistributor");
     address source = makeAddr("source");
 
     function setUp() public {
         token = new MockFeeInvToken();
-        router = new FeeRouter(treasury, insurance, revShare, buyback);
+        router = new FeeRouter(lpDistributor);
         router.authorizeSource(source);
+
+        token.mint(source, type(uint128).max);
+        vm.prank(source);
+        token.approve(address(router), type(uint256).max);
 
         handler = new FeeRouterHandler(router, token, source);
         targetContract(address(handler));
     }
 
-    // ============ Invariant: collected = distributed + pending ============
-
-    function invariant_accountingBalance() public view {
+    function invariant_accountingBalances() public view {
         uint256 collected = router.totalCollected(address(token));
         uint256 distributed = router.totalDistributed(address(token));
         uint256 pending = router.pendingFees(address(token));
 
+        // Accounting invariant: collected = distributed + pending
         assertEq(collected, distributed + pending);
     }
 
-    // ============ Invariant: router balance = pending fees ============
-
-    function invariant_routerBalanceMatchesPending() public view {
-        uint256 routerBal = token.balanceOf(address(router));
-        uint256 pending = router.pendingFees(address(token));
-        assertEq(routerBal, pending);
-    }
-
-    // ============ Invariant: all distributed tokens reach recipients ============
-
-    function invariant_noTokensLost() public view {
-        uint256 recipientTotal = token.balanceOf(treasury) +
-            token.balanceOf(insurance) +
-            token.balanceOf(revShare) +
-            token.balanceOf(buyback);
+    function invariant_100pctToLPs() public view {
         uint256 distributed = router.totalDistributed(address(token));
 
-        assertEq(recipientTotal, distributed);
+        // Everything distributed went to LP distributor
+        // (router balance = pending only, LP distributor got the rest)
+        assertEq(token.balanceOf(lpDistributor), distributed);
     }
 
-    // ============ Invariant: ghost variables match contract ============
+    function invariant_routerHoldsOnlyPending() public view {
+        uint256 pending = router.pendingFees(address(token));
+        assertEq(token.balanceOf(address(router)), pending);
+    }
 
     function invariant_ghostMatchesContract() public view {
         assertEq(handler.ghost_totalCollected(), router.totalCollected(address(token)));
         assertEq(handler.ghost_totalDistributed(), router.totalDistributed(address(token)));
-    }
-
-    // ============ Invariant: config always sums to 10000 BPS ============
-
-    function invariant_configSumsBPS() public view {
-        IFeeRouter.FeeConfig memory cfg = router.config();
-        uint256 total = uint256(cfg.treasuryBps) +
-            uint256(cfg.insuranceBps) +
-            uint256(cfg.revShareBps) +
-            uint256(cfg.buybackBps);
-        assertEq(total, 10_000);
     }
 }

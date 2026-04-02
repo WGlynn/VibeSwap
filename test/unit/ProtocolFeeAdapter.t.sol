@@ -28,10 +28,7 @@ contract ProtocolFeeAdapterTest is Test {
     FeeRouter router;
     ProtocolFeeAdapter adapter;
 
-    address treasury = address(0x1111);
-    address insurance = address(0x2222);
-    address revShare = address(0x3333);
-    address buyback = address(0x4444);
+    address lpDistributor = address(0x1111);
 
     address alice = address(0xA11CE);
 
@@ -40,8 +37,8 @@ contract ProtocolFeeAdapterTest is Test {
         tokenB = new MockAdapterToken();
         weth = new MockWETH();
 
-        // Deploy FeeRouter
-        router = new FeeRouter(treasury, insurance, revShare, buyback);
+        // Deploy FeeRouter (100% to LPs)
+        router = new FeeRouter(lpDistributor);
 
         // Deploy adapter
         adapter = new ProtocolFeeAdapter(address(router), address(weth));
@@ -143,21 +140,18 @@ contract ProtocolFeeAdapterTest is Test {
 
     // ============ Full Flow Test ============
 
-    function test_fullFlow_AMMToCooperativeDistribution() public {
+    function test_fullFlow_AMMToLPDistribution() public {
         // Step 1: VibeAMM sends accumulated fees to adapter (as "treasury")
         tokenA.mint(address(adapter), 10_000 ether);
 
         // Step 2: Anyone triggers forwarding to FeeRouter
         adapter.forwardFees(address(tokenA));
 
-        // Step 3: FeeRouter distributes cooperatively
+        // Step 3: FeeRouter forwards 100% to LP distributor
         router.distribute(address(tokenA));
 
-        // Step 4: Verify cooperative split (40/20/30/10)
-        assertEq(tokenA.balanceOf(treasury), 4000 ether);
-        assertEq(tokenA.balanceOf(insurance), 2000 ether);
-        assertEq(tokenA.balanceOf(revShare), 3000 ether);
-        assertEq(tokenA.balanceOf(buyback), 1000 ether);
+        // Step 4: Verify 100% to LPs
+        assertEq(tokenA.balanceOf(lpDistributor), 10_000 ether);
 
         // Accounting
         assertEq(router.totalCollected(address(tokenA)), 10_000 ether);

@@ -215,18 +215,8 @@ contract DeployIncentives is Script {
         VibeSwapCore(payable(vibeSwapCore)).setIncentiveController(incentiveController);
         console.log("  VibeSwapCore.setIncentiveController set");
 
-        // Update FeeRouter insurance target from deployer placeholder to actual insurance pool
-        if (feeRouterAddr != address(0)) {
-            console.log("");
-            console.log("=== Updating FeeRouter targets ===");
-            FeeRouter(feeRouterAddr).setInsurance(volatilityInsurancePool);
-            console.log("  FeeRouter.setInsurance -> VolatilityInsurancePool");
-            // Note: FeeRouter.setRevShare should be called after DeployTokenomics
-            // when VibeRevShare contract is deployed with JUL token address
-        } else {
-            console.log("  SKIP FeeRouter update (FEE_ROUTER not provided)");
-            console.log("  IMPORTANT: Call FeeRouter.setInsurance(VOLATILITY_INSURANCE_POOL) manually!");
-        }
+        // FeeRouter sends 100% of swap fees to LPs — no insurance/revShare split.
+        // Insurance pool is funded separately, not from LP swap fees.
 
         vm.stopBroadcast();
 

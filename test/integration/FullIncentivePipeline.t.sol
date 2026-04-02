@@ -242,27 +242,12 @@ contract FullIncentivePipelineTest is Test {
     }
 
     function _deployFeePipeline() internal {
-        // FeeRouter
-        feeRouter = new FeeRouter(
-            address(treasury),
-            insuranceWallet,
-            revShareWallet,
-            address(0xDEAD) // placeholder buyback
-        );
+        // FeeRouter: 100% of swap fees to LPs via ShapleyDistributor
+        feeRouter = new FeeRouter(address(shapley));
 
         // ProtocolFeeAdapter
         adapter = new ProtocolFeeAdapter(address(feeRouter), address(wethNative));
 
-        // BuybackEngine
-        buyback = new BuybackEngine(
-            address(amm),
-            address(weth), // protocol token
-            500,           // 5% slippage
-            0              // no cooldown
-        );
-
-        // Wire FeeRouter buyback
-        feeRouter.setBuybackTarget(address(buyback));
         feeRouter.authorizeSource(address(adapter));
     }
 

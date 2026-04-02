@@ -70,15 +70,12 @@ contract ProtocolFeeAdapterInvariantTest is StdInvariant, Test {
     ProtocolFeeAdapter adapter;
     AdapterHandler handler;
 
-    address treasury = makeAddr("treasury");
-    address insurance = makeAddr("insurance");
-    address revShare = makeAddr("revShare");
-    address buyback = makeAddr("buyback");
+    address lpDistributor = makeAddr("lpDistributor");
 
     function setUp() public {
         token = new MockAdapterInvToken();
         MockInvWETH weth = new MockInvWETH();
-        router = new FeeRouter(treasury, insurance, revShare, buyback);
+        router = new FeeRouter(lpDistributor);
         adapter = new ProtocolFeeAdapter(address(router), address(weth));
         router.authorizeSource(address(adapter));
 
@@ -91,10 +88,7 @@ contract ProtocolFeeAdapterInvariantTest is StdInvariant, Test {
     function invariant_tokenConservation() public view {
         uint256 inAdapter = token.balanceOf(address(adapter));
         uint256 inRouter = token.balanceOf(address(router));
-        uint256 distributed = token.balanceOf(treasury) +
-            token.balanceOf(insurance) +
-            token.balanceOf(revShare) +
-            token.balanceOf(buyback);
+        uint256 distributed = token.balanceOf(lpDistributor);
 
         assertEq(handler.ghost_totalSent(), inAdapter + inRouter + distributed);
     }

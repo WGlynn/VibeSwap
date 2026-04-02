@@ -190,7 +190,9 @@ library BatchMath {
             : (spotPrice * PRECISION) / targetPrice;
 
         // Base capacity is 10% of geometric mean, reduced if price is far from spot
-        uint256 geometricMean = sqrt(reserve0 * reserve1);
+        // TRP-R16-F06: Use sqrt(a)*sqrt(b) instead of sqrt(a*b) to avoid uint256
+        // overflow when reserve0 * reserve1 > 2^256 (possible with large pools)
+        uint256 geometricMean = sqrt(reserve0) * sqrt(reserve1);
         capacity = (geometricMean * PRECISION) / (10 * priceRatio);
     }
 

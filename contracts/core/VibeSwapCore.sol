@@ -754,11 +754,14 @@ contract VibeSwapCore is
     // ============ Admin Functions ============
 
     /**
-     * @notice Create a new liquidity pool — PERMISSIONLESS
+     * @notice Create a new liquidity pool — PERMISSIONLESS (via this contract)
      *
-     * DISINTERMEDIATION: Grade A (DISSOLVED). Anyone can create pools.
-     * Safety: VibeAMM enforces fee bounds (5-1000 bps). Pool creation
-     * is permissionless in VibeAMM — this gate was redundant.
+     * DISINTERMEDIATION: Grade A (DISSOLVED). Any caller can create pools
+     * through VibeSwapCore. Note: VibeAMM.createPool() itself is gated to
+     * owner/authorizedExecutors (M-10: prevents front-running deterministic
+     * pool IDs with extreme fee rates). Permissionless access is provided by
+     * routing through this contract, which holds an authorizedExecutor slot.
+     * Direct VibeAMM.createPool() calls from non-authorized addresses revert.
      */
     function createPool(
         address token0,

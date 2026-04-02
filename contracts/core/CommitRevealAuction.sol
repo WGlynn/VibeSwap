@@ -663,26 +663,25 @@ contract CommitRevealAuction is
         if (batch.shuffleSeed == bytes32(0)) {
             uint256 revealEndBlock = batchRevealEndBlock[_currentBatchId];
 
+            // TRP-R17-F04: Enforce 1-block gap between phase advance and settlement.
+            // Without this, a validator who is the last revealer can call advancePhase()
+            // and settleBatch() in the same block they propose, predicting prevrandao
+            // and controlling shuffle outcome. The gap ensures blockhash(revealEndBlock)
+            // is available and was unknown at reveal time.
+            require(
+                revealEndBlock > 0 && block.number > revealEndBlock,
+                "Must wait 1 block after reveal phase ends"
+            );
+
             // Get block entropy from after reveal phase ended
-            // If we're in the same block, use previous block hash
-            bytes32 blockEntropy;
-            if (revealEndBlock > 0 && block.number > revealEndBlock) {
-                // Use blockhash of reveal end block (unpredictable during reveal)
-                blockEntropy = blockhash(revealEndBlock);
-                // FIX TRP-R1-F06: blockhash returns 0 after 256 blocks — fall through
-                if (blockEntropy == bytes32(0)) {
-                    blockEntropy = keccak256(abi.encodePacked(
-                        blockhash(block.number - 1),
-                        block.timestamp,
-                        block.prevrandao
-                    ));
-                }
-            } else {
-                // Fallback: use previous block hash + current block data
+            // block.number > revealEndBlock is enforced above, so blockhash is available
+            bytes32 blockEntropy = blockhash(revealEndBlock);
+            // FIX TRP-R1-F06: blockhash returns 0 after 256 blocks — use fallback
+            if (blockEntropy == bytes32(0)) {
                 blockEntropy = keccak256(abi.encodePacked(
                     blockhash(block.number - 1),
                     block.timestamp,
-                    block.prevrandao  // Beacon chain randomness (post-merge)
+                    block.prevrandao
                 ));
             }
 

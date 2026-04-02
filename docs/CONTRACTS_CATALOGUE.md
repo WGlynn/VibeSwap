@@ -118,7 +118,9 @@ All agent contracts are **UUPS upgradeable**.
 | **ConstantProductCurve** | x * y = k constant-product AMM curve (IPoolCurve) | `getAmountOut`, `getAmountIn`, `validateParams` |
 | **StableSwapCurve** | Curve.fi StableSwap invariant for near-pegged pairs (IPoolCurve) | `getAmountOut`, `getAmountIn`, `validateParams` |
 
-**Key Dependencies (VibeAMM):** VibeLP, CircuitBreaker, BatchMath, SecurityLib, TWAPOracle, VWAPOracle, TruePriceLib, LiquidityProtection, FibonacciScaling, ProofOfWorkLib, ITruePriceOracle, IPriorityRegistry, IIncentiveController, IVolatilityOracle
+| **FeeController** | PID-based dynamic fee controller using EWMA volatility and IL measurement | No | `getFee`, `initializePool`, `takeSnapshot`, `setPIDParams`, `setEmergencyFee` |
+
+**Key Dependencies (VibeAMM):** VibeLP, CircuitBreaker, BatchMath, SecurityLib, TWAPOracle, VWAPOracle, TruePriceLib, LiquidityProtection, FibonacciScaling, ProofOfWorkLib, ITruePriceOracle, IPriorityRegistry, IIncentiveController, IVolatilityOracle, FeeController
 
 ---
 
@@ -678,7 +680,7 @@ Interfaces are organized alongside their implementations in `interfaces/` subdir
 
 ### Upgrade Pattern
 - **164 contracts use UUPS** (UUPSUpgradeable + Initializable) -- the dominant pattern
-- **3 contracts use Initializable only** (VibeAMM, VibeAMMLite, CrossChainRouter, DAOTreasury, CommitRevealAuction) -- upgradeable via external proxy
+- **5 contracts use Initializable only** (VibeAMM, VibeAMMLite, CrossChainRouter, DAOTreasury, CommitRevealAuction) -- upgradeable via external proxy
 - **~120 contracts are non-upgradeable** -- libraries, standalone utilities, immutable primitives
 
 ### Security Patterns Used Across Contracts

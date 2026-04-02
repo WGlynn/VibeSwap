@@ -109,6 +109,12 @@ interface ICommitRevealAuction {
 
     event PendingSlashedFundsWithdrawn(uint256 amount);
 
+    event PriorityBidsWithdrawn(
+        uint64 indexed batchId,
+        address indexed settler,
+        uint256 amount
+    );
+
     // Note: PoolConfigCreated event is defined in PoolComplianceConfig library
 
     // ============ Functions ============
@@ -250,4 +256,11 @@ interface ICommitRevealAuction {
      * @notice Get the batch duration (PROTOCOL CONSTANT)
      */
     function getBatchDuration() external pure returns (uint256);
+
+    /**
+     * @notice Withdraw accumulated priority bid ETH for a settled batch
+     * @param batchId The settled batch to withdraw priority bids for
+     * @return amount The ETH amount withdrawn
+     */
+    function withdrawPriorityBids(uint64 batchId) external returns (uint256 amount);
 }

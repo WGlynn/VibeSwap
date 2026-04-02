@@ -1413,6 +1413,35 @@ contract CommitRevealAuction is
         }
     }
 
+    // ============ Priority Bid Withdrawal ============
+
+    /**
+     * @notice Withdraw accumulated priority bid ETH for a settled batch
+     * @dev Only callable by authorized settlers (VibeSwapCore). ETH is forwarded
+     *      to the caller, which then routes it to the DAO treasury.
+     *      DISINTERMEDIATION: Grade B — settler-gated. Settlers are set by owner,
+     *      and owner transitions to TimelockController in Phase 2.
+     * @param batchId The settled batch to withdraw priority bids for
+     * @return amount The ETH amount withdrawn
+     */
+    function withdrawPriorityBids(uint64 batchId) external nonReentrant returns (uint256 amount) {
+        if (!authorizedSettlers[msg.sender]) revert NotAuthorized();
+
+        Batch storage batch = batches[batchId];
+        if (!batch.isSettled) revert BatchNotSettled();
+
+        amount = batch.totalPriorityBids;
+        if (amount == 0) return 0;
+
+        // Zero out to prevent double withdrawal
+        batch.totalPriorityBids = 0;
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        if (!success) revert TransferFailed();
+
+        emit PriorityBidsWithdrawn(batchId, msg.sender, amount);
+    }
+
     /**
      * @notice Receive function for deposits
      */

@@ -22,7 +22,7 @@ interface IWETH {
  *
  *      Problem: VibeAMM, CommitRevealAuction, and other contracts send fees
  *      directly to treasury. This bypasses the cooperative distribution (FeeRouter)
- *      that splits revenue between treasury, insurance, revshare, and buyback.
+ *      that ensures 100% of fees reach LPs via ShapleyDistributor.
  *
  *      Solution: Set this adapter as the "treasury" address on VibeAMM and other
  *      fee-generating contracts. Fees land here, then get forwarded through FeeRouter.
@@ -30,13 +30,13 @@ interface IWETH {
  *      Flow:
  *        VibeAMM.collectFees() → sends tokens to this adapter (as "treasury")
  *        Anyone calls adapter.forwardFees(token) → forwards to FeeRouter.collectFee()
- *        FeeRouter.distribute() → splits to treasury/insurance/revshare/buyback
+ *        FeeRouter.distribute() → 100% to LPs via ShapleyDistributor
  *
  *      For ETH (priority bids):
  *        VibeSwapCore sends ETH here → adapter wraps or holds
  *        forwardETH() → forwards to FeeRouter (via WETH) or holds for MEV redistribution
  *
- *      Cooperative capitalism: no fee extraction bypasses the community-governed split.
+ *      Cooperative capitalism: all fees reach the people who made the trade possible.
  */
 contract ProtocolFeeAdapter is IProtocolFeeAdapter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;

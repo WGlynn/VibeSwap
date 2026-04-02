@@ -1,8 +1,8 @@
 # TRP Runner Protocol
 
-**Version**: 1.0
-**Date**: 2026-03-27
-**Purpose**: Execute TRP without crashing the context window.
+**Version**: 2.0
+**Date**: 2026-04-02
+**Purpose**: Execute TRP as a full circle — diagnose AND cure — without crashing the context window.
 
 ---
 
@@ -31,11 +31,19 @@ Never load all TRP context at once. The main context is a **coordinator**, not a
 - Each subagent loads ONLY what its loop needs (see Sharding Matrix below)
 - Coordinator waits for results
 
-**Stage 3 — Integration** (coordinator only):
-- Collect subagent results
+**Stage 3 — Cure** (coordinator + subagents):
+- Prioritize findings from R1 + R2 by severity (CRITICAL → HIGH → MEDIUM)
+- Fix the top findings **in this cycle** — patch code, correct NatSpec, close knowledge gaps
+- R3's tests verify fixes hold (run existing + new tests against patched code)
+- Findings that can't be fixed this cycle (too large, needs design decision, blocked) stay as open items with a reason
+- The goal: the open items list should **shrink** each cycle, not grow
+
+**Stage 4 — Integration** (coordinator only):
+- Collect all results (discovery + cures)
 - Write findings to SESSION_STATE
 - Update memory if non-obvious knowledge discovered
-- Score the cycle
+- Score the cycle — scoring now counts **closed** findings, not just found ones
+- A cycle that finds 10 issues and fixes 8 scores higher than one that finds 20 and fixes 0
 
 ### Mitigation 2: Context Guard (50% Rule)
 
@@ -110,32 +118,41 @@ When Will says any of:
 **Jarvis responds:**
 
 ```
-TRP RUNNER v1.0 — PREFLIGHT
+TRP RUNNER v2.0 — PREFLIGHT
 ├── Context guard: [PASS/FAIL — if FAIL, suggest reboot]
 ├── Boot mode: [MINIMAL/already booted]
+├── Prior open items: [N findings from last tier — re-verify FIRST]
 ├── Target: [identified target or ask Will]
 ├── Loops to run: [R0/R1/R2/R3 or subset]
 └── Dispatching [N] shards...
 ```
 
-Then execute Stages 1-3.
+Then execute Stages 1-4. Stage 3 (Cure) is mandatory — a TRP round that only diagnoses is a half circle.
 
 ---
 
 ## Scoring
 
-After each TRP cycle, score on 5 dimensions:
+After each TRP cycle, score on 7 dimensions:
 
 | Dimension | Metric | Score |
 |-----------|--------|-------|
 | **Survival** | Did the session crash? | PASS/FAIL |
 | **R0 (density)** | Bytes saved or context optimized | +/- delta |
 | **R1 (adversarial)** | Bugs found / attack surface reduction | count |
-| **R2 (knowledge)** | Primitives created or updated | count |
+| **R2 (knowledge)** | Gaps found / documentation health | count |
 | **R3 (capability)** | Tools built or improved | count |
+| **R4 (cure)** | Findings fixed this cycle / closure rate | fixed/found ratio |
 | **Integration** | Did loops feed each other? | Y/N + description |
 
-**Overall grade**: S (all loops produced findings + integration) / A (3+ loops productive) / B (2 loops) / C (1 loop) / F (crash)
+**Overall grade**:
+- S: All loops produced findings + integration + closure rate > 50%
+- A: 3+ loops productive + some fixes applied
+- B: 2 loops productive OR diagnosis-only with no fixes
+- C: 1 loop only
+- F: Crash
+
+**Key change (v2.0)**: A cycle that finds 10 issues and fixes 8 (80% closure) outranks one that finds 20 and fixes 0. Diagnosis without cure is a half circle — it does not self-improve, it self-audits. The recursion only works when the system is measurably better at the end of the cycle than the beginning.
 
 ---
 
@@ -155,6 +172,17 @@ If coordinator crashes:
 
 ---
 
+## Cycle Continuity
+
+Each TRP cycle MUST start by re-verifying the prior cycle's open items:
+
+1. Read the previous round summary (e.g., `round-summaries/round-16.md`)
+2. Check each open item: still present? already fixed by other work? obsolete?
+3. Items confirmed still open become **priority targets** for the cure phase
+4. Only after prior items are triaged does new discovery begin
+
+This prevents the open items list from growing monotonically. If the same HIGH finding appears in 3 consecutive rounds unfixed, that's a protocol failure — escalate to Will.
+
 ## Anti-Patterns
 
 - **DON'T** load the full TRP spec (TRINITY_RECURSION_PROTOCOL.md) during a run. That's reference documentation, not runtime context.
@@ -162,3 +190,5 @@ If coordinator crashes:
 - **DON'T** run TRP mid-session after heavy work. Reboot first.
 - **DON'T** run all 4 loops sequentially in the main context. That's the old crash pattern.
 - **DON'T** load CKB "just in case." If a subagent needs alignment context, it loads it itself.
+- **DON'T** end a cycle with only diagnosis. If you found it, fix it. A half circle is not recursion.
+- **DON'T** carry forward the same HIGH finding for more than 2 cycles without fixing or escalating.

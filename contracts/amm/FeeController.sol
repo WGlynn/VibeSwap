@@ -43,7 +43,7 @@ contract FeeController is Ownable {
     uint256 constant PRECISION = 1e18;
     uint256 constant BPS_PRECISION = 10000;
 
-    /// @notice Absolute minimum fee — covers gas/settlement cost (0.5 bps = 0.005%)
+    /// @notice Absolute minimum fee — covers gas/settlement cost (1 bps = 0.01%)
     uint256 public constant MIN_FEE_BPS = 1;
 
     /// @notice Absolute maximum fee — safety cap even in extreme volatility (50 bps = 0.5%)

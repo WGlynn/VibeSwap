@@ -914,6 +914,14 @@ contract ShapleyDistributor is
         if (activityScore > BPS_PRECISION || reputationScore > BPS_PRECISION || economicScore > BPS_PRECISION) {
             revert ScoreExceedsMax();
         }
+        // TRP-R23-F05: Prevent quality weight zero-manipulation.
+        // With all scores at 0, the multiplier is 0.5x. With scores at 10000, it's 1.5x.
+        // Max disparity is 3x, which is acceptable for quality differentiation.
+        // Additional safeguard: at least one score must be non-zero to prevent complete suppression.
+        require(
+            activityScore > 0 || reputationScore > 0 || economicScore > 0,
+            "At least one quality score must be nonzero"
+        );
 
         qualityWeights[participant] = QualityWeight({
             activityScore: activityScore,
@@ -1169,8 +1177,11 @@ contract ShapleyDistributor is
     /// Participant limits are safety bounds — too low breaks games, too high causes OOG.
     /// @dev TRP-R19-F03: Added bounds validation. min=0 allows empty games,
     ///      max>500 risks OOG on computeShapleyValues O(n) loops.
+    /// @dev TRP-R23-F04: maxParticipants capped at 100 = 1/LAWSON_FAIRNESS_FLOOR.
+    ///      With LAWSON_FAIRNESS_FLOOR = 1%, n > 100 participants all needing floor boost
+    ///      would require > 100% of pool, causing underflow revert in _applyFloorAndEfficiency.
     function setParticipantLimits(uint256 _min, uint256 _max) external onlyOwner {
-        require(_min >= 2 && _max >= _min && _max <= 500, "Invalid limits: min>=2, max>=min, max<=500");
+        require(_min >= 2 && _max >= _min && _max <= 100, "Invalid limits: min>=2, max>=min, max<=100");
         minParticipants = _min;
         maxParticipants = _max;
         emit ParticipantLimitsUpdated(_min, _max);

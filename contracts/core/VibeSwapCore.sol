@@ -12,7 +12,8 @@ import "./interfaces/ICommitRevealAuction.sol";
 import "./interfaces/IVibeAMM.sol";
 import "./interfaces/IDAOTreasury.sol";
 import "./interfaces/IwBAR.sol";
-import "./CircuitBreaker.sol";
+// TRP-R24-CB09: Removed dead CircuitBreaker import. VibeSwapCore does not inherit CircuitBreaker.
+// Circuit breaker protection is in VibeAMM. See CB-02 for integration analysis.
 import "../messaging/CrossChainRouter.sol";
 import "../libraries/SecurityLib.sol";
 import "../compliance/ClawbackRegistry.sol";

@@ -27,15 +27,12 @@ contract ProtocolFeeAdapterFuzzTest is Test {
     FeeRouter router;
     ProtocolFeeAdapter adapter;
 
-    address treasury = makeAddr("treasury");
-    address insurance = makeAddr("insurance");
-    address revShare = makeAddr("revShare");
-    address buyback = makeAddr("buyback");
+    address lpDistributor = makeAddr("lpDistributor");
 
     function setUp() public {
         token = new MockAdapterFuzzToken();
         weth = new MockFuzzWETH();
-        router = new FeeRouter(treasury, insurance, revShare, buyback);
+        router = new FeeRouter(lpDistributor);
         adapter = new ProtocolFeeAdapter(address(router), address(weth));
         router.authorizeSource(address(adapter));
     }
@@ -49,12 +46,8 @@ contract ProtocolFeeAdapterFuzzTest is Test {
         adapter.forwardFees(address(token));
         router.distribute(address(token));
 
-        uint256 totalOut = token.balanceOf(treasury) +
-            token.balanceOf(insurance) +
-            token.balanceOf(revShare) +
-            token.balanceOf(buyback);
-
-        assertEq(totalOut, amount);
+        // 100% to LP distributor
+        assertEq(token.balanceOf(lpDistributor), amount);
         assertEq(adapter.totalForwarded(address(token)), amount);
     }
 

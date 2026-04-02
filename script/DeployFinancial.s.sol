@@ -58,11 +58,9 @@ contract DeployFinancial is Script {
             vibeRevShare = address(revShare);
             console.log("VibeRevShare:", vibeRevShare);
 
-            // Wire FeeRouter -> VibeRevShare
+            // Wire VibeRevShare revenue source (FeeRouter no longer splits to revShare —
+            // 100% of swap fees go to LPs via ShapleyDistributor)
             if (feeRouterAddr != address(0)) {
-                FeeRouter(feeRouterAddr).setRevShare(vibeRevShare);
-                console.log("  FeeRouter.setRevShare -> VibeRevShare");
-
                 VibeRevShare(vibeRevShare).setRevenueSource(feeRouterAddr, true);
                 console.log("  VibeRevShare.setRevenueSource -> FeeRouter");
             }
@@ -119,14 +117,12 @@ contract DeployFinancial is Script {
         console.log("");
         console.log("POST-DEPLOY:");
         if (vibeRevShare != address(0) && feeRouterAddr == address(0)) {
-            console.log("  1. FeeRouter.setRevShare(vibeRevShare) -- CRITICAL");
-            console.log("  2. VibeRevShare.setRevenueSource(feeRouter, true)");
+            console.log("  1. VibeRevShare.setRevenueSource(feeRouter, true)");
         }
         if (vibeInsurance != address(0)) {
-            console.log("  3. VibeInsurance.setTriggerResolver(keeperAddr, true)");
+            console.log("  2. VibeInsurance.setTriggerResolver(keeperAddr, true)");
         }
-        console.log("  4. VestingSchedule.createSchedule(...) for team/investor vesting");
-        console.log("  5. BuybackEngine.setProtocolToken(VIBE_TOKEN) if not already set");
+        console.log("  3. VestingSchedule.createSchedule(...) for team/investor vesting");
     }
 }
 

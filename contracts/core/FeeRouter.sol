@@ -9,44 +9,27 @@ import "./interfaces/IFeeRouter.sol";
 
 /**
  * @title FeeRouter
- * @notice Central protocol fee collector and distributor.
+ * @notice Collects swap fees and forwards 100% to LPs via ShapleyDistributor.
  * @dev Part of VSOS (VibeSwap Operating System) DeFi/DeFAI layer.
  *
- *      All protocol revenue flows through FeeRouter:
- *        - AMM swap fees (VibeAMM)
- *        - Priority bid revenue (CommitRevealAuction → MEVRedistributor → FeeRouter)
- *        - Strategy vault performance fees (StrategyVault)
- *        - Liquidation fees (DutchAuctionLiquidator)
+ *      100% of swap fees go to the people who made the trade possible: LPs.
+ *      Distribution is NOT pro-rata — it uses the 5 Shapley contribution factors
+ *      (direct liquidity, enabling time, scarcity, stability, pioneer bonus)
+ *      computed by ShapleyDistributor as FEE_DISTRIBUTION games.
  *
- *      Revenue is distributed according to governance-configured splits:
- *        - DAOTreasury: operational funding and POL
- *        - Insurance: mutualized protection pools
- *        - RevShare: direct distribution to JUL stakers
- *        - Buyback: protocol buyback-and-burn for value accrual
+ *      The protocol takes no cut. No treasury split, no buyback, no redirect.
+ *      Fee agnostic: fees stay in whatever token the trade generated them in.
  *
- *      Cooperative capitalism:
- *        - Transparent accounting: all flows visible on-chain
- *        - Governance-directed: community controls split ratios
- *        - No hidden extraction: every wei accounted for
- *        - Multi-token support: works with any ERC-20
- *
- *      Default split: 40% treasury, 20% insurance, 30% revshare, 10% buyback
+ *      "If you remove the LPs, the trade cannot happen. Their Shapley value
+ *       is the highest. Pay them what they earned, in what they earned it."
  */
 contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // ============ Constants ============
-
-    uint256 private constant BPS = 10_000;
-
     // ============ State ============
 
-    FeeConfig private _config;
-
-    address private _treasury;
-    address private _insurance;
-    address private _revShare;
-    address private _buybackTarget;
+    /// @notice ShapleyDistributor address — 100% of fees forwarded here for LP distribution
+    address private _lpDistributor;
 
     mapping(address => bool) private _authorizedSources;
     mapping(address => TokenAccounting) private _accounting;
@@ -56,35 +39,17 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
     // ============ Constructor ============
 
     constructor(
-        address treasury_,
-        address insurance_,
-        address revShare_,
-        address buybackTarget_
+        address lpDistributor_
     ) Ownable(msg.sender) {
-        if (treasury_ == address(0)) revert ZeroAddress();
-        if (insurance_ == address(0)) revert ZeroAddress();
-        if (revShare_ == address(0)) revert ZeroAddress();
-        if (buybackTarget_ == address(0)) revert ZeroAddress();
-
-        _treasury = treasury_;
-        _insurance = insurance_;
-        _revShare = revShare_;
-        _buybackTarget = buybackTarget_;
-
-        // Default split: 40/20/30/10
-        _config = FeeConfig({
-            treasuryBps: 4000,
-            insuranceBps: 2000,
-            revShareBps: 3000,
-            buybackBps: 1000
-        });
+        if (lpDistributor_ == address(0)) revert ZeroAddress();
+        _lpDistributor = lpDistributor_;
     }
 
     // ============ Fee Collection ============
 
-    // DISINTERMEDIATION: Grade B — authorized sources + owner can collect.
-    // Source authorization is a security gate (prevents arbitrary fee injection).
-    // Grade B is correct: sources are protocol contracts, not arbitrary users.
+    /// @notice Collect fees from authorized protocol sources (VibeAMM, etc.)
+    /// @dev DISINTERMEDIATION: Grade B — authorized sources + owner can collect.
+    ///      Source authorization is a security gate (prevents arbitrary fee injection).
     function collectFee(address token, uint256 amount) external nonReentrant {
         if (!_authorizedSources[msg.sender] && msg.sender != owner()) revert UnauthorizedSource();
         if (token == address(0)) revert ZeroAddress();
@@ -95,7 +60,6 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
         _accounting[token].totalCollected += amount;
         _accounting[token].pending += amount;
 
-        // Track token for enumeration
         if (!_tokenTracked[token]) {
             _trackedTokens.push(token);
             _tokenTracked[token] = true;
@@ -106,40 +70,21 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Distribution ============
 
-    // H-05 DISSOLVED: Only authorized sources or owner can trigger distribution.
-    // Dissolves MEV timing attack where anyone front-runs collectFee with distribute.
-    //
-    // DISINTERMEDIATION: Grade B — authorized sources + owner. The H-05 security fix is correct:
-    // permissionless distribute() was a MEV vector. Grade B is the right ceiling here.
-    // Path to Grade A: batched collect+distribute in same tx (atomic, no front-run window).
+    /// @notice Forward 100% of pending fees to ShapleyDistributor for LP distribution
+    /// @dev DISINTERMEDIATION: Grade B — authorized sources + owner.
+    ///      H-05 fix: permissionless distribute() was a MEV vector.
     function distribute(address token) public nonReentrant {
         require(_authorizedSources[msg.sender] || msg.sender == owner(), "Not authorized to distribute");
         uint256 pending = _accounting[token].pending;
         if (pending == 0) revert NothingToDistribute();
 
-        uint256 toTreasury = (pending * _config.treasuryBps) / BPS;
-        uint256 toInsurance = (pending * _config.insuranceBps) / BPS;
-        uint256 toRevShare = (pending * _config.revShareBps) / BPS;
-        uint256 toBuyback = pending - toTreasury - toInsurance - toRevShare; // dust goes to buyback
-
         _accounting[token].pending = 0;
         _accounting[token].totalDistributed += pending;
 
-        if (toTreasury > 0) {
-            IERC20(token).safeTransfer(_treasury, toTreasury);
-        }
-        if (toInsurance > 0) {
-            IERC20(token).safeTransfer(_insurance, toInsurance);
-        }
-        if (toRevShare > 0) {
-            IERC20(token).safeTransfer(_revShare, toRevShare);
-        }
-        if (toBuyback > 0) {
-            IERC20(token).safeTransfer(_buybackTarget, toBuyback);
-            emit BuybackExecuted(token, toBuyback, _buybackTarget);
-        }
+        // 100% to LPs via ShapleyDistributor. No split. No extraction.
+        IERC20(token).safeTransfer(_lpDistributor, pending);
 
-        emit FeeDistributed(token, toTreasury, toInsurance, toRevShare, toBuyback);
+        emit FeeForwarded(token, pending, _lpDistributor);
     }
 
     function distributeMultiple(address[] calldata tokens) external {
@@ -152,138 +97,33 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Configuration ============
 
-    /**
-     * @notice Update fee distribution split ratios
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: Owner can redirect ALL protocol revenue by setting 100% to any single bucket
-     * (e.g., 100% buyback to a compromised BuybackEngine, or 100% treasury to a personal
-     * address if setTreasury was also compromised). Structural safety: splits must sum to
-     * 10000 BPS, but distribution between buckets is unconstrained.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
-     */
-    function updateConfig(FeeConfig calldata newConfig) external onlyOwner {
-        uint256 total = uint256(newConfig.treasuryBps) +
-            uint256(newConfig.insuranceBps) +
-            uint256(newConfig.revShareBps) +
-            uint256(newConfig.buybackBps);
-
-        if (total != BPS) revert InvalidConfig();
-
-        _config = newConfig;
-
-        emit ConfigUpdated(
-            newConfig.treasuryBps,
-            newConfig.insuranceBps,
-            newConfig.revShareBps,
-            newConfig.buybackBps
-        );
-    }
-
-    /**
-     * @notice Authorize a fee source contract
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: Owner can authorize a malicious contract that calls collectFee with inflated
-     * amounts (requires the source to also hold and approve tokens, limiting direct theft).
-     * More realistically, unauthorized sources could inject fee accounting to dilute
-     * legitimate revenue distribution. Security-critical gate.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
-     */
+    /// @notice Authorize a fee source contract
+    /// @dev DISINTERMEDIATION: Grade C → Target Grade B (TimelockController).
     function authorizeSource(address source) external onlyOwner {
         if (source == address(0)) revert ZeroAddress();
         _authorizedSources[source] = true;
         emit SourceAuthorized(source);
     }
 
-    /**
-     * @notice Revoke a fee source contract's authorization
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: Owner can revoke legitimate fee sources, halting protocol revenue collection.
-     * No direct fund theft — only denial of service for fee pipeline. Recoverable by
-     * re-authorizing the source. Censorship risk if owner selectively blocks revenue streams.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
-     */
+    /// @notice Revoke a fee source contract's authorization
+    /// @dev DISINTERMEDIATION: Grade C → Target Grade B (TimelockController).
     function revokeSource(address source) external onlyOwner {
         _authorizedSources[source] = false;
         emit SourceRevoked(source);
     }
 
-    /**
-     * @notice Set treasury destination address
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: CRITICAL — Owner can redirect ALL treasury-allocated revenue (default 40% of
-     * all protocol fees) to a personal address. Combined with updateConfig (set treasury
-     * to 100%), owner can steal ALL protocol revenue. This is the highest-risk admin
-     * operation alongside other setXxx destination functions.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required. Consider immutable
-     * destination addresses post-bootstrap (Grade A where safe).
-     */
-    function setTreasury(address newTreasury) external onlyOwner {
-        if (newTreasury == address(0)) revert ZeroAddress();
-        _treasury = newTreasury;
-        emit TreasuryUpdated(newTreasury);
+    /// @notice Set LP distributor (ShapleyDistributor) address
+    /// @dev DISINTERMEDIATION: Grade C → Target Grade B (TimelockController).
+    ///      After bootstrap, consider making this immutable (Grade A).
+    function setLPDistributor(address newDistributor) external onlyOwner {
+        if (newDistributor == address(0)) revert ZeroAddress();
+        _lpDistributor = newDistributor;
+        emit LPDistributorUpdated(newDistributor);
     }
 
-    /**
-     * @notice Set insurance pool destination address
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: CRITICAL — Owner can redirect ALL insurance-allocated revenue (default 20% of
-     * all protocol fees) to a personal address. Additionally, undermines the mutualized
-     * insurance pool that protects LPs from impermanent loss, breaking cooperative capitalism
-     * guarantees. Users relying on IL protection would be unprotected.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
-     */
-    function setInsurance(address newInsurance) external onlyOwner {
-        if (newInsurance == address(0)) revert ZeroAddress();
-        _insurance = newInsurance;
-        emit InsuranceUpdated(newInsurance);
-    }
-
-    /**
-     * @notice Set revenue share destination address
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: CRITICAL — Owner can redirect ALL revshare-allocated revenue (default 30% of
-     * all protocol fees) to a personal address. JUL stakers expecting revenue share would
-     * receive nothing, breaking the core value proposition for token holders.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
-     */
-    function setRevShare(address newRevShare) external onlyOwner {
-        if (newRevShare == address(0)) revert ZeroAddress();
-        _revShare = newRevShare;
-        emit RevShareUpdated(newRevShare);
-    }
-
-    /**
-     * @notice Set buyback engine destination address
-     *
-     * DISINTERMEDIATION: Grade C → Target Grade B. Requires governance (TimelockController).
-     * Risk: CRITICAL — Owner can redirect ALL buyback-allocated revenue (default 10% of
-     * all protocol fees) to a personal address instead of BuybackEngine. Tokens that should
-     * be bought back and burned would be stolen, undermining deflationary tokenomics.
-     * Dissolve: TimelockController with 48h+ delay. DAO vote required.
-     */
-    function setBuybackTarget(address newTarget) external onlyOwner {
-        if (newTarget == address(0)) revert ZeroAddress();
-        _buybackTarget = newTarget;
-        emit BuybackTargetUpdated(newTarget);
-    }
-
-    /**
-     * @notice Emergency recovery for stuck tokens
-     *
-     * DISINTERMEDIATION: KEEP → Target Grade B. Requires governance (TimelockController).
-     * Risk: CRITICAL — Owner can drain ALL accumulated and pending fees for any token.
-     * This is the single most dangerous function in FeeRouter: unrestricted transfer of
-     * any amount of any token to any address. No structural safety bounds exist.
-     * Bootstrap necessity only — must be first function dissolved to governance.
-     * Dissolve: TimelockController with 48h+ delay, governance supermajority, and
-     * consider adding a cap or requiring pending=0 as structural safety.
-     */
+    /// @notice Emergency recovery for stuck tokens
+    /// @dev DISINTERMEDIATION: Grade C → Target Grade B (TimelockController).
+    ///      Bootstrap necessity only — first function to dissolve to governance.
     function emergencyRecover(address token, uint256 amount, address to) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
         IERC20(token).safeTransfer(to, amount);
@@ -292,11 +132,7 @@ contract FeeRouter is IFeeRouter, Ownable, ReentrancyGuard {
 
     // ============ Views ============
 
-    function config() external view returns (FeeConfig memory) { return _config; }
-    function treasury() external view returns (address) { return _treasury; }
-    function insurance() external view returns (address) { return _insurance; }
-    function revShare() external view returns (address) { return _revShare; }
-    function buybackTarget() external view returns (address) { return _buybackTarget; }
+    function lpDistributor() external view returns (address) { return _lpDistributor; }
 
     function pendingFees(address token) external view returns (uint256) {
         return _accounting[token].pending;

@@ -17,6 +17,8 @@ contract MockERC20 is ERC20 {
 }
 
 // ============ FeeRouter Tests ============
+// 100% of swap fees go to LPs via ShapleyDistributor.
+// No split. No treasury cut. No buyback. No extraction.
 
 contract FeeRouterTest is Test {
     FeeRouter public router;
@@ -24,10 +26,7 @@ contract FeeRouterTest is Test {
     MockERC20 public tokenB;
 
     address public owner;
-    address public treasuryAddr;
-    address public insuranceAddr;
-    address public revShareAddr;
-    address public buybackAddr;
+    address public lpDistributorAddr;
     address public authorizedSource;
     address public unauthorizedUser;
     address public newDestination;
@@ -35,31 +34,17 @@ contract FeeRouterTest is Test {
     // ============ Events (re-declared for expectEmit) ============
 
     event FeeCollected(address indexed source, address indexed token, uint256 amount);
-    event FeeDistributed(
-        address indexed token,
-        uint256 toTreasury,
-        uint256 toInsurance,
-        uint256 toRevShare,
-        uint256 toBuyback
-    );
-    event ConfigUpdated(uint16 treasuryBps, uint16 insuranceBps, uint16 revShareBps, uint16 buybackBps);
+    event FeeForwarded(address indexed token, uint256 amount, address indexed lpDistributor);
     event SourceAuthorized(address indexed source);
     event SourceRevoked(address indexed source);
-    event TreasuryUpdated(address indexed newTreasury);
-    event InsuranceUpdated(address indexed newInsurance);
-    event RevShareUpdated(address indexed newRevShare);
-    event BuybackTargetUpdated(address indexed newTarget);
-    event BuybackExecuted(address indexed token, uint256 amount, address indexed target);
+    event LPDistributorUpdated(address indexed newDistributor);
     event EmergencyRecovered(address indexed token, uint256 amount, address indexed to);
 
     // ============ Setup ============
 
     function setUp() public {
         owner = makeAddr("owner");
-        treasuryAddr = makeAddr("treasury");
-        insuranceAddr = makeAddr("insurance");
-        revShareAddr = makeAddr("revShare");
-        buybackAddr = makeAddr("buyback");
+        lpDistributorAddr = makeAddr("lpDistributor");
         authorizedSource = makeAddr("authorizedSource");
         unauthorizedUser = makeAddr("unauthorizedUser");
         newDestination = makeAddr("newDestination");
@@ -68,12 +53,11 @@ contract FeeRouterTest is Test {
         tokenB = new MockERC20("Token B", "TKNB");
 
         vm.prank(owner);
-        router = new FeeRouter(treasuryAddr, insuranceAddr, revShareAddr, buybackAddr);
+        router = new FeeRouter(lpDistributorAddr);
     }
 
     // ============ Helpers ============
 
-    /// @dev Mint tokens to `from`, approve router, and prank as `from` to call collectFee.
     function _collectAs(address from, address token, uint256 amount) internal {
         MockERC20(token).mint(from, amount);
         vm.startPrank(from);
@@ -85,43 +69,14 @@ contract FeeRouterTest is Test {
     // ============ Constructor ============
 
     function test_constructor_setsParams() public view {
-        assertEq(router.treasury(), treasuryAddr);
-        assertEq(router.insurance(), insuranceAddr);
-        assertEq(router.revShare(), revShareAddr);
-        assertEq(router.buybackTarget(), buybackAddr);
+        assertEq(router.lpDistributor(), lpDistributorAddr);
         assertEq(router.owner(), owner);
     }
 
-    function test_constructor_defaultConfig() public view {
-        IFeeRouter.FeeConfig memory cfg = router.config();
-        assertEq(cfg.treasuryBps, 4000);
-        assertEq(cfg.insuranceBps, 2000);
-        assertEq(cfg.revShareBps, 3000);
-        assertEq(cfg.buybackBps, 1000);
-    }
-
-    function test_constructor_revertsZeroTreasury() public {
+    function test_constructor_revertsZeroDistributor() public {
         vm.prank(owner);
         vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        new FeeRouter(address(0), insuranceAddr, revShareAddr, buybackAddr);
-    }
-
-    function test_constructor_revertsZeroInsurance() public {
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        new FeeRouter(treasuryAddr, address(0), revShareAddr, buybackAddr);
-    }
-
-    function test_constructor_revertsZeroRevShare() public {
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        new FeeRouter(treasuryAddr, insuranceAddr, address(0), buybackAddr);
-    }
-
-    function test_constructor_revertsZeroBuyback() public {
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        new FeeRouter(treasuryAddr, insuranceAddr, revShareAddr, address(0));
+        new FeeRouter(address(0));
     }
 
     // ============ collectFee ============
@@ -194,48 +149,35 @@ contract FeeRouterTest is Test {
         assertEq(router.totalCollected(address(tokenA)), 350 ether);
     }
 
-    // ============ distribute ============
+    // ============ distribute — 100% to LPs ============
 
-    function test_distribute_correctSplitRatios() public {
+    function test_distribute_100pctToLPs() public {
         vm.prank(owner);
         router.authorizeSource(authorizedSource);
 
-        uint256 amount = 10_000 ether; // clean number for 40/20/30/10 split
+        uint256 amount = 10_000 ether;
         _collectAs(authorizedSource, address(tokenA), amount);
 
         vm.prank(owner);
         router.distribute(address(tokenA));
 
-        assertEq(tokenA.balanceOf(treasuryAddr), 4000 ether);   // 40%
-        assertEq(tokenA.balanceOf(insuranceAddr), 2000 ether);  // 20%
-        assertEq(tokenA.balanceOf(revShareAddr), 3000 ether);   // 30%
-        assertEq(tokenA.balanceOf(buybackAddr), 1000 ether);    // 10%
+        // 100% goes to LP distributor. No split.
+        assertEq(tokenA.balanceOf(lpDistributorAddr), amount);
+        assertEq(tokenA.balanceOf(address(router)), 0);
     }
 
-    function test_distribute_dustGoesToBuyback() public {
+    function test_distribute_noDustRemains() public {
         vm.prank(owner);
         router.authorizeSource(authorizedSource);
 
-        // 10003 wei: treasury=4001, insurance=2000, revshare=3000, buyback=10003-4001-2000-3000=1002
-        // The contract uses: toBuyback = pending - toTreasury - toInsurance - toRevShare
-        // So dust (remainder from integer division) goes to buyback.
+        // Odd amount — no dust because there's no split math
         uint256 amount = 10003;
         _collectAs(authorizedSource, address(tokenA), amount);
 
         vm.prank(owner);
         router.distribute(address(tokenA));
 
-        uint256 toTreasury = (amount * 4000) / 10000;   // 4001
-        uint256 toInsurance = (amount * 2000) / 10000;   // 2000
-        uint256 toRevShare = (amount * 3000) / 10000;    // 3000
-        uint256 toBuyback = amount - toTreasury - toInsurance - toRevShare; // 1002
-
-        assertEq(tokenA.balanceOf(treasuryAddr), toTreasury);
-        assertEq(tokenA.balanceOf(insuranceAddr), toInsurance);
-        assertEq(tokenA.balanceOf(revShareAddr), toRevShare);
-        assertEq(tokenA.balanceOf(buybackAddr), toBuyback);
-
-        // Verify no dust left in router
+        assertEq(tokenA.balanceOf(lpDistributorAddr), amount);
         assertEq(tokenA.balanceOf(address(router)), 0);
     }
 
@@ -279,20 +221,39 @@ contract FeeRouterTest is Test {
         router.distribute(address(tokenA));
 
         assertEq(router.pendingFees(address(tokenA)), 0);
+        assertEq(tokenA.balanceOf(lpDistributorAddr), 1000 ether);
     }
 
-    function test_distribute_emitsEvents() public {
+    function test_distribute_emitsEvent() public {
         vm.prank(owner);
         router.authorizeSource(authorizedSource);
 
         uint256 amount = 10_000 ether;
         _collectAs(authorizedSource, address(tokenA), amount);
 
-        vm.expectEmit(true, false, false, true);
-        emit FeeDistributed(address(tokenA), 4000 ether, 2000 ether, 3000 ether, 1000 ether);
+        vm.expectEmit(true, false, true, true);
+        emit FeeForwarded(address(tokenA), amount, lpDistributorAddr);
 
         vm.prank(owner);
         router.distribute(address(tokenA));
+    }
+
+    function test_distribute_feeAgnostic() public {
+        vm.prank(owner);
+        router.authorizeSource(authorizedSource);
+
+        // Collect in two different tokens — each forwarded in its own denomination
+        _collectAs(authorizedSource, address(tokenA), 5000 ether);
+        _collectAs(authorizedSource, address(tokenB), 3000 ether);
+
+        vm.startPrank(owner);
+        router.distribute(address(tokenA));
+        router.distribute(address(tokenB));
+        vm.stopPrank();
+
+        // LP distributor gets tokenA in tokenA, tokenB in tokenB. Fee agnostic.
+        assertEq(tokenA.balanceOf(lpDistributorAddr), 5000 ether);
+        assertEq(tokenB.balanceOf(lpDistributorAddr), 3000 ether);
     }
 
     // ============ distributeMultiple ============
@@ -311,20 +272,16 @@ contract FeeRouterTest is Test {
         vm.prank(owner);
         router.distributeMultiple(tokens);
 
-        // Token A: fully distributed
         assertEq(router.pendingFees(address(tokenA)), 0);
-        assertEq(tokenA.balanceOf(treasuryAddr), 4000 ether);
-
-        // Token B: fully distributed
         assertEq(router.pendingFees(address(tokenB)), 0);
-        assertEq(tokenB.balanceOf(treasuryAddr), 2000 ether);
+        assertEq(tokenA.balanceOf(lpDistributorAddr), 10_000 ether);
+        assertEq(tokenB.balanceOf(lpDistributorAddr), 5_000 ether);
     }
 
     function test_distributeMultiple_skipsZeroPending() public {
         vm.prank(owner);
         router.authorizeSource(authorizedSource);
 
-        // Only tokenA has pending fees; tokenB has none
         _collectAs(authorizedSource, address(tokenA), 10_000 ether);
 
         address[] memory tokens = new address[](2);
@@ -336,95 +293,6 @@ contract FeeRouterTest is Test {
         router.distributeMultiple(tokens);
 
         assertEq(router.pendingFees(address(tokenA)), 0);
-    }
-
-    // ============ updateConfig ============
-
-    function test_updateConfig_validConfig() public {
-        IFeeRouter.FeeConfig memory newCfg = IFeeRouter.FeeConfig({
-            treasuryBps: 2500,
-            insuranceBps: 2500,
-            revShareBps: 2500,
-            buybackBps: 2500
-        });
-
-        vm.expectEmit(false, false, false, true);
-        emit ConfigUpdated(2500, 2500, 2500, 2500);
-
-        vm.prank(owner);
-        router.updateConfig(newCfg);
-
-        IFeeRouter.FeeConfig memory stored = router.config();
-        assertEq(stored.treasuryBps, 2500);
-        assertEq(stored.insuranceBps, 2500);
-        assertEq(stored.revShareBps, 2500);
-        assertEq(stored.buybackBps, 2500);
-    }
-
-    function test_updateConfig_revertsInvalidTotal() public {
-        IFeeRouter.FeeConfig memory badCfg = IFeeRouter.FeeConfig({
-            treasuryBps: 5000,
-            insuranceBps: 2000,
-            revShareBps: 2000,
-            buybackBps: 2000
-        });
-        // Total = 11000, not 10000
-
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.InvalidConfig.selector);
-        router.updateConfig(badCfg);
-    }
-
-    function test_updateConfig_revertsInvalidTotalUnder() public {
-        IFeeRouter.FeeConfig memory badCfg = IFeeRouter.FeeConfig({
-            treasuryBps: 1000,
-            insuranceBps: 1000,
-            revShareBps: 1000,
-            buybackBps: 1000
-        });
-        // Total = 4000, not 10000
-
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.InvalidConfig.selector);
-        router.updateConfig(badCfg);
-    }
-
-    function test_updateConfig_revertsNonOwner() public {
-        IFeeRouter.FeeConfig memory cfg = IFeeRouter.FeeConfig({
-            treasuryBps: 2500,
-            insuranceBps: 2500,
-            revShareBps: 2500,
-            buybackBps: 2500
-        });
-
-        vm.prank(unauthorizedUser);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", unauthorizedUser));
-        router.updateConfig(cfg);
-    }
-
-    function test_updateConfig_distributeUsesNewConfig() public {
-        vm.prank(owner);
-        router.authorizeSource(authorizedSource);
-
-        // Set 50/20/20/10 config
-        IFeeRouter.FeeConfig memory newCfg = IFeeRouter.FeeConfig({
-            treasuryBps: 5000,
-            insuranceBps: 2000,
-            revShareBps: 2000,
-            buybackBps: 1000
-        });
-        vm.prank(owner);
-        router.updateConfig(newCfg);
-
-        _collectAs(authorizedSource, address(tokenA), 10_000 ether);
-
-        vm.prank(owner);
-        router.distribute(address(tokenA));
-
-        assertEq(tokenA.balanceOf(treasuryAddr), 5000 ether);
-        assertEq(tokenA.balanceOf(insuranceAddr), 2000 ether);
-        assertEq(tokenA.balanceOf(revShareAddr), 2000 ether);
-        assertEq(tokenA.balanceOf(buybackAddr), 1000 ether);
     }
 
     // ============ Source Management ============
@@ -492,102 +360,35 @@ contract FeeRouterTest is Test {
         vm.stopPrank();
     }
 
-    // ============ Destination Setters ============
+    // ============ LP Distributor Setter ============
 
-    function test_setTreasury_works() public {
+    function test_setLPDistributor_works() public {
         vm.expectEmit(true, false, false, true);
-        emit TreasuryUpdated(newDestination);
+        emit LPDistributorUpdated(newDestination);
 
         vm.prank(owner);
-        router.setTreasury(newDestination);
+        router.setLPDistributor(newDestination);
 
-        assertEq(router.treasury(), newDestination);
+        assertEq(router.lpDistributor(), newDestination);
     }
 
-    function test_setTreasury_revertsZeroAddress() public {
+    function test_setLPDistributor_revertsZeroAddress() public {
         vm.prank(owner);
         vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        router.setTreasury(address(0));
+        router.setLPDistributor(address(0));
     }
 
-    function test_setTreasury_revertsNonOwner() public {
+    function test_setLPDistributor_revertsNonOwner() public {
         vm.prank(unauthorizedUser);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", unauthorizedUser));
-        router.setTreasury(newDestination);
+        router.setLPDistributor(newDestination);
     }
 
-    function test_setInsurance_works() public {
-        vm.expectEmit(true, false, false, true);
-        emit InsuranceUpdated(newDestination);
-
-        vm.prank(owner);
-        router.setInsurance(newDestination);
-
-        assertEq(router.insurance(), newDestination);
-    }
-
-    function test_setInsurance_revertsZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        router.setInsurance(address(0));
-    }
-
-    function test_setInsurance_revertsNonOwner() public {
-        vm.prank(unauthorizedUser);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", unauthorizedUser));
-        router.setInsurance(newDestination);
-    }
-
-    function test_setRevShare_works() public {
-        vm.expectEmit(true, false, false, true);
-        emit RevShareUpdated(newDestination);
-
-        vm.prank(owner);
-        router.setRevShare(newDestination);
-
-        assertEq(router.revShare(), newDestination);
-    }
-
-    function test_setRevShare_revertsZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        router.setRevShare(address(0));
-    }
-
-    function test_setRevShare_revertsNonOwner() public {
-        vm.prank(unauthorizedUser);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", unauthorizedUser));
-        router.setRevShare(newDestination);
-    }
-
-    function test_setBuybackTarget_works() public {
-        vm.expectEmit(true, false, false, true);
-        emit BuybackTargetUpdated(newDestination);
-
-        vm.prank(owner);
-        router.setBuybackTarget(newDestination);
-
-        assertEq(router.buybackTarget(), newDestination);
-    }
-
-    function test_setBuybackTarget_revertsZeroAddress() public {
-        vm.prank(owner);
-        vm.expectRevert(IFeeRouter.ZeroAddress.selector);
-        router.setBuybackTarget(address(0));
-    }
-
-    function test_setBuybackTarget_revertsNonOwner() public {
-        vm.prank(unauthorizedUser);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", unauthorizedUser));
-        router.setBuybackTarget(newDestination);
-    }
-
-    function test_setDestination_distributionUsesNew() public {
-        // Change treasury, collect, distribute — fees go to new address
-        address newTreasury = makeAddr("newTreasury");
+    function test_setLPDistributor_distributionUsesNew() public {
+        address newLP = makeAddr("newLPDistributor");
 
         vm.startPrank(owner);
-        router.setTreasury(newTreasury);
+        router.setLPDistributor(newLP);
         router.authorizeSource(authorizedSource);
         vm.stopPrank();
 
@@ -596,14 +397,13 @@ contract FeeRouterTest is Test {
         vm.prank(owner);
         router.distribute(address(tokenA));
 
-        assertEq(tokenA.balanceOf(newTreasury), 4000 ether);
-        assertEq(tokenA.balanceOf(treasuryAddr), 0); // old treasury gets nothing
+        assertEq(tokenA.balanceOf(newLP), 10_000 ether);
+        assertEq(tokenA.balanceOf(lpDistributorAddr), 0);
     }
 
     // ============ emergencyRecover ============
 
     function test_emergencyRecover_works() public {
-        // Send tokens directly to router (simulating stuck tokens)
         uint256 amount = 500 ether;
         tokenA.mint(address(router), amount);
 
@@ -635,21 +435,6 @@ contract FeeRouterTest is Test {
         router.emergencyRecover(address(tokenA), 100 ether, address(0));
     }
 
-    function test_emergencyRecover_canRecoverPendingFees() public {
-        vm.prank(owner);
-        router.authorizeSource(authorizedSource);
-
-        _collectAs(authorizedSource, address(tokenA), 1000 ether);
-        assertEq(router.pendingFees(address(tokenA)), 1000 ether);
-
-        // Emergency recover all tokens (bypasses accounting)
-        address recipient = makeAddr("emergencyRecipient");
-        vm.prank(owner);
-        router.emergencyRecover(address(tokenA), 1000 ether, recipient);
-
-        assertEq(tokenA.balanceOf(recipient), 1000 ether);
-    }
-
     // ============ View Functions ============
 
     function test_views_initialState() public view {
@@ -665,7 +450,6 @@ contract FeeRouterTest is Test {
 
         _collectAs(authorizedSource, address(tokenA), 2000 ether);
 
-        // After collect
         assertEq(router.pendingFees(address(tokenA)), 2000 ether);
         assertEq(router.totalCollected(address(tokenA)), 2000 ether);
         assertEq(router.totalDistributed(address(tokenA)), 0);
@@ -673,7 +457,6 @@ contract FeeRouterTest is Test {
         vm.prank(owner);
         router.distribute(address(tokenA));
 
-        // After distribute
         assertEq(router.pendingFees(address(tokenA)), 0);
         assertEq(router.totalCollected(address(tokenA)), 2000 ether);
         assertEq(router.totalDistributed(address(tokenA)), 2000 ether);
@@ -683,12 +466,10 @@ contract FeeRouterTest is Test {
         vm.prank(owner);
         router.authorizeSource(authorizedSource);
 
-        // Cycle 1
         _collectAs(authorizedSource, address(tokenA), 1000 ether);
         vm.prank(owner);
         router.distribute(address(tokenA));
 
-        // Cycle 2
         _collectAs(authorizedSource, address(tokenA), 3000 ether);
         vm.prank(owner);
         router.distribute(address(tokenA));
@@ -696,17 +477,5 @@ contract FeeRouterTest is Test {
         assertEq(router.totalCollected(address(tokenA)), 4000 ether);
         assertEq(router.totalDistributed(address(tokenA)), 4000 ether);
         assertEq(router.pendingFees(address(tokenA)), 0);
-    }
-
-    function test_views_configReturnsCurrentConfig() public {
-        IFeeRouter.FeeConfig memory cfg = router.config();
-        assertEq(cfg.treasuryBps + cfg.insuranceBps + cfg.revShareBps + cfg.buybackBps, 10000);
-    }
-
-    function test_views_destinationAddresses() public view {
-        assertEq(router.treasury(), treasuryAddr);
-        assertEq(router.insurance(), insuranceAddr);
-        assertEq(router.revShare(), revShareAddr);
-        assertEq(router.buybackTarget(), buybackAddr);
     }
 }

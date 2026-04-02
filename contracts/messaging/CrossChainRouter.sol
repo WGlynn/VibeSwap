@@ -249,11 +249,12 @@ contract CrossChainRouter is
 
         uint256 srcTimestamp = block.timestamp;
 
-        // FIX #1: Include destination chain in commit ID to prevent cross-chain replay
+        // FIX #1 + TRP-R22-NEW02: Use localEid (not block.chainid) to match destination's commitId reconstruction.
+        // block.chainid != localEid (EVM chain ID vs LayerZero endpoint ID).
         bytes32 commitId = keccak256(abi.encodePacked(
             msg.sender,
             commitHash,
-            block.chainid,
+            localEid,         // Must match _handleCommit's use of commit.srcChainId
             dstEid,           // Destination chain prevents replay on other chains
             srcTimestamp
         ));
@@ -485,6 +486,9 @@ contract CrossChainRouter is
         // TRP-R21-H01: Verify destination using LZ eid, not block.chainid
         require(commit.dstChainId == localEid, "Wrong destination chain");
 
+        // TRP-R22-NEW09: Prevent duplicate commitId from inflating totalBridgedDeposits
+        require(pendingCommits[commitId].depositor == address(0), "Commit already exists");
+
         // Store for local processing
         pendingCommits[commitId] = commit;
 
@@ -515,7 +519,10 @@ contract CrossChainRouter is
 
         // Clear the pending bridged deposit BEFORE external calls (Checks-Effects-Interactions)
         bridgedDeposits[commitId] = 0;
+        bridgedDepositTimestamp[commitId] = 0;
         totalBridgedDeposits -= depositAmount;
+        // TRP-R22-NEW08: Clean up pendingCommits after funding to prevent reveal replay
+        delete pendingCommits[commitId];
 
         // Now forward to auction with verified funds
         ICommitRevealAuction(auction).commitOrder{value: depositAmount}(

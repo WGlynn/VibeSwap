@@ -443,6 +443,10 @@ contract VibeAMM is
      * @param token1 Second token address
      * @param feeRate Fee rate in basis points
      * @return poolId Unique pool identifier
+     * @dev Access: restricted to owner or authorizedExecutors (e.g. VibeSwapCore).
+     *      Not callable by arbitrary addresses directly. The permissionless path is:
+     *      caller → VibeSwapCore.createPool() → this function.
+     *      Gate prevents front-running deterministic pool IDs with extreme fees (M-10).
      */
     function createPool(
         address token0,
@@ -687,6 +691,16 @@ contract VibeAMM is
      * @param batchId Batch identifier
      * @param orders Array of swap orders
      * @return result Batch execution results
+     * @dev SETTLEMENT SEMANTICS — NOT FULLY ATOMIC:
+     *      The clearing price is computed once from aggregate buy/sell pressure
+     *      and held constant for all orders. However, orders execute sequentially
+     *      and reserves update after each swap. Later orders see post-trade
+     *      reserves, not the reserves at clearing-price computation time. If early
+     *      orders drain the pool near its liquidity limit, later orders may fail
+     *      the `grossOut - protocolFee > reserveOut` check and be skipped (emitting
+     *      SwapFailed). Priority bidders execute first and are structurally advantaged.
+     *      This trades full atomicity for gas efficiency and MEV resistance via
+     *      the commit-reveal shuffle. See TRP-R16-F02 for full analysis.
      */
     function executeBatchSwap(
         bytes32 poolId,

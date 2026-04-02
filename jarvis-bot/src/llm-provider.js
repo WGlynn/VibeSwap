@@ -2173,12 +2173,17 @@ export async function llmChat(request) {
             break; // Break retry loop, continue chain loop
           }
 
-          // 529/overloaded → DON'T retry same provider, instant escalate
-          // The circuit breaker already tripped via recordOverloaded() — skip remaining retries
+          // 529/overloaded OR 429/rate-limit → DON'T retry same provider, instant escalate
+          // The circuit breaker already tripped — skip remaining retries, try next provider.
+          // Retrying a rate-limited provider wastes 30-60s when a fallback can answer instantly.
           const errStatus = error?.status || error?.statusCode || error?.response?.status;
           const errMsg = (error?.message || '').toLowerCase();
           if (errStatus === 529 || errMsg.includes('overloaded')) {
             console.warn(`[escalation] ${currentProvider.name} overloaded (529) — instant escalate, no retry`);
+            break; // Skip remaining retries, move to next provider
+          }
+          if (errStatus === 429 || errMsg.includes('rate limit')) {
+            console.warn(`[escalation] ${currentProvider.name} rate limited (429) — instant escalate, no retry`);
             break; // Skip remaining retries, move to next provider
           }
 

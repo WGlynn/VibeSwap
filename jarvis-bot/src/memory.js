@@ -37,6 +37,8 @@ const MEMORY_DIR = config.memory.dir;
 const SESSION_STATE_PATH = join(REPO_PATH, '.claude', 'SESSION_STATE.md');
 const CLAUDE_MD_PATH = join(REPO_PATH, 'CLAUDE.md');
 const CKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_CKB.md');
+const SKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_SKB.md');
+const GKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_GKB.md');
 
 // ============ File Change Detection for Shard Sync ============
 // Track content hashes across reloads. When a file changes, emit
@@ -138,6 +140,8 @@ export async function diagnoseContext() {
     { path: CLAUDE_MD_PATH, label: 'CLAUDE.md' },
     { path: SESSION_STATE_PATH, label: 'SESSION_STATE.md' },
     { path: CKB_PATH, label: 'JarvisxWill_CKB.md' },
+    { path: SKB_PATH, label: 'JarvisxWill_SKB.md' },
+    { path: GKB_PATH, label: 'JarvisxWill_GKB.md' },
     ...MEMORY_FILES.map(f => ({ path: join(MEMORY_DIR, f), label: f })),
   ];
 
@@ -762,6 +766,30 @@ export async function loadSystemPrompt() {
     // Cap at 5000 chars — key operational tiers, skip philosophy (already sanitized out)
     const capped = sanitized.slice(0, 5000);
     dynamicParts.push('<context type="core_knowledge_base" description="Core alignment, identity protocols, and operational principles">');
+    dynamicParts.push(capped);
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  // ============ Shared Knowledge Base (SKB) — Full session boot context ============
+  const skb = await safeRead(SKB_PATH, 'JarvisxWill_SKB.md');
+  if (skb) {
+    await detectAndSyncChanges(SKB_PATH, skb);
+    const sanitized = sanitizeContextForBot(skb);
+    const capped = sanitized.slice(0, 8000);
+    dynamicParts.push('<context type="shared_knowledge_base" description="Shared Knowledge Base — project architecture, mechanism design, tech stack, key decisions">');
+    dynamicParts.push(capped);
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  // ============ Glyph Knowledge Base (GKB) — Compressed post-reboot context ============
+  const gkb = await safeRead(GKB_PATH, 'JarvisxWill_GKB.md');
+  if (gkb) {
+    await detectAndSyncChanges(GKB_PATH, gkb);
+    const sanitized = sanitizeContextForBot(gkb);
+    const capped = sanitized.slice(0, 5000);
+    dynamicParts.push('<context type="glyph_knowledge_base" description="Glyph Knowledge Base — compressed protocol glyphs, canon, axioms">');
     dynamicParts.push(capped);
     dynamicParts.push('</context>');
     dynamicParts.push('');

@@ -728,6 +728,16 @@ contract VibeAMM is
             address _poolToken0 = pool.token0;
             address _poolToken1 = pool.token1;
 
+            // TRP-R16-F03: Pre-credit trackedBalances with expected batch inflow
+            // before donation check. VibeSwapCore transfers tokens to AMM before
+            // calling executeBatchSwap, so actual balance includes batch tokens but
+            // trackedBalances doesn't yet. Without this, batches >1% of pool
+            // reserves trigger false-positive DonationAttackSuspected reverts.
+            for (uint256 i = 0; i < orders.length;) {
+                trackedBalances[orders[i].tokenIn] += orders[i].amountIn;
+                unchecked { ++i; }
+            }
+
             // Check for donation attacks before batch execution
             _checkDonationAttack(_poolToken0);
             _checkDonationAttack(_poolToken1);

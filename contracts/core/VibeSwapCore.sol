@@ -186,8 +186,9 @@ contract VibeSwapCore is
     /// @dev Needed because auction records core as trader, but deposits are keyed by user
     mapping(uint64 => mapping(uint256 => address)) private _orderDepositors;
 
-    /// @notice Order count per batch (for indexing _orderDepositors during reveal)
-    mapping(uint64 => uint256) private _orderRevealCount;
+    /// @notice DEPRECATED — was used for sequential indexing, replaced by CRA array length query (TRP-R16-F07)
+    /// @dev Kept to preserve storage layout for UUPS proxy compatibility. Do not use.
+    mapping(uint64 => uint256) private _orderRevealCount_DEPRECATED;
 
     /// @dev Reserved storage gap for future upgrades
     uint256[44] private __gap;
@@ -504,10 +505,14 @@ contract VibeSwapCore is
         // Pass address(this) as originalDepositor because VibeSwapCore is the depositor
         // in the auction (commitment.depositor = address(this)), and commitHash was
         // generated with address(this) as the identity in commitSwap.
-        // Record actual depositor before reveal (auction records core as trader)
+        // TRP-R16-F07: Record actual depositor keyed by the ACTUAL index the order
+        // will occupy in CRA's revealedOrders array. Previous code used a separate
+        // _orderRevealCount which desyncs when direct CRA reveals are interleaved.
+        // By querying CRA's current array length, we get the exact index the next
+        // push will occupy, regardless of how many direct reveals preceded it.
         uint64 currentBatchId = auction.getCurrentBatchId();
-        _orderDepositors[currentBatchId][_orderRevealCount[currentBatchId]] = msg.sender;
-        _orderRevealCount[currentBatchId]++;
+        uint256 nextOrderIdx = auction.getRevealedOrders(currentBatchId).length;
+        _orderDepositors[currentBatchId][nextOrderIdx] = msg.sender;
 
         auction.revealOrderCrossChain{value: msg.value}(
             commitId,
@@ -877,10 +882,16 @@ contract VibeSwapCore is
     }
 
     /// @notice Resolve actual depositor for an order in a batch
-    /// @dev Auction records core as trader; this maps back to the user who called commitSwap
+    /// @dev TRP-R16-F07: Two cases:
+    ///      1. Core-originated order (trader == address(this)): look up real user from
+    ///         _orderDepositors, keyed by actual revealedOrders index (not a separate counter).
+    ///      2. Direct CRA order (trader != address(this)): trader IS the real depositor.
     function _getDepositor(uint64 batchId, uint256 orderIdx, address fallbackTrader) internal view returns (address) {
-        address depositor = _orderDepositors[batchId][orderIdx];
-        return depositor != address(0) ? depositor : fallbackTrader;
+        if (fallbackTrader == address(this)) {
+            address depositor = _orderDepositors[batchId][orderIdx];
+            return depositor != address(0) ? depositor : fallbackTrader;
+        }
+        return fallbackTrader;
     }
 
     // ============ Internal Functions ============

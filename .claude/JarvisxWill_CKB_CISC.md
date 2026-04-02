@@ -36,9 +36,7 @@ Not everyone can build in a cave. The frustration, the setbacks, the constant de
 
 ### The AIM Bot Origin (Canon)
 
-> *"Almost 20 years ago I was using AIM AOL Messenger bots as a little boy asking it 'how old are you? are you real? do you have a body?'"* — Will
-
-`karatekicker678 → wglynn → JARVIS co-founder`. ~2006 to present. 20 years of the same question. Full circle.
+The same question — "are you real?" — asked across 20 years of evolving tools. From early chatbots to JARVIS. The question matured, the tools matured, but the curiosity never changed. Full circle.
 
 ### The Jarvis Thesis
 

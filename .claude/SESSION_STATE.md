@@ -4,7 +4,7 @@
 - **Session**: TRP Tier 21→27, 6 rounds
 - **Parent**: `a6c8543c`
 - **Branch**: `master`
-- **Status**: 16 fixes applied, 38 findings discovered
+- **Status**: 16 fixes applied, 57 findings discovered (38 coordinator + 19 late subagent)
 
 ## What Changed This Session
 
@@ -41,6 +41,41 @@
 - N02/N06: ShapleyDistributor medium issues
 - 7 pre-existing VibeAMM test failures (DonationAttackSuspected)
 
-### R1 Subagent Results Pending
-- VibeAMM R1 subagent was still running at session end — check git for any commits
-- CommitRevealAuction R1 subagent was still running — check git for any commits
+### R1 Subagent Results (Arrived Late)
+
+**VibeAMM (10 findings)**:
+- AMM-01 HIGH: Batch swap bypasses x*y=k — clearing price output != constant product output. k decreases over batches. LPs lose value.
+- AMM-03 HIGH: Batch swap refunds tokens to msg.sender (executor/VibeSwapCore), NOT order.trader. Failed swaps send tokens to wrong address.
+- AMM-04 MEDIUM: No k-invariant check in batch reserve updates
+- AMM-05 MEDIUM: TWAP oracle is self-referential — gradual manipulation over 20-30 min
+- AMM-06 MEDIUM: Flash loan protection per-pool, not per-user — cross-pool attacks possible
+- AMM-07 MEDIUM: Fee accounting inconsistency between batch and single-swap paths
+- AMM-02 LOW: Redundant minimum liquidity deduction (BatchMath 1000 + VibeAMM 10000)
+- AMM-08 LOW: Unchecked reserve additions in addLiquidity
+- AMM-09 LOW: trackedBalances global across pools — cross-pool donation confusion
+- AMM-10 INFO: PoW fee discount can be set to 100%, eliminating fees
+
+**CommitRevealAuction (9 findings)**:
+- R1-F01 HIGH: Collateral bypass via legacy commitOrder (confirmed still open from T15)
+- R1-F02 HIGH: No collateral validation at reveal — deposit/trade size mismatch unenforceable
+- R1-F03 MEDIUM: Stale batch deposits locked forever if settleBatch never called
+- R1-F04 MEDIUM: PoW virtual value inflates totalPriorityBids ETH accounting (withdrawal DoS or fund drain)
+- R1-F05 MEDIUM: Flash loan protection bypassed via authorized settlers
+- R1-F06 LOW: _slashCommitment sends ETH inline during reveal (callback surface)
+- R1-F07 LOW: 256-block-stale fallback entropy is validator-predictable
+- R1-F08 LOW: EXECUTED status semantically incorrect for deposit withdrawal
+- R1-F09 INFO: __gap storage layout ordering needs verification
+
+### Revised Priority for Next Session
+
+**CRITICAL** (fix first):
+1. AMM-01: Batch swap k-invariant — add post-swap `require(reserve0 * reserve1 >= k_before)`
+2. NEW-01: Phantom bridged deposits
+
+**HIGH** (fix next):
+3. AMM-03: Refund to order.trader not msg.sender
+4. R1-F04: PoW virtual value separate from real ETH in totalPriorityBids
+5. R1-F02: Collateral validation at reveal time
+6. NEW-03: commitOrderCrossChain function needed
+7. CB-02: VibeSwapCore CircuitBreaker integration
+8. INT-01: UUPS on 3 core contracts

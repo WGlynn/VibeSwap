@@ -349,9 +349,12 @@ contract VibeAMM is
     }
 
     /// @notice Prevents flash loan attacks by blocking same-block interactions
+    /// @dev Key is global per-user (no poolId) so cross-pool attacks in the same block are blocked.
+    ///      An attacker who interacts with Pool A cannot interact with Pool B in the same block.
     modifier noFlashLoan(bytes32 poolId) {
         if ((protectionFlags & FLAG_FLASH_LOAN) != 0) {
-            bytes32 interactionKey = keccak256(abi.encodePacked(msg.sender, poolId, block.number));
+            // AMM-06 fix: exclude poolId from key — guard is global per-user across ALL pools
+            bytes32 interactionKey = keccak256(abi.encodePacked(msg.sender, block.number));
             if (sameBlockInteraction[interactionKey]) {
                 emit FlashLoanAttemptBlocked(msg.sender, poolId);
                 revert SameBlockInteraction();

@@ -1435,23 +1435,25 @@ contract VibeAMM is
 
         amountIn = order.amountIn;
 
-        // Calculate output at clearing price
-        if (isToken0) {
-            amountOut = (amountIn * clearingPrice) / 1e18;
-        } else {
-            amountOut = clearingPrice > 0 ? (amountIn * 1e18) / clearingPrice : 0;
+        // AMM-07 FIX: Apply fee on input (consistent with single-swap path which uses
+        // BatchMath.getAmountOut — an input-fee model: amountInWithFee = amountIn * (10000 - fee)).
+        // Previously the batch path deducted fee from output, creating an arbitrage where
+        // routing through batch vs single swap produced different effective fee rates.
+        // Standardized to input-fee: fee stays as tokenIn in the pool (LP benefit),
+        // and output is computed on the post-fee input amount at clearing price.
+        // Stack note: inline calculations to avoid extra local variables (function near stack limit).
+        {
+            // effectiveAmountIn = amountIn * (10000 - feeRate) / 10000
+            uint256 effIn = amountIn * (10000 - feeRate) / 10000;
+            if (isToken0) {
+                amountOut = (effIn * clearingPrice) / 1e18;
+            } else {
+                amountOut = clearingPrice > 0 ? (effIn * 1e18) / clearingPrice : 0;
+            }
+            // protocolFee = feeAmount * protocolFeeShare / 10000
+            //             = (amountIn - effIn) * protocolFeeShare / 10000
+            protocolFee = (amountIn - effIn) * protocolFeeShare / 10000;
         }
-
-        // Apply fee - deduct from output (uses effective feeRate, may include True Price surcharge)
-        (protocolFee, ) = BatchMath.calculateFees(
-            amountOut,
-            feeRate,
-            protocolFeeShare
-        );
-
-        // Compute gross amount (before fees) and net amount
-        uint256 grossOut = amountOut;
-        amountOut = (grossOut * (10000 - feeRate)) / 10000;
 
         // Validate and execute — all checks scoped to minimize stack depth
         {
@@ -1464,10 +1466,10 @@ contract VibeAMM is
                 return (0, 0, 0);
             }
 
-            // Verify enough output tokens (LP fees stay in pool)
+            // Verify enough output tokens available in reserves
             {
                 uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
-                if (grossOut - protocolFee > reserveOut) {
+                if (amountOut > reserveOut) {
                     emit SwapFailed(pid, order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut, "Insufficient liquidity");
                     IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
                     return (0, 0, 0);
@@ -1478,20 +1480,18 @@ contract VibeAMM is
             address tokenOut = isToken0 ? pool.token1 : pool.token0;
             IERC20(tokenOut).safeTransfer(order.trader, amountOut);
 
-            // Update reserves
-            {
-                uint256 lpDeduction = grossOut - protocolFee;
-                if (isToken0) {
-                    pool.reserve0 += amountIn;
-                    pool.reserve1 -= lpDeduction;
-                } else {
-                    pool.reserve1 += amountIn;
-                    pool.reserve0 -= lpDeduction;
-                }
+            // Update reserves: full amountIn added to reserveIn (fee stays in pool as LP benefit).
+            // Protocol fee share tracked in accumulatedFees (paid from contract balance on collectFees).
+            if (isToken0) {
+                pool.reserve0 += amountIn;
+                pool.reserve1 -= amountOut;
+            } else {
+                pool.reserve1 += amountIn;
+                pool.reserve0 -= amountOut;
             }
 
             // Track protocol fees — route surcharge surplus to insurance pool
-            _trackProtocolFees(pid, tokenOut, feeRate, pool.feeRate, amountOut, protocolFee);
+            _trackProtocolFees(pid, order.tokenIn, feeRate, pool.feeRate, amountIn, protocolFee);
 
             emit SwapExecuted(pid, order.trader, order.tokenIn, tokenOut, amountIn, amountOut);
         }

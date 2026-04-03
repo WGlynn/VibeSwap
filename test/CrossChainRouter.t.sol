@@ -41,6 +41,8 @@ contract CrossChainRouterTest is Test {
     event PeerSet(uint32 indexed eid, bytes32 peer);
     event CrossChainCommitSent(bytes32 indexed commitId, uint32 indexed dstEid, address depositor);
     event CrossChainCommitReceived(bytes32 indexed commitId, uint32 indexed srcEid, address depositor);
+    event BridgedCommitPendingFunding(bytes32 indexed commitId, uint256 expectedAmount);
+    event BridgedDepositFunded(bytes32 indexed commitId, uint256 amount);
 
     function setUp() public {
         owner = address(this);
@@ -508,9 +510,9 @@ contract CrossChainRouterTest is Test {
             commit.srcTimestamp
         ));
 
-        // Verify deposit exists
+        // Verify deposit record exists but totalBridgedDeposits is NOT inflated (TRP-R34-NEW01)
         assertEq(router.bridgedDeposits(commitId), 1 ether);
-        assertEq(router.totalBridgedDeposits(), 1 ether);
+        assertEq(router.totalBridgedDeposits(), 0, "TRP-R34-NEW01: no phantom deposits");
 
         // Try to recover before expiry - should fail
         vm.prank(authorized);
@@ -579,5 +581,247 @@ contract CrossChainRouterTest is Test {
     function test_recoverExpiredDeposit_noDeposit() public {
         vm.expectRevert(CrossChainRouter.NoDepositToRecover.selector);
         router.recoverExpiredDeposit(keccak256("nonexistent"));
+    }
+
+    // ============ TRP-R34-NEW01: Phantom Bridged Deposit Tests ============
+
+    /// @notice Core test: _handleCommit must NOT inflate totalBridgedDeposits
+    /// This is the exact exploit vector from NEW-01. A cross-chain commit message
+    /// arrives via LayerZero with NO ETH. If totalBridgedDeposits is incremented,
+    /// the contract believes it holds funds it doesn't have (phantom deposits).
+    function test_TRP_R34_NEW01_noPhantomDepositsOnCommit() public {
+        uint256 totalBefore = router.totalBridgedDeposits();
+        uint256 balanceBefore = address(router).balance;
+
+        // Simulate receiving a commit from chain B (no ETH arrives with this message)
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B,
+            sender: PEER_B,
+            nonce: 1
+        });
+
+        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+            commitHash: keccak256("phantom-test"),
+            depositor: authorized,
+            depositAmount: 5 ether,  // Large amount to make phantom obvious
+            srcChainId: CHAIN_B,
+            dstChainId: CHAIN_A,
+            srcTimestamp: block.timestamp
+        });
+
+        bytes memory message = abi.encode(
+            CrossChainRouter.MessageType.ORDER_COMMIT,
+            abi.encode(commit)
+        );
+
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("guid-phantom"), message, address(0), "");
+
+        // CRITICAL ASSERTION: totalBridgedDeposits must NOT increase
+        assertEq(
+            router.totalBridgedDeposits(),
+            totalBefore,
+            "TRP-R34-NEW01: totalBridgedDeposits must not increase on commit receipt"
+        );
+
+        // The contract balance should also be unchanged (no ETH arrived)
+        assertEq(
+            address(router).balance,
+            balanceBefore,
+            "No ETH should arrive with a LayerZero message"
+        );
+
+        // But the pending deposit record should exist
+        bytes32 commitId = keccak256(abi.encodePacked(
+            commit.depositor,
+            commit.commitHash,
+            commit.srcChainId,
+            commit.dstChainId,
+            commit.srcTimestamp
+        ));
+        assertEq(router.bridgedDeposits(commitId), 5 ether, "Pending deposit should be recorded");
+        assertFalse(router.bridgedDepositFunded(commitId), "Should not be marked as funded");
+    }
+
+    /// @notice Multiple commits should not inflate totalBridgedDeposits
+    function test_TRP_R34_NEW01_multipleCommitsNoInflation() public {
+        uint256 ts = block.timestamp;
+
+        for (uint256 i = 0; i < 5; i++) {
+            CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+                srcEid: CHAIN_B,
+                sender: PEER_B,
+                nonce: uint64(i + 1)
+            });
+
+            CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+                commitHash: keccak256(abi.encodePacked("order", i)),
+                depositor: authorized,
+                depositAmount: 1 ether,
+                srcChainId: CHAIN_B,
+                dstChainId: CHAIN_A,
+                srcTimestamp: ts + i  // Different timestamps for unique commitIds
+            });
+
+            bytes memory message = abi.encode(
+                CrossChainRouter.MessageType.ORDER_COMMIT,
+                abi.encode(commit)
+            );
+
+            vm.prank(address(endpoint));
+            router.lzReceive(
+                origin,
+                keccak256(abi.encodePacked("guid-multi", i)),
+                message,
+                address(0),
+                ""
+            );
+        }
+
+        // 5 commits of 1 ETH each — totalBridgedDeposits must remain 0
+        assertEq(
+            router.totalBridgedDeposits(),
+            0,
+            "TRP-R34-NEW01: 5 phantom commits must not inflate totalBridgedDeposits"
+        );
+    }
+
+    /// @notice Emergency withdraw must not be blocked by phantom deposits
+    /// Old bug: phantom totalBridgedDeposits reduced surplus, locking real ETH
+    function test_TRP_R34_NEW01_emergencyWithdrawNotBlockedByPhantom() public {
+        // Router has 10 ETH from setUp
+        uint256 routerBalance = address(router).balance;
+        assertEq(routerBalance, 10 ether);
+
+        // Receive a commit for 5 ETH (no actual ETH arrives)
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B,
+            sender: PEER_B,
+            nonce: 1
+        });
+
+        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+            commitHash: keccak256("emergency-test"),
+            depositor: authorized,
+            depositAmount: 5 ether,
+            srcChainId: CHAIN_B,
+            dstChainId: CHAIN_A,
+            srcTimestamp: block.timestamp
+        });
+
+        bytes memory message = abi.encode(
+            CrossChainRouter.MessageType.ORDER_COMMIT,
+            abi.encode(commit)
+        );
+
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("guid-emergency"), message, address(0), "");
+
+        // With the fix, totalBridgedDeposits is 0, so all 10 ETH is surplus
+        // Old bug: totalBridgedDeposits would be 5 ETH, making only 5 ETH withdrawable
+        address recipient = makeAddr("recipient");
+        uint256 recipientBefore = recipient.balance;
+
+        router.emergencyWithdrawETH(recipient);
+
+        // All 10 ETH should be withdrawable — no phantom protection
+        assertEq(
+            recipient.balance - recipientBefore,
+            10 ether,
+            "TRP-R34-NEW01: Full balance should be withdrawable, no phantom protection"
+        );
+    }
+
+    /// @notice fundBridgedDeposit should work correctly without totalBridgedDeposits manipulation
+    function test_TRP_R34_NEW01_fundBridgedDeposit_correctFlow() public {
+        // Step 1: Receive cross-chain commit
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B,
+            sender: PEER_B,
+            nonce: 1
+        });
+
+        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+            commitHash: keccak256("fund-test"),
+            depositor: authorized,
+            depositAmount: 1 ether,
+            srcChainId: CHAIN_B,
+            dstChainId: CHAIN_A,
+            srcTimestamp: block.timestamp
+        });
+
+        bytes memory message = abi.encode(
+            CrossChainRouter.MessageType.ORDER_COMMIT,
+            abi.encode(commit)
+        );
+
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("guid-fund"), message, address(0), "");
+
+        bytes32 commitId = keccak256(abi.encodePacked(
+            commit.depositor,
+            commit.commitHash,
+            commit.srcChainId,
+            commit.dstChainId,
+            commit.srcTimestamp
+        ));
+
+        // Step 2: Verify state before funding
+        assertEq(router.totalBridgedDeposits(), 0, "No phantom deposits");
+        assertEq(router.bridgedDeposits(commitId), 1 ether, "Pending deposit recorded");
+        assertFalse(router.bridgedDepositFunded(commitId), "Not yet funded");
+
+        // Step 3: Fund with real ETH
+        vm.prank(authorized);
+        router.fundBridgedDeposit{value: 1 ether}(commitId);
+
+        // Step 4: Verify state after funding
+        assertEq(router.totalBridgedDeposits(), 0, "No deposits held after forwarding to auction");
+        assertEq(router.bridgedDeposits(commitId), 0, "Pending deposit cleared");
+        assertTrue(router.bridgedDepositFunded(commitId), "Marked as funded");
+    }
+
+    /// @notice Double-funding must be prevented
+    function test_TRP_R34_NEW01_doubleFundingPrevented() public {
+        // Receive commit
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B,
+            sender: PEER_B,
+            nonce: 1
+        });
+
+        CrossChainRouter.CrossChainCommit memory commit = CrossChainRouter.CrossChainCommit({
+            commitHash: keccak256("double-fund"),
+            depositor: authorized,
+            depositAmount: 1 ether,
+            srcChainId: CHAIN_B,
+            dstChainId: CHAIN_A,
+            srcTimestamp: block.timestamp
+        });
+
+        bytes memory message = abi.encode(
+            CrossChainRouter.MessageType.ORDER_COMMIT,
+            abi.encode(commit)
+        );
+
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("guid-double"), message, address(0), "");
+
+        bytes32 commitId = keccak256(abi.encodePacked(
+            commit.depositor,
+            commit.commitHash,
+            commit.srcChainId,
+            commit.dstChainId,
+            commit.srcTimestamp
+        ));
+
+        // Fund once — should succeed
+        vm.prank(authorized);
+        router.fundBridgedDeposit{value: 1 ether}(commitId);
+
+        // Fund again — should fail (pendingCommits deleted after first funding)
+        vm.prank(authorized);
+        vm.expectRevert("Unknown commit");
+        router.fundBridgedDeposit{value: 1 ether}(commitId);
     }
 }

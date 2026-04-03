@@ -188,6 +188,17 @@ interface ICommitRevealAuction {
     ) external payable;
 
     /**
+     * @notice Commit an order on behalf of a cross-chain user (called by authorized router)
+     * @param originalUser The actual user who committed on the source chain
+     * @param commitHash Hash of (originalUser, tokenIn, tokenOut, amountIn, minAmountOut, secret)
+     * @return commitId Unique identifier for this commitment
+     */
+    function commitOrderCrossChain(
+        address originalUser,
+        bytes32 commitHash
+    ) external payable returns (bytes32 commitId);
+
+    /**
      * @notice Reveal order on behalf of another address (for cross-chain or aggregator use)
      * @param commitId The commitment ID from commitOrder
      * @param originalDepositor Original address that made the commitment

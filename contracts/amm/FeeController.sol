@@ -93,6 +93,11 @@ contract FeeController is Ownable {
 
     mapping(bytes32 => PoolFeeState) public poolState;
 
+    /// @notice INT-R1-FT005: Authorized callers for measureAndUpdate (AMM, keepers)
+    /// @dev Without this, anyone could call measureAndUpdate with fabricated reserves,
+    ///      poisoning both the fee rate and the reserve snapshot for future measurements.
+    mapping(address => bool) public authorizedCallers;
+
     // ============ Events ============
 
     event FeeUpdated(
@@ -111,10 +116,25 @@ contract FeeController is Ownable {
     error PoolNotInitialized();
     error TooSoon();
     error InvalidPIDParams();
+    error NotAuthorizedCaller();
+
+    // ============ Modifiers ============
+
+    modifier onlyAuthorizedCaller() {
+        if (!authorizedCallers[msg.sender] && msg.sender != owner()) revert NotAuthorizedCaller();
+        _;
+    }
 
     // ============ Constructor ============
 
     constructor() Ownable(msg.sender) {}
+
+    // ============ Authorization ============
+
+    /// @notice INT-R1-FT005: Set authorized callers (AMM, VibeSwapCore, keepers)
+    function setAuthorizedCaller(address caller, bool authorized_) external onlyOwner {
+        authorizedCallers[caller] = authorized_;
+    }
 
     // ============ Initialization ============
 
@@ -154,7 +174,7 @@ contract FeeController is Ownable {
         bytes32 poolId,
         uint256 currentReserve0,
         uint256 currentReserve1
-    ) external returns (uint256 newFeeBps) {
+    ) external onlyAuthorizedCaller returns (uint256 newFeeBps) {
         PoolFeeState storage state = poolState[poolId];
         if (!state.initialized) revert PoolNotInitialized();
 

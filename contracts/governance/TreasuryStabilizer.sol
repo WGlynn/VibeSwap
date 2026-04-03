@@ -305,12 +305,20 @@ contract TreasuryStabilizer is
         bytes32 poolId,
         uint256 lpAmount
     ) external override onlyOwner nonReentrant returns (uint256 received) {
-        // L-05: Use 95% of expected output as minimum — dissolves sandwich attack surface
-        // Passing 0 accepted any output, making withdrawal exploitable via MEV.
-        // 5% slippage tolerance is generous but prevents worst-case extraction.
-        uint256 expectedPerLp = lpAmount > 0 ? lpAmount : 1; // avoid div by zero
-        uint256 minOut = (expectedPerLp * 95) / 100;
-        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount, minOut, minOut) returns (uint256 amount) {
+        // INT-R1-FT002: Compute actual expected output from pool reserves, not lpAmount.
+        // Old code: expectedPerLp = lpAmount (conflates LP count with token value).
+        // LP tokens are NOT 1:1 with underlying — their value = reserves * share / totalLiquidity.
+        IVibeAMM.Pool memory pool = vibeAMM.getPool(poolId);
+        uint256 expectedOut0;
+        uint256 expectedOut1;
+        if (pool.totalLiquidity > 0) {
+            expectedOut0 = (lpAmount * pool.reserve0) / pool.totalLiquidity;
+            expectedOut1 = (lpAmount * pool.reserve1) / pool.totalLiquidity;
+        }
+        // 5% slippage tolerance against sandwich attacks
+        uint256 minOut0 = (expectedOut0 * 95) / 100;
+        uint256 minOut1 = (expectedOut1 * 95) / 100;
+        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount, minOut0, minOut1) returns (uint256 amount) {
             received = amount;
         } catch {
             received = 0;

@@ -400,6 +400,54 @@ contract CommitRevealAuction is
     }
 
     /**
+     * @notice Commit an order on behalf of a cross-chain user
+     * @dev Only callable by authorized settlers (CrossChainRouter). Records originalUser
+     *      as depositor so that revealOrderCrossChain can match depositor correctly.
+     *      TRP-R35-NEW03: Without this, fundBridgedDeposit records the Router as depositor,
+     *      causing all cross-chain reveals to fail the depositor check.
+     * @param originalUser The actual user who committed on the source chain
+     * @param commitHash Hash of (originalUser, tokenIn, tokenOut, amountIn, minAmountOut, secret)
+     * @return commitId Unique identifier for this commitment
+     */
+    function commitOrderCrossChain(
+        address originalUser,
+        bytes32 commitHash
+    ) external payable nonReentrant onlyAuthorizedSettler inPhase(BatchPhase.COMMIT) returns (bytes32 commitId) {
+        if (commitHash == bytes32(0)) revert InvalidHash();
+        if (originalUser == address(0)) revert NotOwner();
+
+        // Calculate required deposit using PROTOCOL CONSTANTS
+        if (msg.value < MIN_DEPOSIT) revert InsufficientDeposit();
+
+        // Gas: cache storage read in memory (avoid repeated SLOAD)
+        uint64 _currentBatchId = currentBatchId;
+
+        // Generate unique commit ID (uses originalUser, not msg.sender)
+        commitId = keccak256(abi.encodePacked(
+            originalUser,
+            commitHash,
+            bytes32(0),        // default pool
+            _currentBatchId,
+            block.timestamp
+        ));
+
+        if (commitments[commitId].status != CommitStatus.NONE) revert AlreadyCommitted();
+
+        commitments[commitId] = OrderCommitment({
+            commitHash: commitHash,
+            poolId: bytes32(0),
+            batchId: _currentBatchId,
+            depositAmount: msg.value,
+            depositor: originalUser,   // KEY: originalUser, not msg.sender
+            status: CommitStatus.COMMITTED
+        });
+
+        batches[_currentBatchId].orderCount++;
+
+        emit OrderCommitted(commitId, originalUser, _currentBatchId, msg.value);
+    }
+
+    /**
      * @notice Reveal a previously committed order
      * @param commitId The commitment ID from commitOrder
      * @param tokenIn Token being sold

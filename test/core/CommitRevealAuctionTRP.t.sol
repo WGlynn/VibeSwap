@@ -246,11 +246,11 @@ contract CommitRevealAuctionTRP is Test {
         return keccak256(abi.encodePacked(trader, tknIn, tknOut, amtIn, minOut, secret));
     }
 
-    /// @notice Helper: commit during COMMIT phase (0.01 ether deposit — only valid for amountIn <= 0.2 ether)
+    /// @notice Helper: commit during COMMIT phase (0.05 ether deposit — covers 5% collateral on 1 ether amountIn)
     function _commit(address trader, bytes32 secret) internal returns (bytes32 commitId, bytes32 commitHash) {
         commitHash = _hash(trader, tokenA, tokenB, 1 ether, 0.9 ether, secret);
         vm.prank(trader);
-        commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+        commitId = auction.commitOrder{value: 0.05 ether}(commitHash);
     }
 
     /// @notice Helper: commit with explicit deposit — required when amountIn > 0.2 ether (5% collateral)
@@ -284,6 +284,7 @@ contract CommitRevealAuctionTRP is Test {
         _reveal(trader, commitId, secret);
         vm.warp(block.timestamp + 3); // Move past BATCH_DURATION
         auction.advancePhase();
+        vm.roll(block.number + 1); // Must wait 1 block after reveal phase ends
         auction.settleBatch();
     }
 
@@ -444,6 +445,7 @@ contract CommitRevealAuctionTRP is Test {
         auction.revealOrder{value: 0.2 ether}(commitId1, tokenA, tokenB, 1 ether, 0.9 ether, secret1, 0);
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         // Batch 2
@@ -451,7 +453,7 @@ contract CommitRevealAuctionTRP is Test {
         bytes32 hash2 = _hash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret2);
         vm.roll(block.number + 1); // Avoid flash loan
         vm.prank(alice);
-        bytes32 commitId2 = auction.commitOrder{value: 0.01 ether}(hash2);
+        bytes32 commitId2 = auction.commitOrder{value: 0.05 ether}(hash2);
         vm.warp(block.timestamp + 9);
         vm.prank(alice);
         auction.revealOrder{value: 0.3 ether}(commitId2, tokenA, tokenB, 1 ether, 0.9 ether, secret2, 0);
@@ -609,6 +611,7 @@ contract CommitRevealAuctionTRP is Test {
         // Skip to settle without revealing
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         uint256 treasuryBal = treasury.balance;
@@ -616,10 +619,10 @@ contract CommitRevealAuctionTRP is Test {
 
         auction.slashUnrevealedCommitment(commitId);
 
-        // 50% to treasury
-        assertEq(treasury.balance, treasuryBal + 0.005 ether);
+        // 50% to treasury (deposit is 0.05 ether, so 50% = 0.025 ether)
+        assertEq(treasury.balance, treasuryBal + 0.025 ether);
         // 50% refunded to alice
-        assertEq(alice.balance, aliceBal + 0.005 ether);
+        assertEq(alice.balance, aliceBal + 0.025 ether);
 
         ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
         assertEq(uint256(c.status), uint256(ICommitRevealAuction.CommitStatus.SLASHED));
@@ -632,6 +635,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         auction.slashUnrevealedCommitment(commitId);
@@ -656,7 +660,7 @@ contract CommitRevealAuctionTRP is Test {
 
         ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
         assertEq(uint256(c.status), uint256(ICommitRevealAuction.CommitStatus.SLASHED));
-        assertEq(treasury.balance, treasuryBal + 0.005 ether);
+        assertEq(treasury.balance, treasuryBal + 0.025 ether); // 50% of 0.05 ether deposit
     }
 
     /// @notice Slash refund failure accrues to pendingRefunds (pull pattern)
@@ -668,18 +672,20 @@ contract CommitRevealAuctionTRP is Test {
         bytes32 secret = keccak256("s");
         bytes32 hash = _hash(address(rejectTrader), tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
+        // 5% of 1 ether amountIn = 0.05 ether collateral required
         vm.prank(address(rejectTrader));
-        bytes32 commitId = auction.commitOrder{value: 0.02 ether}(hash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(hash);
 
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         // Slash - refund portion fails because rejectTrader rejects ETH
         auction.slashUnrevealedCommitment(commitId);
 
-        // 50% refund portion should go to pendingRefunds
-        assertEq(auction.pendingRefunds(address(rejectTrader)), 0.01 ether);
+        // 50% refund portion should go to pendingRefunds (50% of 0.05 = 0.025)
+        assertEq(auction.pendingRefunds(address(rejectTrader)), 0.025 ether);
     }
 
     // ============================================================
@@ -970,6 +976,7 @@ contract CommitRevealAuctionTRP is Test {
     function test_phase_doubleSettlementReverts() public {
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         // settleBatch starts new batch -> need to warp again
@@ -987,6 +994,7 @@ contract CommitRevealAuctionTRP is Test {
     function test_phase_emptyBatchSettles() public {
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         ICommitRevealAuction.Batch memory b = auction.getBatch(1);
@@ -998,6 +1006,7 @@ contract CommitRevealAuctionTRP is Test {
     function test_phase_batchRolloverTimestamp() public {
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
 
         uint256 settleTime = block.timestamp;
         auction.settleBatch();
@@ -1063,7 +1072,7 @@ contract CommitRevealAuctionTRP is Test {
         uint256 balBefore = alice.balance;
         vm.prank(alice);
         auction.withdrawDeposit(commitId);
-        assertEq(alice.balance, balBefore + 0.01 ether);
+        assertEq(alice.balance, balBefore + 0.05 ether);
     }
 
     /// @notice Cannot withdraw if not the depositor
@@ -1084,6 +1093,7 @@ contract CommitRevealAuctionTRP is Test {
         // Settle without revealing
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         vm.prank(alice);
@@ -1190,6 +1200,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -1216,6 +1227,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -1240,6 +1252,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -1507,6 +1520,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         uint256 treasuryBal = treasury.balance;
@@ -1537,6 +1551,7 @@ contract CommitRevealAuctionTRP is Test {
         _reveal(alice, commitId, secret);
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         vm.prank(alice);
@@ -1558,8 +1573,8 @@ contract CommitRevealAuctionTRP is Test {
         bytes32 s2 = keccak256("s2");
         (bytes32 id2, ) = _commit(bob, s2);
 
-        // 2 deposits of 0.01 ether
-        assertEq(address(auction).balance, contractBefore + 0.02 ether);
+        // 2 deposits of 0.05 ether
+        assertEq(address(auction).balance, contractBefore + 0.1 ether);
 
         vm.warp(block.timestamp + 9);
 
@@ -1568,6 +1583,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         // Alice withdraws deposit
@@ -1713,6 +1729,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         assertEq(auction.getCurrentBatchId(), 2);
@@ -1724,7 +1741,7 @@ contract CommitRevealAuctionTRP is Test {
         bytes32 s2 = keccak256("b2c");
         bytes32 hash2 = _hash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, s2);
         vm.prank(charlie);
-        bytes32 id2 = auction.commitOrder{value: 0.01 ether}(hash2);
+        bytes32 id2 = auction.commitOrder{value: 0.05 ether}(hash2);
 
         vm.warp(block.timestamp + 9);
         vm.prank(charlie);
@@ -1732,6 +1749,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         assertEq(auction.getCurrentBatchId(), 3);
@@ -1739,6 +1757,7 @@ contract CommitRevealAuctionTRP is Test {
         // Batch 3: Empty batch
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         assertEq(auction.getCurrentBatchId(), 4);
@@ -1910,7 +1929,7 @@ contract CommitRevealAuctionTRP is Test {
 
     /// @notice Fuzz: slash always distributes 50/50
     function testFuzz_slashDistribution(uint256 deposit) public {
-        deposit = bound(deposit, 0.001 ether, 5 ether);
+        deposit = bound(deposit, 0.05 ether, 5 ether); // min 0.05 to cover 5% collateral on 1 ether amountIn
 
         bytes32 secret = keccak256(abi.encode("fuzz_slash", deposit));
         bytes32 hash = _hash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
@@ -1920,6 +1939,7 @@ contract CommitRevealAuctionTRP is Test {
 
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1);
         auction.settleBatch();
 
         uint256 treasuryBal = treasury.balance;
@@ -2149,9 +2169,9 @@ contract CommitRevealAuctionTRP is Test {
 
         bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
 
-        // 5% of 0.5 ETH = 0.025 ETH
+        // 5% of actual amountIn (1 ETH) = 0.05 ETH (collateral check at reveal uses actual amountIn)
         vm.prank(alice);
-        bytes32 commitId = auction.commitOrderToPool{value: 0.025 ether}(bytes32(0), hash, estimatedTradeValue);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.05 ether}(bytes32(0), hash, estimatedTradeValue);
 
         vm.warp(block.timestamp + 9);
 
@@ -2215,9 +2235,9 @@ contract CommitRevealAuctionTRP is Test {
 
         bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
 
-        // Legacy commitOrder: estimatedTradeValue=0, deposit=MIN_DEPOSIT
+        // Legacy commitOrder: estimatedTradeValue=0, deposit must cover 5% collateral
         vm.prank(alice);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(hash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(hash);
 
         vm.warp(block.timestamp + 9);
 
@@ -2286,7 +2306,10 @@ contract CommitRevealAuctionTRP is Test {
         bytes32 secret = keccak256(abi.encodePacked("r38_fuzz", estimate, amountIn));
         bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
 
-        uint256 requiredDeposit = auction.getRequiredDeposit(estimate);
+        // Deposit must cover collateral for the max tolerated amountIn (estimate * 2)
+        // because the collateral check at reveal uses actual amountIn, not estimate.
+        // For amountIn > estimate*2, tolerance check slashes first (before collateral check).
+        uint256 requiredDeposit = auction.getRequiredDeposit(estimate * 2);
 
         vm.prank(alice);
         bytes32 commitId = auction.commitOrderToPool{value: requiredDeposit}(bytes32(0), hash, estimate);

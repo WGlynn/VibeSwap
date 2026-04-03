@@ -1,17 +1,18 @@
-# Write-Ahead Log — CLEAN
+# Write-Ahead Log — ACTIVE
 
 ## Epoch
 - **Started**: 2026-04-03
-- **Ended**: 2026-04-03
-- **Intent**: TRP R44-R48 (5 rounds — all HIGHs closed + CrossChainRouter MEDs)
-- **Parent Commit**: `87b37a84`
-- **Tasks**: 5/5 rounds complete
+- **Intent**: TRP R49-R53 (5 rounds — N06 MED + test regressions)
+- **Parent Commit**: `a5f1e1af`
+- **Tasks**: 0/5 rounds complete
 - **Branch**: master
 
-## Final Summary
-- R44-R48 all resolved. 5 new fixes, 2 verified (already fixed). All compile clean.
-- CrossChainRouter.t.sol 41/41 passing.
-- Committed at `df4ed756`.
+## Round Plan
+| Round | Target | Finding | Severity |
+|-------|--------|---------|----------|
+| R49 | ShapleyDistributor | N06: Halving at creation vs settlement | MED |
+| R50-R51 | VibeAMM | 7 DonationAttackSuspected test failures | REGRESSION |
+| R52-R53 | CommitRevealAuction | 31 collateral enforcement test failures | REGRESSION |
 
 ## Recovery Notes
-_CLEAN session end. No in-flight work._
+_In-flight. If crash, resume from last completed round._

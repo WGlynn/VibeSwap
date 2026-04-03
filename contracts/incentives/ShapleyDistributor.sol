@@ -523,27 +523,18 @@ contract ShapleyDistributor is
             require(IERC20(token).balanceOf(address(this)) >= totalCommittedBalance[token] + totalValue, "Insufficient tokens for game");
         }
 
-        // Apply halving ONLY for TOKEN_EMISSION games (not fee distribution)
-        // Fee distribution is time-neutral: same work = same reward regardless of era
-        // See: docs/TIME_NEUTRAL_TOKENOMICS.md §4.1
-        uint256 adjustedValue = totalValue;
-        uint8 currentEra = getCurrentHalvingEra();
-
-        if (gameType == GameType.TOKEN_EMISSION && halvingEnabled && currentEra > 0) {
-            uint256 emissionMultiplier = getEmissionMultiplier(currentEra);
-            adjustedValue = (totalValue * emissionMultiplier) / PRECISION;
-
-            emit HalvingApplied(gameId, totalValue, adjustedValue, currentEra);
-        }
-
-        // TRP-R19-F02: Commit adjustedValue (post-halving), not totalValue.
-        // Previous code committed totalValue then set game.totalValue = adjustedValue,
-        // creating phantom committed balance that permanently locked funds.
-        totalCommittedBalance[token] += adjustedValue;
+        // TRP-R49-N06: Halving is now applied at SETTLEMENT, not creation.
+        // This prevents front-running at era boundaries (mass-creating games
+        // just before a halving to lock in higher rewards). The era that matters
+        // is the one active when the game settles, not when it's created.
+        //
+        // Commit the FULL totalValue. At settlement, computeShapleyValues applies
+        // halving and releases the surplus back to uncommitted balance.
+        totalCommittedBalance[token] += totalValue;
 
         games[gameId] = CooperativeGame({
             gameId: gameId,
-            totalValue: adjustedValue,
+            totalValue: totalValue,
             token: token,
             gameType: gameType,
             settled: false,
@@ -571,15 +562,17 @@ contract ShapleyDistributor is
         }
 
         // Update halving tracking
+        // Update halving tracking
         uint8 prevEra = totalGamesCreated > 0 ? uint8((totalGamesCreated - 1) / gamesPerEra) : 0;
         totalGamesCreated++;
 
         // Check if we crossed into a new era
-        if (currentEra > prevEra && currentEra <= MAX_HALVING_ERAS) {
-            emit HalvingEraChanged(currentEra, getEmissionMultiplier(currentEra), totalGamesCreated);
+        uint8 newEra = getCurrentHalvingEra();
+        if (newEra > prevEra && newEra <= MAX_HALVING_ERAS) {
+            emit HalvingEraChanged(newEra, getEmissionMultiplier(newEra), totalGamesCreated);
         }
 
-        emit GameCreated(gameId, adjustedValue, token, participants.length);
+        emit GameCreated(gameId, totalValue, token, participants.length);
     }
 
     /**
@@ -604,6 +597,29 @@ contract ShapleyDistributor is
         // ABC Conservation Gate: no settlement when curve is under stress
         _requireABCHealthy(gameId);
 
+        // TRP-R49-N06: Apply halving at SETTLEMENT, not creation.
+        // The era active NOW determines the multiplier, preventing front-running
+        // at era boundaries. FEE_DISTRIBUTION games are always time-neutral.
+        uint256 distributableValue = game.totalValue;
+        if (game.gameType == GameType.TOKEN_EMISSION && halvingEnabled) {
+            uint8 currentEra = getCurrentHalvingEra();
+            if (currentEra > 0) {
+                uint256 emissionMultiplier = getEmissionMultiplier(currentEra);
+                distributableValue = (game.totalValue * emissionMultiplier) / PRECISION;
+                emit HalvingApplied(gameId, game.totalValue, distributableValue, currentEra);
+            }
+        }
+
+        // Release surplus (rawValue - adjustedValue) from committed balance.
+        // These tokens remain in the contract but are no longer locked to this game.
+        uint256 surplus = game.totalValue - distributableValue;
+        if (surplus > 0 && totalCommittedBalance[game.token] >= surplus) {
+            totalCommittedBalance[game.token] -= surplus;
+        }
+
+        // Update game's effective value for claims
+        game.totalValue = distributableValue;
+
         // Step 1+2: Compute weights and proportional shares (scoped to free stack)
         Participant[] storage participants = gameParticipants[gameId];
         uint256 n = participants.length;
@@ -622,12 +638,12 @@ contract ShapleyDistributor is
 
             shares = new uint256[](n);
             for (uint256 i = 0; i < n; i++) {
-                shares[i] = (game.totalValue * weights[i]) / totalWeight;
+                shares[i] = (distributableValue * weights[i]) / totalWeight;
             }
         }
 
         // Step 3: Enforce Lawson Fairness Floor + Step 4: Force efficiency
-        _applyFloorAndEfficiency(game.totalValue, participants, weights, shares);
+        _applyFloorAndEfficiency(distributableValue, participants, weights, shares);
 
         // Final assignment
         for (uint256 i = 0; i < n; i++) {
@@ -727,6 +743,25 @@ contract ShapleyDistributor is
         // ABC Conservation Gate
         _requireABCHealthy(gameId);
 
+        // TRP-R49-N06: Apply halving at settlement (same as computeShapleyValues path)
+        uint256 rawValue = game.totalValue;
+        uint256 distributableValue = rawValue;
+        if (game.gameType == GameType.TOKEN_EMISSION && halvingEnabled) {
+            uint8 currentEra = getCurrentHalvingEra();
+            if (currentEra > 0) {
+                uint256 emissionMultiplier = getEmissionMultiplier(currentEra);
+                distributableValue = (rawValue * emissionMultiplier) / PRECISION;
+                emit HalvingApplied(gameId, rawValue, distributableValue, currentEra);
+            }
+        }
+
+        // Release surplus from committed balance
+        uint256 surplus = rawValue - distributableValue;
+        if (surplus > 0 && totalCommittedBalance[game.token] >= surplus) {
+            totalCommittedBalance[game.token] -= surplus;
+        }
+        game.totalValue = distributableValue;
+
         // Pull verified values — reverts inside verifier if not finalized
         (address[] memory participants, uint256[] memory values) =
             shapleyVerifier.getVerifiedValues(gameId);
@@ -735,26 +770,25 @@ contract ShapleyDistributor is
         Participant[] storage gamePs = gameParticipants[gameId];
         if (participants.length != gamePs.length) revert VerifierParticipantMismatch();
 
-        // TRP-R19-F06: Verify that sum of verifier values matches game totalValue.
-        // Without this, a verifier with a different totalPool could over-distribute
-        // (draining other games' funds) or under-distribute (locking funds).
+        // TRP-R19-F06: Verify that sum of verifier values matches raw game value.
+        // Verifier computes against the raw (pre-halving) value.
         {
             uint256 valueSum;
             for (uint256 j = 0; j < values.length; j++) {
                 valueSum += values[j];
             }
-            require(valueSum == game.totalValue, "TRP-R19-F06: Verifier total mismatch");
+            require(valueSum == rawValue, "TRP-R19-F06: Verifier total mismatch");
         }
 
-        // TRP-R19-F01: Verify that verifier-returned addresses match stored participants.
-        // Without this, a compromised verifier could redirect all rewards to arbitrary addresses.
-        // Assign verified Shapley values directly.
-        // The verifier already enforced efficiency (sum == totalPool),
-        // sanity (no value > totalPool), and Lawson floor (>= 1% average)
+        // TRP-R19-F01: Verify addresses match stored participants.
+        // TRP-R49-N06: Scale verifier values proportionally to halving-adjusted total.
         for (uint256 i = 0; i < participants.length; i++) {
             require(participants[i] == gamePs[i].participant, "TRP-R19-F01: Verifier address mismatch");
-            shapleyValues[gameId][participants[i]] = values[i];
-            emit ShapleyComputed(gameId, participants[i], values[i]);
+            uint256 scaledValue = rawValue > 0
+                ? (values[i] * distributableValue) / rawValue
+                : 0;
+            shapleyValues[gameId][participants[i]] = scaledValue;
+            emit ShapleyComputed(gameId, participants[i], scaledValue);
         }
 
         game.settled = true;

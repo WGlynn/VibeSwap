@@ -226,10 +226,12 @@ contract VibeAMMTest is Test {
         uint256 balanceA_before = tokenA.balanceOf(lp1);
         uint256 balanceB_before = tokenB.balanceOf(lp1);
 
+        // Remove 20% of liquidity (within 25% withdrawal breaker threshold)
+        uint256 removeAmount = liquidity / 5;
         vm.prank(lp1);
         (uint256 amount0, uint256 amount1) = amm.removeLiquidity(
             poolId,
-            liquidity,
+            removeAmount,
             0,
             0
         );
@@ -310,9 +312,10 @@ contract VibeAMMTest is Test {
         vm.prank(lp1);
         amm.addLiquidity(poolId, 100 ether, 100 ether, 0, 0);
 
-        // Transfer tokens to AMM for batch execution and sync balance
+        // Transfer tokens to AMM for batch execution
+        // NOTE: Do NOT syncTrackedBalance — executeBatchSwap pre-credits batch inflow
+        // to trackedBalances (TRP-R16-F03). Syncing first would double-count.
         tokenA.mint(address(amm), 20 ether);
-        amm.syncTrackedBalance(address(tokenA));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](2);
         orders[0] = IVibeAMM.SwapOrder({

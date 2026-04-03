@@ -486,16 +486,22 @@ contract ShapleyDistributorTest is Test {
         // Now in era 1
         assertEq(distributor.getCurrentHalvingEra(), 1);
 
-        // Create a TOKEN_EMISSION game — value should be halved
+        // Create a TOKEN_EMISSION game — value stored at full nominal (halving at settlement)
         uint256 nominalValue = 1 ether;
         ShapleyDistributor.Participant[] memory ps2 = _makeParticipants2(alice, 100 ether, bob, 100 ether);
         bytes32 halvingGame = keccak256("halvingGame");
         vm.prank(creator);
         distributor.createGameTyped(halvingGame, nominalValue, address(0), ShapleyDistributor.GameType.TOKEN_EMISSION, ps2);
 
-        (, uint256 storedValue, , , , ) = distributor.games(halvingGame);
-        // Era 1 => 50% emission multiplier => stored value = nominalValue / 2
-        assertEq(storedValue, nominalValue / 2);
+        // TRP-R49-N06: At creation, full value is stored (halving deferred to settlement)
+        (, uint256 storedValueBeforeSettle, , , , ) = distributor.games(halvingGame);
+        assertEq(storedValueBeforeSettle, nominalValue, "Pre-settlement: full value stored");
+
+        // Settle — halving applied at this point (era 1 => 50%)
+        distributor.computeShapleyValues(halvingGame);
+
+        (, uint256 storedValueAfterSettle, , , , ) = distributor.games(halvingGame);
+        assertEq(storedValueAfterSettle, nominalValue / 2, "Post-settlement: halving applied");
     }
 
     function test_feeDistribution_halvingDoesNotApply() public {

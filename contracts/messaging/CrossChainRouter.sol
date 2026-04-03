@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -18,7 +19,8 @@ import "../core/interfaces/ICommitRevealAuction.sol";
 contract CrossChainRouter is
     Initializable,
     OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
 
@@ -189,6 +191,9 @@ contract CrossChainRouter is
     /// @notice NEW-04: Emitted when escrowed ETH is claimed by the depositor on this chain.
     event ClaimableDepositClaimed(bytes32 indexed commitId, address indexed recipient, uint256 amount);
 
+    /// @dev TRP-R48-NEW05: Emitted when a liquidity sync is rejected for exceeding rate-of-change limits
+    event LiquiditySyncRejected(bytes32 indexed poolId, uint32 indexed srcEid, uint256 maxDelta);
+
     // ============ Errors ============
 
     error NotEndpoint();
@@ -239,6 +244,7 @@ contract CrossChainRouter is
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         require(_lzEndpoint != address(0), "Invalid endpoint");
         require(_auction != address(0), "Invalid auction");
@@ -269,21 +275,25 @@ contract CrossChainRouter is
      *      The actual deposit stays on the source chain auction contract.
      *      The destination chain uses depositAmount for bridged deposit bookkeeping.
      */
+    /// @dev TRP-R48-NEW10: Added `depositor` parameter so VibeSwapCore can pass the
+    ///      actual user address instead of recording itself (authorized caller) as depositor.
     function sendCommit(
         uint32 dstEid,
         bytes32 commitHash,
         uint256 depositAmount,
-        bytes calldata options
+        bytes calldata options,
+        address depositor
     ) external payable nonReentrant onlyAuthorized {
         bytes32 peer = peers[dstEid];
         if (peer == bytes32(0)) revert InvalidPeer();
+        require(depositor != address(0), "Invalid depositor");
 
         uint256 srcTimestamp = block.timestamp;
 
         // FIX #1 + TRP-R22-NEW02: Use localEid (not block.chainid) to match destination's commitId reconstruction.
         // block.chainid != localEid (EVM chain ID vs LayerZero endpoint ID).
         bytes32 commitId = keccak256(abi.encodePacked(
-            msg.sender,
+            depositor,
             commitHash,
             localEid,         // Must match _handleCommit's use of commit.srcChainId
             dstEid,           // Destination chain prevents replay on other chains
@@ -292,7 +302,7 @@ contract CrossChainRouter is
 
         CrossChainCommit memory commit = CrossChainCommit({
             commitHash: commitHash,
-            depositor: msg.sender,
+            depositor: depositor,
             depositAmount: depositAmount,  // TRP-R22-H03: Explicit deposit, not msg.value
             srcChainId: localEid,
             dstChainId: dstEid,
@@ -584,12 +594,10 @@ contract CrossChainRouter is
             return;
         }
 
-        // Determine how much ETH we can send for priority bid
-        // TRP-R34-NEW01: totalBridgedDeposits now only reflects real funded ETH held by router
-        uint256 availableEth = address(this).balance > totalBridgedDeposits
-            ? address(this).balance - totalBridgedDeposits
-            : 0;
-        uint256 priorityBidToSend = reveal.priorityBid > availableEth ? availableEth : reveal.priorityBid;
+        // TRP-R48-NEW07: Cross-chain priority bids are not supported until explicit
+        // user pre-funding is implemented. Previously, the router silently used its
+        // surplus ETH balance for priority bids the user never paid for.
+        uint256 priorityBidToSend = 0;
 
         ICommitRevealAuction auctionContract = ICommitRevealAuction(auction);
 
@@ -624,8 +632,34 @@ contract CrossChainRouter is
         emit BatchResultReceived(result.batchId, srcEid);
     }
 
+    /// @dev TRP-R48-NEW05: Rate-of-change validation prevents spoofed liquidity from a compromised peer.
+    ///      Rejects syncs where either reserve changes by >50% in a single update.
+    ///      First sync for a pool is accepted unconditionally.
     function _handleLiquiditySync(bytes memory payload, uint32 srcEid) internal {
         LiquiditySync memory sync = abi.decode(payload, (LiquiditySync));
+
+        LiquiditySync storage current = liquidityState[sync.poolId];
+
+        // If pool already has state, validate rate of change
+        if (current.totalLiquidity > 0) {
+            // Reject >50% change in either reserve (compromised peer protection)
+            uint256 maxDelta0 = current.reserve0 / 2;
+            uint256 maxDelta1 = current.reserve1 / 2;
+            uint256 delta0 = sync.reserve0 > current.reserve0
+                ? sync.reserve0 - current.reserve0
+                : current.reserve0 - sync.reserve0;
+            uint256 delta1 = sync.reserve1 > current.reserve1
+                ? sync.reserve1 - current.reserve1
+                : current.reserve1 - sync.reserve1;
+
+            if (delta0 > maxDelta0 || delta1 > maxDelta1) {
+                emit LiquiditySyncRejected(
+                    sync.poolId, srcEid,
+                    delta0 > delta1 ? delta0 : delta1
+                );
+                return; // Silently reject — don't revert the LZ message
+            }
+        }
 
         liquidityState[sync.poolId] = sync;
 
@@ -900,4 +934,9 @@ contract CrossChainRouter is
     // ============ Receive ============
 
     receive() external payable {}
+
+    // ============ UUPS Upgrade Authorization ============
+
+    /// @dev TRP-R45-INT01: Required for UUPSUpgradeable. Only owner can authorize upgrades.
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

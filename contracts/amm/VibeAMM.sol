@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -35,6 +36,7 @@ contract VibeAMM is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
+    UUPSUpgradeable,
     CircuitBreaker,
     IVibeAMM
 {
@@ -439,6 +441,7 @@ contract VibeAMM is
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
@@ -2650,4 +2653,9 @@ contract VibeAMM is
     ) external pure returns (uint256 goldenMean) {
         return FibonacciScaling.goldenRatioMean(bidPrice, askPrice);
     }
+
+    // ============ UUPS Upgrade Authorization ============
+
+    /// @dev TRP-R45-INT01: Required for UUPSUpgradeable. Only owner can authorize upgrades.
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

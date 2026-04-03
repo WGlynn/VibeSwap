@@ -82,7 +82,7 @@ contract MockCCRouter {
     bytes32 public lastCommitHash;
     uint32 public lastDstChainId;
 
-    function sendCommit(uint32 dstChainId, bytes32 commitHash, bytes calldata) external payable {
+    function sendCommit(uint32 dstChainId, bytes32 commitHash, uint256, bytes calldata, address) external payable {
         lastCommitHash = commitHash;
         lastDstChainId = dstChainId;
     }

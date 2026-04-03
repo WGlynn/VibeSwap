@@ -402,10 +402,12 @@ contract VibeIntentRouter is IVibeIntentRouter, Ownable, ReentrancyGuard {
         // Forward to CrossChainRouter (requires msg.value for LayerZero fees)
         (bool success,) = crossChainRouter.call{value: msg.value}(
             abi.encodeWithSignature(
-                "sendCommit(uint32,bytes32,bytes)",
+                "sendCommit(uint32,bytes32,uint256,bytes,address)",
                 dstEid,
                 commitHash,
-                options
+                intent.amountIn,
+                options,
+                msg.sender
             )
         );
         require(success, "Cross-chain commit failed");

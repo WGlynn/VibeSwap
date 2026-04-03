@@ -91,7 +91,7 @@ contract MockGovTreasury {
 }
 
 contract MockGovRouter {
-    function sendCommit(uint32, bytes32, bytes calldata) external payable {}
+    function sendCommit(uint32, bytes32, uint256, bytes calldata, address) external payable {}
     receive() external payable {}
 }
 

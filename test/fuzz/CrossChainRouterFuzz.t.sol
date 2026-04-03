@@ -116,7 +116,8 @@ contract CrossChainRouterFuzzTest is Test {
             CHAIN_B,
             keccak256("commit"),
             0.1 ether,
-            bytes("")
+            bytes(""),
+            caller
         );
     }
 
@@ -132,7 +133,8 @@ contract CrossChainRouterFuzzTest is Test {
             chainId,
             keccak256("commit"),
             0.1 ether,
-            bytes("")
+            bytes(""),
+            authorized
         );
     }
 

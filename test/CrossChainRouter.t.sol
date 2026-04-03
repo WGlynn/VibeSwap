@@ -119,7 +119,7 @@ contract CrossChainRouterTest is Test {
         bytes memory options = "";
 
         vm.prank(authorized);
-        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, options);
+        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, options, authorized);
 
         // Verify pending commit stored (commitId uses localEid, not block.chainid)
         bytes32 commitId = keccak256(abi.encodePacked(
@@ -143,7 +143,7 @@ contract CrossChainRouterTest is Test {
 
         vm.prank(authorized);
         vm.expectRevert(CrossChainRouter.InvalidPeer.selector);
-        router.sendCommit{value: 0.01 ether}(99, commitHash, 0.1 ether, ""); // Non-existent chain
+        router.sendCommit{value: 0.01 ether}(99, commitHash, 0.1 ether, "", authorized); // Non-existent chain
     }
 
     function test_sendCommit_unauthorized() public {
@@ -152,7 +152,7 @@ contract CrossChainRouterTest is Test {
         vm.deal(treasury, 1 ether);
         vm.prank(treasury);
         vm.expectRevert(CrossChainRouter.Unauthorized.selector);
-        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, "");
+        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, "", treasury);
     }
 
     // ============ Cross-Chain Reveal Tests ============
@@ -574,7 +574,7 @@ contract CrossChainRouterTest is Test {
         bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
         vm.store(address(router), fundedSlot, bytes32(uint256(1)));
         // Also set totalBridgedDeposits to 1 ether (slot 13)
-        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+        vm.store(address(router), bytes32(uint256(12)), bytes32(uint256(1 ether))); // slot 12 = totalBridgedDeposits
         // Ensure router has the ETH (setUp already gave it 10 ether)
 
         assertTrue(router.bridgedDepositFunded(commitId));
@@ -607,7 +607,7 @@ contract CrossChainRouterTest is Test {
         // Force funded state
         bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
         vm.store(address(router), fundedSlot, bytes32(uint256(1)));
-        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+        vm.store(address(router), bytes32(uint256(12)), bytes32(uint256(1 ether))); // slot 12 = totalBridgedDeposits
 
         vm.warp(block.timestamp + 24 hours + 1);
         vm.prank(authorized);
@@ -631,7 +631,7 @@ contract CrossChainRouterTest is Test {
 
         bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
         vm.store(address(router), fundedSlot, bytes32(uint256(1)));
-        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+        vm.store(address(router), bytes32(uint256(12)), bytes32(uint256(1 ether))); // slot 12 = totalBridgedDeposits
 
         vm.warp(block.timestamp + 24 hours + 1);
         vm.prank(authorized);
@@ -653,7 +653,7 @@ contract CrossChainRouterTest is Test {
 
         bytes32 fundedSlot = keccak256(abi.encode(commitId, uint256(11)));
         vm.store(address(router), fundedSlot, bytes32(uint256(1)));
-        vm.store(address(router), bytes32(uint256(13)), bytes32(uint256(1 ether)));
+        vm.store(address(router), bytes32(uint256(12)), bytes32(uint256(1 ether))); // slot 12 = totalBridgedDeposits
 
         vm.warp(block.timestamp + 24 hours + 1);
         vm.prank(authorized);
@@ -887,7 +887,8 @@ contract CrossChainRouterTest is Test {
         bytes32 commitHash = keccak256(abi.encodePacked(
             originalUser, tokenIn, tokenOut, amountIn, minAmountOut, secret
         ));
-        uint256 depositAmount = 0.01 ether;
+        // TRP-R46-F02: Deposit must cover 5% collateral on actual amountIn
+        uint256 depositAmount = 0.05 ether; // 5% of 1 ETH
 
         bytes32 routerCommitId = _simulateReceivedCommit(originalUser, commitHash, depositAmount);
         vm.prank(authorized);

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/ICommitRevealAuction.sol";
@@ -41,6 +42,7 @@ contract CommitRevealAuction is
     Initializable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
+    UUPSUpgradeable,
     ICommitRevealAuction
 {
     using DeterministicShuffle for bytes32[];
@@ -232,6 +234,7 @@ contract CommitRevealAuction is
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         treasury = _treasury;
         complianceRegistry = _complianceRegistry;
@@ -506,6 +509,17 @@ contract CommitRevealAuction is
             return;
         }
 
+        // TRP-R46-F02: Validate deposit covers actual trade collateral
+        // Closes gap where cross-chain commits (estimatedTradeValue=0) or
+        // under-2x estimates bypass collateral checks entirely
+        {
+            uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+            if (requiredCollateral > MIN_DEPOSIT && commitment.depositAmount < requiredCollateral) {
+                _slashCommitment(commitId);
+                return;
+            }
+        }
+
         // Verify priority bid payment
         if (priorityBid > 0) {
             if (msg.value < priorityBid) revert InsufficientPriorityBid();
@@ -609,6 +623,14 @@ contract CommitRevealAuction is
                 amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
                 _slashCommitment(commitId);
                 return;
+            }
+            // TRP-R46-F02: Validate deposit covers actual trade collateral
+            {
+                uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+                if (requiredCollateral > MIN_DEPOSIT && commitment.depositAmount < requiredCollateral) {
+                    _slashCommitment(commitId);
+                    return;
+                }
             }
             if (priorityBid > 0 && msg.value < priorityBid) revert InsufficientPriorityBid();
             commitment.status = CommitStatus.REVEALED;
@@ -929,6 +951,16 @@ contract CommitRevealAuction is
             amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
             _slashCommitment(commitId);
             return;
+        }
+
+        // TRP-R46-F02: Validate deposit covers actual trade collateral
+        // Critical for cross-chain where estimatedTradeValue=0 bypasses R38
+        {
+            uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+            if (requiredCollateral > MIN_DEPOSIT && commitment.depositAmount < requiredCollateral) {
+                _slashCommitment(commitId);
+                return;
+            }
         }
 
         commitment.status = CommitStatus.REVEALED;
@@ -1532,4 +1564,9 @@ contract CommitRevealAuction is
      * @notice Receive function for deposits
      */
     receive() external payable {}
+
+    // ============ UUPS Upgrade Authorization ============
+
+    /// @dev TRP-R45-INT01: Required for UUPSUpgradeable. Only owner can authorize upgrades.
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

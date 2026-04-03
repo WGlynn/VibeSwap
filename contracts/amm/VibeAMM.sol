@@ -784,7 +784,8 @@ contract VibeAMM is
                 clearingPrice: 0,
                 totalTokenInSwapped: 0,
                 totalTokenOutSwapped: 0,
-                protocolFees: 0
+                protocolFees: 0,
+                batchFeeRate: 0
             });
         }
 
@@ -864,6 +865,8 @@ contract VibeAMM is
         if ((protectionFlags & FLAG_TRUE_PRICE) != 0 && address(truePriceOracle) != address(0)) {
             batchFeeRate = _computeTruePriceFeeSurcharge(poolId, baseFee);
         }
+        // INT-R1-INT001: Return actual fee rate so Core's SEC-1 detection uses the correct model
+        result.batchFeeRate = batchFeeRate;
 
         // Execute each order at clearing price
         for (uint256 i = 0; i < orders.length;) {
@@ -1508,17 +1511,22 @@ contract VibeAMM is
             address tokenOut = isToken0 ? pool.token1 : pool.token0;
             IERC20(tokenOut).safeTransfer(order.trader, amountOut);
 
-            // Update reserves: full amountIn added to reserveIn (fee stays in pool as LP benefit).
-            // Protocol fee share tracked in accumulatedFees (paid from contract balance on collectFees).
+            // INT-R1-INT002: Subtract protocolFee from reserves. The LP fee portion stays in
+            // reserves (LP benefit), but protocolFee is tracked separately in accumulatedFees
+            // and transferred out via collectFees(). Adding full amountIn to reserves AND
+            // tracking protocolFee in accumulatedFees double-counts the protocol's share,
+            // causing reserve insolvency after fee collection.
+            uint256 reserveCredit = amountIn - protocolFee;
             if (isToken0) {
-                pool.reserve0 += amountIn;
+                pool.reserve0 += reserveCredit;
                 pool.reserve1 -= amountOut;
             } else {
-                pool.reserve1 += amountIn;
+                pool.reserve1 += reserveCredit;
                 pool.reserve0 -= amountOut;
             }
 
             // Track protocol fees — route surcharge surplus to insurance pool
+            // INT-R1-INT002: Fix parameter semantics — tokenIn is the fee token in input-fee model
             _trackProtocolFees(pid, order.tokenIn, feeRate, pool.feeRate, amountIn, protocolFee);
 
             emit SwapExecuted(pid, order.trader, order.tokenIn, tokenOut, amountIn, amountOut);

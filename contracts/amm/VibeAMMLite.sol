@@ -208,11 +208,12 @@ contract VibeAMMLite is
     function executeBatchSwap(
         bytes32 poolId, uint64 batchId, SwapOrder[] calldata orders
     ) external nonReentrant onlyAuthorizedExecutor poolExists(poolId) notPaused brkOk(_VOL) returns (BatchSwapResult memory result) {
-        if (orders.length == 0) return BatchSwapResult(0, 0, 0, 0);
+        if (orders.length == 0) return BatchSwapResult(0, 0, 0, 0, 0);
         Pool storage pool = pools[poolId];
         (uint256[] memory buys, uint256[] memory sells) = _catOrders(orders, pool.token0, pool.reserve0, pool.reserve1);
         (uint256 cp, ) = BatchMath.calculateClearingPrice(buys, sells, pool.reserve0, pool.reserve1);
         result.clearingPrice = cp;
+        result.batchFeeRate = pool.feeRate;
         for (uint256 i = 0; i < orders.length; i++) {
             (uint256 ai, uint256 ao, uint256 f) = _batchSwap(pool, orders[i], cp);
             result.totalTokenInSwapped += ai; result.totalTokenOutSwapped += ao; result.protocolFees += f;

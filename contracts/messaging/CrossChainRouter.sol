@@ -159,9 +159,14 @@ contract CrossChainRouter is
     /// @dev TRP-R21-H01: block.chainid != LayerZero eid. Must use eid for cross-chain checks.
     uint32 public localEid;
 
+    /// @notice INT-R1-XC001: Maps routerCommitId → CRA commitId after funding.
+    /// @dev The Router and CRA derive commitIds from different inputs. After fundBridgedDeposit
+    ///      calls CRA.commitOrderCrossChain, the CRA returns its own commitId. We store the
+    ///      mapping so _handleReveal can translate and call CRA with the correct ID.
+    mapping(bytes32 => bytes32) public craCommitIds;
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 2 for claimableDeposits + claimableDepositOwner)
-    uint256[48] private __gap;
+    /// @dev Reserved storage gap for future upgrades (reduced by 3 for claimableDeposits + claimableDepositOwner + craCommitIds)
+    uint256[47] private __gap;
 
     // ============ Events ============
 
@@ -563,14 +568,17 @@ contract CrossChainRouter is
         bridgedDepositFunded[commitId] = true;
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
-        // TRP-R22-NEW08: Clean up pendingCommits after funding to prevent reveal replay
-        delete pendingCommits[commitId];
+        // INT-R1-XC002: Do NOT delete pendingCommits here. _handleReveal needs commit.depositor
+        // for ownership verification. The bridgedDepositFunded flag prevents double-funding.
 
         // TRP-R35-NEW03: Use commitOrderCrossChain to preserve original user as depositor
-        ICommitRevealAuction(auction).commitOrderCrossChain{value: depositAmount}(
+        // INT-R1-XC001: Capture CRA's commitId (derived from batchId + block.timestamp)
+        // and store the mapping so _handleReveal can translate routerCommitId → craCommitId.
+        bytes32 craCommitId = ICommitRevealAuction(auction).commitOrderCrossChain{value: depositAmount}(
             commit.depositor,
             commit.commitHash
         );
+        craCommitIds[commitId] = craCommitId;
 
         emit BridgedDepositFunded(commitId, depositAmount);
 
@@ -584,13 +592,24 @@ contract CrossChainRouter is
     function _handleReveal(bytes memory payload, uint32 srcEid) internal {
         CrossChainReveal memory reveal = abi.decode(payload, (CrossChainReveal));
 
-        // FIX: Get the original depositor from pending commits for ownership verification
+        // INT-R1-XC002: Get depositor from pendingCommits (no longer deleted in fundBridgedDeposit)
         CrossChainCommit memory commit = pendingCommits[reveal.commitId];
 
-        // FIX #2: Only process reveals for commits we've received and funded
-        // If commit.depositor is zero, this reveal is invalid
+        // Verify commit exists and has been funded
         if (commit.depositor == address(0)) {
             emit CrossChainRevealFailed(reveal.commitId, srcEid, "Unknown commit");
+            return;
+        }
+        if (!bridgedDepositFunded[reveal.commitId]) {
+            emit CrossChainRevealFailed(reveal.commitId, srcEid, "Commit not yet funded");
+            return;
+        }
+
+        // INT-R1-XC001: Translate routerCommitId → CRA commitId for the reveal call.
+        // The CRA stores commitments under its own derived ID, not the router's.
+        bytes32 craCommitId = craCommitIds[reveal.commitId];
+        if (craCommitId == bytes32(0)) {
+            emit CrossChainRevealFailed(reveal.commitId, srcEid, "No CRA commit mapping");
             return;
         }
 
@@ -601,9 +620,9 @@ contract CrossChainRouter is
 
         ICommitRevealAuction auctionContract = ICommitRevealAuction(auction);
 
-        // FIX: Use revealOrderCrossChain which allows revealing on behalf of original depositor
+        // Use revealOrderCrossChain with the CRA's commitId (not the router's)
         try auctionContract.revealOrderCrossChain{value: priorityBidToSend}(
-            reveal.commitId,
+            craCommitId,          // INT-R1-XC001: Use CRA's commitId
             commit.depositor,     // Original depositor from our records
             reveal.tokenIn,
             reveal.tokenOut,
@@ -612,7 +631,8 @@ contract CrossChainRouter is
             reveal.secret,
             priorityBidToSend
         ) {
-            // Success
+            // Clean up pendingCommits after successful reveal (not before)
+            delete pendingCommits[reveal.commitId];
         } catch {
             // If reveal fails, log but don't revert the whole message
             emit CrossChainRevealFailed(reveal.commitId, srcEid, "Reveal rejected");

@@ -32,6 +32,7 @@ interface IVibeAMM {
         uint256 totalTokenInSwapped;
         uint256 totalTokenOutSwapped;
         uint256 protocolFees;
+        uint256 batchFeeRate; // INT-R1-INT001: Actual fee rate applied (includes surcharge)
     }
 
     // ============ Events ============

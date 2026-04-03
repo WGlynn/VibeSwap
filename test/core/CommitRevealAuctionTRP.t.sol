@@ -1883,4 +1883,219 @@ contract CommitRevealAuctionTRP is Test {
 
         assertEq(required, expected);
     }
+
+    // ============================================================
+    // TRP-R38: COLLATERAL UNDERPRICING FIXES
+    // ============================================================
+
+    /// @notice TRP-R38: estimatedTradeValue is stored in commitment
+    function test_R38_estimatedTradeValueStored() public {
+        bytes32 secret = keccak256("r38_stored");
+        bytes32 hash = _hash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
+
+        // Commit with estimatedTradeValue = 10 ether (requires 0.5 ETH collateral)
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.5 ether}(bytes32(0), hash, 10 ether);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(c.estimatedTradeValue, 10 ether, "estimatedTradeValue should be stored");
+        assertEq(c.depositAmount, 0.5 ether, "deposit should be 0.5 ETH");
+    }
+
+    /// @notice TRP-R38: legacy commitOrder stores estimatedTradeValue=0
+    function test_R38_legacyCommitStoresZeroEstimate() public {
+        bytes32 secret = keccak256("r38_legacy");
+        bytes32 hash = _hash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
+
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(hash);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(c.estimatedTradeValue, 0, "legacy commitOrder should store 0 estimate");
+    }
+
+    /// @notice TRP-R38: Reveal within tolerance succeeds (amountIn <= estimate * 2)
+    function test_R38_revealWithinToleranceSucceeds() public {
+        bytes32 secret = keccak256("r38_ok");
+        uint256 amountIn = 1 ether;
+        uint256 estimatedTradeValue = 1 ether; // amountIn == estimate, well within 2x
+
+        bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
+
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.05 ether}(bytes32(0), hash, estimatedTradeValue);
+
+        // Move to reveal phase
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.REVEALED), "Should be REVEALED");
+    }
+
+    /// @notice TRP-R38: Reveal at exact 2x tolerance succeeds
+    function test_R38_revealAtExact2xToleranceSucceeds() public {
+        bytes32 secret = keccak256("r38_edge");
+        uint256 estimatedTradeValue = 0.5 ether;
+        uint256 amountIn = 1 ether; // exactly 2x estimate — should pass
+
+        bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
+
+        // 5% of 0.5 ETH = 0.025 ETH
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.025 ether}(bytes32(0), hash, estimatedTradeValue);
+
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.REVEALED), "2x edge should pass");
+    }
+
+    /// @notice TRP-R38: Reveal exceeding 2x tolerance is SLASHED
+    function test_R38_revealExceedingToleranceSlashed() public {
+        bytes32 secret = keccak256("r38_slash");
+        uint256 estimatedTradeValue = 0.5 ether;
+        uint256 amountIn = 1.01 ether; // just over 2x estimate — should be slashed
+
+        bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
+
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.025 ether}(bytes32(0), hash, estimatedTradeValue);
+
+        vm.warp(block.timestamp + 9);
+
+        uint256 treasuryBalBefore = treasury.balance;
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.SLASHED), "Should be SLASHED");
+
+        // 50% of deposit slashed to treasury
+        uint256 expectedSlash = (0.025 ether * 5000) / 10000;
+        assertEq(treasury.balance - treasuryBalBefore, expectedSlash, "Treasury should receive slash");
+    }
+
+    /// @notice TRP-R38: Massive overshoot (100x estimate) is slashed
+    function test_R38_massiveOvershootSlashed() public {
+        bytes32 secret = keccak256("r38_huge");
+        uint256 estimatedTradeValue = 0.01 ether;
+        uint256 amountIn = 100 ether; // 10000x estimate
+
+        bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
+
+        // MIN_DEPOSIT = 0.001 ether (5% of 0.01 = 0.0005, below floor)
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.001 ether}(bytes32(0), hash, estimatedTradeValue);
+
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.SLASHED), "100x overshoot must slash");
+    }
+
+    /// @notice TRP-R38: Legacy commitOrder (estimatedTradeValue=0) skips tolerance check
+    function test_R38_legacyCommitSkipsToleranceCheck() public {
+        bytes32 secret = keccak256("r38_legacy_reveal");
+        uint256 amountIn = 1 ether;
+
+        bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
+
+        // Legacy commitOrder: estimatedTradeValue=0, deposit=MIN_DEPOSIT
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(hash);
+
+        vm.warp(block.timestamp + 9);
+
+        // Reveal should succeed — tolerance check is skipped when estimate=0
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.REVEALED), "Legacy should still reveal OK");
+    }
+
+    /// @notice TRP-R38: ESTIMATE_TOLERANCE_X constant is 2
+    function test_R38_estimateToleranceConstant() public view {
+        assertEq(auction.ESTIMATE_TOLERANCE_X(), 2, "ESTIMATE_TOLERANCE_X should be 2");
+    }
+
+    /// @notice TRP-R38: Spam attack scenario — low-collateral griefing blocked
+    function test_R38_spamGriefingBlocked() public {
+        // Attacker tries to submit 1000 ETH trade with tiny collateral
+        bytes32 secret = keccak256("r38_spam");
+        uint256 estimatedTradeValue = 0.01 ether; // lie about trade size
+        uint256 realAmountIn = 1000 ether; // actual trade much bigger
+
+        bytes32 hash = _hash(alice, tokenA, tokenB, realAmountIn, 900 ether, secret);
+
+        // Attacker pays only MIN_DEPOSIT (0.001 ETH)
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.001 ether}(bytes32(0), hash, estimatedTradeValue);
+
+        vm.warp(block.timestamp + 9);
+
+        // When revealing the real amount, it's 100000x the estimate — slashed
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, realAmountIn, 900 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.SLASHED), "Spam griefing should be slashed");
+    }
+
+    /// @notice TRP-R38: Cross-chain reveal also enforces estimate tolerance
+    function test_R38_crossChainRevealEnforcesTolerance() public {
+        bytes32 secret = keccak256("r38_xchain");
+        uint256 estimatedTradeValue = 1 ether;
+        uint256 amountIn = 3 ether; // 3x estimate > 2x tolerance
+
+        bytes32 hash = keccak256(abi.encodePacked(alice, tokenA, tokenB, amountIn, uint256(0.9 ether), secret));
+
+        // Alice commits via commitOrderToPool
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: 0.05 ether}(bytes32(0), hash, estimatedTradeValue);
+
+        vm.warp(block.timestamp + 9);
+
+        // Authorized settler reveals on behalf of alice — should be slashed
+        auction.revealOrderCrossChain(commitId, alice, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+        assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.SLASHED), "Cross-chain should enforce tolerance");
+    }
+
+    /// @notice TRP-R38 Fuzz: amountIn <= estimate*2 always reveals, > always slashes
+    function testFuzz_R38_toleranceEnforcement(uint256 estimate, uint256 amountIn) public {
+        estimate = bound(estimate, 0.02 ether, 100 ether); // min 0.02 ETH to keep collateral > MIN_DEPOSIT
+        amountIn = bound(amountIn, 0.001 ether, 1000 ether);
+
+        bytes32 secret = keccak256(abi.encodePacked("r38_fuzz", estimate, amountIn));
+        bytes32 hash = _hash(alice, tokenA, tokenB, amountIn, 0.9 ether, secret);
+
+        uint256 requiredDeposit = auction.getRequiredDeposit(estimate);
+
+        vm.prank(alice);
+        bytes32 commitId = auction.commitOrderToPool{value: requiredDeposit}(bytes32(0), hash, estimate);
+
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(alice);
+        auction.revealOrder(commitId, tokenA, tokenB, amountIn, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory c = auction.getCommitment(commitId);
+
+        if (amountIn > estimate * 2) {
+            assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.SLASHED), "Over 2x must slash");
+        } else {
+            assertEq(uint8(c.status), uint8(ICommitRevealAuction.CommitStatus.REVEALED), "Within 2x must reveal");
+        }
+    }
 }

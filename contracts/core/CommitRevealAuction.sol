@@ -78,6 +78,7 @@ contract CommitRevealAuction is
     error TradeSizeExceeded();
     error FlashLoanDetected();
     error NoRefundPending();
+    error EstimateExceeded();
 
     // ============ Protocol Constants (Uniform Fairness) ============
     // These are FIXED for all pools - they define HOW trading works
@@ -99,6 +100,11 @@ contract CommitRevealAuction is
     /// @notice Collateral as basis points of trade value (PROTOCOL CONSTANT)
     /// @dev 5% collateral required for all trades
     uint256 public constant COLLATERAL_BPS = 500; // 5%
+
+    /// @notice Maximum allowed ratio of amountIn to estimatedTradeValue at reveal (PROTOCOL CONSTANT)
+    /// @dev 2x tolerance — amountIn can be at most 2x the declared estimate.
+    ///      If exceeded, the commitment is slashed. Prevents collateral underpricing.
+    uint256 public constant ESTIMATE_TOLERANCE_X = 2;
 
     /// @notice Slash rate for invalid/unrevealed commits (PROTOCOL CONSTANT)
     /// @dev 50% penalty - strong incentive to reveal honestly
@@ -390,6 +396,7 @@ contract CommitRevealAuction is
             poolId: poolId,
             batchId: _currentBatchId,
             depositAmount: msg.value,
+            estimatedTradeValue: estimatedTradeValue,
             depositor: msg.sender,
             status: CommitStatus.COMMITTED
         });
@@ -441,6 +448,14 @@ contract CommitRevealAuction is
 
         if (expectedHash != commitment.commitHash) {
             // Invalid reveal - slash deposit
+            _slashCommitment(commitId);
+            return;
+        }
+
+        // TRP-R38: Validate amountIn against declared estimatedTradeValue
+        // Prevents collateral underpricing: user can't declare tiny estimate then reveal huge trade
+        if (commitment.estimatedTradeValue > 0 &&
+            amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
             _slashCommitment(commitId);
             return;
         }
@@ -543,6 +558,12 @@ contract CommitRevealAuction is
                 msg.sender, tokenIn, tokenOut, amountIn, minAmountOut, secret
             ));
             if (expectedHash != commitment.commitHash) { _slashCommitment(commitId); return; }
+            // TRP-R38: Validate amountIn against declared estimatedTradeValue
+            if (commitment.estimatedTradeValue > 0 &&
+                amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
+                _slashCommitment(commitId);
+                return;
+            }
             if (priorityBid > 0 && msg.value < priorityBid) revert InsufficientPriorityBid();
             commitment.status = CommitStatus.REVEALED;
         }
@@ -845,6 +866,13 @@ contract CommitRevealAuction is
         ));
 
         if (expectedHash != commitment.commitHash) {
+            _slashCommitment(commitId);
+            return;
+        }
+
+        // TRP-R38: Validate amountIn against declared estimatedTradeValue
+        if (commitment.estimatedTradeValue > 0 &&
+            amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
             _slashCommitment(commitId);
             return;
         }

@@ -171,7 +171,7 @@ contract ShapleyInvariantTest is StdInvariant, Test {
             if (!distributor.isGameSettled(gameId)) continue;
 
             ShapleyDistributor.Participant[] memory participants = distributor.getGameParticipants(gameId);
-            (,uint256 totalValue,,,) = distributor.games(gameId);
+            (,uint256 totalValue,,,,) = distributor.games(gameId);
 
             uint256 sumShapley = 0;
             for (uint256 i = 0; i < participants.length; i++) {
@@ -233,7 +233,7 @@ contract ShapleyInvariantTest is StdInvariant, Test {
             if (!distributor.isGameSettled(gameId)) continue;
 
             ShapleyDistributor.Participant[] memory participants = distributor.getGameParticipants(gameId);
-            (,uint256 totalValue,,,) = distributor.games(gameId);
+            (,uint256 totalValue,,,,) = distributor.games(gameId);
 
             for (uint256 i = 0; i < participants.length; i++) {
                 uint256 share = distributor.getShapleyValue(gameId, participants[i].participant);

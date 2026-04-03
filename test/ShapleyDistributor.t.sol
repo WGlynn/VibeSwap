@@ -19,6 +19,10 @@ contract ShapleyDistributorTest is Test {
     ShapleyDistributor public distributor;
     MockRewardToken public token;
 
+    // Allow this contract to receive ETH (needed for reclaimExpiredRewards tests
+    // where owner == address(this))
+    receive() external payable {}
+
     address public owner;
     address public creator;
     address public alice;
@@ -137,7 +141,7 @@ contract ShapleyDistributorTest is Test {
         emit GameCreated(GAME_1, value, address(0), 2);
         distributor.createGame(GAME_1, value, address(0), ps);
 
-        (bytes32 gId, uint256 totalVal, address tok, , bool settled) = distributor.games(GAME_1);
+        (bytes32 gId, uint256 totalVal, address tok, , bool settled, ) = distributor.games(GAME_1);
         assertEq(gId, GAME_1);
         assertEq(totalVal, value);
         assertEq(tok, address(0));
@@ -215,7 +219,7 @@ contract ShapleyDistributorTest is Test {
         vm.prank(creator);
         distributor.createGame(GAME_1, value, address(token), ps);
 
-        (, uint256 totalVal, address tok, , ) = distributor.games(GAME_1);
+        (, uint256 totalVal, address tok, , , ) = distributor.games(GAME_1);
         assertEq(totalVal, value);
         assertEq(tok, address(token));
     }
@@ -489,7 +493,7 @@ contract ShapleyDistributorTest is Test {
         vm.prank(creator);
         distributor.createGameTyped(halvingGame, nominalValue, address(0), ShapleyDistributor.GameType.TOKEN_EMISSION, ps2);
 
-        (, uint256 storedValue, , , ) = distributor.games(halvingGame);
+        (, uint256 storedValue, , , , ) = distributor.games(halvingGame);
         // Era 1 => 50% emission multiplier => stored value = nominalValue / 2
         assertEq(storedValue, nominalValue / 2);
     }
@@ -520,7 +524,7 @@ contract ShapleyDistributorTest is Test {
         vm.prank(creator);
         distributor.createGame(feeGame, nominalValue, address(0), ps2); // createGame defaults to FEE_DISTRIBUTION
 
-        (, uint256 storedValue, , , ) = distributor.games(feeGame);
+        (, uint256 storedValue, , , , ) = distributor.games(feeGame);
         assertEq(storedValue, nominalValue); // No halving for fee distribution
     }
 
@@ -831,7 +835,7 @@ contract ShapleyDistributorTest is Test {
         assertEq(distributor.totalCommittedBalance(address(0)), 0, "committed balance must be 0 after cancel");
 
         // game is marked settled (re-cancellation guard) and totalValue zeroed
-        (, uint256 totalVal, , , bool settled) = distributor.games(GAME_1);
+        (, uint256 totalVal, , , bool settled, ) = distributor.games(GAME_1);
         assertTrue(settled, "game must be marked settled after cancel");
         assertEq(totalVal, 0, "game totalValue must be 0 after cancel");
     }
@@ -912,5 +916,280 @@ contract ShapleyDistributorTest is Test {
     function test_n02_cancelStaleGame_gameNotFoundReverts() public {
         vm.expectRevert("Game not found");
         distributor.cancelStaleGame(GAME_1);
+    }
+
+    // ============ N02: Claim Window & reclaimExpiredRewards ============
+
+    event ExpiredRewardsReclaimed(bytes32 indexed gameId, uint256 amount, address token, address recipient);
+    event ClaimWindowUpdated(uint256 claimWindow);
+
+    /**
+     * @notice N02 — claimDeadline is set on settlement, and participants can claim within the window.
+     */
+    function test_n02_claimDeadline_setOnSettlement() public {
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+
+        uint256 before = block.timestamp;
+        distributor.computeShapleyValues(GAME_1);
+
+        (,,,,, uint64 deadline) = distributor.games(GAME_1);
+        assertEq(deadline, before + distributor.claimWindow(), "deadline should be settlement time + claimWindow");
+    }
+
+    /**
+     * @notice N02 — participant can successfully claim before the deadline.
+     */
+    function test_n02_claim_succeeds_before_deadline() public {
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // Warp to just before deadline
+        vm.warp(block.timestamp + distributor.claimWindow() - 1);
+
+        // Claim should succeed
+        vm.prank(alice);
+        distributor.claimReward(GAME_1);
+        assertGt(alice.balance, 0, "alice should have received ETH");
+    }
+
+    /**
+     * @notice N02 — participant cannot claim after the deadline; gets ClaimWindowExpired.
+     */
+    function test_n02_claim_reverts_after_deadline() public {
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // Warp past deadline
+        vm.warp(block.timestamp + distributor.claimWindow() + 1);
+
+        vm.prank(alice);
+        vm.expectRevert(ShapleyDistributor.ClaimWindowExpired.selector);
+        distributor.claimReward(GAME_1);
+    }
+
+    /**
+     * @notice N02 — reclaimExpiredRewards reverts before deadline passes.
+     */
+    function test_n02_reclaimExpiredRewards_reverts_before_deadline() public {
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // Not yet expired
+        vm.expectRevert(ShapleyDistributor.ClaimWindowNotExpired.selector);
+        distributor.reclaimExpiredRewards(GAME_1);
+    }
+
+    /**
+     * @notice N02 — reclaimExpiredRewards sweeps all unclaimed ETH to owner after deadline.
+     *         Participants who already claimed are excluded from the sweep.
+     */
+    function test_n02_reclaimExpiredRewards_eth_sweepToOwner() public {
+        uint256 value = 2 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        uint256 aliceVal = distributor.getShapleyValue(GAME_1, alice);
+        uint256 bobVal   = distributor.getShapleyValue(GAME_1, bob);
+
+        // Alice claims before deadline
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(alice);
+        distributor.claimReward(GAME_1);
+
+        // Advance past deadline
+        vm.warp(block.timestamp + distributor.claimWindow() + 1);
+
+        uint256 ownerBefore = owner.balance;
+
+        vm.expectEmit(true, false, false, true);
+        emit ExpiredRewardsReclaimed(GAME_1, bobVal, address(0), owner);
+        uint256 reclaimed = distributor.reclaimExpiredRewards(GAME_1);
+
+        assertEq(reclaimed, bobVal, "reclaimed amount should equal bob's unclaimed share");
+        assertEq(owner.balance, ownerBefore + bobVal, "owner should receive bob's unclaimed ETH");
+        assertEq(alice.balance, aliceVal, "alice's prior claim should be unaffected");
+    }
+
+    /**
+     * @notice N02 — reclaimExpiredRewards works for ERC20 tokens.
+     */
+    function test_n02_reclaimExpiredRewards_erc20() public {
+        uint256 value = 1000e18;
+        token.mint(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants3(alice, bob, carol);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(token), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        uint256 aliceVal = distributor.getShapleyValue(GAME_1, alice);
+
+        // Alice claims immediately
+        vm.prank(alice);
+        distributor.claimReward(GAME_1);
+
+        // Bob and Carol never claim — advance past deadline
+        vm.warp(block.timestamp + distributor.claimWindow() + 1);
+
+        uint256 ownerBefore = token.balanceOf(owner);
+        uint256 reclaimed = distributor.reclaimExpiredRewards(GAME_1);
+
+        // Reclaimed should be bob's + carol's shares
+        assertEq(reclaimed, value - aliceVal, "should reclaim all unclaimed tokens");
+        assertEq(token.balanceOf(owner), ownerBefore + reclaimed, "owner should receive ERC20 tokens");
+    }
+
+    /**
+     * @notice N02 — reclaimExpiredRewards is owner-only.
+     */
+    function test_n02_reclaimExpiredRewards_onlyOwner() public {
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        vm.warp(block.timestamp + distributor.claimWindow() + 1);
+
+        vm.prank(alice);
+        vm.expectRevert();
+        distributor.reclaimExpiredRewards(GAME_1);
+    }
+
+    /**
+     * @notice N02 — reclaimExpiredRewards reverts if all participants already claimed.
+     *         Returns 0 gracefully (no ETH transfer for 0 amount).
+     */
+    function test_n02_reclaimExpiredRewards_allClaimed_returnsZero() public {
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // Both claim before deadline
+        vm.prank(alice); distributor.claimReward(GAME_1);
+        vm.prank(bob);   distributor.claimReward(GAME_1);
+
+        // Advance past deadline
+        vm.warp(block.timestamp + distributor.claimWindow() + 1);
+
+        uint256 reclaimed = distributor.reclaimExpiredRewards(GAME_1);
+        assertEq(reclaimed, 0, "nothing to reclaim if all claimed");
+    }
+
+    /**
+     * @notice N02 — reclaimExpiredRewards reverts when claimWindow == 0 (expiry disabled).
+     */
+    function test_n02_reclaimExpiredRewards_reverts_when_window_disabled() public {
+        // Disable claim window
+        distributor.setClaimWindow(0);
+        assertEq(distributor.claimWindow(), 0);
+
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // claimDeadline should be 0 (not set) since window was 0 at settlement
+        (,,,,, uint64 deadline) = distributor.games(GAME_1);
+        assertEq(deadline, 0, "no deadline should be set when window disabled");
+
+        // Even after a long time
+        vm.warp(block.timestamp + 365 days);
+
+        // Should revert with ClaimWindowDisabled, not ClaimWindowNotExpired
+        vm.expectRevert(ShapleyDistributor.ClaimWindowDisabled.selector);
+        distributor.reclaimExpiredRewards(GAME_1);
+    }
+
+    /**
+     * @notice N02 — when window is disabled (0), participants can claim at any time.
+     */
+    function test_n02_noDeadline_when_window_disabled() public {
+        // Disable claim window
+        distributor.setClaimWindow(0);
+
+        uint256 value = 1 ether;
+        vm.deal(address(distributor), value);
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // Warp far into the future — should still be claimable
+        vm.warp(block.timestamp + 3650 days);
+
+        // Claim must succeed (no deadline set)
+        vm.prank(alice);
+        distributor.claimReward(GAME_1); // must not revert
+        assertGt(alice.balance, 0);
+    }
+
+    /**
+     * @notice N02 — setClaimWindow enforces minimum 7-day window to prevent griefing.
+     */
+    function test_n02_setClaimWindow_minimumEnforced() public {
+        // 0 is allowed (disables expiry)
+        distributor.setClaimWindow(0);
+        assertEq(distributor.claimWindow(), 0);
+
+        // 7 days exactly is allowed
+        distributor.setClaimWindow(7 days);
+        assertEq(distributor.claimWindow(), 7 days);
+
+        // Less than 7 days reverts
+        vm.expectRevert("Claim window must be 0 or >= 7 days");
+        distributor.setClaimWindow(6 days);
+    }
+
+    /**
+     * @notice N02 — setClaimWindow is owner-only.
+     */
+    function test_n02_setClaimWindow_onlyOwner() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        distributor.setClaimWindow(30 days);
+    }
+
+    /**
+     * @notice N02 — setClaimWindow emits ClaimWindowUpdated.
+     */
+    function test_n02_setClaimWindow_emitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit ClaimWindowUpdated(180 days);
+        distributor.setClaimWindow(180 days);
     }
 }

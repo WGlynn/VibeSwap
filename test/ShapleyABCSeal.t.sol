@@ -198,7 +198,7 @@ contract ShapleyABCSealTest is Test {
         distributor.createGame(gameId, 100e18, address(rewardToken), participants);
 
         // Verify game was created
-        (bytes32 storedId, uint256 totalValue,,,) = distributor.games(gameId);
+        (bytes32 storedId, uint256 totalValue,,,,) = distributor.games(gameId);
         assertEq(storedId, gameId, "Game ID should match");
         assertEq(totalValue, 100e18, "Total value should match");
     }
@@ -234,7 +234,7 @@ contract ShapleyABCSealTest is Test {
         distributor.computeShapleyValues(gameId);
 
         // Verify settlement occurred
-        (,,,, bool settled) = distributor.games(gameId);
+        (,,,, bool settled, ) = distributor.games(gameId);
         assertTrue(settled, "Game should be settled");
 
         // Verify Shapley values are assigned
@@ -289,7 +289,7 @@ contract ShapleyABCSealTest is Test {
         // Compute Shapley values — should also work without ABC check
         distributor.computeShapleyValues(gameId);
 
-        (,,,, bool settled) = distributor.games(gameId);
+        (,,,, bool settled, ) = distributor.games(gameId);
         assertTrue(settled, "Game should be settled without ABC seal");
     }
 

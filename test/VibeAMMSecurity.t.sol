@@ -202,8 +202,8 @@ contract VibeAMMSecurityTest is Test {
         vm.prank(trader);
         amm.swap(poolId, address(tokenA), 10 ether, 0, trader);
 
-        // Protocol fees should have accumulated
-        uint256 accFees = amm.accumulatedFees(address(tokenA));
+        // Protocol fees accumulate on tokenOut (tokenB), not tokenIn
+        uint256 accFees = amm.accumulatedFees(address(tokenB));
         assertGt(accFees, 0);
     }
 

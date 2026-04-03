@@ -556,9 +556,9 @@ contract CrossChainRouter is
         // TRP-R22-NEW08: Clean up pendingCommits after funding to prevent reveal replay
         delete pendingCommits[commitId];
 
-        // Now forward to auction with verified funds
-        // TODO(TRP-R35-NEW03): Use commitOrderCrossChain once R35 is merged
-        ICommitRevealAuction(auction).commitOrder{value: depositAmount}(
+        // TRP-R35-NEW03: Use commitOrderCrossChain to preserve original user as depositor
+        ICommitRevealAuction(auction).commitOrderCrossChain{value: depositAmount}(
+            commit.depositor,
             commit.commitHash
         );
 

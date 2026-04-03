@@ -402,29 +402,27 @@ contract CommitRevealAuction is
     }
 
     /**
-     * @notice Commit an order on behalf of another address (for cross-chain router use)
-     * @dev TRP-R35-NEW03: Fixes router-as-depositor bug. Only authorized settlers (e.g. CrossChainRouter)
-     *      can call this. Stores the original trader as depositor so they can reveal via revealOrderCrossChain.
-     * @param commitHash Hash of (depositor, tokenIn, tokenOut, amountIn, minAmountOut, secret)
-     * @param depositor The original trader address to record as depositor
+     * @notice Commit an order on behalf of a cross-chain user
+     * @dev TRP-R35-NEW03: Fixes router-as-depositor bug. Only authorized settlers (CrossChainRouter)
+     *      can call this. Records originalUser as depositor so revealOrderCrossChain matches correctly.
+     * @param originalUser The actual user who committed on the source chain
+     * @param commitHash Hash of (originalUser, tokenIn, tokenOut, amountIn, minAmountOut, secret)
      * @return commitId Unique identifier for this commitment
      */
-    function commitOrderOnBehalf(
-        bytes32 commitHash,
-        address depositor
+    function commitOrderCrossChain(
+        address originalUser,
+        bytes32 commitHash
     ) external payable nonReentrant onlyAuthorizedSettler inPhase(BatchPhase.COMMIT) returns (bytes32 commitId) {
         if (commitHash == bytes32(0)) revert InvalidHash();
-        require(depositor != address(0), "Invalid depositor");
-
-        // Minimum deposit check (no collateral calc — cross-chain deposits are pre-validated)
+        if (originalUser == address(0)) revert NotOwner();
         if (msg.value < MIN_DEPOSIT) revert InsufficientDeposit();
 
         // Gas: cache storage read in memory (avoid repeated SLOAD)
         uint64 _currentBatchId = currentBatchId;
 
-        // Generate unique commit ID (uses depositor, not msg.sender)
+        // Generate unique commit ID (uses originalUser, not msg.sender)
         commitId = keccak256(abi.encodePacked(
-            depositor,
+            originalUser,
             commitHash,
             bytes32(0),        // default pool
             _currentBatchId,
@@ -438,13 +436,13 @@ contract CommitRevealAuction is
             poolId: bytes32(0),
             batchId: _currentBatchId,
             depositAmount: msg.value,
-            depositor: depositor,        // Original trader, NOT msg.sender
+            depositor: originalUser,   // Original trader, NOT msg.sender
             status: CommitStatus.COMMITTED
         });
 
         batches[_currentBatchId].orderCount++;
 
-        emit OrderCommitted(commitId, depositor, _currentBatchId, msg.value);
+        emit OrderCommitted(commitId, originalUser, _currentBatchId, msg.value);
     }
 
     /**

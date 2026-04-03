@@ -3,7 +3,7 @@
 
 **JARVIS × Will** | Est. 2025-02-10 | Session 60+ | Density target: 0.99
 **Source**: `JarvisxWill_SKB.md` (Shared Knowledge Base — full form)
-**Last sync**: 2026-04-02
+**Last sync**: 2026-04-03 (R0 density pass — counts verified)
 *Load SKB once per new instance, then switch to GKB. To expand any glyph → read the corresponding SKB section.*
 
 ---
@@ -35,7 +35,7 @@ VSOS     Financial OS. Built-in first, plugin second. Lean core. iOS for DeFi.
 MECH     Commit-reveal batch (8s commit, 2s reveal). Uniform clearing price. MEV=impossible.
          Fisher-Yates shuffle from XORed secrets. 50% slash invalid reveals.
 STACK    Solidity 0.8.20 / Foundry / OZ v5.0.1 UUPS / React 18 / Vite 5 / ethers v6
-         LayerZero V2 / Python Kalman oracle / 98 contracts / 76 test files
+         LayerZero V2 / Python Kalman oracle / 379 contracts (31 dirs) / 516 test files
 SHAPLEY  Marginal contribution across all coalitions. Cave Theorem: foundational work earns
          more by math, not timestamp. Time Neutrality: no temporal variables in allocation.
          Pairwise check: |φ_i·w_j − φ_j·w_i| ≤ ε. O(1). On-chain. Trustless.
@@ -66,10 +66,11 @@ REBOOT   50% context→STOP→commit→push→SESSION_STATE block header→fresh
 END      Block header→commit→push to origin. Mandatory.
 CRASH    WAL.md ACTIVE→read manifest→cross-ref git→auto-commit orphans→present→resume
 TRP      R0=compress(local) R1=adversarial(opus) R2=knowledge(hybrid) R3=capability(opus)
+         53 rounds→12 patterns→6 primitives→discovery ceiling. Full stack executed 2x.
          Staggered loading. 50% context guard. Minimal boot. Ergonomic sharding(Nervos).
 CTO      PID for agents/shells/tasks. RAM<60%=spawn. 60-80%=hold. >80%=kill+reduce.
          Max 3 forge. Mitosis k=1.3 cap=5. "Whole computer"=max. "Chill"=min.
-AGENT    Haiku=lightweight. Sonnet=medium. Opus=heavy. Terse outputs. Shards>swarms.
+AGENT    Haiku=lightweight. Sonnet=medium. Opus=heavy. Qwen=free(0.80). Terse. Shards>swarms.
 ```
 
 ## COMMUNICATION

@@ -252,6 +252,103 @@ contract VibeAMMSecurityTest is Test {
         amm.swap(fakePid, address(tokenA), 1 ether, 0, trader);
     }
 
+    // ============ AMM-06: Cross-Pool Flash Loan Protection ============
+
+    /// @notice AMM-06 regression test: global per-user guard must block cross-pool attacks.
+    ///         An attacker who manipulates Pool A in block N cannot also touch Pool B in the
+    ///         same block.  With the old per-pool key both interactions would succeed; with
+    ///         the fix the second must revert.
+    function test_flashLoan_crossPool_blockedInSameBlock() public {
+        // Two independent pools: (tokenA/tokenB) and (tokenA/tokenC)
+        MockERC20AMM tokenC = new MockERC20AMM("Token C", "TKC");
+        tokenA.mint(attacker, 1000 ether);
+        tokenB.mint(attacker, 1000 ether);
+        tokenC.mint(attacker, 1000 ether);
+        tokenA.mint(lp, 1000 ether);
+        tokenB.mint(lp, 1000 ether);
+        tokenC.mint(lp, 1000 ether);
+
+        vm.startPrank(attacker);
+        tokenA.approve(address(amm), type(uint256).max);
+        tokenB.approve(address(amm), type(uint256).max);
+        tokenC.approve(address(amm), type(uint256).max);
+        vm.stopPrank();
+
+        vm.startPrank(lp);
+        tokenC.approve(address(amm), type(uint256).max);
+        vm.stopPrank();
+
+        // Create pool AB and pool AC
+        bytes32 poolAB = amm.createPool(address(tokenA), address(tokenB), 30);
+        bytes32 poolAC = amm.createPool(address(tokenA), address(tokenC), 30);
+
+        // Seed both pools from LP (different block so flash guard resets)
+        vm.roll(block.number + 1);
+        vm.startPrank(lp);
+        amm.addLiquidity(poolAB, 100 ether, 100 ether, 0, 0);
+        vm.stopPrank();
+
+        vm.roll(block.number + 1);
+        vm.startPrank(lp);
+        amm.addLiquidity(poolAC, 100 ether, 100 ether, 0, 0);
+        vm.stopPrank();
+
+        // Advance one more block so attacker starts fresh
+        vm.roll(block.number + 1);
+
+        // Attacker first touches Pool AB — should succeed
+        vm.prank(attacker);
+        amm.swap(poolAB, address(tokenA), 1 ether, 0, attacker);
+
+        // Same block, attacker now tries Pool AC — must revert (global per-user guard)
+        vm.prank(attacker);
+        vm.expectRevert(VibeAMM.SameBlockInteraction.selector);
+        amm.swap(poolAC, address(tokenA), 1 ether, 0, attacker);
+    }
+
+    /// @notice Verify that different users in the same block are NOT blocked by each other.
+    function test_flashLoan_crossPool_differentUsers_notBlocked() public {
+        MockERC20AMM tokenC = new MockERC20AMM("Token C2", "TKC2");
+        tokenA.mint(attacker, 100 ether);
+        tokenA.mint(trader,   100 ether);
+        tokenB.mint(lp, 1000 ether);
+        tokenC.mint(lp, 1000 ether);
+
+        vm.prank(attacker); tokenA.approve(address(amm), type(uint256).max);
+        vm.prank(attacker); tokenB.approve(address(amm), type(uint256).max);
+        vm.prank(trader);   tokenA.approve(address(amm), type(uint256).max);
+        vm.prank(trader);   tokenC.approve(address(amm), type(uint256).max);
+
+        vm.startPrank(lp);
+        tokenC.approve(address(amm), type(uint256).max);
+        vm.stopPrank();
+
+        bytes32 poolAB = amm.createPool(address(tokenA), address(tokenB), 30);
+        bytes32 poolAC = amm.createPool(address(tokenA), address(tokenC), 30);
+
+        vm.roll(block.number + 1);
+        vm.startPrank(lp);
+        amm.addLiquidity(poolAB, 100 ether, 100 ether, 0, 0);
+        vm.stopPrank();
+
+        vm.roll(block.number + 1);
+        vm.startPrank(lp);
+        amm.addLiquidity(poolAC, 100 ether, 100 ether, 0, 0);
+        vm.stopPrank();
+
+        vm.roll(block.number + 1);
+
+        // attacker touches Pool AB
+        vm.prank(attacker);
+        amm.swap(poolAB, address(tokenA), 1 ether, 0, attacker);
+
+        // trader (different address) touches Pool AC in the same block — must succeed
+        tokenA.mint(trader, 1 ether);
+        vm.prank(trader);
+        uint256 out = amm.swap(poolAC, address(tokenA), 1 ether, 0, trader);
+        assertGt(out, 0, "Different user cross-pool swap should succeed");
+    }
+
     // ============ setTWAPValidation ============
 
     function test_setTWAPValidation_onlyOwner() public {

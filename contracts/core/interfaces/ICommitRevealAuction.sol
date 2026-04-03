@@ -30,6 +30,7 @@ interface ICommitRevealAuction {
         bytes32 poolId;           // Pool this commitment belongs to
         uint64 batchId;
         uint256 depositAmount;
+        uint256 estimatedTradeValue; // Declared trade value at commit time (for reveal validation)
         address depositor;
         CommitStatus status;
     }

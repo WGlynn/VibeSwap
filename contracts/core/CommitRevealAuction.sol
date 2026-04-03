@@ -79,6 +79,7 @@ contract CommitRevealAuction is
     error TradeSizeExceeded();
     error FlashLoanDetected();
     error NoRefundPending();
+    error EstimateExceeded();
 
     // ============ Protocol Constants (Uniform Fairness) ============
     // These are FIXED for all pools - they define HOW trading works
@@ -100,6 +101,11 @@ contract CommitRevealAuction is
     /// @notice Collateral as basis points of trade value (PROTOCOL CONSTANT)
     /// @dev 5% collateral required for all trades
     uint256 public constant COLLATERAL_BPS = 500; // 5%
+
+    /// @notice Maximum allowed ratio of amountIn to estimatedTradeValue at reveal (PROTOCOL CONSTANT)
+    /// @dev 2x tolerance — amountIn can be at most 2x the declared estimate.
+    ///      If exceeded, the commitment is slashed. Prevents collateral underpricing.
+    uint256 public constant ESTIMATE_TOLERANCE_X = 2;
 
     /// @notice Slash rate for invalid/unrevealed commits (PROTOCOL CONSTANT)
     /// @dev 50% penalty - strong incentive to reveal honestly
@@ -392,6 +398,7 @@ contract CommitRevealAuction is
             poolId: poolId,
             batchId: _currentBatchId,
             depositAmount: msg.value,
+            estimatedTradeValue: estimatedTradeValue,
             depositor: msg.sender,
             status: CommitStatus.COMMITTED
         });
@@ -437,6 +444,7 @@ contract CommitRevealAuction is
             batchId: _currentBatchId,
             depositAmount: msg.value,
             depositor: originalUser,   // Original trader, NOT msg.sender
+            estimatedTradeValue: 0,    // Cross-chain: no estimate, tolerance check skipped
             status: CommitStatus.COMMITTED
         });
 
@@ -491,8 +499,12 @@ contract CommitRevealAuction is
             return;
         }
 
-        // TRP-R38: Verify deposit covers the revealed trade size at COLLATERAL_BPS (5%).
-        _checkCollateral(commitment.depositAmount, amountIn);
+        // TRP-R38: Validate amountIn against declared estimatedTradeValue
+        if (commitment.estimatedTradeValue > 0 &&
+            amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
+            _slashCommitment(commitId);
+            return;
+        }
 
         // Verify priority bid payment
         if (priorityBid > 0) {
@@ -592,8 +604,12 @@ contract CommitRevealAuction is
                 msg.sender, tokenIn, tokenOut, amountIn, minAmountOut, secret
             ));
             if (expectedHash != commitment.commitHash) { _slashCommitment(commitId); return; }
-            // TRP-R38: Verify deposit covers the revealed trade size at COLLATERAL_BPS (5%).
-            _checkCollateral(commitment.depositAmount, amountIn);
+            // TRP-R38: Validate amountIn against declared estimatedTradeValue
+            if (commitment.estimatedTradeValue > 0 &&
+                amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
+                _slashCommitment(commitId);
+                return;
+            }
             if (priorityBid > 0 && msg.value < priorityBid) revert InsufficientPriorityBid();
             commitment.status = CommitStatus.REVEALED;
         }
@@ -908,8 +924,12 @@ contract CommitRevealAuction is
             return;
         }
 
-        // TRP-R38: Verify deposit covers the revealed trade size at COLLATERAL_BPS (5%).
-        _checkCollateral(commitment.depositAmount, amountIn);
+        // TRP-R38: Validate amountIn against declared estimatedTradeValue
+        if (commitment.estimatedTradeValue > 0 &&
+            amountIn > commitment.estimatedTradeValue * ESTIMATE_TOLERANCE_X) {
+            _slashCommitment(commitId);
+            return;
+        }
 
         commitment.status = CommitStatus.REVEALED;
 
@@ -1361,16 +1381,6 @@ contract CommitRevealAuction is
      * @notice Validate that a committed deposit is sufficient for the revealed trade size.
      * @dev TRP-R38: Closes the gap where a user commits with MIN_DEPOSIT and reveals a massive trade.
      *      Uses PROTOCOL CONSTANT COLLATERAL_BPS (5%). Trades whose 5% requirement is below
-     *      MIN_DEPOSIT are exempt -- the MIN_DEPOSIT already provides adequate skin-in-the-game.
-     *      Extracted as a helper to avoid adding stack variables in the already-deep revealOrder frame.
-     */
-    function _checkCollateral(uint256 depositAmount, uint256 amountIn) internal pure {
-        uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
-        if (requiredCollateral > MIN_DEPOSIT && depositAmount < requiredCollateral) {
-            revert InsufficientCollateral();
-        }
-    }
-
     /**
      * @notice Slash an invalid commitment
      * @dev FIX #4: Treasury failure holds funds in contract instead of refunding user

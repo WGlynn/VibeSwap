@@ -76,7 +76,7 @@ contract ShapleyDistributorTest is Test {
 
         distributor.createGame(GAME_ID, 100 ether, address(token), participants);
 
-        (bytes32 gameId, uint256 totalValue, address gameToken,, bool settled) = distributor.games(GAME_ID);
+        (bytes32 gameId, uint256 totalValue, address gameToken,, bool settled, ) = distributor.games(GAME_ID);
         assertEq(gameId, GAME_ID);
         assertEq(totalValue, 100 ether);
         assertEq(gameToken, address(token));
@@ -90,7 +90,7 @@ contract ShapleyDistributorTest is Test {
 
         distributor.createGame(GAME_ID, 10 ether, address(0), participants);
 
-        (, uint256 totalValue, address gameToken,,) = distributor.games(GAME_ID);
+        (, uint256 totalValue, address gameToken,,,) = distributor.games(GAME_ID);
         assertEq(totalValue, 10 ether);
         assertEq(gameToken, address(0));
     }
@@ -671,7 +671,7 @@ contract ShapleyDistributorTest is Test {
         distributor.createGame(GAME_ID, 100 ether, address(token), participants);
 
         // Game value should be unchanged in Era 0
-        (, uint256 totalValue,,,) = distributor.games(GAME_ID);
+        (, uint256 totalValue,,,,) = distributor.games(GAME_ID);
         assertEq(totalValue, 100 ether);
         assertEq(distributor.totalGamesCreated(), 1);
     }
@@ -697,7 +697,7 @@ contract ShapleyDistributorTest is Test {
         distributor.createGameTyped(era1Game, 100 ether, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, participants);
 
         // Game value should be halved
-        (, uint256 totalValue,,,) = distributor.games(era1Game);
+        (, uint256 totalValue,,,,) = distributor.games(era1Game);
         assertEq(totalValue, 50 ether); // 50% of 100 ether
     }
 
@@ -722,7 +722,7 @@ contract ShapleyDistributorTest is Test {
         distributor.createGameTyped(era2Game, 100 ether, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, participants);
 
         // Game value should be 25%
-        (, uint256 totalValue,,,) = distributor.games(era2Game);
+        (, uint256 totalValue,,,,) = distributor.games(era2Game);
         assertEq(totalValue, 25 ether); // 25% of 100 ether
     }
 
@@ -790,7 +790,7 @@ contract ShapleyDistributorTest is Test {
         bytes32 testGame = keccak256("test-game");
         distributor.createGame(testGame, 100 ether, address(token), participants);
 
-        (, uint256 totalValue,,,) = distributor.games(testGame);
+        (, uint256 totalValue,,,,) = distributor.games(testGame);
         assertEq(totalValue, 100 ether); // Full value, no halving applied
     }
 
@@ -986,7 +986,7 @@ contract ShapleyDistributorTest is Test {
         bytes32 feeGameId = keccak256("fee-game-era2");
         distributor.createGame(feeGameId, 100 ether, address(token), participants);
 
-        (, uint256 feeGameValue,,,) = distributor.games(feeGameId);
+        (, uint256 feeGameValue,,,,) = distributor.games(feeGameId);
         assertEq(feeGameValue, 100 ether, "FEE_DISTRIBUTION must NOT be halved");
     }
 
@@ -1013,7 +1013,7 @@ contract ShapleyDistributorTest is Test {
             participants
         );
 
-        (, uint256 emissionGameValue,,,) = distributor.games(emissionGameId);
+        (, uint256 emissionGameValue,,,,) = distributor.games(emissionGameId);
         assertEq(emissionGameValue, 25 ether, "TOKEN_EMISSION must be halved to 25% in Era 2");
     }
 
@@ -1035,7 +1035,7 @@ contract ShapleyDistributorTest is Test {
         // FEE_DISTRIBUTION: full value
         bytes32 feeGameId = keccak256("fee-era1");
         distributor.createGame(feeGameId, 100 ether, address(token), participants);
-        (, uint256 feeVal,,,) = distributor.games(feeGameId);
+        (, uint256 feeVal,,,,) = distributor.games(feeGameId);
 
         // TOKEN_EMISSION: halved
         bytes32 emissionGameId = keccak256("emission-era1");
@@ -1044,7 +1044,7 @@ contract ShapleyDistributorTest is Test {
             ShapleyDistributor.GameType.TOKEN_EMISSION,
             participants
         );
-        (, uint256 emissionVal,,,) = distributor.games(emissionGameId);
+        (, uint256 emissionVal,,,,) = distributor.games(emissionGameId);
 
         assertEq(feeVal, 100 ether, "FEE game should be full value in Era 1");
         assertEq(emissionVal, 50 ether, "EMISSION game should be 50% in Era 1");

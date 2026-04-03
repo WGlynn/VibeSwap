@@ -341,7 +341,7 @@ contract TimeNeutralityProofsTest is Test {
         vm.prank(authorizedCreator);
         distributor.createGame(feeGameId, totalValue, address(token), pFee);
 
-        (,uint256 feeGameValue,,,) = distributor.games(feeGameId);
+        (,uint256 feeGameValue,,,,) = distributor.games(feeGameId);
         assertEq(feeGameValue, totalValue, "Fee game should NOT be halved");
 
         // Emission game in Era 1: halving DOES apply → 50%
@@ -352,7 +352,7 @@ contract TimeNeutralityProofsTest is Test {
         vm.prank(authorizedCreator);
         distributor.createGameTyped(emitGameId, totalValue, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, pEmit);
 
-        (,uint256 emitGameValue,,,) = distributor.games(emitGameId);
+        (,uint256 emitGameValue,,,,) = distributor.games(emitGameId);
         assertEq(emitGameValue, totalValue / 2, "Emission game should be halved to 50%");
     }
 

@@ -148,6 +148,7 @@ contract ShapleyDistributor is
      * @param token Token to distribute (address(0) for ETH)
      * @param gameType FEE_DISTRIBUTION (time-neutral) or TOKEN_EMISSION (halving)
      * @param settled Whether the game has been settled
+     * @param claimDeadline Timestamp after which unclaimed rewards can be reclaimed (0 = not set)
      */
     struct CooperativeGame {
         bytes32 gameId;
@@ -155,6 +156,7 @@ contract ShapleyDistributor is
         address token;
         GameType gameType;
         bool settled;
+        uint64 claimDeadline;
     }
 
     /**
@@ -197,6 +199,16 @@ contract ShapleyDistributor is
     uint256 public minParticipants;
     uint256 public maxParticipants;
     bool public useQualityWeights;
+
+    // ============ Claim Window (N02 — stale game cleanup) ============
+
+    /// @notice Duration after settlement during which participants can claim rewards.
+    ///         After this window, unclaimed rewards can be reclaimed by the owner.
+    ///         Default: 90 days. Set to 0 to disable expiry (rewards claimable forever).
+    uint256 public claimWindow;
+
+    /// @notice Default claim window (90 days)
+    uint256 public constant DEFAULT_CLAIM_WINDOW = 90 days;
 
     // ============ Pioneer Priority State ============
 
@@ -290,6 +302,8 @@ contract ShapleyDistributor is
     event GamesPerEraUpdated(uint256 gamesPerEra);
     event GenesisTimestampReset(uint256 newTimestamp);
     event SybilGuardUpdated(address indexed guard);
+    event ExpiredRewardsReclaimed(bytes32 indexed gameId, uint256 amount, address token, address recipient);
+    event ClaimWindowUpdated(uint256 claimWindow);
 
     // ============ Errors ============
 
@@ -309,6 +323,9 @@ contract ShapleyDistributor is
     error VerifierNotSet();
     error VerifierResultNotFinalized();
     error VerifierParticipantMismatch();
+    error ClaimWindowNotExpired();
+    error ClaimWindowExpired();
+    error ClaimWindowDisabled();
 
     // ============ Modifiers ============
 
@@ -339,6 +356,9 @@ contract ShapleyDistributor is
         genesisTimestamp = block.timestamp;
         gamesPerEra = DEFAULT_GAMES_PER_ERA;
         halvingEnabled = true;
+
+        // Initialize claim window (N02: stale game cleanup)
+        claimWindow = DEFAULT_CLAIM_WINDOW;
     }
 
     // ============ ABC Conservation Seal (Set Once, Immutable Forever) ============
@@ -526,7 +546,8 @@ contract ShapleyDistributor is
             totalValue: adjustedValue,
             token: token,
             gameType: gameType,
-            settled: false
+            settled: false,
+            claimDeadline: 0
         });
 
         // Store scope for pioneer lookup
@@ -615,6 +636,11 @@ contract ShapleyDistributor is
         }
 
         game.settled = true;
+
+        // N02: Set claim deadline when settling. If claimWindow == 0, deadline stays 0 (disabled).
+        if (claimWindow > 0) {
+            game.claimDeadline = uint64(block.timestamp + claimWindow);
+        }
     }
 
     /// @dev Steps 3-4 of computeShapleyValues: Lawson floor enforcement + dust efficiency.
@@ -733,6 +759,11 @@ contract ShapleyDistributor is
 
         game.settled = true;
 
+        // N02: Set claim deadline when settling via verifier path as well.
+        if (claimWindow > 0) {
+            game.claimDeadline = uint64(block.timestamp + claimWindow);
+        }
+
         emit SettledFromVerifier(gameId, participants.length,
             shapleyVerifier.getVerifiedTotalPool(gameId));
     }
@@ -746,6 +777,12 @@ contract ShapleyDistributor is
         if (game.totalValue == 0) revert GameNotFound();
         if (!game.settled) revert GameNotSettled();
         if (claimed[gameId][msg.sender]) revert AlreadyClaimed();
+
+        // N02: Reject claims after the claim deadline (if a deadline is set).
+        // Once expired, reclaimExpiredRewards() is the only path to recover funds.
+        if (game.claimDeadline > 0 && block.timestamp > game.claimDeadline) {
+            revert ClaimWindowExpired();
+        }
 
         amount = shapleyValues[gameId][msg.sender];
         if (amount == 0) revert NoReward();
@@ -1197,6 +1234,75 @@ contract ShapleyDistributor is
     /// @dev Emitted when a stale game is cancelled by owner
     event GameCancelled(bytes32 indexed gameId, uint256 releasedValue, address token);
 
+    /**
+     * @notice Reclaim unclaimed rewards from an expired settled game back to the owner.
+     * @dev N02 FIX: Settled games with unclaimed rewards previously locked those funds forever.
+     *      After the claimDeadline passes, the owner can sweep remaining funds back.
+     *      This requires:
+     *      1. claimWindow > 0 (expiry enabled)
+     *      2. game.claimDeadline > 0 and block.timestamp > game.claimDeadline
+     *      3. At least one participant has an unclaimed reward
+     *
+     *      The function sweeps ALL remaining unclaimed rewards in one pass,
+     *      marking each as claimed so they cannot be double-reclaimed.
+     *      Participants who already claimed their rewards are skipped.
+     *
+     *      Funds go to owner (typically treasury in production via governance).
+     *
+     *      DISINTERMEDIATION: Grade C -> Target Grade B (TimelockController).
+     *      The claim window itself provides the user-protection delay.
+     *
+     * @param gameId Game identifier
+     * @return reclaimedAmount Total unclaimed amount swept back to owner
+     */
+    function reclaimExpiredRewards(bytes32 gameId) external onlyOwner nonReentrant returns (uint256 reclaimedAmount) {
+        CooperativeGame storage game = games[gameId];
+        require(game.totalValue > 0 || game.settled, "Game not found");
+        require(game.settled, "Game not settled");
+
+        // claimWindow == 0 means expiry is disabled; owner cannot reclaim
+        if (claimWindow == 0) revert ClaimWindowDisabled();
+
+        // Must have a deadline set (games settled before claimWindow was enabled won't have one)
+        if (game.claimDeadline == 0) revert ClaimWindowDisabled();
+
+        // Enforce the deadline — cannot reclaim before the window closes
+        if (block.timestamp <= game.claimDeadline) revert ClaimWindowNotExpired();
+
+        // Sweep all unclaimed participant rewards
+        Participant[] storage participants = gameParticipants[gameId];
+        for (uint256 i = 0; i < participants.length; i++) {
+            address p = participants[i].participant;
+            if (!claimed[gameId][p]) {
+                uint256 unclaimed = shapleyValues[gameId][p];
+                if (unclaimed > 0) {
+                    claimed[gameId][p] = true;
+                    reclaimedAmount += unclaimed;
+
+                    // Release committed balance tracking
+                    if (totalCommittedBalance[game.token] >= unclaimed) {
+                        totalCommittedBalance[game.token] -= unclaimed;
+                    }
+                }
+            }
+        }
+
+        if (reclaimedAmount == 0) return 0;
+
+        address recipient = owner();
+        address token = game.token;
+
+        // Transfer reclaimed funds to owner
+        if (token == address(0)) {
+            (bool success, ) = recipient.call{value: reclaimedAmount}("");
+            if (!success) revert ETHTransferFailed();
+        } else {
+            IERC20(token).safeTransfer(recipient, reclaimedAmount);
+        }
+
+        emit ExpiredRewardsReclaimed(gameId, reclaimedAmount, token, recipient);
+    }
+
     // ============ Admin Functions ============
 
     /// @notice DISINTERMEDIATION: KEEP — controls which contracts can create games with
@@ -1226,6 +1332,24 @@ contract ShapleyDistributor is
     function setUseQualityWeights(bool _use) external onlyOwner {
         useQualityWeights = _use;
         emit QualityWeightsToggled(_use);
+    }
+
+    /**
+     * @notice Set the claim window duration for reward expiry.
+     * @dev N02: Controls how long participants have to claim rewards after a game settles.
+     *      Set to 0 to disable expiry entirely (rewards are claimable forever).
+     *      Only affects FUTURE settlements — already-settled games keep their existing deadline.
+     *
+     *      Minimum non-zero value is 7 days to prevent griefing (owner cannot set
+     *      a window so short that rewards expire before participants can react).
+     *
+     *      DISINTERMEDIATION: Grade C -> Target Grade B. Changes reward expiry policy.
+     * @param _claimWindow Duration in seconds (0 = disabled, else >= 7 days)
+     */
+    function setClaimWindow(uint256 _claimWindow) external onlyOwner {
+        require(_claimWindow == 0 || _claimWindow >= 7 days, "Claim window must be 0 or >= 7 days");
+        claimWindow = _claimWindow;
+        emit ClaimWindowUpdated(_claimWindow);
     }
 
     // ============ Settlement Layer Admin ============

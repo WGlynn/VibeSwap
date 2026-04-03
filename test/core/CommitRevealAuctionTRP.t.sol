@@ -246,11 +246,21 @@ contract CommitRevealAuctionTRP is Test {
         return keccak256(abi.encodePacked(trader, tknIn, tknOut, amtIn, minOut, secret));
     }
 
-    /// @notice Helper: commit during COMMIT phase
+    /// @notice Helper: commit during COMMIT phase (0.01 ether deposit — only valid for amountIn <= 0.2 ether)
     function _commit(address trader, bytes32 secret) internal returns (bytes32 commitId, bytes32 commitHash) {
         commitHash = _hash(trader, tokenA, tokenB, 1 ether, 0.9 ether, secret);
         vm.prank(trader);
         commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+    }
+
+    /// @notice Helper: commit with explicit deposit — required when amountIn > 0.2 ether (5% collateral)
+    function _commitWithDeposit(address trader, bytes32 secret, uint256 deposit)
+        internal
+        returns (bytes32 commitId, bytes32 commitHash)
+    {
+        commitHash = _hash(trader, tokenA, tokenB, 1 ether, 0.9 ether, secret);
+        vm.prank(trader);
+        commitId = auction.commitOrder{value: deposit}(commitHash);
     }
 
     /// @notice Helper: reveal during REVEAL phase (caller must vm.warp to reveal first)
@@ -1827,7 +1837,8 @@ contract CommitRevealAuctionTRP is Test {
     ///         never attempts to send more ETH than exists.
     function test_r1f04_realBidWithNoPoW_onlyCountsAsRealETH() public {
         bytes32 secret = keccak256("r1f04_a");
-        (bytes32 commitId, ) = _commit(alice, secret);
+        // 5% of 1 ether amountIn = 0.05 ether collateral required
+        (bytes32 commitId, ) = _commitWithDeposit(alice, secret, 0.05 ether);
         vm.warp(block.timestamp + 9);
 
         uint256 realBid = 0.1 ether;
@@ -1850,8 +1861,9 @@ contract CommitRevealAuctionTRP is Test {
     function test_r1f04_twoPlainReveals_splitAccountingZeroVirtual() public {
         bytes32 s1 = keccak256("r1f04_b1");
         bytes32 s2 = keccak256("r1f04_b2");
-        (bytes32 c1, ) = _commit(alice, s1);
-        (bytes32 c2, ) = _commit(bob, s2);
+        // 5% of 1 ether amountIn = 0.05 ether collateral required
+        (bytes32 c1, ) = _commitWithDeposit(alice, s1, 0.05 ether);
+        (bytes32 c2, ) = _commitWithDeposit(bob,   s2, 0.05 ether);
         vm.warp(block.timestamp + 9);
 
         uint256 bid1 = 0.2 ether;
@@ -1931,5 +1943,150 @@ contract CommitRevealAuctionTRP is Test {
         uint256 expected = collateral > 0.001 ether ? collateral : 0.001 ether;
 
         assertEq(required, expected);
+    }
+
+    // ============================================================
+    // R1-F04 (continued): Live PoW Path - Real ETH vs Virtual Split
+    // ============================================================
+
+    /// @notice Helper: brute-force find a nonce producing >= targetBits leading zero bits
+    ///         using keccak256(challenge || nonce). Low target (1 bit) completes in <256
+    ///         iterations on average.
+    function _findPoWNonce(bytes32 challenge, uint8 targetBits)
+        internal
+        pure
+        returns (bytes32 nonce, uint8 achievedBits)
+    {
+        for (uint256 i = 1; i < 10_000; i++) {
+            bytes32 candidate = bytes32(i);
+            bytes32 h = keccak256(abi.encodePacked(challenge, candidate));
+            uint8 leading = _countLeadingZeroBits(h);
+            if (leading >= targetBits) {
+                return (candidate, leading);
+            }
+        }
+        revert("_findPoWNonce: no nonce found within 10k iterations");
+    }
+
+    /// @notice Mirror of ProofOfWorkLib.countLeadingZeroBits (pure, accessible in tests)
+    function _countLeadingZeroBits(bytes32 hash) internal pure returns (uint8 zeros) {
+        uint256 value = uint256(hash);
+        if (value == 0) return 255;
+        zeros = 0;
+        if (value <= 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) { zeros += 32; value <<= 32; }
+        if (value <= 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) { zeros += 16; value <<= 16; }
+        if (value <= 0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) { zeros += 8;  value <<= 8; }
+        if (value <= 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) { zeros += 4;  value <<= 4; }
+        if (value <= 0x3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) { zeros += 2;  value <<= 2; }
+        if (value <= 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF) { zeros += 1; }
+    }
+
+    /// @notice R1-F04 CRITICAL: A real PoW reveal puts virtual value into
+    ///         totalVirtualPriorityBids only; totalPriorityBids reflects only
+    ///         the real ETH sent. Contract remains solvent: ETH balance >=
+    ///         totalPriorityBids at all times.
+    function test_r1f04_powReveal_virtualValueIsolatedFromETHAccounting() public {
+        bytes32 secret = keccak256("r1f04_pow_live");
+        // 5% of 1 ether amountIn = 0.05 ether collateral required
+        (bytes32 commitId, ) = _commitWithDeposit(alice, secret, 0.05 ether);
+        vm.warp(block.timestamp + 9);
+
+        // Find valid nonce in a scoped block to reduce stack depth
+        bytes32 powNonce;
+        {
+            bytes32 challenge = keccak256(abi.encodePacked(
+                alice, uint64(1), bytes32(0), block.chainid, address(auction)
+            ));
+            uint8 achievedBits;
+            (powNonce, achievedBits) = _findPoWNonce(challenge, 1);
+            assertGe(achievedBits, 1, "sanity: nonce meets difficulty");
+        }
+
+        uint256 realBid = 0.05 ether;
+        uint256 expectedPowValue = auction.powBaseValue();
+
+        // Reveal via helper to avoid stack-too-deep on 10-arg call
+        vm.prank(alice);
+        _revealWithPoWHelper(commitId, secret, realBid, powNonce, 1);
+
+        ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
+
+        assertEq(batch.totalPriorityBids, realBid,
+            "R1-F04: totalPriorityBids must equal only real ETH bid");
+        assertEq(batch.totalVirtualPriorityBids, expectedPowValue,
+            "R1-F04: totalVirtualPriorityBids must equal PoW virtual value");
+        assertGe(address(auction).balance, batch.totalPriorityBids,
+            "R1-F04: ETH solvency - contract holds enough for all real priority withdrawals");
+        // deposit(0.05) + realBid(0.05) = 0.10 ether; virtual value does not inflate ETH balance
+        assertEq(address(auction).balance, 0.05 ether + realBid,
+            "R1-F04: contract ETH matches only real ETH received");
+    }
+
+    /// @dev Helper to reduce stack depth: reveal with PoW using stored locals
+    function _revealWithPoWHelper(
+        bytes32 commitId,
+        bytes32 secret,
+        uint256 realBid,
+        bytes32 powNonce,
+        uint8 difficulty
+    ) internal {
+        auction.revealOrderWithPoW{value: realBid}(
+            commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret,
+            realBid, powNonce, 0, difficulty
+        );
+    }
+
+    /// @notice R1-F04: Mixed batch - one plain ETH bid + one PoW reveal.
+    ///         totalPriorityBids sums only real ETH; totalVirtualPriorityBids
+    ///         holds only the PoW virtual portion. Solvency invariant holds.
+    function test_r1f04_mixedBatch_powAndPlainBidsAccountedSeparately() public {
+        bytes32 sAlice = keccak256("r1f04_mixed_alice");
+        bytes32 sBob   = keccak256("r1f04_mixed_bob");
+        // 5% of 1 ether amountIn = 0.05 ether collateral required
+        (bytes32 cAlice, ) = _commitWithDeposit(alice, sAlice, 0.05 ether);
+        (bytes32 cBob,   ) = _commitWithDeposit(bob,   sBob,   0.05 ether);
+
+        vm.warp(block.timestamp + 9);
+
+        // Find valid PoW nonce for Alice (scoped block to free stack)
+        bytes32 powNonce;
+        {
+            bytes32 challenge = keccak256(abi.encodePacked(
+                alice, uint64(1), bytes32(0), block.chainid, address(auction)
+            ));
+            (powNonce, ) = _findPoWNonce(challenge, 1);
+        }
+
+        uint256 aliceRealBid = 0.03 ether;
+        uint256 bobRealBid   = 0.07 ether;
+        uint256 expectedPowValue = auction.powBaseValue();
+
+        // Alice reveals with PoW (via helper to stay within stack limit)
+        vm.prank(alice);
+        _revealWithPoWHelper(cAlice, sAlice, aliceRealBid, powNonce, 1);
+
+        // Bob reveals plain
+        vm.prank(bob);
+        auction.revealOrder{value: bobRealBid}(
+            cBob, tokenA, tokenB, 1 ether, 0.9 ether, sBob, bobRealBid
+        );
+
+        ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
+
+        assertEq(
+            batch.totalPriorityBids,
+            aliceRealBid + bobRealBid,
+            "R1-F04: totalPriorityBids = sum of real ETH bids only"
+        );
+        assertEq(
+            batch.totalVirtualPriorityBids,
+            expectedPowValue,
+            "R1-F04: totalVirtualPriorityBids = Alice PoW virtual value only"
+        );
+        assertGe(
+            address(auction).balance,
+            batch.totalPriorityBids,
+            "R1-F04: solvency - enough ETH for all real priority withdrawals"
+        );
     }
 }

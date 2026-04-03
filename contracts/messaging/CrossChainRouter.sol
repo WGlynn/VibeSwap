@@ -148,6 +148,11 @@ contract CrossChainRouter is
     ///         ETH stays on the destination chain; depositor must use THEIR destination-chain address.
     mapping(bytes32 => uint256) public claimableDeposits;
 
+    /// @notice NEW-04: Records the source-chain depositor address for each escrowed commitId.
+    ///         Only this address (or the owner) may claim the escrowed ETH.
+    ///         Prevents arbitrary callers from draining escrow by self-naming as recipient.
+    mapping(bytes32 => address) public claimableDepositOwner;
+
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
 
@@ -156,8 +161,8 @@ contract CrossChainRouter is
     uint32 public localEid;
 
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 1 for claimableDeposits)
-    uint256[49] private __gap;
+    /// @dev Reserved storage gap for future upgrades (reduced by 2 for claimableDeposits + claimableDepositOwner)
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -844,6 +849,8 @@ contract CrossChainRouter is
             // claimExpiredDeposit() from their destination-chain address.
             totalBridgedDeposits -= depositAmount;
             claimableDeposits[commitId] = depositAmount;
+            // Record the authorized claimer: only commit.depositor (or owner) may withdraw.
+            claimableDepositOwner[commitId] = commit.depositor;
             emit ClaimableDepositStored(commitId, commit.depositor, depositAmount);
         } else {
             // UNFUNDED: ETH never arrived on this chain — it still lives in the source-chain
@@ -875,15 +882,18 @@ contract CrossChainRouter is
         if (amount == 0) revert NoClaimableDeposit();
         require(recipient != address(0), "Invalid recipient");
 
-        // Only owner can claim on behalf of arbitrary recipients.
-        // Otherwise, caller must be the recipient (self-service on dest chain).
+        // Authorization: only the recorded depositor OR the owner may claim.
+        // We do NOT use `msg.sender == recipient` because that would allow any caller
+        // to drain any escrow by simply naming themselves as recipient (NEW-04 vuln).
+        address depositorOnSrcChain = claimableDepositOwner[commitId];
         require(
-            msg.sender == owner() || msg.sender == recipient,
+            msg.sender == owner() || msg.sender == depositorOnSrcChain,
             "Not authorized to claim"
         );
 
         // Effects before interactions (CEI)
         claimableDeposits[commitId] = 0;
+        claimableDepositOwner[commitId] = address(0);
 
         (bool success, ) = recipient.call{value: amount}("");
         require(success, "Claim transfer failed");

@@ -102,6 +102,9 @@ contract VibeAMM is
     ///         Lets small LPs exit even when a whale has tripped the breaker.
     uint256 public constant SMALL_WITHDRAWAL_BPS_THRESHOLD = 100; // 1% of pool
 
+    /// @notice Snapshot window for TWAP drift measurement (matches DEFAULT_TWAP_PERIOD)
+    uint256 public constant TWAP_DRIFT_WINDOW = 10 minutes;
+
     // ============ Structs for Parameter Bundling ============
 
     /// @notice Parameters for basic swap to reduce stack depth
@@ -151,18 +154,6 @@ contract VibeAMM is
 
     /// @notice TWAP oracle state per pool
     mapping(bytes32 => TWAPOracle.OracleState) internal poolOracles;
-
-    // ============ AMM-05: TWAP Drift Rate Tracking ============
-
-    /// @notice AMM-05: TWAP value at the start of the previous window (per pool).
-    ///         Used to detect gradual TWAP manipulation: if the TWAP moves more than
-    ///         MAX_TWAP_DRIFT_BPS between consecutive window snapshots, the clearing
-    ///         price is damped back toward the baseline.
-    mapping(bytes32 => uint256) internal lastTwapSnapshot;
-
-    /// @notice AMM-05: Block timestamp when lastTwapSnapshot was recorded (per pool).
-    ///         Snapshots are refreshed once per TWAP window to avoid stale comparisons.
-    mapping(bytes32 => uint32) internal lastTwapSnapshotTime;
 
     /// @notice Tracked balances per token (for donation attack detection)
     mapping(address => uint256) public trackedBalances;
@@ -262,13 +253,25 @@ contract VibeAMM is
     ///      When address(0), falls back to static pool.feeRate (backwards compatible).
     FeeController public feeController;
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 1 for feeController)
-    uint256[49] private __gap;
+    // ============ TWAP Drift Protection State ============
+    // NOTE: Added after __gap reduction to maintain upgrade-safe storage layout.
+    // Each new variable here corresponds to one slot consumed from the gap below.
+
+    /// @notice TWAP price snapshot per pool at the start of each drift window
+    /// @dev Compared against current TWAP each window to detect gradual manipulation (AMM-05)
+    mapping(bytes32 => uint256) public lastTwapSnapshot;
+
+    /// @notice Timestamp when lastTwapSnapshot was last recorded per pool
+    mapping(bytes32 => uint256) public lastTwapSnapshotTime;
+
+    /// @dev Reserved storage gap for future upgrades (49 - 1 feeController - 2 TWAP drift = 46)
+    uint256[46] private __gap;
 
     // ============ Security Events ============
 
     event FlashLoanAttemptBlocked(address indexed user, bytes32 indexed poolId);
     event PriceManipulationDetected(bytes32 indexed poolId, uint256 spotPrice, uint256 twapPrice);
+    event TWAPDriftDetected(bytes32 indexed poolId, uint256 snapshotPrice, uint256 currentTwap, uint256 driftBps);
     event DonationAttackDetected(address indexed token, uint256 tracked, uint256 actual);
     event LargeTradeLimited(bytes32 indexed poolId, uint256 requested, uint256 allowed);
     event FeesCollected(address indexed token, uint256 amount);
@@ -318,8 +321,6 @@ contract VibeAMM is
     event VWAPCardinalityGrown(bytes32 indexed poolId, uint16 cardinality);
     event FlashLoanProtectionToggled(bool enabled);
     event TWAPValidationToggled(bool enabled);
-    /// @notice AMM-05: Emitted when TWAP drift rate exceeds MAX_TWAP_DRIFT_BPS in one window.
-    event TWAPDriftDetected(bytes32 indexed poolId, uint256 baselineTwap, uint256 currentTwap, uint256 driftBps);
     event PoolMaxTradeSizeUpdated(bytes32 indexed poolId, uint256 maxSize);
     event OracleCardinalityGrown(bytes32 indexed poolId, uint16 cardinality);
     event TrackedBalanceSynced(address indexed token, uint256 balance);
@@ -395,8 +396,29 @@ contract VibeAMM is
         _;
     }
 
-    /// @notice Validates price against TWAP to prevent manipulation
+    /// @notice Validates price against TWAP to prevent manipulation and detects gradual drift
     modifier validatePrice(bytes32 poolId) {
+        // Pre-swap: check if TWAP has already drifted beyond MAX_TWAP_DRIFT_BPS from last snapshot.
+        // This guards against the AMM-05 gradual manipulation attack where an attacker walks the
+        // TWAP across multiple windows, each time staying under the 5% single-trade limit.
+        // We emit the event and revert rather than damp here because the single-swap path does not
+        // compute a clearing price to blend — the caller must retry in a future window.
+        if ((protectionFlags & FLAG_TWAP) != 0 && lastTwapSnapshot[poolId] != 0
+            && poolOracles[poolId].cardinality >= 2
+            && poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD))
+        {
+            uint256 snapshot = lastTwapSnapshot[poolId];
+            uint256 currentTwap = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+            if (currentTwap > 0 && snapshot > 0) {
+                uint256 driftBps = currentTwap > snapshot
+                    ? ((currentTwap - snapshot) * 10000) / snapshot
+                    : ((snapshot - currentTwap) * 10000) / snapshot;
+                if (driftBps > MAX_TWAP_DRIFT_BPS) {
+                    emit TWAPDriftDetected(poolId, snapshot, currentTwap, driftBps);
+                    revert PriceDeviationTooHigh(currentTwap, snapshot);
+                }
+            }
+        }
         _;
         if ((protectionFlags & FLAG_TWAP) != 0 && poolOracles[poolId].cardinality >= 2) {
             _validatePriceAgainstTWAP(poolId);
@@ -825,6 +847,13 @@ contract VibeAMM is
         if ((protectionFlags & FLAG_TWAP) != 0 && poolOracles[poolId].cardinality >= 2) {
             clearingPrice = _validateTWAP(poolId, clearingPrice);
         }
+
+        // ============ TWAP Drift-Rate Check ============
+        // Guards against gradual manipulation across windows (the AMM-05 attack vector).
+        // An attacker can stay under the 5% single-trade limit but walk TWAP 2%/window.
+        // This check compares the current TWAP against the last window snapshot and damps
+        // the clearing price back toward the snapshot if drift exceeds MAX_TWAP_DRIFT_BPS.
+        clearingPrice = _checkAndDampTwapDrift(poolId, clearingPrice);
 
         result.clearingPrice = clearingPrice;
 
@@ -1524,13 +1553,66 @@ contract VibeAMM is
     // ============ Security Internal Functions ============
 
     /**
-     * @notice Update TWAP oracle for a pool
+     * @notice Update TWAP oracle for a pool and refresh drift snapshot when the window rolls over
+     * @dev Called on every swap/liquidity event. Snapshot is refreshed once per TWAP_DRIFT_WINDOW
+     *      so that drift is measured across a meaningful time horizon, not tick-by-tick.
      */
     function _updateOracle(bytes32 poolId) internal {
         Pool storage pool = pools[poolId];
         if (pool.reserve0 > 0) {
             uint256 spotPrice = (pool.reserve1 * 1e18) / pool.reserve0;
             poolOracles[poolId].write(spotPrice);
+
+            // Refresh drift snapshot once per window
+            uint256 snapshotTime = lastTwapSnapshotTime[poolId];
+            if (block.timestamp >= snapshotTime + TWAP_DRIFT_WINDOW) {
+                // Capture current TWAP as the baseline for the next window
+                if (poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) {
+                    lastTwapSnapshot[poolId] = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+                } else {
+                    // Not enough history yet — seed with spot price
+                    lastTwapSnapshot[poolId] = spotPrice;
+                }
+                lastTwapSnapshotTime[poolId] = block.timestamp;
+            }
+        }
+    }
+
+    /**
+     * @notice Check whether the current TWAP has drifted beyond MAX_TWAP_DRIFT_BPS from the
+     *         last window snapshot. Emits TWAPDriftDetected and returns the clamped price when
+     *         drift is excessive.
+     * @param poolId Pool identifier
+     * @param price  Price to potentially damp (clearing price or spot price)
+     * @return dampedPrice Price after drift-rate damping (unchanged when drift is within bounds)
+     */
+    function _checkAndDampTwapDrift(bytes32 poolId, uint256 price) internal returns (uint256 dampedPrice) {
+        uint256 snapshot = lastTwapSnapshot[poolId];
+        // No snapshot yet or TWAP validation disabled — pass through
+        if (snapshot == 0 || (protectionFlags & FLAG_TWAP) == 0) return price;
+        // Need at least 2 observations to consult
+        if (poolOracles[poolId].cardinality < 2) return price;
+        if (!poolOracles[poolId].canConsult(DEFAULT_TWAP_PERIOD)) return price;
+
+        uint256 currentTwap = poolOracles[poolId].consult(DEFAULT_TWAP_PERIOD);
+        if (currentTwap == 0) return price;
+
+        // Calculate drift in basis points: |currentTwap - snapshot| / snapshot * 10000
+        uint256 driftBps;
+        if (currentTwap > snapshot) {
+            driftBps = ((currentTwap - snapshot) * 10000) / snapshot;
+        } else {
+            driftBps = ((snapshot - currentTwap) * 10000) / snapshot;
+        }
+
+        if (driftBps > MAX_TWAP_DRIFT_BPS) {
+            emit TWAPDriftDetected(poolId, snapshot, currentTwap, driftBps);
+            // Damp the price back toward the snapshot using golden-ratio blending
+            // This makes gradual manipulation expensive: attacker must fight the damper
+            // every swap rather than walking unchallenged across windows.
+            dampedPrice = BatchMath.applyGoldenRatioDamping(snapshot, price, MAX_TWAP_DRIFT_BPS);
+        } else {
+            dampedPrice = price;
         }
     }
 
@@ -1868,7 +1950,7 @@ contract VibeAMM is
     function getTwapDriftBaseline(bytes32 poolId)
         external
         view
-        returns (uint256 baseline, uint32 snapshotTime)
+        returns (uint256 baseline, uint256 snapshotTime)
     {
         return (lastTwapSnapshot[poolId], lastTwapSnapshotTime[poolId]);
     }
@@ -2098,12 +2180,12 @@ contract VibeAMM is
 
         // ── Layer 2: AMM-05 — drift rate check against previous window baseline ─────────────
         uint256 baseline = lastTwapSnapshot[poolId];
-        uint32 snapshotAge = uint32(block.timestamp) - lastTwapSnapshotTime[poolId];
+        uint256 snapshotAge = block.timestamp - lastTwapSnapshotTime[poolId];
 
         if (baseline == 0) {
             // First observation: seed snapshot and return.
             lastTwapSnapshot[poolId] = twapPrice;
-            lastTwapSnapshotTime[poolId] = uint32(block.timestamp);
+            lastTwapSnapshotTime[poolId] = block.timestamp;
             return dampedPrice;
         }
 
@@ -2113,7 +2195,7 @@ contract VibeAMM is
         // individual window still cannot exceed MAX_TWAP_DRIFT_BPS from its own baseline.
         if (snapshotAge >= DEFAULT_TWAP_PERIOD) {
             lastTwapSnapshot[poolId] = twapPrice;
-            lastTwapSnapshotTime[poolId] = uint32(block.timestamp);
+            lastTwapSnapshotTime[poolId] = block.timestamp;
             // Use the fresh baseline for this batch's drift check.
             baseline = twapPrice;
         }

@@ -527,15 +527,13 @@ contract VibeSwapCore is
         // Pass address(this) as originalDepositor because VibeSwapCore is the depositor
         // in the auction (commitment.depositor = address(this)), and commitHash was
         // generated with address(this) as the identity in commitSwap.
-        // TRP-R16-F07: Record actual depositor keyed by the ACTUAL index the order
-        // will occupy in CRA's revealedOrders array. Previous code used a separate
-        // _orderRevealCount which desyncs when direct CRA reveals are interleaved.
-        // By querying CRA's current array length, we get the exact index the next
-        // push will occupy, regardless of how many direct reveals preceded it.
         uint64 currentBatchId = auction.getCurrentBatchId();
-        uint256 nextOrderIdx = auction.getRevealedOrders(currentBatchId).length;
-        _orderDepositors[currentBatchId][nextOrderIdx] = msg.sender;
 
+        // INT-R1-INT003: Call CRA first, THEN read the array length to get the actual
+        // index where the order was stored. The old code read length BEFORE the call,
+        // creating a TOCTOU race if a direct CRA.revealOrder() was interleaved by a
+        // miner/sequencer between the length read and the revealOrderCrossChain call.
+        // After the CRA call, the new length - 1 is the guaranteed index of our order.
         auction.revealOrderCrossChain{value: msg.value}(
             commitId,
             address(this), // Core contract is the depositor in the auction commitment
@@ -546,6 +544,9 @@ contract VibeSwapCore is
             params.secret,
             priorityBid
         );
+
+        uint256 actualOrderIdx = auction.getRevealedOrders(currentBatchId).length - 1;
+        _orderDepositors[currentBatchId][actualOrderIdx] = msg.sender;
 
         emit SwapRevealed(
             commitId,
@@ -1176,17 +1177,21 @@ contract VibeSwapCore is
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
 
             // SEC-1: Skip failed orders within a partial batch — don't decrement their deposits.
+            // INT-R1-INT001: Use input-fee model matching AMM's actual execution path.
+            // Old code used output-fee (grossOut * (1-fee)) with static pool.feeRate.
+            // AMM uses input-fee (effIn = amountIn * (1-fee), then effIn * price) with
+            // dynamic batchFeeRate including True Price surcharge.
             if (hasFailures) {
                 bool isToken0 = order.tokenIn == pool.token0;
-                uint256 grossOut;
+                uint256 effIn = (order.amountIn * (10000 - result.batchFeeRate)) / 10000;
+                uint256 netOut;
                 if (isToken0) {
-                    grossOut = (order.amountIn * result.clearingPrice) / 1e18;
+                    netOut = (effIn * result.clearingPrice) / 1e18;
                 } else {
-                    grossOut = result.clearingPrice > 0
-                        ? (order.amountIn * 1e18) / result.clearingPrice
+                    netOut = result.clearingPrice > 0
+                        ? (effIn * 1e18) / result.clearingPrice
                         : 0;
                 }
-                uint256 netOut = (grossOut * (10000 - pool.feeRate)) / 10000;
 
                 if (netOut < order.minAmountOut) {
                     emit OrderRefunded(
@@ -1347,6 +1352,35 @@ contract VibeSwapCore is
      */
     function getFailedExecutionCount() external view returns (uint256 count) {
         return failedExecutions.length;
+    }
+
+    /**
+     * @notice Compact the failedExecutions array by removing zeroed-out (retried) entries
+     * @dev INT-R1-INT005: `delete failedExecutions[index]` zeroes the struct but doesn't
+     *      shrink the array. Once length hits MAX_FAILED_QUEUE, new failures are silently
+     *      dropped even if all entries have been retried. This function compacts the array.
+     *
+     * DISINTERMEDIATION: Grade C -> Target Grade A. Permissionless compaction is safe
+     * because it only removes already-deleted entries (trader == address(0)).
+     */
+    function compactFailedExecutions() external {
+        uint256 writeIdx = 0;
+        uint256 len = failedExecutions.length;
+        for (uint256 readIdx = 0; readIdx < len;) {
+            if (failedExecutions[readIdx].trader != address(0)) {
+                if (writeIdx != readIdx) {
+                    failedExecutions[writeIdx] = failedExecutions[readIdx];
+                }
+                unchecked { ++writeIdx; }
+            }
+            unchecked { ++readIdx; }
+        }
+        // Trim the array to only contain live entries
+        uint256 toRemove = len - writeIdx;
+        for (uint256 i = 0; i < toRemove;) {
+            failedExecutions.pop();
+            unchecked { ++i; }
+        }
     }
 
     /**

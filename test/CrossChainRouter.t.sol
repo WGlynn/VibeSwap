@@ -781,8 +781,10 @@ contract CrossChainRouterTest is Test {
         vm.prank(authorized);
         router.fundBridgedDeposit{value: 1 ether}(commitId);
 
+        // INT-R1-XC002: pendingCommits no longer deleted in fundBridgedDeposit.
+        // Double-fund is now caught by bridgedDepositFunded check, not missing commit.
         vm.prank(authorized);
-        vm.expectRevert("Unknown commit");
+        vm.expectRevert("Already funded or not pending");
         router.fundBridgedDeposit{value: 1 ether}(commitId);
     }
 

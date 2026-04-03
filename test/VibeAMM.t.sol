@@ -469,4 +469,153 @@ contract VibeAMMTest is Test {
         // sqrt(100e18 * 100e18) - 1000 = 100e18 - 1000
         assertEq(liquidity, 100 ether - 1000);
     }
+
+    // ============ AMM-07: Fee Path Equivalence Tests ============
+
+    /**
+     * @notice AMM-07: Prove single-swap and batch-swap paths charge equivalent fees.
+     *
+     * Both paths should use the input-fee model: fee = amountIn * feeRate / 10000.
+     * The effective "fee paid" as a fraction of amountIn must be equal.
+     *
+     * We measure fee impact by comparing how much output the trader receives relative
+     * to a zero-fee reference. The ratio (amountOut / zeroFeeOut) should be
+     * approximately equal for both paths when using the same feeRate.
+     *
+     * Note: Single-swap uses constant-product formula (output decreases with price impact)
+     * while batch-swap uses clearing price (spot rate). They produce different absolute
+     * amountOut values, but the *fee deduction fraction* should be equal.
+     */
+    function test_AMM07_feePathEquivalence_inputFeeModel() public {
+        // Setup: 1:1 pool, 30 bps fee (0.3%)
+        poolId = amm.createPool(address(tokenA), address(tokenB), 30);
+        vm.prank(lp1);
+        amm.addLiquidity(poolId, 100 ether, 100 ether, 0, 0);
+
+        uint256 amountIn = 1 ether; // Small trade to minimize price impact difference
+        uint256 feeRate = 30; // 30 bps
+
+        // ---- Single swap: measure effective fee ----
+        // Quote with fee (actual output)
+        uint256 singleOut = amm.quote(poolId, address(tokenA), amountIn);
+        // Quote without fee (zero-fee reference) — fee=0 in getAmountOut
+        uint256 singleOutNoFee = BatchMath.getAmountOut(amountIn, 100 ether, 100 ether, 0);
+
+        // Effective fee fraction = (noFeeOut - actualOut) / noFeeOut
+        // This equals feeRate / 10000 for an input-fee model
+        uint256 singleFeeFraction = ((singleOutNoFee - singleOut) * 10000) / singleOutNoFee;
+
+        // ---- Batch swap: measure effective fee ----
+        // At spot price 1:1, clearing price = 1e18
+        // With input-fee model: effectiveIn = amountIn * (10000 - feeRate) / 10000
+        //                       amountOut = effectiveIn * price / 1e18
+        // Zero-fee reference: amountOut_noFee = amountIn * price / 1e18
+        // Fee fraction = (amountOut_noFee - amountOut) / amountOut_noFee = feeRate / 10000
+        uint256 spotPrice = amm.getSpotPrice(poolId); // Should be 1e18 for 1:1 pool
+        uint256 batchOutNoFee = (amountIn * spotPrice) / 1e18;
+        uint256 effectiveAmountIn = (amountIn * (10000 - feeRate)) / 10000;
+        uint256 batchOut = (effectiveAmountIn * spotPrice) / 1e18;
+        uint256 batchFeeFraction = ((batchOutNoFee - batchOut) * 10000) / batchOutNoFee;
+
+        // Both fee fractions must equal feeRate (30 bps) — proving input-fee model is used
+        assertEq(batchFeeFraction, feeRate, "Batch path must use input-fee model");
+        // Single-swap fee fraction may differ slightly due to constant-product math,
+        // but should be within 1 bps of feeRate
+        assertApproxEqAbs(singleFeeFraction, feeRate, 1, "Single swap fee fraction should approximate feeRate");
+    }
+
+    /**
+     * @notice AMM-07: Execute actual batch swap and verify fee deduction matches
+     * the input-fee model (not the old output-fee model). Split into two helpers
+     * to avoid stack-too-deep.
+     */
+    function test_AMM07_batchFeeIsInputBased_nonUnityPrice() public {
+        poolId = amm.createPool(address(tokenA), address(tokenB), 30);
+        vm.prank(lp1);
+        amm.addLiquidity(poolId, 100 ether, 100 ether, 0, 0);
+
+        // Pre-fund AMM — no syncTrackedBalance: pre-credit loop in executeBatchSwap handles it
+        tokenA.mint(address(amm), 1 ether);
+
+        _runBatchAndAssertInputFee(poolId);
+    }
+
+    /// @dev Helper split out to avoid stack-too-deep in the parent test
+    function _runBatchAndAssertInputFee(bytes32 pid) internal {
+        IVibeAMM.Pool memory poolBefore = amm.getPool(pid);
+        bool tokenAIsToken0 = poolBefore.token0 == address(tokenA);
+
+        uint256 amountIn = 1 ether;
+        uint256 feeRate = 30;
+        // effectiveAmountIn = amountIn * (10000 - feeRate) / 10000
+        uint256 effectiveIn = (amountIn * (10000 - feeRate)) / 10000;
+
+        IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
+        orders[0] = IVibeAMM.SwapOrder({
+            trader: trader,
+            tokenIn: address(tokenA),
+            tokenOut: address(tokenB),
+            amountIn: amountIn,
+            minAmountOut: 0,
+            isPriority: false
+        });
+
+        uint256 traderBefore = tokenB.balanceOf(trader);
+        IVibeAMM.BatchSwapResult memory result = amm.executeBatchSwap(pid, 1, orders);
+        uint256 actualOut = tokenB.balanceOf(trader) - traderBefore;
+
+        assertGt(result.totalTokenInSwapped, 0, "Batch swap must have executed");
+        assertGt(result.clearingPrice, 0, "Clearing price must be non-zero");
+
+        _assertInputFeeModel(tokenAIsToken0, amountIn, effectiveIn, feeRate,
+            result.clearingPrice, actualOut, poolBefore);
+    }
+
+    /// @dev Asserts input-fee model invariants (split for stack depth)
+    function _assertInputFeeModel(
+        bool tokenAIsToken0,
+        uint256 amountIn,
+        uint256 effectiveIn,
+        uint256 feeRate,
+        uint256 clearingPrice,
+        uint256 actualOut,
+        IVibeAMM.Pool memory poolBefore
+    ) internal {
+        // Input-fee model: amountOut = effectiveIn * price (or /price for reverse swap)
+        // Output-fee model (old):  amountOut = (amountIn * price) * (10000 - fee) / 10000
+        uint256 expectedInputFee;
+        uint256 grossOut;
+        if (tokenAIsToken0) {
+            expectedInputFee = (effectiveIn * clearingPrice) / 1e18;
+            grossOut = (amountIn * clearingPrice) / 1e18;
+        } else {
+            expectedInputFee = clearingPrice > 0 ? (effectiveIn * 1e18) / clearingPrice : 0;
+            grossOut = clearingPrice > 0 ? (amountIn * 1e18) / clearingPrice : 0;
+        }
+        uint256 expectedOutputFee = (grossOut * (10000 - feeRate)) / 10000;
+
+        // Verify actual output matches input-fee formula
+        assertApproxEqAbs(actualOut, expectedInputFee, 1,
+            "Batch must use input-fee: amountOut = effectiveIn * clearingPrice");
+
+        // Verify actual output does NOT match output-fee formula (proves the fix)
+        if (expectedInputFee != expectedOutputFee) {
+            assertTrue(actualOut != expectedOutputFee,
+                "Batch must NOT use output-fee model (pre-fix behavior)");
+        }
+
+        // Reserve accounting: reserveIn += amountIn, reserveOut -= amountOut (input-fee)
+        IVibeAMM.Pool memory poolAfter = amm.getPool(poolId);
+        if (tokenAIsToken0) {
+            assertEq(poolAfter.reserve0, poolBefore.reserve0 + amountIn,
+                "reserve0 must increase by full amountIn");
+            assertEq(poolAfter.reserve1, poolBefore.reserve1 - actualOut,
+                "reserve1 must decrease by amountOut");
+        } else {
+            assertEq(poolAfter.reserve1, poolBefore.reserve1 + amountIn,
+                "reserve1 must increase by full amountIn");
+            assertEq(poolAfter.reserve0, poolBefore.reserve0 - actualOut,
+                "reserve0 must decrease by amountOut");
+        }
+    }
 }

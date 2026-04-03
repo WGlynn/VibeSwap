@@ -56,6 +56,20 @@ contract ConcreteCircuitBreaker is CircuitBreaker {
         _checkInvariants(conditions, messages);
     }
 
+    /// @notice Expose _checkBreaker for CB-05 testing (simulates the whenBreakerNotTripped modifier path)
+    function checkBreaker(bytes32 breakerType) external {
+        _checkBreaker(breakerType);
+    }
+
+    /// @notice Expose raw BreakerState fields for assertion
+    function getWindowValue(bytes32 breakerType) external view returns (uint256) {
+        return breakerStates[breakerType].windowValue;
+    }
+
+    function getWindowStart(bytes32 breakerType) external view returns (uint256) {
+        return breakerStates[breakerType].windowStart;
+    }
+
 }
 
 contract CircuitBreakerTest is Test {
@@ -528,5 +542,155 @@ contract CircuitBreakerTest is Test {
         bool blocked = cb.withdrawalWithExemption(500);
         assertFalse(blocked, "Large withdrawal that doesn't trip breaker should not be blocked");
         assertTrue(cb.actionCalled());
+    }
+
+    // ============ CB-05: Stale Window Re-Trip ============
+    // Finding: after cooldown expires the breaker auto-resets, but if windowValue is
+    // not cleared the next small trade can immediately re-trip using stale accumulated
+    // volume. The fix zeroes windowValue and resets windowStart in both _checkBreaker
+    // and _updateBreaker when auto-resetting after cooldown.
+
+    function _setupVolumeBreaker() internal {
+        cb.configureBreaker(cb.VOLUME_BREAKER(), 1000 ether, 1 hours, 10 minutes);
+    }
+
+    /// @dev Core CB-05 regression: trip the breaker, wait for cooldown, then call
+    ///      _checkBreaker (the modifier path). windowValue MUST be zero after auto-reset,
+    ///      not THRESHOLD. If the bug were present, windowValue would remain at THRESHOLD
+    ///      and the next tiny trade would re-trip.
+    function test_cb05_checkBreaker_clearsWindowValueOnAutoReset() public {
+        _setupVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        // Trip: accumulate exactly at threshold
+        cb.updateBreaker(vol, 1000 ether);
+
+        // Confirm tripped and windowValue is at threshold
+        (, bool trippedBefore,,,) = cb.getBreakerStatus(vol);
+        assertTrue(trippedBefore, "Breaker must be tripped");
+        assertEq(cb.getWindowValue(vol), 1000 ether, "windowValue should equal threshold at trip");
+
+        // Advance past cooldown
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // Simulate the whenBreakerNotTripped modifier calling _checkBreaker
+        cb.checkBreaker(vol);
+
+        // CB-05 fix: windowValue must be zeroed, not left at the old threshold
+        assertEq(cb.getWindowValue(vol), 0, "CB-05: windowValue MUST be zeroed on auto-reset via _checkBreaker");
+        assertEq(cb.getWindowStart(vol), block.timestamp, "windowStart must be refreshed to now");
+
+        (, bool trippedAfter,,,) = cb.getBreakerStatus(vol);
+        assertFalse(trippedAfter, "Breaker must be clear after cooldown");
+    }
+
+    /// @dev After _checkBreaker clears stale state, a small trade must NOT re-trip.
+    ///      This is the exact user-visible symptom of CB-05.
+    function test_cb05_smallTradeAfterCheckBreakerReset_doesNotRetrip() public {
+        _setupVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        // Trip
+        cb.updateBreaker(vol, 1000 ether);
+
+        // Expire cooldown, simulate modifier gate
+        vm.warp(block.timestamp + 1 hours + 1);
+        cb.checkBreaker(vol);
+
+        // A 1% trade should NOT re-trip a freshly reset breaker
+        bool reTripped = cb.updateBreaker(vol, 10 ether);
+        assertFalse(reTripped, "CB-05: tiny trade must not re-trip after _checkBreaker auto-reset");
+        assertEq(cb.getWindowValue(vol), 10 ether, "windowValue must only reflect new trade");
+    }
+
+    /// @dev _updateBreaker also auto-resets on cooldown expiry. Verify it too clears
+    ///      windowValue (the TRP-R24-CB01 code path, confirmed intact for CB-05).
+    function test_cb05_updateBreaker_clearsWindowValueOnAutoReset() public {
+        _setupVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        cb.updateBreaker(vol, 1000 ether);
+
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // Small value — if bug were present (windowValue not cleared), this would re-trip
+        bool reTripped = cb.updateBreaker(vol, 1 ether);
+        assertFalse(reTripped, "CB-05: _updateBreaker auto-reset must clear old windowValue");
+        assertEq(cb.getWindowValue(vol), 1 ether, "windowValue must only be the new trade amount");
+    }
+
+    /// @dev Verify the breaker blocks during cooldown and auto-clears exactly at expiry.
+    ///      The condition is `block.timestamp < trippedAt + cooldownPeriod`, so equality
+    ///      means the cooldown has expired and auto-reset triggers.
+    function test_cb05_checkBreaker_revertsInCooldown_clearsAtExpiry() public {
+        _setupVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+        uint256 tripTime = block.timestamp;
+
+        cb.updateBreaker(vol, 1000 ether);
+
+        // One second BEFORE cooldown ends: timestamp < trippedAt + cooldown → still locked
+        vm.warp(tripTime + 1 hours - 1);
+        vm.expectRevert(abi.encodeWithSelector(CircuitBreaker.BreakerTrippedError.selector, vol));
+        cb.checkBreaker(vol);
+
+        // At exactly trippedAt + cooldown: timestamp == trippedAt + cooldown → NOT < → auto-reset
+        vm.warp(tripTime + 1 hours);
+        cb.checkBreaker(vol); // must not revert
+
+        assertEq(cb.getWindowValue(vol), 0, "windowValue must be zero when cooldown expires");
+    }
+
+    /// @dev A fresh threshold-sized trade after reset should legitimately re-trip
+    ///      (this is correct behavior — threshold is freshly reached with new data).
+    function test_cb05_freshThresholdTrade_legitimatelyRetrips() public {
+        _setupVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        cb.updateBreaker(vol, 1000 ether);
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // After reset, a brand-new full-threshold trade should trip (this is correct)
+        cb.checkBreaker(vol);
+        bool reTripped = cb.updateBreaker(vol, 1000 ether);
+        assertTrue(reTripped, "A fresh threshold-sized trade must still trip after reset");
+    }
+
+    /// @dev Multiple trip-reset cycles: each cycle must produce a clean slate.
+    function test_cb05_multipleCycles_eachCycleCleansWindow() public {
+        _setupVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        for (uint256 i = 0; i < 3; i++) {
+            // Trip
+            cb.updateBreaker(vol, 1000 ether);
+            (, bool tripped,,,) = cb.getBreakerStatus(vol);
+            assertTrue(tripped, "Should be tripped at cycle start");
+
+            // Expire and auto-reset via modifier path
+            vm.warp(block.timestamp + 1 hours + 1);
+            cb.checkBreaker(vol);
+
+            // Verify clean slate after each reset
+            assertEq(cb.getWindowValue(vol), 0, "windowValue must be 0 at cycle reset");
+            (, bool cleared,,,) = cb.getBreakerStatus(vol);
+            assertFalse(cleared, "Breaker must be clear after each cycle reset");
+        }
+    }
+
+    /// @dev Confirm that TRP-R24-CB03 validation is intact: configuring with zero
+    ///      threshold/cooldown/window reverts. This prevents pathological configs
+    ///      that could interact badly with CB-05's window-clearing logic.
+    function test_cb05_configValidation_preventsZeroParams() public {
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        vm.expectRevert("Threshold must be > 0");
+        cb.configureBreaker(vol, 0, 1 hours, 10 minutes);
+
+        vm.expectRevert("Cooldown must be > 0");
+        cb.configureBreaker(vol, 1000 ether, 0, 10 minutes);
+
+        vm.expectRevert("Window must be > 0");
+        cb.configureBreaker(vol, 1000 ether, 1 hours, 0);
     }
 }

@@ -128,15 +128,12 @@ contract CrossChainRouter is
     mapping(bytes32 => uint256) public bridgedDepositTimestamp;
 
     /// @notice Whether a bridged deposit has been funded with real ETH
+    /// @dev TRP-R34-NEW01: Tracks funding status separately from deposit amount
     mapping(bytes32 => bool) public bridgedDepositFunded;
 
-    /// @notice Total pending deposits (expected but NOT yet funded — no ETH held)
-    /// @dev TRP-R34-NEW01: Split from totalBridgedDeposits to fix phantom accounting.
-    ///      Incremented in _handleCommit, decremented in fundBridgedDeposit/recoverExpiredDeposit.
-    uint256 public totalPendingDeposits;
-
-    /// @notice Total funded bridged deposits (real ETH held by router for auction commits)
-    /// @dev Invariant: address(this).balance >= totalBridgedDeposits (always true)
+    /// @notice Total bridged deposits actually funded and held by this contract
+    /// @dev TRP-R34-NEW01: Only incremented when real ETH arrives via fundBridgedDeposit(),
+    ///      NEVER in _handleCommit(). Prevents phantom deposit inflation.
     uint256 public totalBridgedDeposits;
 
     /// @notice Expiry duration for bridged deposits (default 24 hours)
@@ -178,6 +175,8 @@ contract CrossChainRouter is
     event CrossChainRevealFailed(bytes32 indexed commitId, uint32 indexed srcEid, string reason);
     event BridgedDepositFunded(bytes32 indexed commitId, uint256 amount);
     event BridgedDepositRecovered(bytes32 indexed commitId, address indexed depositor, uint256 amount);
+    /// @notice TRP-R34-NEW01: Emitted when a cross-chain commit is received but awaiting funding.
+    event BridgedCommitPendingFunding(bytes32 indexed commitId, uint256 expectedAmount);
     /// @notice NEW-04: Emitted when an unfunded commit expires. Depositor must reclaim on srcChainId.
     event CrossChainCommitExpired(
         bytes32 indexed commitId,
@@ -524,13 +523,13 @@ contract CrossChainRouter is
         // Store for local processing
         pendingCommits[commitId] = commit;
 
-        // TRP-R34-NEW01: Track expected deposit in pending (NOT totalBridgedDeposits).
-        // No ETH has arrived yet — only a LayerZero message. Real ETH arrives via fundBridgedDeposit().
-        // totalBridgedDeposits must only reflect ETH actually held by the router.
+        // TRP-R34-NEW01: Record expected deposit amount but do NOT credit totalBridgedDeposits.
+        // No ETH has arrived yet — the message came via LayerZero without value transfer.
+        // totalBridgedDeposits is only incremented in fundBridgedDeposit() when real ETH arrives.
         bridgedDeposits[commitId] = commit.depositAmount;
         bridgedDepositTimestamp[commitId] = block.timestamp;
-        totalPendingDeposits += commit.depositAmount;
 
+        emit BridgedCommitPendingFunding(commitId, commit.depositAmount);
         emit CrossChainCommitReceived(commitId, srcEid, commit.depositor);
     }
 
@@ -544,26 +543,26 @@ contract CrossChainRouter is
         require(commit.depositor != address(0), "Unknown commit");
         require(msg.value >= commit.depositAmount, "Insufficient deposit");
         require(bridgedDeposits[commitId] > 0, "Already funded or not pending");
+        require(!bridgedDepositFunded[commitId], "Already funded");
 
         // Cache deposit amount before state changes (CEI pattern)
         uint256 depositAmount = commit.depositAmount;
         uint256 excess = msg.value - depositAmount;
 
-        // TRP-R34-NEW01: ETH has arrived. Move from pending to funded tracking.
-        // Since we immediately forward to auction in the same tx, totalBridgedDeposits
-        // is a transient state here. But we track it for the invariant:
-        //   address(this).balance >= totalBridgedDeposits
-        totalPendingDeposits -= depositAmount;
+        // TRP-R34-NEW01: Mark as funded and clear pending state BEFORE external calls (CEI)
+        bridgedDepositFunded[commitId] = true;
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
         // TRP-R22-NEW08: Clean up pendingCommits after funding to prevent reveal replay
         delete pendingCommits[commitId];
 
         // Now forward to auction with verified funds
-        // TODO(TRP-R35-NEW03): Use commitOrderOnBehalf once implemented in CommitRevealAuction
+        // TODO(TRP-R35-NEW03): Use commitOrderCrossChain once R35 is merged
         ICommitRevealAuction(auction).commitOrder{value: depositAmount}(
             commit.commitHash
         );
+
+        emit BridgedDepositFunded(commitId, depositAmount);
 
         // Refund excess
         if (excess > 0) {
@@ -849,14 +848,11 @@ contract CrossChainRouter is
             // claimExpiredDeposit() from their destination-chain address.
             totalBridgedDeposits -= depositAmount;
             claimableDeposits[commitId] = depositAmount;
-            // Record the authorized claimer: only commit.depositor (or owner) may withdraw.
             claimableDepositOwner[commitId] = commit.depositor;
             emit ClaimableDepositStored(commitId, commit.depositor, depositAmount);
         } else {
-            // UNFUNDED: ETH never arrived on this chain — it still lives in the source-chain
-            // CommitRevealAuction. Only clean up destination-chain accounting here.
+            // UNFUNDED: ETH never arrived — only clean up accounting.
             // The depositor must reclaim on srcChainId.
-            totalPendingDeposits -= depositAmount;
             emit CrossChainCommitExpired(
                 commitId,
                 commit.depositor,

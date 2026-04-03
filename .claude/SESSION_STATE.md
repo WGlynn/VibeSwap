@@ -1,52 +1,55 @@
-# Session Tip — 2026-04-03 (Session 5)
+# Session Tip — 2026-04-03 (Session 6)
 
 ## Block Header
-- **Session**: TRP R44-R53 (10 rounds — all HIGHs + MEDs + test regressions)
-- **Parent**: `87b37a84`
+- **Session**: Full Stack RSI — 2 Cycles Complete
+- **Parent**: `60289ee7`
 - **Branch**: `master`
-- **Status**: 10 rounds completed. All CRITICAL/HIGH/MEDIUM closed. Test suites green.
+- **Status**: ALL LOOPS COMPLETE (except R1 Integration)
 
 ## What Changed This Session
 
-### TRP Rounds R44-R53 — All Resolved
+### Cycle 1
 
-| Round | Finding | Severity | Status | Notes |
-|-------|---------|----------|--------|-------|
-| R44 | CB-02 VibeSwapCore CB integration | HIGH | ALREADY FIXED | Verified: inherits CircuitBreaker |
-| R45 | INT-01 UUPSUpgradeable | HIGH | **FIXED** | Added to VibeAMM, CRA, CrossChainRouter |
-| R46 | R1-F02 Collateral validation at reveal | HIGH | **FIXED** | All 3 reveal paths validate deposit |
-| R47 | N03 Quality weight front-running | HIGH | ALREADY FIXED | Snapshot at game creation |
-| R48 | NEW-05 Liquidity state spoofing | MED | **FIXED** | 50% rate-of-change limit |
-| R48 | NEW-07 Priority bid from router surplus | MED | **FIXED** | Cross-chain priority bids disabled |
-| R48 | NEW-10 sendCommit depositor identity | MED | **FIXED** | Explicit depositor param |
-| R49 | N06 Halving at creation vs settlement | MED | **FIXED** | Moved to settlement time |
-| R50-R51 | VibeAMM test regressions | REGRESSION | **FIXED** | 3 test fixes (donation, breaker, fee token) |
-| R52-R53 | CRA test regressions | REGRESSION | **FIXED** | 65 test fixes (collateral + vm.roll) |
+| Loop | Key Output |
+|------|-----------|
+| R0 (Density) | 17 files deleted, SKB/GKB counts fixed (98→379 contracts, 76→516 tests), protocol chain deduped |
+| R2 (Knowledge) | 6 design primitives + 12-pattern taxonomy paper |
+| R3 (Capability) | 3 TRP scripts (heatmap, regression, round-gen) + heatmap updated to R53 |
+| Loop 2 (Papers) | 3 papers: TRP empirical RSI, GEV resistance, settlement-time binding |
 
-### Architecture Changes
-- UUPSUpgradeable on VibeAMM, CommitRevealAuction, CrossChainRouter
-- sendCommit: added `address depositor` parameter
-- Halving moved from game creation to settlement in ShapleyDistributor
-- Collateral validation at all 3 reveal paths in CommitRevealAuction
-- Liquidity sync rate-of-change validation in CrossChainRouter
-- TRP_RUNNER.md bumped to v3.0 (efficiency block, heat map, round template)
+### Cycle 2
 
-### Test Results
-- CrossChainRouter.t.sol: 41/41
-- ShapleyDistributor.t.sol: 65/65
-- VibeAMM.t.sol: 24/24
-- VibeAMMLite.t.sol: 59/59
-- CommitRevealAuctionTRP.t.sol: 111/111
+| Loop | Key Output |
+|------|-----------|
+| R0 v2 | SKB architecture updated (12→31 dirs) |
+| R1 v2 + R3 v2 | 4 bugs fixed in TRP scripts, 29 issues found |
+| R2 v2 | Trusted-doc-drift primitive, GKB TRP glyph updated |
+| Loop 2 v2 | Section 9.5 (second-order recursion) added to TRP paper |
+
+### New Files Created
+- `memory/primitive_deposit-identity-propagation.md`
+- `memory/primitive_settlement-time-binding.md`
+- `memory/primitive_rate-of-change-guards.md`
+- `memory/primitive_collateral-path-independence.md`
+- `memory/primitive_batch-invariant-verification.md`
+- `memory/primitive_discovery-ceiling.md`
+- `memory/primitive_trusted-doc-drift.md`
+- `docs/papers/trp-pattern-taxonomy.md`
+- `docs/papers/trp-empirical-rsi.md`
+- `docs/papers/from-mev-to-gev.md` (rewritten)
+- `docs/papers/settlement-time-parameter-binding.md`
+- `scripts/trp-heatmap.sh`
+- `scripts/trp-regression.sh`
+- `scripts/trp-round-gen.sh`
+
+### Files Modified
+- `JarvisxWill_GKB.md` — counts, sync date, TRP glyph
+- `JarvisxWill_SKB.md` — counts, architecture tree, DEEP$ in TIER 14
+- `MEMORY.md` — reindexed, MIT Expo added, TRP primitives section
+- `docs/trp/efficiency-heatmap.md` — updated to R53, tooling section
+- `~/.claude/CLAUDE.md` — protocol chain compressed
 
 ## Pending / Next Session
-
-### ALL CRITICAL, HIGH, AND MEDIUM FINDINGS CLOSED.
-
-### Remaining
-- Pre-existing VibeAMMSecurity test (20/21 — 1 unrelated failure from previous session?)
-- Broader test suite verification (run full non-via_ir build)
-
-### TRP Tier
-- Previous: Tier 39 → 44 (R44-R48)
-- This session: +5 more (R49-R53)
-- **Estimated: Tier 49**
+- R1 (Integration): Cross-contract adversarial flows (Core→CRA→AMM→Shapley as system)
+- MIT Bitcoin Expo: April 10-12 (7 days)
+- Commit and push this session's work

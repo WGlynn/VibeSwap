@@ -134,23 +134,33 @@ The DEX, the contracts, the frontend, the CKB port — these are implementations
 
 Philosophy: **Cooperative Capitalism** — mutualized risk + free market competition + pluralist governance. Every primitive embodies collective benefit and individual sovereignty.
 
-### Architecture (98 contracts, Feb 2026)
+### Architecture (379 contracts, Apr 2026)
 
 ```
-contracts/
-├── core/           # CommitRevealAuction, VibeSwapCore, CircuitBreaker, BatchSettlement
-├── amm/            # VibeAMM, VibeLP, VibePoolFactory, Curves (CP, StableSwap)
-├── governance/     # DAOTreasury, TreasuryStabilizer, ConvictionVoting, Forum
-├── incentives/     # ShapleyDistributor, ILProtection, LoyaltyRewards
-├── messaging/      # CrossChainRouter (LayerZero V2)
-├── oracles/        # ReputationOracle, TWAPOracle
-├── financial/      # wBAR, VibeLPNFT, VibeStream, VibeOptions, VibeYieldStable,
-│                   # VibeBonds, VibeCredit, VibeSynth, VibeInsurance, VibeRevShare
-├── hooks/          # VibeHookRegistry, hook interfaces
-├── identity/       # SoulboundIdentity, DIDRegistry
-├── compliance/     # KYCVerifier, SanctionsList
-├── quantum/        # LatticeSig, DilithiumVerifier
-└── libraries/      # BatchMath, DeterministicShuffle, TWAPOracle
+contracts/                     # 379 contracts across 31 directories
+├── mechanism/    (102)        # Batch auctions, prediction markets, dispute resolution
+├── core/          (13)        # CommitRevealAuction, VibeSwapCore, CircuitBreaker
+├── amm/            (8)        # VibeAMM, VibeLP, VibePoolFactory, Curves
+├── financial/     (20)        # wBAR, Bonds, Credit, Synths, Insurance, Streaming, Options
+├── incentives/    (19)        # ShapleyDistributor, ILProtection, LoyaltyRewards, Emission
+├── governance/    (14)        # DAOTreasury, TreasuryStabilizer, ConvictionVoting, Forum
+├── settlement/    (15)        # Batch settlement, clearing, execution
+├── identity/      (15)        # SoulboundIdentity, DIDRegistry, reputation
+├── agents/        (15)        # AI agent infrastructure, strategy vaults
+├── libraries/     (15)        # BatchMath, DeterministicShuffle, TWAPOracle
+├── interfaces/    (12)        # Contract interfaces
+├── security/       (9)        # Guards, validators, access control
+├── community/      (6)        # Social, forum, contribution tracking
+├── rwa/            (5)        # Real-world asset tokenization
+├── oracles/        (4)        # ReputationOracle, TWAPOracle, price feeds
+├── quantum/        (4)        # LatticeSig, DilithiumVerifier
+├── monetary/       (4)        # JUL, emission, elastic money
+├── depin/          (4)        # Decentralized physical infrastructure
+├── compliance/     (4)        # KYCVerifier, SanctionsList
+├── hooks/          (2)        # VibeHookRegistry, hook interfaces
+├── framework/      (2)        # Plugin registry, intent routing
+├── messaging/      (1)        # CrossChainRouter (LayerZero V2)
+└── (+9 more)                  # account, bridge, compute, consensus, metatx, naming, oracle, proxy
 ```
 
 ### Phase 2 Status
@@ -168,7 +178,7 @@ contracts/
 - **Frontend**: React 18, Vite 5, Tailwind CSS, ethers.js v6 (51 components, GE-style redesign)
 - **Oracle**: Python, Kalman filter for true price discovery
 - **Cross-chain**: LayerZero V2 OApp protocol
-- **Testing**: 76 test files — unit + fuzz + invariant (mandatory triad)
+- **Testing**: 516 test files — unit + fuzz + invariant (mandatory triad)
 
 ### Git Protocol
 
@@ -339,6 +349,12 @@ The field now has a name for what we do: "context engineering." Gartner predicts
 **Their finding**: MIRIX uses 6 memory types (Core, Episodic, Semantic, Procedural, Resource, Knowledge Vault) managed by dedicated agents + meta-controller.
 
 **Our implementation**: CKB (Core), SESSION_STATE (Episodic), MEMORY.md (Semantic index), TRP (Procedural), docs/ (Knowledge Vault). We have 5 of 6 types operational. The meta-controller is the protocol chain in CLAUDE.md.
+
+### 7. DeepFunding — Log-Space Scoring & Dependency DAG (SingularityNET, 2026)
+
+**Their finding**: Retroactive funding with log-space scoring, human jury calibration, and dependency DAG credit flow. Contributors earn based on graph position and marginal value.
+
+**Our implementation**: ContributionDAG + FractalShapley + Augmented Governance. Will gave them the Shapley fairness idea; they gave us the DAG credit flow model. Mutual intellectual debt. Repos cloned in `research/`.
 
 ### Summary: We're not behind. We're ahead.
 

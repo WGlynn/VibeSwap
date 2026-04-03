@@ -2,7 +2,7 @@
 
 **Faraday1, JARVIS**
 **March 2026 | VibeSwap Research**
-**Revision: v3.0 (Hybrid Escalation)**
+**Revision: v3.1 (Qwen Integration)**
 
 ---
 
@@ -27,6 +27,7 @@ Theoretical availability with 13 independent providers at 95% individual uptime:
 | v1.0 | Jan 2026 | Cascade Down | Premium-first, degrade on failure |
 | v2.0 | Feb 2026 | Skill-Based Routing | Cooperative routing by task type, still premium-first |
 | v3.0 | Mar 2026 | Hybrid Escalation | Start cheap, level up on demand. Quality-gate-driven auto-escalation |
+| v3.1 | Apr 2026 | Qwen Integration | Qwen 3.6 Plus (free, 0.80 quality, 1M context) as Tier 0 lead for coding/math/moderate. A/B tested. Capacity +36% |
 
 ---
 
@@ -84,16 +85,19 @@ Providers are organized into three cost tiers. Tier assignment is based on cost,
 
 #### Tier 0 -- Free ($0/MTok)
 
-| Provider | Model | Quality Score | Typical Latency | Daily Capacity |
-|----------|-------|--------------|-----------------|----------------|
-| Groq | llama-3.3-70b-versatile | 0.60 | ~0.3s | ~1M tok |
-| Cerebras | llama-3.3-70b | 0.60 | ~0.5s | ~1M tok |
-| SambaNova | llama-3.3-70b | 0.60 | ~0.5s | ~1M tok |
-| Fireworks | llama-v3p3-70b-instruct | 0.58 | ~0.8s | ~500K tok |
-| Novita | llama-3.3-70b-instruct | 0.55 | ~1s | ~500K tok |
-| OpenRouter | deepseek-r1:free | 0.55 | ~3s | ~500K tok |
-| Mistral | mistral-small-latest | 0.50 | ~1s | ~500K tok |
-| Together | Llama-3.3-70B-Instruct-Turbo | 0.60 | ~1s | ~500K tok |
+| Provider | Model | Quality Score | Typical Latency | Daily Capacity | Notes |
+|----------|-------|--------------|-----------------|----------------|-------|
+| **OpenRouter** | **qwen3.6-plus:free** | **0.80** | **~5s** | **~2M tok** | **1M context, zero hallucination on A/B test, Hybrid Gated DeltaNet** |
+| Groq | llama-3.3-70b-versatile | 0.60 | ~0.3s | ~1M tok | |
+| Cerebras | llama-3.3-70b | 0.60 | ~0.5s | ~1M tok | |
+| SambaNova | llama-3.3-70b | 0.60 | ~0.5s | ~1M tok | |
+| Fireworks | llama-v3p3-70b-instruct | 0.58 | ~0.8s | ~500K tok | |
+| Novita | llama-3.3-70b-instruct | 0.55 | ~1s | ~500K tok | |
+| OpenRouter | deepseek-r1:free | 0.55 | ~3s | ~500K tok | |
+| Mistral | mistral-small-latest | 0.50 | ~1s | ~500K tok | |
+| Together | Llama-3.3-70B-Instruct-Turbo | 0.60 | ~1s | ~500K tok | |
+
+**Qwen 3.6 Plus addition (v3.1, April 2026):** A/B tested against Claude Opus 4.6 on DeFi mechanism design prompt. Scored 32/40 vs Claude's 37/40 — zero hallucination, strong on auction theory and financial reasoning. Quality gap is context-specific (protocol architecture knowledge), not capability. At 0.80 quality score and $0 cost, Qwen is the highest-quality free-tier provider and the preferred starting point for `coding`, `math`, and `moderate` classifications.
 
 #### Tier 1 -- Budget (~$0.50/MTok)
 
@@ -170,14 +174,16 @@ Each classification maps to a cost-ascending escalation chain. The system tries 
 
 ```
 simple    : groq[T0] → cerebras[T0] → sambanova[T0] → fireworks[T0] → deepseek[T1] → gemini[T1] → ollama[T1]
-moderate  : groq[T0] → cerebras[T0] → sambanova[T0] → deepseek[T1] → gemini[T1] → xai[T2] → claude[T2]
-coding    : deepseek[T1] → gemini[T1] → openai[T2] → xai[T2] → claude[T2]
-math      : deepseek[T1] → gemini[T1] → openai[T2] → xai[T2] → claude[T2]
+moderate  : qwen[T0] → groq[T0] → cerebras[T0] → deepseek[T1] → gemini[T1] → xai[T2] → claude[T2]
+coding    : qwen[T0] → deepseek[T1] → gemini[T1] → openai[T2] → xai[T2] → claude[T2]
+math      : qwen[T0] → deepseek[T1] → gemini[T1] → openai[T2] → xai[T2] → claude[T2]
 multimodal: gemini[T1] → xai[T2] → claude[T2] → openai[T2]
-reasoning : claude[T2] → xai[T2] → openai[T2] → deepseek[T1] → gemini[T1]
+reasoning : claude[T2] → xai[T2] → openai[T2] → qwen[T0] → deepseek[T1] → gemini[T1]
 tooluse   : claude[T2] → openai[T2] → xai[T2] → deepseek[T1]
-complex   : claude[T2] → xai[T2] → openai[T2] → deepseek[T1] → gemini[T1]
+complex   : claude[T2] → xai[T2] → openai[T2] → qwen[T0] → deepseek[T1] → gemini[T1]
 ```
+
+**v3.1 chain changes:** Qwen 3.6 Plus inserted as first try for `moderate`, `coding`, and `math` (highest quality at Tier 0). For `reasoning` and `complex`, Qwen is a strong fallback after premium tier — 0.80 quality at $0 is better than most Tier 1 options. Qwen excluded from `simple` (overkill — latency matters more than quality for greetings) and `tooluse` (tool calling not tested yet).
 
 Within each tier, providers are ordered by skill fit (best specialist first for that task type).
 
@@ -266,34 +272,35 @@ For a network of `N` shards, each with `P` free-tier providers, where provider `
 Total_free_capacity = N × Σ(C_p) for p = 1..P
 ```
 
-With current production values (N=3 shards, P=8 free providers):
+With current production values (N=3 shards, P=9 free providers):
 
-| Provider | Per-Shard Capacity | × 3 Shards |
-|----------|-------------------|------------|
-| Groq | 1M tok/day | 3M tok/day |
-| Cerebras | 1M tok/day | 3M tok/day |
-| SambaNova | 1M tok/day | 3M tok/day |
-| Fireworks | 500K tok/day | 1.5M tok/day |
-| OpenRouter | 500K tok/day | 1.5M tok/day |
-| Together | 500K tok/day | 1.5M tok/day |
-| Mistral | 500K tok/day | 1.5M tok/day |
-| Novita | 500K tok/day | 1.5M tok/day |
-| **Total** | **5.5M tok/day** | **16.5M tok/day** |
+| Provider | Per-Shard Capacity | × 3 Shards | Quality |
+|----------|-------------------|------------|---------|
+| **Qwen 3.6 Plus** | **2M tok/day** | **6M tok/day** | **0.80** |
+| Groq | 1M tok/day | 3M tok/day | 0.60 |
+| Cerebras | 1M tok/day | 3M tok/day | 0.60 |
+| SambaNova | 1M tok/day | 3M tok/day | 0.60 |
+| Fireworks | 500K tok/day | 1.5M tok/day | 0.58 |
+| OpenRouter (DR1) | 500K tok/day | 1.5M tok/day | 0.55 |
+| Together | 500K tok/day | 1.5M tok/day | 0.60 |
+| Mistral | 500K tok/day | 1.5M tok/day | 0.50 |
+| Novita | 500K tok/day | 1.5M tok/day | 0.55 |
+| **Total** | **7.5M tok/day** | **22.5M tok/day** | |
 
-Daily requirement: ~925K tokens. Three-shard free capacity: 16.5M tokens.
+Daily requirement: ~925K tokens. Three-shard free capacity: 22.5M tokens.
 
-**Headroom: 17.8x at Tier 0 alone.** The entire network could run on free-tier providers and still have 16x capacity margin.
+**Headroom: 24.3x at Tier 0 alone.** Qwen 3.6 Plus adds 6M tok/day across 3 shards at 0.80 quality — higher quality than any other Tier 0 provider by a significant margin.
 
 ### 5.3 Scaling Law
 
 ```
-Free_headroom(N) = (N × 5.5M) / 925K
-                 = N × 5.95
+Free_headroom(N) = (N × 7.5M) / 925K
+                 = N × 8.11
 
-Free_headroom(1)  =  5.95x
-Free_headroom(3)  = 17.84x
-Free_headroom(10) = 59.46x
-Free_headroom(100)= 594.6x
+Free_headroom(1)  =  8.11x
+Free_headroom(3)  = 24.32x
+Free_headroom(10) = 81.08x
+Free_headroom(100)= 810.8x
 ```
 
 **Free compute scales linearly with shard count.** Demand scales sub-linearly (many queries are broadcast and answered once for the network via CRPC consensus). The gap widens as the network grows.

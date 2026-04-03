@@ -100,6 +100,7 @@ contract VibeSwapCore is
         address trader;
         uint256 amountIn;
         uint256 estimatedOut;
+        uint256 expectedMinOut; // INT-R1-FT007: preserve slippage threshold for retry
         bytes reason;
         uint256 timestamp;
     }
@@ -1249,7 +1250,7 @@ contract VibeSwapCore is
                 poolId, order.trader, order.amountIn, estimatedOut, order.minAmountOut
             ) {} catch (bytes memory reason) {
                 emit ExecutionTrackingFailed(poolId, order.trader, reason);
-                _queueFailedExecution(poolId, order.trader, order.amountIn, estimatedOut, reason);
+                _queueFailedExecution(poolId, order.trader, order.amountIn, estimatedOut, order.minAmountOut, reason);
             }
         }
 
@@ -1271,6 +1272,7 @@ contract VibeSwapCore is
         address trader,
         uint256 amountIn,
         uint256 estimatedOut,
+        uint256 expectedMinOut,
         bytes memory reason
     ) internal {
         if (failedExecutions.length >= MAX_FAILED_QUEUE) return;
@@ -1280,6 +1282,7 @@ contract VibeSwapCore is
             trader: trader,
             amountIn: amountIn,
             estimatedOut: estimatedOut,
+            expectedMinOut: expectedMinOut, // INT-R1-FT007: preserve for retry
             reason: reason,
             timestamp: block.timestamp
         }));
@@ -1335,8 +1338,10 @@ contract VibeSwapCore is
         // Clear before retry to prevent reentrancy
         delete failedExecutions[index];
 
+        // INT-R1-FT007: Pass stored expectedMinOut instead of 0. Without this,
+        // slippage guarantee recording is bypassed on retry (0 always passes check).
         try incentiveController.recordExecution(
-            failed.poolId, failed.trader, failed.amountIn, failed.estimatedOut, 0
+            failed.poolId, failed.trader, failed.amountIn, failed.estimatedOut, failed.expectedMinOut
         ) {
             emit FailedExecutionRetried(index, true);
         } catch {

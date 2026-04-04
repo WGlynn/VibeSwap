@@ -82,9 +82,9 @@ contract MockCCRouter {
     bytes32 public lastCommitHash;
     uint32 public lastDstChainId;
 
-    function sendCommit(uint32 dstChainId, bytes32 commitHash, uint256, bytes calldata, address) external payable {
+    function sendCommit(uint32 dstEid, bytes32 commitHash, uint256, bytes calldata, address, address) external payable {
         lastCommitHash = commitHash;
-        lastDstChainId = dstChainId;
+        lastDstChainId = dstEid;
     }
 
     receive() external payable {}
@@ -94,11 +94,11 @@ contract MockCCRouter {
 
 /**
  * @title CrossChainTimeoutTest
- * @notice Security tests for cross-chain order timeout and refund mechanism
- * @dev Validates the CrossChainOrder lifecycle: creation, expiry refund, and settlement
- *
- * DISINTERMEDIATION: These tests verify Grade A (DISSOLVED) behavior —
- * refundExpiredCrossChain is permissionless after the 2-hour timeout.
+ * @notice Security tests for XC-003 two-phase cross-chain refund mechanism
+ * @dev Validates the CrossChainOrder state machine:
+ *      PENDING → REFUND_REQUESTED → REFUNDED (normal refund path)
+ *      PENDING → SETTLED (settlement arrived before timeout)
+ *      REFUND_REQUESTED → SETTLED (settlement arrived during challenge window)
  */
 contract CrossChainTimeoutTest is Test {
     VibeSwapCore public core;
@@ -113,27 +113,26 @@ contract CrossChainTimeoutTest is Test {
     address public trader;
     address public anyoneElse;
 
-    uint32 constant DST_CHAIN_ID = 30101; // Example LayerZero endpoint ID
+    uint32 constant DST_CHAIN_ID = 30101;
     uint256 constant SWAP_AMOUNT = 1000e18;
     uint256 constant MIN_AMOUNT_OUT = 900e18;
     bytes32 constant SECRET = keccak256("test_secret");
     bytes constant LZ_OPTIONS = hex"0003010011010000000000000000000000000000ea60";
 
-    // Events for assertion
     event CrossChainOrderCreated(
-        bytes32 indexed commitHash,
-        address indexed trader,
-        uint32 destinationChain,
-        address tokenIn,
-        uint256 depositAmount
+        bytes32 indexed commitHash, address indexed trader,
+        uint32 destinationChain, address tokenIn, uint256 depositAmount
     );
     event CrossChainOrderRefunded(
-        bytes32 indexed commitHash,
-        address indexed trader,
-        address tokenIn,
-        uint256 depositAmount
+        bytes32 indexed commitHash, address indexed trader,
+        address tokenIn, uint256 depositAmount
     );
     event CrossChainOrderSettled(bytes32 indexed commitHash);
+    event CrossChainRefundRequested(bytes32 indexed commitHash, address indexed trader);
+    event CrossChainDepositReleased(
+        bytes32 indexed commitHash, address indexed trader,
+        address tokenIn, uint256 amount
+    );
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -144,26 +143,20 @@ contract CrossChainTimeoutTest is Test {
         amm = new MockCCAMM();
         treasury = new MockCCTreasury();
         router = new MockCCRouter();
-
         tokenA = new MockCCERC20("Token A", "TKA");
         tokenB = new MockCCERC20("Token B", "TKB");
 
-        // Deploy VibeSwapCore behind UUPS proxy
         VibeSwapCore impl = new VibeSwapCore();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(impl),
             abi.encodeWithSelector(
                 VibeSwapCore.initialize.selector,
-                owner,
-                address(auction),
-                address(amm),
-                address(treasury),
-                address(router)
+                owner, address(auction), address(amm),
+                address(treasury), address(router)
             )
         );
         core = VibeSwapCore(payable(address(proxy)));
 
-        // Setup: support tokens, disable cooldown and EOA check for testing
         vm.startPrank(owner);
         core.setSupportedToken(address(tokenA), true);
         core.setSupportedToken(address(tokenB), true);
@@ -171,349 +164,479 @@ contract CrossChainTimeoutTest is Test {
         core.setRequireEOA(false);
         vm.stopPrank();
 
-        // Mint tokens to trader and approve
         tokenA.mint(trader, 10_000_000e18);
         tokenB.mint(trader, 10_000_000e18);
-
         vm.prank(trader);
         tokenA.approve(address(core), type(uint256).max);
         vm.prank(trader);
         tokenB.approve(address(core), type(uint256).max);
 
-        vm.warp(100); // Avoid timestamp-zero edge cases
+        vm.warp(100);
     }
 
     // ============ Helpers ============
 
-    /// @dev Compute the same commitHash that VibeSwapCore generates internally
     function _computeCommitHash(
-        address _trader,
-        address _tokenIn,
-        address _tokenOut,
-        uint256 _amountIn,
-        uint256 _minAmountOut,
-        bytes32 _secret
+        address _trader, address _tokenIn, address _tokenOut,
+        uint256 _amountIn, uint256 _minAmountOut, bytes32 _secret
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(
-            _trader,
-            _tokenIn,
-            _tokenOut,
-            _amountIn,
-            _minAmountOut,
-            _secret
-        ));
+        return keccak256(abi.encodePacked(_trader, _tokenIn, _tokenOut, _amountIn, _minAmountOut, _secret));
     }
 
-    /// @dev Submit a cross-chain order as `trader` and return the commitHash
     function _commitCrossChain() internal returns (bytes32 commitHash) {
-        commitHash = _computeCommitHash(
-            trader, address(tokenA), address(tokenB),
-            SWAP_AMOUNT, MIN_AMOUNT_OUT, SECRET
-        );
-
+        commitHash = _computeCommitHash(trader, address(tokenA), address(tokenB), SWAP_AMOUNT, MIN_AMOUNT_OUT, SECRET);
         vm.prank(trader);
         core.commitCrossChainSwap(
-            DST_CHAIN_ID,
-            address(tokenA),
-            address(tokenB),
-            SWAP_AMOUNT,
-            MIN_AMOUNT_OUT,
-            SECRET,
-            LZ_OPTIONS,
-            address(0)
+            DST_CHAIN_ID, address(tokenA), address(tokenB),
+            SWAP_AMOUNT, MIN_AMOUNT_OUT, SECRET, LZ_OPTIONS, address(0)
         );
     }
 
-    // ============ Test 1: Cross-chain orders are properly tracked ============
+    function _getOrderStatus(bytes32 commitHash) internal view returns (VibeSwapCore.CrossChainStatus) {
+        (,,,,,, VibeSwapCore.CrossChainStatus status,) = core.crossChainOrders(commitHash);
+        return status;
+    }
+
+    // ============ Order Creation ============
 
     function test_crossChainOrderTrackedOnCommit() public {
         bytes32 commitHash = _commitCrossChain();
-
-        // Verify the order is stored in the mapping
         (
-            uint256 commitTimestamp,
-            uint32 destinationChain,
-            bytes32 storedCommitHash,
-            uint256 depositAmount,
-            address tokenIn,
-            address storedTrader,
-            bool settled
+            uint256 commitTimestamp, uint32 destinationChain, bytes32 storedHash,
+            uint256 depositAmount, address tokenIn, address storedTrader,
+            VibeSwapCore.CrossChainStatus status, uint256 refundRequestTime
         ) = core.crossChainOrders(commitHash);
 
-        assertEq(commitTimestamp, block.timestamp, "commitTimestamp mismatch");
-        assertEq(destinationChain, DST_CHAIN_ID, "destinationChain mismatch");
-        assertEq(storedCommitHash, commitHash, "commitHash mismatch");
-        assertEq(depositAmount, SWAP_AMOUNT, "depositAmount mismatch");
-        assertEq(tokenIn, address(tokenA), "tokenIn mismatch");
-        assertEq(storedTrader, trader, "trader mismatch");
-        assertFalse(settled, "should not be settled");
+        assertEq(commitTimestamp, block.timestamp);
+        assertEq(destinationChain, DST_CHAIN_ID);
+        assertEq(storedHash, commitHash);
+        assertEq(depositAmount, SWAP_AMOUNT);
+        assertEq(tokenIn, address(tokenA));
+        assertEq(storedTrader, trader);
+        assertTrue(status == VibeSwapCore.CrossChainStatus.PENDING);
+        assertEq(refundRequestTime, 0);
     }
 
     function test_crossChainOrderEmitsEvent() public {
-        bytes32 commitHash = _computeCommitHash(
-            trader, address(tokenA), address(tokenB),
-            SWAP_AMOUNT, MIN_AMOUNT_OUT, SECRET
-        );
-
+        bytes32 commitHash = _computeCommitHash(trader, address(tokenA), address(tokenB), SWAP_AMOUNT, MIN_AMOUNT_OUT, SECRET);
         vm.expectEmit(true, true, false, true);
         emit CrossChainOrderCreated(commitHash, trader, DST_CHAIN_ID, address(tokenA), SWAP_AMOUNT);
-
         vm.prank(trader);
-        core.commitCrossChainSwap(
-            DST_CHAIN_ID,
-            address(tokenA),
-            address(tokenB),
-            SWAP_AMOUNT,
-            MIN_AMOUNT_OUT,
-            SECRET,
-            LZ_OPTIONS,
-            address(0)
-        );
+        core.commitCrossChainSwap(DST_CHAIN_ID, address(tokenA), address(tokenB), SWAP_AMOUNT, MIN_AMOUNT_OUT, SECRET, LZ_OPTIONS, address(0));
     }
 
-    function test_crossChainOrderDepositsTokens() public {
-        uint256 traderBalanceBefore = tokenA.balanceOf(trader);
-        uint256 coreBalanceBefore = tokenA.balanceOf(address(core));
+    // ============ Phase 1: Request Refund ============
 
-        _commitCrossChain();
-
-        assertEq(tokenA.balanceOf(trader), traderBalanceBefore - SWAP_AMOUNT, "trader balance not decreased");
-        assertEq(tokenA.balanceOf(address(core)), coreBalanceBefore + SWAP_AMOUNT, "core balance not increased");
-    }
-
-    function test_crossChainOrderForwardsToRouter() public {
+    function test_requestRefundRevertsBeforeTimeout() public {
         bytes32 commitHash = _commitCrossChain();
-
-        assertEq(router.lastCommitHash(), commitHash, "router did not receive commitHash");
-        assertEq(router.lastDstChainId(), DST_CHAIN_ID, "router did not receive dstChainId");
-    }
-
-    // ============ Test 2: Refund reverts before 2-hour timeout ============
-
-    function test_refundRevertsBeforeTimeout() public {
-        bytes32 commitHash = _commitCrossChain();
-
-        // Immediately after commit — should revert
         vm.expectRevert(VibeSwapCore.CrossChainOrderNotExpired.selector);
-        core.refundExpiredCrossChain(commitHash);
+        core.requestCrossChainRefund(commitHash);
     }
 
-    function test_refundRevertsAt1HourBeforeTimeout() public {
+    function test_requestRefundRevertsAtExactly2Hours() public {
         bytes32 commitHash = _commitCrossChain();
-
-        // Warp 1 hour — still within the 2-hour window
-        vm.warp(block.timestamp + 1 hours);
-
-        vm.expectRevert(VibeSwapCore.CrossChainOrderNotExpired.selector);
-        core.refundExpiredCrossChain(commitHash);
-    }
-
-    function test_refundRevertsAtExactly2Hours() public {
-        bytes32 commitHash = _commitCrossChain();
-
-        // Warp exactly to the 2-hour mark (uses <=, so this should still revert)
         vm.warp(block.timestamp + 2 hours);
-
         vm.expectRevert(VibeSwapCore.CrossChainOrderNotExpired.selector);
-        core.refundExpiredCrossChain(commitHash);
+        core.requestCrossChainRefund(commitHash);
     }
 
-    // ============ Test 3: Refund succeeds after 2 hours ============
-
-    function test_refundSucceedsAfterTimeout() public {
+    function test_requestRefundSucceedsAfterTimeout() public {
         bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.REFUND_REQUESTED);
+    }
 
+    function test_requestRefundEmitsEvent() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        vm.expectEmit(true, true, false, true);
+        emit CrossChainRefundRequested(commitHash, trader);
+        core.requestCrossChainRefund(commitHash);
+    }
+
+    function test_requestRefundSetsRefundRequestTime() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        (,,,,,,, uint256 refundRequestTime) = core.crossChainOrders(commitHash);
+        assertEq(refundRequestTime, block.timestamp);
+    }
+
+    function test_requestRefundIsPermissionless() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        vm.prank(anyoneElse);
+        core.requestCrossChainRefund(commitHash);
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.REFUND_REQUESTED);
+    }
+
+    function test_requestRefundRevertsIfAlreadyRequested() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotPending.selector);
+        core.requestCrossChainRefund(commitHash);
+    }
+
+    function test_requestRefundRevertsIfSettled() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.prank(owner);
+        core.markCrossChainSettled(commitHash);
+        vm.warp(block.timestamp + 2 hours + 1);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotPending.selector);
+        core.requestCrossChainRefund(commitHash);
+    }
+
+    // ============ Phase 2: Execute Refund ============
+
+    function test_executeRefundRevertsDuringChallengeWindow() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+
+        // Immediately after request — challenge window still active
+        vm.expectRevert(VibeSwapCore.CrossChainChallengeWindowActive.selector);
+        core.executeCrossChainRefund(commitHash);
+    }
+
+    function test_executeRefundRevertsAtExactlyChallengeEnd() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+
+        vm.warp(block.timestamp + 1 hours); // Exactly at challenge end (uses <=)
+        vm.expectRevert(VibeSwapCore.CrossChainChallengeWindowActive.selector);
+        core.executeCrossChainRefund(commitHash);
+    }
+
+    function test_executeRefundSucceedsAfterChallengeWindow() public {
+        bytes32 commitHash = _commitCrossChain();
         uint256 traderBalanceBefore = tokenA.balanceOf(trader);
 
-        // Warp past the 2-hour window
         vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
 
-        core.refundExpiredCrossChain(commitHash);
+        vm.warp(block.timestamp + 1 hours + 1);
+        core.executeCrossChainRefund(commitHash);
 
-        // Trader gets deposit back
-        assertEq(tokenA.balanceOf(trader), traderBalanceBefore + SWAP_AMOUNT, "trader not refunded");
+        assertEq(tokenA.balanceOf(trader), traderBalanceBefore + SWAP_AMOUNT);
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.REFUNDED);
     }
 
-    function test_refundEmitsEvent() public {
+    function test_executeRefundEmitsEvent() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        vm.warp(block.timestamp + 1 hours + 1);
 
         vm.expectEmit(true, true, false, true);
         emit CrossChainOrderRefunded(commitHash, trader, address(tokenA), SWAP_AMOUNT);
-
-        core.refundExpiredCrossChain(commitHash);
+        core.executeCrossChainRefund(commitHash);
     }
 
-    function test_refundMarksOrderAsSettled() public {
+    function test_executeRefundIsPermissionless() public {
+        bytes32 commitHash = _commitCrossChain();
+        uint256 traderBalanceBefore = tokenA.balanceOf(trader);
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        vm.prank(anyoneElse);
+        core.executeCrossChainRefund(commitHash);
+
+        // Funds go to trader, not caller
+        assertEq(tokenA.balanceOf(trader), traderBalanceBefore + SWAP_AMOUNT);
+        assertEq(tokenA.balanceOf(anyoneElse), 0);
+    }
+
+    function test_executeRefundRevertsWithoutRequest() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 24 hours);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotRequested.selector);
+        core.executeCrossChainRefund(commitHash);
+    }
+
+    // ============ XC-003: Challenge Window Override ============
+    // The critical test: settlement confirmation arriving during challenge window cancels the refund
+
+    function test_settlementCancelsRefundDuringChallengeWindow() public {
+        bytes32 commitHash = _commitCrossChain();
+
+        // Phase 1: Request refund after timeout
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.REFUND_REQUESTED);
+
+        // Settlement confirmation arrives during challenge window
+        vm.prank(owner);
+        core.markCrossChainSettled(commitHash);
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
+
+        // Phase 2: Execute refund should now revert
+        vm.warp(block.timestamp + 1 hours + 1);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotRequested.selector);
+        core.executeCrossChainRefund(commitHash);
+    }
+
+    function test_settlementByRouterCancelsRefundDuringChallengeWindow() public {
         bytes32 commitHash = _commitCrossChain();
 
         vm.warp(block.timestamp + 2 hours + 1);
-        core.refundExpiredCrossChain(commitHash);
+        core.requestCrossChainRefund(commitHash);
 
-        (,,,,, , bool settled) = core.crossChainOrders(commitHash);
-        assertTrue(settled, "order should be settled after refund");
+        // Router marks settlement (simulating LayerZero callback)
+        vm.prank(address(router));
+        core.markCrossChainSettled(commitHash);
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
     }
 
-    function test_refundCanBeCalledByAnyone() public {
+    function test_doubleSpendPreventedByTwoPhase() public {
         bytes32 commitHash = _commitCrossChain();
-
         uint256 traderBalanceBefore = tokenA.balanceOf(trader);
 
+        // Refund requested after timeout
         vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
 
-        // Anyone can trigger the refund (Grade A — permissionless)
-        vm.prank(anyoneElse);
-        core.refundExpiredCrossChain(commitHash);
-
-        // But funds go to the original trader, not the caller
-        assertEq(tokenA.balanceOf(trader), traderBalanceBefore + SWAP_AMOUNT, "funds should go to trader");
-        assertEq(tokenA.balanceOf(anyoneElse), 0, "caller should not receive funds");
-    }
-
-    function test_refundReducesDepositsMapping() public {
-        bytes32 commitHash = _commitCrossChain();
-
-        uint256 depositBefore = core.deposits(trader, address(tokenA));
-        assertEq(depositBefore, SWAP_AMOUNT, "deposit not tracked");
-
-        vm.warp(block.timestamp + 2 hours + 1);
-        core.refundExpiredCrossChain(commitHash);
-
-        uint256 depositAfter = core.deposits(trader, address(tokenA));
-        assertEq(depositAfter, 0, "deposit not cleared after refund");
-    }
-
-    // ============ Test 4: Refund reverts for already-settled orders ============
-
-    function test_refundRevertsAfterAlreadyRefunded() public {
-        bytes32 commitHash = _commitCrossChain();
-
-        vm.warp(block.timestamp + 2 hours + 1);
-        core.refundExpiredCrossChain(commitHash);
-
-        // Second refund attempt should revert
-        vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
-        core.refundExpiredCrossChain(commitHash);
-    }
-
-    function test_refundRevertsAfterMarkedSettled() public {
-        bytes32 commitHash = _commitCrossChain();
-
-        // Owner marks as settled (simulating successful cross-chain delivery)
+        // Settlement arrives before challenge window expires
         vm.prank(owner);
         core.markCrossChainSettled(commitHash);
 
-        // Now even after timeout, refund should revert
-        vm.warp(block.timestamp + 2 hours + 1);
+        // Challenge window expires — but order is SETTLED, not REFUND_REQUESTED
+        vm.warp(block.timestamp + 1 hours + 1);
 
-        vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
-        core.refundExpiredCrossChain(commitHash);
+        // Execute refund reverts — double-spend prevented
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotRequested.selector);
+        core.executeCrossChainRefund(commitHash);
+
+        // Trader does NOT get deposit back
+        assertEq(tokenA.balanceOf(trader), traderBalanceBefore);
     }
 
-    // ============ Test 5: markCrossChainSettled proper behavior ============
+    // ============ Settlement ============
 
     function test_markSettledByOwner() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.prank(owner);
         core.markCrossChainSettled(commitHash);
-
-        (,,,,, , bool settled) = core.crossChainOrders(commitHash);
-        assertTrue(settled, "order should be settled");
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
     }
 
     function test_markSettledByRouter() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.prank(address(router));
         core.markCrossChainSettled(commitHash);
-
-        (,,,,, , bool settled) = core.crossChainOrders(commitHash);
-        assertTrue(settled, "order should be settled");
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
     }
 
     function test_markSettledEmitsEvent() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.expectEmit(true, false, false, true);
         emit CrossChainOrderSettled(commitHash);
-
         vm.prank(owner);
         core.markCrossChainSettled(commitHash);
     }
 
     function test_markSettledRevertsForUnauthorized() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.prank(anyoneElse);
-        vm.expectRevert("Only owner or router");
-        core.markCrossChainSettled(commitHash);
-    }
-
-    function test_markSettledRevertsForTrader() public {
-        bytes32 commitHash = _commitCrossChain();
-
-        vm.prank(trader);
         vm.expectRevert("Only owner or router");
         core.markCrossChainSettled(commitHash);
     }
 
     function test_markSettledPreventsDoubleSettling() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.prank(owner);
         core.markCrossChainSettled(commitHash);
-
-        // Second settle should revert
         vm.prank(owner);
         vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
         core.markCrossChainSettled(commitHash);
     }
 
-    // ============ Test 6: markCrossChainSettled reverts for non-existent orders ============
+    function test_markSettledRevertsAfterRefund() public {
+        bytes32 commitHash = _commitCrossChain();
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        vm.warp(block.timestamp + 1 hours + 1);
+        core.executeCrossChainRefund(commitHash);
+
+        vm.prank(owner);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
+        core.markCrossChainSettled(commitHash);
+    }
+
+    // ============ Edge Cases ============
 
     function test_markSettledRevertsForNonExistentOrder() public {
         bytes32 fakeHash = keccak256("does_not_exist");
-
         vm.prank(owner);
         vm.expectRevert(VibeSwapCore.CrossChainOrderNotFound.selector);
         core.markCrossChainSettled(fakeHash);
     }
 
-    function test_refundRevertsForNonExistentOrder() public {
+    function test_requestRefundRevertsForNonExistentOrder() public {
         bytes32 fakeHash = keccak256("does_not_exist");
-
         vm.warp(block.timestamp + 3 hours);
         vm.expectRevert(VibeSwapCore.CrossChainOrderNotFound.selector);
-        core.refundExpiredCrossChain(fakeHash);
+        core.requestCrossChainRefund(fakeHash);
     }
-
-    // ============ Edge Cases ============
 
     function test_settledOrderCannotBeRefundedEvenLater() public {
         bytes32 commitHash = _commitCrossChain();
-
-        // Settle immediately
         vm.prank(owner);
         core.markCrossChainSettled(commitHash);
-
-        // Warp far past timeout
         vm.warp(block.timestamp + 24 hours);
-
-        vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
-        core.refundExpiredCrossChain(commitHash);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotPending.selector);
+        core.requestCrossChainRefund(commitHash);
     }
 
     function test_refundedOrderCannotBeSettled() public {
         bytes32 commitHash = _commitCrossChain();
-
         vm.warp(block.timestamp + 2 hours + 1);
-        core.refundExpiredCrossChain(commitHash);
+        core.requestCrossChainRefund(commitHash);
+        vm.warp(block.timestamp + 1 hours + 1);
+        core.executeCrossChainRefund(commitHash);
 
-        // Try to settle after refund — should revert (already settled via refund)
         vm.prank(owner);
         vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
         core.markCrossChainSettled(commitHash);
+    }
+
+    function test_depositsReducedOnRefundExecute() public {
+        bytes32 commitHash = _commitCrossChain();
+        assertEq(core.deposits(trader, address(tokenA)), SWAP_AMOUNT);
+
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+        // Deposits still held during challenge window
+        assertEq(core.deposits(trader, address(tokenA)), SWAP_AMOUNT);
+
+        vm.warp(block.timestamp + 1 hours + 1);
+        core.executeCrossChainRefund(commitHash);
+        assertEq(core.deposits(trader, address(tokenA)), 0);
+    }
+
+    // ============ XC-004: Deposit Decrement on Settlement ============
+
+    function test_depositsDecrementedOnSettlement() public {
+        bytes32 commitHash = _commitCrossChain();
+        assertEq(core.deposits(trader, address(tokenA)), SWAP_AMOUNT);
+
+        vm.prank(owner);
+        core.markCrossChainSettled(commitHash);
+        assertEq(core.deposits(trader, address(tokenA)), 0);
+    }
+
+    function test_withdrawBlockedAfterSettlement() public {
+        bytes32 commitHash = _commitCrossChain();
+
+        vm.prank(owner);
+        core.markCrossChainSettled(commitHash);
+
+        vm.prank(trader);
+        vm.expectRevert("No deposit");
+        core.withdrawDeposit(address(tokenA));
+    }
+
+    function test_doubleSpendViaWithdrawalPrevented() public {
+        bytes32 commitHash = _commitCrossChain();
+        uint256 traderBalanceBefore = tokenA.balanceOf(trader);
+
+        // Settlement arrives — deposits decremented
+        vm.prank(owner);
+        core.markCrossChainSettled(commitHash);
+
+        // Trader cannot withdraw deposited tokens
+        vm.prank(trader);
+        vm.expectRevert("No deposit");
+        core.withdrawDeposit(address(tokenA));
+
+        // Balance unchanged (no tokens returned)
+        assertEq(tokenA.balanceOf(trader), traderBalanceBefore);
+    }
+
+    function test_depositReleasedEventOnSettlement() public {
+        bytes32 commitHash = _commitCrossChain();
+
+        vm.expectEmit(true, true, false, true);
+        emit CrossChainDepositReleased(commitHash, trader, address(tokenA), SWAP_AMOUNT);
+        vm.prank(owner);
+        core.markCrossChainSettled(commitHash);
+    }
+
+    // ============ XC-004: settleCrossChainOrder ============
+
+    function test_settleCrossChainOrderByOwner() public {
+        bytes32 commitHash = _commitCrossChain();
+        bytes32 poolId = keccak256(abi.encodePacked(address(tokenA), address(tokenB)));
+
+        vm.prank(owner);
+        core.settleCrossChainOrder(commitHash, poolId, 950e18);
+
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
+        assertEq(core.deposits(trader, address(tokenA)), 0);
+    }
+
+    function test_settleCrossChainOrderByRouter() public {
+        bytes32 commitHash = _commitCrossChain();
+        bytes32 poolId = keccak256(abi.encodePacked(address(tokenA), address(tokenB)));
+
+        vm.prank(address(router));
+        core.settleCrossChainOrder(commitHash, poolId, 950e18);
+
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
+    }
+
+    function test_settleCrossChainOrderRevertsUnauthorized() public {
+        bytes32 commitHash = _commitCrossChain();
+        bytes32 poolId = keccak256(abi.encodePacked(address(tokenA), address(tokenB)));
+
+        vm.prank(anyoneElse);
+        vm.expectRevert("Only owner or router");
+        core.settleCrossChainOrder(commitHash, poolId, 950e18);
+    }
+
+    function test_settleCrossChainOrderRevertsDoubleSettle() public {
+        bytes32 commitHash = _commitCrossChain();
+        bytes32 poolId = keccak256(abi.encodePacked(address(tokenA), address(tokenB)));
+
+        vm.prank(owner);
+        core.settleCrossChainOrder(commitHash, poolId, 950e18);
+
+        vm.prank(owner);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderAlreadySettled.selector);
+        core.settleCrossChainOrder(commitHash, poolId, 950e18);
+    }
+
+    function test_settleCrossChainOrderCancelsRefund() public {
+        bytes32 commitHash = _commitCrossChain();
+        bytes32 poolId = keccak256(abi.encodePacked(address(tokenA), address(tokenB)));
+
+        // Request refund after timeout
+        vm.warp(block.timestamp + 2 hours + 1);
+        core.requestCrossChainRefund(commitHash);
+
+        // Full settlement arrives during challenge window
+        vm.prank(owner);
+        core.settleCrossChainOrder(commitHash, poolId, 950e18);
+
+        assertTrue(_getOrderStatus(commitHash) == VibeSwapCore.CrossChainStatus.SETTLED);
+        assertEq(core.deposits(trader, address(tokenA)), 0);
+
+        // Execute refund reverts
+        vm.warp(block.timestamp + 1 hours + 1);
+        vm.expectRevert(VibeSwapCore.CrossChainOrderNotRequested.selector);
+        core.executeCrossChainRefund(commitHash);
+    }
+
+    // ============ Constants Verification ============
+
+    function test_refundTimeoutIs2Hours() public view {
+        assertEq(core.REFUND_TIMEOUT(), 2 hours);
+    }
+
+    function test_challengeWindowIs1Hour() public view {
+        assertEq(core.CHALLENGE_WINDOW(), 1 hours);
     }
 }

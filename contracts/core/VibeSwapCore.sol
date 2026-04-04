@@ -84,6 +84,14 @@ contract VibeSwapCore is
         uint256 feeRate;
     }
 
+    // ============ Cross-Chain Order State Machine ============
+    // XC-003: Four-state machine prevents double-spend via timeout refund race condition.
+    // PENDING → SETTLED (settlement confirmation arrived)
+    // PENDING → REFUND_REQUESTED (timeout elapsed, user requests refund)
+    // REFUND_REQUESTED → SETTLED (settlement confirmation arrives during challenge window)
+    // REFUND_REQUESTED → REFUNDED (challenge window expires, refund executes)
+    enum CrossChainStatus { PENDING, REFUND_REQUESTED, SETTLED, REFUNDED }
+
     struct CrossChainOrder {
         uint256 commitTimestamp;
         uint32 destinationChain;
@@ -91,7 +99,8 @@ contract VibeSwapCore is
         uint256 depositAmount;
         address tokenIn;
         address trader;
-        bool settled;
+        CrossChainStatus status;
+        uint256 refundRequestTime;  // XC-003: When refund was requested (0 if not requested)
     }
 
     /// @notice Queued failed execution for retry (incentive tracking failures)
@@ -109,6 +118,13 @@ contract VibeSwapCore is
 
     /// @notice Maximum number of failed executions to queue (don't block settlement)
     uint256 public constant MAX_FAILED_QUEUE = 1000;
+
+    /// @notice XC-003: Cross-chain refund timing constants
+    /// @dev REFUND_TIMEOUT: Time after commit before refund can be requested
+    /// @dev CHALLENGE_WINDOW: Time after refund request where settlement can still cancel it
+    /// Total worst-case refund time: REFUND_TIMEOUT + CHALLENGE_WINDOW = 3 hours
+    uint256 public constant REFUND_TIMEOUT = 2 hours;
+    uint256 public constant CHALLENGE_WINDOW = 1 hours;
 
     // ============ State ============
 
@@ -287,6 +303,13 @@ contract VibeSwapCore is
         uint256 depositAmount
     );
     event CrossChainOrderSettled(bytes32 indexed commitHash);
+    event CrossChainDepositReleased(
+        bytes32 indexed commitHash,
+        address indexed trader,
+        address tokenIn,
+        uint256 amount
+    );
+    event CrossChainRefundRequested(bytes32 indexed commitHash, address indexed trader);
 
     // ============ Errors ============
 
@@ -305,6 +328,9 @@ contract VibeSwapCore is
     error CrossChainOrderNotExpired();
     error CrossChainOrderAlreadySettled();
     error CrossChainOrderNotFound();
+    error CrossChainOrderNotPending();
+    error CrossChainOrderNotRequested();
+    error CrossChainChallengeWindowActive();
 
     // ============ Modifiers ============
 
@@ -510,11 +536,14 @@ contract VibeSwapCore is
      * @notice Reveal a previously committed swap
      * @param commitId Commitment ID
      * @param priorityBid Priority bid for execution order
+     * @dev INT-004: Volume breaker removed from reveals. Reveals don't create new exposure —
+     *      funds are already committed. Blocking reveals harms liveness and pushes cross-chain
+     *      orders toward timeout refund, which is the XC-003 attack vector.
      */
     function revealSwap(
         bytes32 commitId,
         uint256 priorityBid
-    ) external payable whenNotPaused whenNotGloballyPaused whenBreakerNotTripped(VOLUME_BREAKER) nonReentrant {
+    ) external payable whenNotPaused whenNotGloballyPaused nonReentrant {
         SwapParams storage params = pendingSwaps[commitId];
         require(params.amountIn > 0, "Invalid commit");
 
@@ -672,7 +701,8 @@ contract VibeSwapCore is
             depositAmount: amountIn,
             tokenIn: tokenIn,
             trader: msg.sender,
-            settled: false
+            status: CrossChainStatus.PENDING,
+            refundRequestTime: 0
         });
 
         // Send via router
@@ -684,21 +714,47 @@ contract VibeSwapCore is
         emit CrossChainOrderCreated(commitHash, msg.sender, dstChainId, tokenIn, amountIn);
     }
 
+    // ============ XC-003: Two-Phase Cross-Chain Refund ============
+    // Phase 1: Request refund (after REFUND_TIMEOUT). Opens a CHALLENGE_WINDOW.
+    // Phase 2: Execute refund (after CHALLENGE_WINDOW expires). Actually transfers funds.
+    // Settlement confirmation can cancel the refund during the challenge window.
+    // This eliminates the race between LayerZero delivery and timeout refund.
+
     /**
-     * @notice Refund a cross-chain order that has expired (LayerZero message failed or timed out)
+     * @notice Phase 1: Request a refund for an expired cross-chain order
      * @param commitHash The commitment hash of the cross-chain order
-     * @dev Anyone can call this after the 2-hour timeout, but funds go to the original trader.
-     *      The 2-hour window gives LayerZero sufficient time for message delivery + retries.
+     * @dev Anyone can call this after REFUND_TIMEOUT, but it does NOT transfer funds yet.
+     *      Opens a CHALLENGE_WINDOW where settlement confirmation can still cancel the refund.
      *
      * DISINTERMEDIATION: Grade A (DISSOLVED). Permissionless after timeout — no trust required.
      */
-    function refundExpiredCrossChain(bytes32 commitHash) external nonReentrant {
+    function requestCrossChainRefund(bytes32 commitHash) external nonReentrant {
         CrossChainOrder storage order = crossChainOrders[commitHash];
         if (order.trader == address(0)) revert CrossChainOrderNotFound();
-        if (order.settled) revert CrossChainOrderAlreadySettled();
-        if (block.timestamp <= order.commitTimestamp + 2 hours) revert CrossChainOrderNotExpired();
+        if (order.status != CrossChainStatus.PENDING) revert CrossChainOrderNotPending();
+        if (block.timestamp <= order.commitTimestamp + REFUND_TIMEOUT) revert CrossChainOrderNotExpired();
 
-        order.settled = true;
+        order.status = CrossChainStatus.REFUND_REQUESTED;
+        order.refundRequestTime = block.timestamp;
+
+        emit CrossChainRefundRequested(commitHash, order.trader);
+    }
+
+    /**
+     * @notice Phase 2: Execute a refund after the challenge window has elapsed
+     * @param commitHash The commitment hash of the cross-chain order
+     * @dev Only callable after CHALLENGE_WINDOW expires from the refund request.
+     *      If settlement arrived during the window, status is SETTLED and this reverts.
+     *
+     * DISINTERMEDIATION: Grade A (DISSOLVED). Permissionless — no trust required.
+     */
+    function executeCrossChainRefund(bytes32 commitHash) external nonReentrant {
+        CrossChainOrder storage order = crossChainOrders[commitHash];
+        if (order.trader == address(0)) revert CrossChainOrderNotFound();
+        if (order.status != CrossChainStatus.REFUND_REQUESTED) revert CrossChainOrderNotRequested();
+        if (block.timestamp <= order.refundRequestTime + CHALLENGE_WINDOW) revert CrossChainChallengeWindowActive();
+
+        order.status = CrossChainStatus.REFUNDED;
 
         // Release deposit back to original trader
         deposits[order.trader][order.tokenIn] -= order.depositAmount;
@@ -711,6 +767,9 @@ contract VibeSwapCore is
      * @notice Mark a cross-chain order as settled (prevents refund after successful delivery)
      * @param commitHash The commitment hash of the cross-chain order
      * @dev Called by owner or router after confirming the destination chain processed the order.
+     *      XC-003: Can override REFUND_REQUESTED status — settlement confirmation arriving
+     *      during the challenge window cancels the pending refund.
+     *      XC-004: Also decrements deposits to prevent withdrawal of settled tokens.
      *
      * DISINTERMEDIATION: Grade C → Target Grade B. Owner/router marks settlement.
      * Target: router auto-marks on lzReceive callback; owner as fallback.
@@ -720,12 +779,77 @@ contract VibeSwapCore is
             msg.sender == owner() || msg.sender == address(router),
             "Only owner or router"
         );
-        CrossChainOrder storage order = crossChainOrders[commitHash];
-        if (order.trader == address(0)) revert CrossChainOrderNotFound();
-        if (order.settled) revert CrossChainOrderAlreadySettled();
+        _settleSourceChainOrder(commitHash);
+    }
 
-        order.settled = true;
+    /**
+     * @notice Full cross-chain settlement: marks settled, decrements deposits, records execution
+     * @param commitHash The commitment hash of the cross-chain order
+     * @param poolId Pool where the order was executed on the destination chain
+     * @param estimatedOut Estimated output amount from batch result
+     * @dev Called by router when a BatchResult message arrives with per-order execution data.
+     *      Extends markCrossChainSettled with incentive/compliance recording.
+     */
+    function settleCrossChainOrder(
+        bytes32 commitHash,
+        bytes32 poolId,
+        uint256 estimatedOut
+    ) external {
+        require(
+            msg.sender == owner() || msg.sender == address(router),
+            "Only owner or router"
+        );
+        CrossChainOrder storage order = _settleSourceChainOrder(commitHash);
+        _recordCrossChainExecution(poolId, order.trader, order.depositAmount, order.tokenIn, estimatedOut);
+    }
+
+    /**
+     * @dev Internal: core settlement state transition + deposit release.
+     *      XC-004: Decrements deposits so the trader cannot withdrawDeposit() after settlement.
+     *      Without this, settled cross-chain orders leave phantom deposits that can be withdrawn
+     *      for a double-spend (output on destination chain + input withdrawal on source chain).
+     */
+    function _settleSourceChainOrder(bytes32 commitHash) internal returns (CrossChainOrder storage order) {
+        order = crossChainOrders[commitHash];
+        if (order.trader == address(0)) revert CrossChainOrderNotFound();
+        if (order.status == CrossChainStatus.SETTLED || order.status == CrossChainStatus.REFUNDED) {
+            revert CrossChainOrderAlreadySettled();
+        }
+
+        order.status = CrossChainStatus.SETTLED;
+        deposits[order.trader][order.tokenIn] -= order.depositAmount;
+
         emit CrossChainOrderSettled(commitHash);
+        emit CrossChainDepositReleased(commitHash, order.trader, order.tokenIn, order.depositAmount);
+    }
+
+    /**
+     * @dev Record cross-chain execution for incentive/compliance tracking.
+     *      Mirrors _recordExecution but takes flat args instead of RevealedOrder.
+     */
+    function _recordCrossChainExecution(
+        bytes32 poolId,
+        address trader,
+        uint256 amountIn,
+        address tokenIn,
+        uint256 estimatedOut
+    ) internal {
+        if (address(incentiveController) != address(0)) {
+            try incentiveController.recordExecution(
+                poolId, trader, amountIn, estimatedOut, 0
+            ) {} catch (bytes memory reason) {
+                emit ExecutionTrackingFailed(poolId, trader, reason);
+                _queueFailedExecution(poolId, trader, amountIn, estimatedOut, 0, reason);
+            }
+        }
+
+        if (address(clawbackRegistry) != address(0)) {
+            try clawbackRegistry.recordTransaction(
+                trader, address(amm), amountIn, tokenIn
+            ) {} catch (bytes memory reason) {
+                emit ComplianceCheckFailed(poolId, trader, reason);
+            }
+        }
     }
 
     // ============ View Functions ============

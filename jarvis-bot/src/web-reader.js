@@ -9,7 +9,32 @@
 const MAX_URLS = 2;
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_BODY_CHARS = 2000;
+const MAX_RESPONSE_BYTES = 512 * 1024; // BOT-301: 512KB cap on response body
 const USER_AGENT = 'JarvisBot/1.0 (VibeSwap; +https://vibeswap.io)';
+
+// BOT-300: SSRF protection — block internal/private network addresses
+const BLOCKED_HOSTS = /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|0\.0\.0\.0|\[?::1?\]?|metadata\.google\.internal)$/i;
+
+function isBlockedUrl(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return true;
+    if (BLOCKED_HOSTS.test(u.hostname)) return true;
+    // Block numeric IPs in private ranges (catches decimal, octal, hex variations)
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) {
+      const parts = u.hostname.split('.').map(Number);
+      if (parts[0] === 10) return true;
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+      if (parts[0] === 192 && parts[1] === 168) return true;
+      if (parts[0] === 169 && parts[1] === 254) return true;
+      if (parts[0] === 127) return true;
+      if (parts[0] === 0) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
 
 // ============ URL Detection ============
 
@@ -150,6 +175,12 @@ function extractBodyText(html) {
  */
 async function fetchPage(url) {
   try {
+    // BOT-300: Block requests to internal/private network addresses
+    if (isBlockedUrl(url)) {
+      console.warn(`[web-reader] Blocked SSRF attempt: ${url}`);
+      return null;
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
@@ -160,13 +191,30 @@ async function fetchPage(url) {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
-      redirect: 'follow',
+      redirect: 'manual', // BOT-300: Don't auto-follow redirects — validate each hop
     });
 
     clearTimeout(timeout);
 
+    // BOT-300: Handle redirects manually to check each destination
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location || isBlockedUrl(new URL(location, url).href)) {
+        console.warn(`[web-reader] Blocked redirect to internal address from ${url}`);
+        return null;
+      }
+      return fetchPage(new URL(location, url).href); // Recurse with validation
+    }
+
     if (!response.ok) {
       console.warn(`[web-reader] HTTP ${response.status} for ${url}`);
+      return null;
+    }
+
+    // BOT-301: Check Content-Length before reading body
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_RESPONSE_BYTES) {
+      console.warn(`[web-reader] Response too large (${contentLength} bytes) for ${url}`);
       return null;
     }
 
@@ -176,7 +224,22 @@ async function fetchPage(url) {
       return null;
     }
 
-    const html = await response.text();
+    // BOT-301: Stream response with size cap (Content-Length can be missing or lie)
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalSize = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalSize += value.length;
+      if (totalSize > MAX_RESPONSE_BYTES) {
+        reader.cancel();
+        console.warn(`[web-reader] Response exceeded ${MAX_RESPONSE_BYTES} bytes for ${url}, truncating`);
+        break;
+      }
+      chunks.push(value);
+    }
+    const html = Buffer.concat(chunks).toString('utf-8');
     const title = extractTitle(html) || 'Untitled';
     const description = extractMetaDescription(html);
     const body = extractBodyText(html);

@@ -314,7 +314,9 @@ export async function getGovernanceActivity(protocol) {
     hop: 'hop.eth',
   };
 
-  const space = SPACE_MAP[protocol.toLowerCase()] || `${protocol.toLowerCase()}.eth`;
+  // BOT-302: Sanitize space ID to prevent GraphQL injection
+  const rawSpace = SPACE_MAP[protocol.toLowerCase()] || `${protocol.toLowerCase().replace(/[^a-z0-9.\-]/g, '')}.eth`;
+  const space = rawSpace.replace(/["\\\n\r]/g, ''); // Strip GraphQL-breaking chars
 
   const query = `{
     space(id: "${space}") {

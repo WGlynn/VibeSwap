@@ -139,7 +139,8 @@ export async function getTokenBalance(tokenAddress, walletAddress) {
 export async function swap(direction, amount, reasoning = '') {
   const walletInfo = getWalletInfo()
   if (!walletInfo.address) return { error: 'Wallet not initialized. Create or unlock first.' }
-  if (walletInfo.locked) return { error: 'Wallet is locked. Unlock first.' }
+  // BOT-219: Fixed — getWalletInfo() returns { unlocked: bool }, not { locked: bool }
+  if (!walletInfo.unlocked) return { error: 'Wallet is locked. Unlock first.' }
 
   const walletAddress = walletInfo.address
   const ethPrice = await getEthPrice()
@@ -259,13 +260,14 @@ async function ensureApproval(tokenAddress, spender, amount, walletAddress) {
   const allowance = await token.allowance(walletAddress, spender)
   if (allowance >= amount) return { already: true }
 
-  console.log(`[trading] Approving ${tokenAddress} for ${spender}`)
+  // BOT-204: Approve exact amount instead of MaxUint256 — limits exposure if router is compromised
+  console.log(`[trading] Approving ${tokenAddress} for ${spender} (amount: ${amount})`)
   return callContract({
     chain: 'base',
     contractAddress: tokenAddress,
     abi: ERC20_ABI,
     functionName: 'approve',
-    args: [spender, ethers.MaxUint256],
+    args: [spender, amount],
   })
 }
 

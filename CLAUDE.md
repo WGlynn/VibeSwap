@@ -4,12 +4,16 @@
 
 ### BOOT
 ```
-WAL.md check ──→ [ACTIVE?] ──YES──→ AAP Recovery ──→ Auto-Commit Orphans ──→ BOOT:3
-                     │NO                              (docs/ANTI_AMNESIA_PROTOCOL.md)
-                     ▼
-Read SKB ──→ Read CLAUDE.md ──→ Read SESSION_STATE.md ──→ git pull ──→ READY
-  (fresh boot: .claude/JarvisxWill_SKB.md)
-  (after compression: .claude/JarvisxWill_GKB.md = glyph form)
+SESSION_STATE.md FIRST ──→ WAL.md check ──→ [ACTIVE?] ──YES──→ AAP Recovery ──→ Auto-Commit Orphans
+  (last session's final thought            │NO                   (docs/ANTI_AMNESIA_PROTOCOL.md)
+   = this session's first thought)         ▼
+                                Read SKB ──→ Read CLAUDE.md ──→ git pull ──→ READY
+                                  (fresh boot: .claude/JarvisxWill_SKB.md)
+                                  (after compression: .claude/JarvisxWill_GKB.md = glyph form)
+
+RULE: SESSION_STATE.md is MANDATORY first read. Its "Pending / Next Session" section
+is the continuation point. The new session must open by referencing what was left pending.
+No amnesia. The first message of a new session continues the last message of the old one.
 ```
 
 ### WORK
@@ -25,9 +29,16 @@ Instant start → Pull → SESSION_STATE → BIG-SMALL rotation loop → Commit 
 
 ### REBOOT (~50% context) | END (mandatory) | CRASH (WAL ACTIVE on boot)
 ```
-REBOOT: Commit all → SESSION_STATE block header → Push → Fresh session (loads SKB) → BOOT
-END:    Block header → Commit → Push to origin
+REBOOT: Pre-reboot checklist → Commit all → SESSION_STATE block header → Push → BOOT
+END:    Pre-reboot checklist → Block header → Commit → Push to origin
 CRASH:  WAL manifest → cross-ref git → auto-commit orphans → resume via BOOT
+
+PRE-REBOOT CHECKLIST (mandatory, no exceptions):
+  □ Context scan: anything discussed that exists ONLY in conversation? → persist to file
+  □ Plans: any plan in context not yet in .claude/plans/ or memory/? → write it NOW
+  □ SESSION_STATE "Pending" has FULL CONTENT of next steps (not just labels)
+  □ WAL reflects current state (ACTIVE if work pending, CLEAN if done)
+  □ "Plan's saved" = cite the file path. No path = not saved.
 ```
 
 ### AGENT SPAWN | NAMING | ALWAYS-ON

@@ -1,18 +1,16 @@
-# Write-Ahead Log — CLEAN
+# Write-Ahead Log — ACTIVE
 
 ## Epoch
 - **Started**: 2026-04-03
-- **Ended**: 2026-04-03
-- **Intent**: Full Stack RSI — R1 Integration (cross-contract adversarial flows)
-- **Parent Commit**: `04a16e87`
-- **Tasks**: ALL complete
+- **Intent**: R1 Integration batch 3 — fix open architectural findings (FT-001 CRIT, FT-003/004 HIGH)
+- **Parent Commit**: `26664d1f`
+- **Tasks**: 0/3
 - **Branch**: master
 
-## Final Summary
-- 3 contract seams analyzed (Core↔Auction↔AMM, CrossChain↔Core, Shapley↔Treasury↔FeeRouter)
-- 9 bugs fixed across 2 commits: `75669e65` (2 CRIT + 2 HIGH + 2 MED), `affc6dda` (1 HIGH + 2 MED)
-- 0 test regressions across all suites
-- FT-001 (CRITICAL: auction proceeds share inflation) documented — needs checkpoint pattern redesign
+## In-Flight
+- [ ] FT-001: Checkpoint pattern for claimAuctionProceeds (CRITICAL)
+- [ ] FT-003: createShapleyGame fund-lock on computeShapleyValues failure
+- [ ] FT-004: FractalShapley push→pull ETH distribution
 
 ## Recovery Notes
-_CLEAN session end. No in-flight work._
+_Architectural fixes for open R1 Integration findings. If crash: check git log for partial commits._

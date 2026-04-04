@@ -296,17 +296,79 @@ ECDSA (which is vulnerable to quantum computers via Shor's algorithm) is used on
 
 ---
 
-## 9. Implementation
+## 9. Why Three Tokens Are Necessary (Not Sufficient with Fewer)
+
+The three tokens exist to guarantee **decentralization between capital, compute, and cognition**. Each token represents an independent power structure that cannot dominate the other two. If any two merge into one asset, whoever holds that asset controls two of three consensus dimensions — and needs only marginal influence on the third to achieve majority. Three independent tokens are separation of powers encoded in tokenomics.
+
+### 9.1 Why One Token Fails
+
+A single token conflates all three consensus dimensions into one asset. This creates a fundamental impossibility:
+
+- If the token is **transferable** (needed for PoS staking), then it cannot be **non-transferable** (needed for PoM). You can buy governance weight, defeating the temporal barrier.
+- If the token has a **hard cap** (needed for PoM scarcity/governance), then it cannot have **elastic supply** (needed for PoW energy-peg stability).
+- If the token is **inflationary** (needed for state rent economics), then holding it as governance weight becomes a depreciating asset, punishing long-term contributors.
+
+One token means one set of properties. Three dimensions require three independent property sets. QED.
+
+### 9.2 Why Two Tokens Fail
+
+Two tokens cover two dimensions but force the third to piggyback on an incompatible host:
+
+**Case 1: Merge PoW + PoS into one token, separate PoM.** The PoW token must have elastic supply (energy-peg). Using it for PoS staking means your collateral's purchasing power is unstable — rebasing changes your slashing exposure mid-epoch. Validators can't price risk.
+
+**Case 2: Merge PoS + PoM into one token, separate PoW.** The PoM token must be non-transferable (earned-only). Using it for PoS staking means you can never exit your position — locked forever. Or if you make it transferable for staking, you can buy Mind Score, defeating temporal security.
+
+**Case 3: Merge PoW + PoM into one token, separate PoS.** The PoW token requires hash-rate work. The PoM token requires cognitive work. These are categorically different activities with different supply dynamics. Forcing them into one token means either miners earn governance weight they didn't cognitively earn, or contributors must mine to participate.
+
+Every two-token arrangement forces at least one dimension to compromise its core property. The dimensions are **orthogonal by design** — each requires properties that contradict the others.
+
+### 9.3 The Three-Token Resolution
+
+| Token | Dimension | Key Properties | Why It Can't Share |
+|-------|-----------|----------------|-------------------|
+| **VIBE** | PoM (60%) | 21M hard cap, Shapley-distributed, governance-weighted | Must be earned through verified contribution, not bought. Hard cap ensures scarcity of genuine expertise. |
+| **CKB-native** | PoS (30%) | No hard cap, state rent model, inflationary with DAO shelter | Must be inflationary (secondary issuance creates state rent pressure). Must be transferable (stake deposits/withdrawals). |
+| **JUL** | PoW (10%) | SHA-256 mining, elastic rebase, energy-pegged | Must have elastic supply (absorbs demand shocks via rebase). Must be mineable (anchors to electricity cost). |
+
+The three tokens form a **basis** for the consensus space — three linearly independent vectors spanning the full security surface. Remove any one and the space collapses to a plane, leaving an entire attack dimension undefended.
+
+### 9.4 Token Flow Architecture
+
+```
+MINE JUL (SHA-256 PoW)
+  ├─→ Hold JUL (operational currency, elastic supply)
+  └─→ BURN JUL → MINT CKB-native (one-way bridge)
+        ├─→ LOCK in cells (state rent: 1 token = 1 byte)
+        ├─→ STAKE in DAO shelter (inflation protection)
+        └─→ STAKE to run shard (earn secondary issuance)
+
+CONTRIBUTE VALUE (verified cognitive work)
+  └─→ EARN VIBE (Shapley-distributed, 60% of NCI vote weight)
+```
+
+Energy (JUL) crystallizes into collateral (CKB-native) which funds the state layer. Contribution earns governance weight (VIBE) which cannot be purchased at any price. The one-way bridge ensures PoW energy is permanently converted — you cannot unstake back to hashpower.
+
+## 10. Implementation
 
 NCI is implemented as a set of Solidity smart contracts on the VibeSwap Operating System (VSOS):
 
-- `ProofOfMind.sol` — Three-dimensional consensus with PoW/PoS/PoM hybrid voting
+**Core Consensus:**
+- `NakamotoConsensusInfinity.sol` — 3-dimensional validator set, epoch management, equivocation slashing
+- `ProofOfMind.sol` — PoW/PoS/PoM hybrid voting, meta-node architecture
 - `TrinityGuardian.sol` — Immutable BFT authority node protection
 - `HoneypotDefense.sol` — The Siren Protocol implementation
-- `PostQuantumShield.sol` — Hash-based post-quantum security layer
-- `VibeReputation.sol` — Mind Score aggregation across protocol modules
 
-The reference implementation is open-source and deployed on Base (Ethereum L2).
+**3-Token Infrastructure:**
+- `VIBEToken.sol` — PoM governance token (21M cap, Shapley emission)
+- `Joule.sol` — PoW mining token (SHA-256, elastic rebase, PI controller)
+- `CKBNativeToken.sol` — PoS state rent token (lock/unlock, circulating cap)
+- `JULBridge.sol` — One-way PoW→PoS bridge (burn JUL, mint CKB-native)
+
+**State Rent Economics:**
+- `StateRentVault.sol` — Lock CKB-native for CKA cell capacity
+- `DAOShelter.sol` — Inflation shelter (Nervos DAO equivalent)
+- `SecondaryIssuanceController.sol` — Fixed annual emission, 3-way split
+- `ShardOperatorRegistry.sol` — Shard node management and reward distribution
 
 Source code: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
 

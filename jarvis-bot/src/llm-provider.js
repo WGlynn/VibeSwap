@@ -12,9 +12,10 @@
 //
 // Architecture: Triage → Route to cheapest adequate tier → Escalate on quality failure
 //
-// Tier 0 (free):    Groq, Cerebras, SambaNova, Fireworks, Novita, OpenRouter, Mistral, Together
+// Tier 0 (free):    OpenRouter/Qwen (0.80), Groq, Cerebras, SambaNova, Together, Fireworks, Novita, Mistral
 // Tier 1 (budget):  DeepSeek ($0.69), Gemini ($0.38), Ollama (local)
 // Tier 2 (premium): Claude ($9), OpenAI ($8.75), xAI ($5)
+// v3.1: All 8 Tier 0 providers now in escalation chains (was 4). Qwen leads coding/math/moderate.
 //
 // Economics: ~70% of messages at $0, ~20% at $0.50/MTok, ~10% at $8/MTok
 // Old model: 100% starting at $8/MTok → now saves ~90% on routine messages
@@ -1146,14 +1147,16 @@ function createGroqProvider(providerConfig) {
 
 registerProvider('groq', createGroqProvider);
 
-// ============ OpenRouter Provider (Free Tier — DeepSeek/Qwen free models) ============
+// ============ OpenRouter Provider (Free Tier — Qwen 3.6 Plus stable, quality 0.80) ============
+// Wardenclyffe v3.1: Qwen 3.6 Plus (stable, April 2 build) replaces DeepSeek R1 free as default.
+// Tier 0 lead for coding, math, moderate chains. 0.80 quality at $0.
 
 function createOpenRouterProvider(providerConfig) {
   return createOpenAIProvider({
     ...providerConfig,
     providerName: 'openrouter',
     baseUrl: providerConfig.baseUrl || 'https://openrouter.ai/api/v1',
-    model: providerConfig.model || 'deepseek/deepseek-r1:free',
+    model: providerConfig.model || 'qwen/qwen3.6-plus:free',
   });
 }
 
@@ -1563,8 +1566,8 @@ function getProviderConfig(providerName) {
 // New model (Hybrid Escalation): Triage → Route to cheapest adequate tier → Escalate on quality failure
 //   Benefit: Cost scales with actual complexity. Simple = $0. Premium reserved for premium tasks.
 //
-// Tier 0 — Free ($0):     Groq, Cerebras, SambaNova, Fireworks, Novita
-//   For: greetings, short Q&A, status checks, simple factual
+// Tier 0 — Free ($0):     OpenRouter/Qwen (0.80), Groq, Cerebras, SambaNova, Together, Fireworks, Novita, Mistral
+//   For: greetings, short Q&A, status checks, simple factual, coding, math (Qwen leads)
 // Tier 1 — Budget (~$0.50/MTok): DeepSeek, Gemini, Mistral, Ollama
 //   For: conversation, coding, math, moderate reasoning, multimodal (Gemini)
 // Tier 2 — Premium (~$8/MTok):   Claude, OpenAI, xAI
@@ -1708,18 +1711,23 @@ const providerPool = new Map();
 // Within each tier, providers are ordered by skill fit (best specialist first).
 const ESCALATION_CHAINS = {
   // Start FREE → Budget → Premium
-  simple:     ['groq', 'cerebras', 'sambanova', 'fireworks', 'deepseek', 'gemini', 'ollama'],
-  moderate:   ['groq', 'cerebras', 'sambanova', 'deepseek', 'gemini', 'xai', 'claude'],
+  // All 8 Tier 0 providers in chains. Ordered by quality within tier.
+  // openrouter = Qwen 3.6 Plus (0.80), groq/cerebras/sambanova/together (0.60),
+  // fireworks (0.58), novita (0.55), mistral (0.50)
+  simple:     ['openrouter', 'groq', 'cerebras', 'sambanova', 'together', 'fireworks', 'novita', 'mistral', 'deepseek', 'gemini', 'ollama'],
+  moderate:   ['openrouter', 'groq', 'cerebras', 'sambanova', 'together', 'novita', 'deepseek', 'gemini', 'xai', 'claude'],
 
-  // Start BUDGET → Premium (skill-specialized)
-  coding:     ['deepseek', 'gemini', 'openai', 'xai', 'claude'],        // DeepSeek handles 80% of coding
-  math:       ['deepseek', 'gemini', 'openai', 'xai', 'claude'],        // DeepSeek leads math
-  multimodal: ['gemini', 'xai', 'claude', 'openai'],                    // Gemini cheap + vision
+  // Start FREE (Qwen 0.80 quality) → Budget → Premium
+  // Wardenclyffe v3.1: Qwen leads coding/math — 32/40 on DeFi mechanism design, $0.
+  coding:     ['openrouter', 'deepseek', 'gemini', 'openai', 'xai', 'claude'],
+  math:       ['openrouter', 'deepseek', 'gemini', 'openai', 'xai', 'claude'],
+  multimodal: ['gemini', 'xai', 'claude', 'openai'],                    // Gemini cheap + vision (text-only models can't help here)
 
   // Start PREMIUM (irreducible complexity — these NEED frontier models)
-  reasoning:  ['claude', 'xai', 'openai', 'deepseek', 'gemini'],
-  tooluse:    ['claude', 'openai', 'xai', 'deepseek'],
-  complex:    ['claude', 'xai', 'openai', 'deepseek', 'gemini'],
+  // Qwen as fallback between premium and budget — 0.80 quality may satisfy before hitting paid tiers
+  reasoning:  ['claude', 'xai', 'openai', 'openrouter', 'deepseek', 'gemini'],
+  tooluse:    ['claude', 'openai', 'xai', 'deepseek'],                  // Tool use needs native tool support, Qwen via OpenRouter won't help
+  complex:    ['claude', 'xai', 'openai', 'openrouter', 'deepseek', 'gemini'],
 
   explicit:   [], // Caller specified model — use activeProvider
 };

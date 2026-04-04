@@ -62,14 +62,24 @@ async function detectAndSyncChanges(filePath, content) {
   }
 }
 
+const FALLBACK_DIR = join(process.cwd(), 'context-fallback');
+
 async function safeRead(filePath, label) {
   try {
     const content = await readFile(filePath, 'utf-8');
     console.log(`[memory] Loaded ${label} (${content.length} chars)`);
     return content;
   } catch (err) {
-    console.warn(`[memory] MISSING: ${label} at ${filePath} — ${err.code || err.message}`);
-    return null;
+    // Try context-fallback/ directory (bundled in Docker image)
+    try {
+      const fallbackPath = join(FALLBACK_DIR, label);
+      const content = await readFile(fallbackPath, 'utf-8');
+      console.log(`[memory] Loaded ${label} from fallback (${content.length} chars)`);
+      return content;
+    } catch {
+      console.warn(`[memory] MISSING: ${label} at ${filePath} (no fallback) — ${err.code || err.message}`);
+      return null;
+    }
   }
 }
 

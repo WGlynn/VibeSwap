@@ -771,12 +771,15 @@ contract VibeAMM is
      *      This trades full atomicity for gas efficiency and MEV resistance via
      *      the commit-reveal shuffle. See TRP-R16-F02 for full analysis.
      */
+    // INT-R1-INT004: Volume breaker removed from settlement. Volume was committed during
+    // commit phase — blocking settlement creates liveness risk without security benefit.
+    // True Price breaker remains because price manipulation can happen between commit and settlement.
     function executeBatchSwap(
         bytes32 poolId,
         uint64 batchId,
         SwapOrder[] calldata orders
     ) external nonReentrant onlyAuthorizedExecutor poolExists(poolId) whenNotGloballyPaused
-      whenBreakerNotTripped(VOLUME_BREAKER) whenBreakerNotTripped(TRUE_PRICE_BREAKER) returns (
+      whenBreakerNotTripped(TRUE_PRICE_BREAKER) returns (
         BatchSwapResult memory result
     ) {
         if (orders.length == 0) {

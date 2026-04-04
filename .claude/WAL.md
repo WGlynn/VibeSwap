@@ -1,18 +1,17 @@
-# Write-Ahead Log — CLEAN
+# Write-Ahead Log — ACTIVE
 
 ## Epoch
 - **Started**: 2026-04-03
-- **Ended**: 2026-04-03
-- **Intent**: Full Stack RSI — R1 Integration (all 3 batches)
-- **Parent Commit**: `04a16e87`
-- **Tasks**: ALL complete
+- **Intent**: Build cross-chain settlement lifecycle features (XC-003, XC-004, XC-005, INT-004)
+- **Parent Commit**: `788c5a69`
+- **Tasks**: 0/4
 - **Branch**: master
 
-## Final Summary
-- 3 batches committed: `75669e65`, `affc6dda`, `7d0cf76a`
-- 12 bugs fixed total (3 CRIT, 3 HIGH, 3 MED + 3 from batch 2)
-- 1 false positive (FT-003)
-- 0 test regressions across all suites
+## In-Flight
+- [ ] XC-005: Add destinationRecipient to CrossChainCommit (foundational — others depend on this)
+- [ ] XC-004: Implement _handleBatchResult (route tokens + mark settlements)
+- [ ] XC-003: Settlement confirmation callback (source chain marks settled, blocks refund)
+- [ ] INT-004: Settlement-mode bypass for circuit breaker
 
 ## Recovery Notes
-_CLEAN session end. No in-flight work._
+_Cross-chain feature build. If crash: check git log, each feature is independently committable._

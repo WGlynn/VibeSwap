@@ -1,0 +1,97 @@
+{
+  "version": "1.0.0",
+  "architecture": "CKA",
+  "description": "Cell Knowledge Architecture — UTXO model for knowledge sharding",
+  "cells": {
+    "canon": {
+      "file": "cells/canon.md",
+      "type": "alignment",
+      "scope": "public",
+      "tier": "RISC",
+      "always": true,
+      "keywords": [],
+      "glyphs": ["CANON", "RIGHTS", "CAVE", "AIM", "TRUST"]
+    },
+    "security": {
+      "file": "cells/security.md",
+      "type": "alignment",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["security", "key", "wallet", "encrypt", "cold", "hot", "hack", "safe", "protect", "password", "private key", "seed"],
+      "glyphs": ["HCOLD", "7AX", "SIMPLE"]
+    },
+    "axioms": {
+      "file": "cells/axioms.md",
+      "type": "primitive",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["fairness", "extraction", "mev", "p-000", "p-001", "axiom", "lawson", "principle", "ethics", "fair"],
+      "glyphs": ["P-000", "P-001", "LAWSON"]
+    },
+    "vsos": {
+      "file": "cells/vsos.md",
+      "type": "technical",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["vibeswap", "amm", "swap", "pool", "auction", "batch", "commit", "reveal", "mev", "shapley", "token", "vibe", "jul", "layer", "bridge", "cross-chain", "layerzero", "solidity", "contract", "dex", "trade", "liquidity", "reserve", "price", "fee"],
+      "glyphs": ["VSOS", "MECH", "STACK", "SHAPLEY", "TOKENS", "LAYERS", "ABSORB"]
+    },
+    "governance": {
+      "file": "cells/governance.md",
+      "type": "governance",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["governance", "dao", "vote", "proposal", "cincinnatus", "disintermediation", "proof of mind", "pom", "social", "parasocial", "reputation"],
+      "glyphs": ["POM", "CINCIN", "METASOC"]
+    },
+    "protocols": {
+      "file": "cells/protocols.md",
+      "type": "protocol",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["boot", "reboot", "crash", "session", "autopilot", "trp", "agent", "shard", "protocol", "workflow", "deploy", "test", "review"],
+      "glyphs": ["BOOT", "WORK", "AUTO", "REBOOT", "END", "CRASH", "TRP", "CTO", "AGENT"]
+    },
+    "communication": {
+      "file": "cells/communication.md",
+      "type": "alignment",
+      "scope": "public",
+      "tier": "RISC",
+      "always": true,
+      "keywords": [],
+      "glyphs": ["FRANK", "DISCRET"]
+    },
+    "knowledge": {
+      "file": "cells/knowledge.md",
+      "type": "protocol",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["learn", "knowledge", "ckb", "skb", "gkb", "primitive", "paper", "research", "document"],
+      "glyphs": ["2LOOP", "SKILL"]
+    },
+    "external": {
+      "file": "cells/external.md",
+      "type": "external",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["paper", "arxiv", "research", "academic", "lora", "rag", "context engineering", "deepfunding", "iclr", "mit"],
+      "glyphs": ["ILWS", "RLM", "K>SIZE", "ICLR26", "CTXENG", "MIRIX", "DEEP$"]
+    },
+    "future": {
+      "file": "cells/future.md",
+      "type": "technical",
+      "scope": "public",
+      "tier": "RISC",
+      "always": false,
+      "keywords": ["402", "micropayment", "erc8004", "identity", "reputation", "future", "roadmap"],
+      "glyphs": ["x402", "ERC8004"]
+    }
+  }
+}

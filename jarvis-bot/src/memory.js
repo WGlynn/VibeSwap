@@ -40,6 +40,72 @@ const CKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_CKB.md');
 const SKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_SKB.md');
 const GKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_GKB.md');
 
+// ============ CKA: Cell Knowledge Architecture ============
+// UTXO model for knowledge. Cells loaded selectively by topic relevance.
+const KNOWLEDGE_DIR = join(process.cwd(), 'knowledge');
+let cellManifest = null;
+let cellCache = new Map(); // cellId -> content
+
+async function loadCellManifest() {
+  try {
+    const raw = await readFile(join(KNOWLEDGE_DIR, 'manifest.json'), 'utf-8');
+    cellManifest = JSON.parse(raw);
+    console.log(`[CKA] Manifest loaded: ${Object.keys(cellManifest.cells).length} cells`);
+  } catch (err) {
+    console.warn(`[CKA] No manifest found: ${err.message}`);
+    cellManifest = null;
+  }
+}
+
+async function loadCell(cellId) {
+  if (cellCache.has(cellId)) return cellCache.get(cellId);
+  const cell = cellManifest?.cells[cellId];
+  if (!cell) return null;
+  try {
+    const content = await readFile(join(KNOWLEDGE_DIR, cell.file), 'utf-8');
+    const hash = createHash('sha256').update(content).digest('hex').slice(0, 12);
+    cellCache.set(cellId, { content, hash, ...cell });
+    return cellCache.get(cellId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Select cells relevant to a message. Core cells always load.
+ * Topic cells load when message keywords match.
+ * Returns array of { cellId, content, glyphs, hash }
+ */
+export async function selectCells(message = '') {
+  if (!cellManifest) await loadCellManifest();
+  if (!cellManifest) return [];
+
+  const lc = message.toLowerCase();
+  const selected = [];
+
+  for (const [cellId, meta] of Object.entries(cellManifest.cells)) {
+    const shouldLoad = meta.always || meta.keywords.some(kw => lc.includes(kw));
+    if (shouldLoad) {
+      const cell = await loadCell(cellId);
+      if (cell) selected.push({ cellId, ...cell });
+    }
+  }
+
+  return selected;
+}
+
+// Expose for diagnostics
+export function getCellStats() {
+  if (!cellManifest) return { loaded: false };
+  return {
+    loaded: true,
+    totalCells: Object.keys(cellManifest.cells).length,
+    cachedCells: cellCache.size,
+    architecture: cellManifest.architecture,
+    version: cellManifest.version,
+  };
+}
+
 // ============ File Change Detection for Shard Sync ============
 // Track content hashes across reloads. When a file changes, emit
 // a file_sync change to the knowledge chain for peer-to-peer propagation.
@@ -794,16 +860,33 @@ export async function loadSystemPrompt() {
     dynamicParts.push('');
   }
 
-  // ============ Glyph Knowledge Base (GKB) — Compressed post-reboot context ============
-  const gkb = await safeRead(GKB_PATH, 'JarvisxWill_GKB.md');
-  if (gkb) {
-    await detectAndSyncChanges(GKB_PATH, gkb);
-    const sanitized = sanitizeContextForBot(gkb);
-    const capped = sanitized.slice(0, 5000);
-    dynamicParts.push('<context type="glyph_knowledge_base" description="Glyph Knowledge Base — compressed protocol glyphs, canon, axioms">');
-    dynamicParts.push(capped);
-    dynamicParts.push('</context>');
-    dynamicParts.push('');
+  // ============ CKA: Cell Knowledge Architecture — Replaces monolithic GKB ============
+  // Always-on cells load at boot. Topic cells loaded per-message via getCellContext().
+  if (!cellManifest) await loadCellManifest();
+  if (cellManifest) {
+    const alwaysCells = await selectCells(''); // empty message = only always-on cells
+    if (alwaysCells.length > 0) {
+      dynamicParts.push('<context type="cka_cells" description="CKA: Core alignment cells (always loaded)">');
+      for (const cell of alwaysCells) {
+        dynamicParts.push(`[${cell.cellId}:${cell.hash}] ${cell.glyphs.join(',')}`);
+        dynamicParts.push(cell.content);
+      }
+      dynamicParts.push('</context>');
+      dynamicParts.push('');
+      console.log(`[CKA] Boot cells: ${alwaysCells.map(c => c.cellId).join(', ')} (${alwaysCells.length} cells)`);
+    }
+  } else {
+    // Fallback: load monolithic GKB if no CKA manifest
+    const gkb = await safeRead(GKB_PATH, 'JarvisxWill_GKB.md');
+    if (gkb) {
+      await detectAndSyncChanges(GKB_PATH, gkb);
+      const sanitized = sanitizeContextForBot(gkb);
+      const capped = sanitized.slice(0, 5000);
+      dynamicParts.push('<context type="glyph_knowledge_base" description="GKB fallback — CKA manifest not found">');
+      dynamicParts.push(capped);
+      dynamicParts.push('</context>');
+      dynamicParts.push('');
+    }
   }
 
   // ============ Memory Files — Operational Knowledge ============
@@ -854,4 +937,26 @@ export async function loadSystemPrompt() {
 
 export async function refreshMemory() {
   return loadSystemPrompt();
+}
+
+/**
+ * CKA: Get topic-relevant cells for a specific message.
+ * Returns formatted context string to inject into the conversation.
+ * Only returns cells NOT already loaded at boot (avoids duplication).
+ */
+export async function getCellContext(message) {
+  if (!message) return '';
+  const cells = await selectCells(message);
+  // Filter out always-on cells (already in system prompt)
+  const topicCells = cells.filter(c => !cellManifest?.cells[c.cellId]?.always);
+  if (topicCells.length === 0) return '';
+
+  const parts = ['<cka_topic_cells>'];
+  for (const cell of topicCells) {
+    parts.push(`[${cell.cellId}:${cell.hash}] ${cell.glyphs.join(',')}`);
+    parts.push(cell.content);
+  }
+  parts.push('</cka_topic_cells>');
+  console.log(`[CKA] Topic cells for message: ${topicCells.map(c => c.cellId).join(', ')}`);
+  return parts.join('\n');
 }

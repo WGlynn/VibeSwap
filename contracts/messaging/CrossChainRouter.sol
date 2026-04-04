@@ -10,9 +10,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../core/interfaces/ICommitRevealAuction.sol";
 
-/// @notice Minimal interface for settlement confirmation callbacks to VibeSwapCore
+/// @notice Interface for settlement confirmation callbacks to VibeSwapCore
 interface IVibeSwapCoreSettlement {
     function markCrossChainSettled(bytes32 commitHash) external;
+    function settleCrossChainOrder(bytes32 commitHash, bytes32 poolId, uint256 estimatedOut) external;
 }
 
 /**
@@ -217,6 +218,9 @@ contract CrossChainRouter is
     event SettlementConfirmSent(uint64 indexed batchId, uint32 indexed dstEid);
     /// @notice NEW-04: Emitted when escrowed ETH is claimed by the depositor on this chain.
     event ClaimableDepositClaimed(bytes32 indexed commitId, address indexed recipient, uint256 amount);
+
+    /// @notice XC-003: Emitted when markCrossChainSettled fails (observability for silent try-catch)
+    event SettlementMarkFailed(bytes32 indexed commitHash, bytes reason);
 
     /// @dev TRP-R48-NEW05: Emitted when a liquidity sync is rejected for exceeding rate-of-change limits
     event LiquiditySyncRejected(bytes32 indexed poolId, uint32 indexed srcEid, uint256 maxDelta);
@@ -706,24 +710,29 @@ contract CrossChainRouter is
     }
 
     /// @notice XC-003/XC-004: Process batch settlement results from hub chain.
-    ///      Marks cross-chain orders as settled on the source chain, blocking timeout refunds.
-    ///      This prevents the XC-003 double-spend: user can no longer refund after settlement.
+    ///      Settles cross-chain orders on the source chain: marks settled, decrements deposits,
+    ///      and records execution for incentive/compliance tracking.
+    ///      XC-003: Blocks timeout refunds for filled orders (double-spend prevention).
+    ///      XC-004: Decrements deposits so traders can't withdrawDeposit() after settlement.
     ///
     ///      Asset transfers (OFT/bridge) back to source chain are handled separately by the
-    ///      bridge operator after verifying the batch result. This function only marks state.
+    ///      bridge operator after verifying the batch result. This function handles state only.
     function _handleBatchResult(bytes memory payload, uint32 srcEid) internal {
         BatchResult memory result = abi.decode(payload, (BatchResult));
 
-        // XC-003: Mark each filled order as settled on the source chain.
-        // This calls VibeSwapCore.markCrossChainSettled which sets order.settled = true,
-        // blocking refundExpiredCrossChain for these orders.
         if (vibeSwapCore != address(0) && result.filledCommitHashes.length > 0) {
             for (uint256 i = 0; i < result.filledCommitHashes.length;) {
-                // Use try/catch: don't block other settlements if one fails
-                // (commitHash might not exist on this chain if it originated elsewhere)
-                try IVibeSwapCoreSettlement(vibeSwapCore).markCrossChainSettled(
-                    result.filledCommitHashes[i]
-                ) {} catch {}
+                // XC-004: Full settlement with execution recording.
+                // filledAmounts[i] = estimated output for this order from the destination chain.
+                uint256 estimatedOut = i < result.filledAmounts.length ? result.filledAmounts[i] : 0;
+
+                try IVibeSwapCoreSettlement(vibeSwapCore).settleCrossChainOrder(
+                    result.filledCommitHashes[i],
+                    result.poolId,
+                    estimatedOut
+                ) {} catch (bytes memory reason) {
+                    emit SettlementMarkFailed(result.filledCommitHashes[i], reason);
+                }
                 unchecked { ++i; }
             }
         }
@@ -741,7 +750,9 @@ contract CrossChainRouter is
             for (uint256 i = 0; i < confirm.commitHashes.length;) {
                 try IVibeSwapCoreSettlement(vibeSwapCore).markCrossChainSettled(
                     confirm.commitHashes[i]
-                ) {} catch {}
+                ) {} catch (bytes memory reason) {
+                    emit SettlementMarkFailed(confirm.commitHashes[i], reason);
+                }
                 unchecked { ++i; }
             }
         }

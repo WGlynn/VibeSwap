@@ -27,6 +27,7 @@ interface IIncentiveController {
     event AuthorizedCallerUpdated(address indexed caller, bool authorized);
     event ShapleyDistributorUpdated(address indexed distributor);
     event ShapleyEnabledUpdated(bytes32 indexed poolId, bool enabled);
+    event AuctionProceedsForfeited(bytes32 indexed poolId, address indexed lp, uint256 amount);
 
     // Structs
     struct IncentiveConfig {

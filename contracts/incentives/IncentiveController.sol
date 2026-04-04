@@ -94,16 +94,29 @@ contract IncentiveController is
     mapping(bytes32 => IncentiveConfig) public poolConfigs;
     mapping(bytes32 => bool) public hasPoolConfig;
 
-    // Auction proceeds distribution
+    // Auction proceeds distribution (legacy cumulative tracker — kept for storage layout + view)
     mapping(bytes32 => uint256) public poolAuctionProceeds; // poolId => accumulated proceeds
-    mapping(bytes32 => mapping(address => uint256)) public lpAuctionClaims; // poolId => lp => claimed
+    mapping(bytes32 => mapping(address => uint256)) public lpAuctionClaims; // poolId => lp => DEPRECATED
 
     // Authorized callers
     mapping(address => bool) public authorizedCallers;
 
+    // INT-R1-FT001: Masterchef-style checkpoint pattern for auction proceeds.
+    // Old pattern used current LP balance against cumulative proceeds (share inflation).
+    // New pattern: accRewardPerShare increases when proceeds arrive, rewardDebt checkpoints
+    // each LP's position so they can only claim proceeds accumulated WHILE they held LP.
+    //
+    // pending = (lpBalance * accRewardPerShare / ACC_PRECISION) - rewardDebt[lp]
+    uint256 private constant ACC_PRECISION = 1e18;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @notice Accumulated reward per share of LP tokens (scaled by ACC_PRECISION)
+    mapping(bytes32 => uint256) public accRewardPerShare;
+
+    /// @notice Reward debt per LP (Masterchef pattern — set on every position change)
+    mapping(bytes32 => mapping(address => uint256)) public rewardDebt;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 2 for accRewardPerShare + rewardDebt)
+    uint256[48] private __gap;
 
     // ============ Errors ============
 
@@ -245,9 +258,18 @@ contract IncentiveController is
 
         uint256 totalDistributed;
 
+        IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
         for (uint256 i = 0; i < poolIds.length; i++) {
             if (amounts[i] > 0) {
                 poolAuctionProceeds[poolIds[i]] += amounts[i];
+
+                // INT-R1-FT001: Update accRewardPerShare so LPs earn proportionally
+                // to how long they held LP tokens, not their balance at claim time.
+                IAMMLiquidityQuery.Pool memory pool = amm.getPool(poolIds[i]);
+                if (pool.totalLiquidity > 0) {
+                    accRewardPerShare[poolIds[i]] += (amounts[i] * ACC_PRECISION) / pool.totalLiquidity;
+                }
+
                 totalDistributed += amounts[i];
             }
         }
@@ -279,6 +301,15 @@ contract IncentiveController is
         uint256 liquidity,
         uint256 entryPrice
     ) external override onlyAMM {
+        // INT-R1-FT001: Checkpoint auction proceeds before LP balance changes.
+        // The new liquidity hasn't been added to totalLiquidity yet at this point
+        // (AMM calls this before updating), but the LP's balance IS already updated
+        // by the AMM. We set rewardDebt to the LP's NEW balance * accRewardPerShare
+        // so they don't retroactively earn proceeds from before they joined.
+        IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
+        uint256 newLpBalance = amm.liquidityBalance(poolId, lp);
+        rewardDebt[poolId][lp] = (newLpBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
+
         // Register with IL Protection
         if (address(ilProtectionVault) != address(0)) {
             ilProtectionVault.registerPosition(poolId, lp, liquidity, entryPrice, 0);
@@ -303,6 +334,30 @@ contract IncentiveController is
         address lp,
         uint256 liquidity
     ) external override onlyAMM {
+        // INT-R1-FT001: Checkpoint and auto-claim unclaimed proceeds before position shrinks.
+        // Without this, removing LP forfeits unclaimed proceeds (they'd be absorbed by
+        // remaining LPs — the exact share inflation bug this pattern prevents).
+        IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
+        uint256 currentLpBalance = amm.liquidityBalance(poolId, lp);
+        // currentLpBalance is BEFORE removal (AMM calls hook before updating balances)
+        uint256 accumulated = (currentLpBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
+        uint256 debt = rewardDebt[poolId][lp];
+        if (accumulated > debt) {
+            uint256 pending = accumulated - debt;
+            // Transfer pending proceeds to LP (pull would be cleaner but this is only
+            // called from AMM's nonReentrant context, and the LP initiated the removal)
+            (bool success, ) = lp.call{value: pending}("");
+            if (!success) {
+                // If transfer fails (contract LP that rejects ETH), don't block removal.
+                // Proceeds are forfeited. Emit event for off-chain tracking.
+                emit AuctionProceedsForfeited(poolId, lp, pending);
+            }
+        }
+        // Set debt to new (post-removal) balance * accRewardPerShare
+        // SafeMath: currentLpBalance may be 0 if AMM doesn't track pre-hook balance
+        uint256 newBalance = currentLpBalance > liquidity ? currentLpBalance - liquidity : 0;
+        rewardDebt[poolId][lp] = (newBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
+
         // Record unstake and get penalty
         if (address(loyaltyRewardsManager) != address(0)) {
             loyaltyRewardsManager.recordUnstake(poolId, lp, liquidity);
@@ -390,25 +445,21 @@ contract IncentiveController is
      * @param poolId Pool identifier
      */
     function claimAuctionProceeds(bytes32 poolId) external override nonReentrant returns (uint256 amount) {
-        uint256 totalProceeds = poolAuctionProceeds[poolId];
-        uint256 claimed = lpAuctionClaims[poolId][msg.sender];
-
-        if (totalProceeds <= claimed) revert NothingToClaim();
-
-        // Pro-rata share based on LP's liquidity in the pool
+        // INT-R1-FT001: Masterchef-style claim. pending = accumulated - debt.
+        // Old code used (totalProceeds * currentLP / totalLP) which allowed share
+        // inflation when LPs exited without claiming.
         IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
         uint256 lpBalance = amm.liquidityBalance(poolId, msg.sender);
-        IAMMLiquidityQuery.Pool memory pool = amm.getPool(poolId);
 
-        if (lpBalance == 0 || pool.totalLiquidity == 0) revert NothingToClaim();
+        if (lpBalance == 0) revert NothingToClaim();
 
-        // LP's proportional share of total unclaimed proceeds
-        uint256 proRataShare = (totalProceeds * lpBalance) / pool.totalLiquidity;
+        uint256 accumulated = (lpBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
+        uint256 debt = rewardDebt[poolId][msg.sender];
 
-        if (proRataShare <= claimed) revert NothingToClaim();
+        if (accumulated <= debt) revert NothingToClaim();
 
-        amount = proRataShare - claimed;
-        lpAuctionClaims[poolId][msg.sender] = proRataShare;
+        amount = accumulated - debt;
+        rewardDebt[poolId][msg.sender] = accumulated;
 
         (bool success, ) = msg.sender.call{value: amount}("");
         require(success, "Transfer failed");
@@ -492,18 +543,15 @@ contract IncentiveController is
     }
 
     function getPendingAuctionProceeds(bytes32 poolId, address lp) external view override returns (uint256) {
-        uint256 totalProceeds = poolAuctionProceeds[poolId];
-        uint256 claimed = lpAuctionClaims[poolId][lp];
-
-        // Pro-rata share based on LP's liquidity
+        // INT-R1-FT001: Checkpoint-based pending calculation
         IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
         uint256 lpBalance = amm.liquidityBalance(poolId, lp);
-        IAMMLiquidityQuery.Pool memory pool = amm.getPool(poolId);
 
-        if (lpBalance == 0 || pool.totalLiquidity == 0) return 0;
+        if (lpBalance == 0) return 0;
 
-        uint256 proRataShare = (totalProceeds * lpBalance) / pool.totalLiquidity;
-        return proRataShare > claimed ? proRataShare - claimed : 0;
+        uint256 accumulated = (lpBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
+        uint256 debt = rewardDebt[poolId][lp];
+        return accumulated > debt ? accumulated - debt : 0;
     }
 
     // ============ Internal Functions ============

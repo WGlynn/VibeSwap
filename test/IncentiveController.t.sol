@@ -466,6 +466,12 @@ contract IncentiveControllerTest is Test {
 
     function test_claimAuctionProceeds() public {
         bytes32 poolId = keccak256("pool1");
+
+        // INT-R1-FT001: LP must exist BEFORE proceeds distribution so accRewardPerShare
+        // is computed against their liquidity. (Old code allowed post-hoc LP setup.)
+        address lp = makeAddr("lp");
+        mockAMM.setLiquidity(poolId, lp, 1000e18, 1000e18);
+
         bytes32[] memory poolIds = new bytes32[](1);
         poolIds[0] = poolId;
         uint256[] memory amounts = new uint256[](1);
@@ -474,10 +480,6 @@ contract IncentiveControllerTest is Test {
         vm.deal(coreAddr, 10 ether);
         vm.prank(coreAddr);
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
-
-        // Set up LP with 100% of pool liquidity (pro-rata = full share)
-        address lp = makeAddr("lp");
-        mockAMM.setLiquidity(poolId, lp, 1000e18, 1000e18);
 
         vm.prank(lp);
         uint256 amount = controller.claimAuctionProceeds(poolId);
@@ -486,6 +488,13 @@ contract IncentiveControllerTest is Test {
 
     function test_claimAuctionProceeds_proRata() public {
         bytes32 poolId = keccak256("pool1");
+
+        // INT-R1-FT001: Set up LPs BEFORE distribution
+        address lp1 = makeAddr("lp1");
+        address lp2 = makeAddr("lp2");
+        mockAMM.setLiquidity(poolId, lp1, 300e18, 1000e18);
+        mockAMM.setLiquidity(poolId, lp2, 700e18, 1000e18);
+
         bytes32[] memory poolIds = new bytes32[](1);
         poolIds[0] = poolId;
         uint256[] memory amounts = new uint256[](1);
@@ -494,12 +503,6 @@ contract IncentiveControllerTest is Test {
         vm.deal(coreAddr, 10 ether);
         vm.prank(coreAddr);
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
-
-        // LP1 has 30%, LP2 has 70%
-        address lp1 = makeAddr("lp1");
-        address lp2 = makeAddr("lp2");
-        mockAMM.setLiquidity(poolId, lp1, 300e18, 1000e18);
-        mockAMM.setLiquidity(poolId, lp2, 700e18, 1000e18);
 
         vm.prank(lp1);
         uint256 amount1 = controller.claimAuctionProceeds(poolId);
@@ -654,6 +657,11 @@ contract IncentiveControllerTest is Test {
 
     function test_getPendingAuctionProceeds() public {
         bytes32 poolId = keccak256("pool1");
+
+        // INT-R1-FT001: LP must exist before distribution
+        address lp = makeAddr("lp");
+        mockAMM.setLiquidity(poolId, lp, 500e18, 1000e18);
+
         bytes32[] memory poolIds = new bytes32[](1);
         poolIds[0] = poolId;
         uint256[] memory amounts = new uint256[](1);
@@ -664,9 +672,6 @@ contract IncentiveControllerTest is Test {
         controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
 
         // LP has 50% of pool → should get 5 ether
-        address lp = makeAddr("lp");
-        mockAMM.setLiquidity(poolId, lp, 500e18, 1000e18);
-
         uint256 pending = controller.getPendingAuctionProceeds(poolId, lp);
         assertEq(pending, 5 ether);
     }

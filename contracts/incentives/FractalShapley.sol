@@ -105,6 +105,11 @@ contract FractalShapley is
     /// @notice Contributor address => total credit received across all contributions
     mapping(address => uint256) private _totalCreditReceived;
 
+    /// @notice INT-R1-FT004: Pending ETH withdrawals for recipients that rejected push transfers.
+    /// @dev A single griefing recipient (contract that reverts on receive) would block ALL
+    ///      distributions for a contribution. Pull pattern ensures other recipients aren't affected.
+    mapping(address => uint256) public pendingWithdrawals;
+
     /// @dev Internal storage struct (no dynamic arrays for gas efficiency)
     struct ContributionStorage {
         address contributor;
@@ -304,8 +309,15 @@ contract FractalShapley is
 
             // Transfer
             if (token == address(0)) {
+                // INT-R1-FT004: Use pull pattern for failed ETH transfers.
+                // A single griefing recipient that reverts on receive() would block
+                // ALL distributions for this contribution. Queue failed transfers
+                // for later withdrawal instead of reverting the entire tx.
                 (bool ok,) = alloc.recipient.call{value: alloc.amount}("");
-                if (!ok) revert ETHTransferFailed();
+                if (!ok) {
+                    pendingWithdrawals[alloc.recipient] += alloc.amount;
+                    emit ETHTransferQueued(alloc.recipient, alloc.amount);
+                }
             } else {
                 IERC20(token).safeTransferFrom(msg.sender, alloc.recipient, alloc.amount);
             }
@@ -321,6 +333,21 @@ contract FractalShapley is
             }
         }
     }
+
+    // ============ Pull Withdrawals (INT-R1-FT004) ============
+
+    /// @notice Withdraw pending ETH from failed push transfers
+    function withdrawPending() external nonReentrant {
+        uint256 amount = pendingWithdrawals[msg.sender];
+        if (amount == 0) revert ZeroReward();
+        pendingWithdrawals[msg.sender] = 0;
+        (bool ok,) = msg.sender.call{value: amount}("");
+        if (!ok) revert ETHTransferFailed();
+        emit PendingWithdrawn(msg.sender, amount);
+    }
+
+    event ETHTransferQueued(address indexed recipient, uint256 amount);
+    event PendingWithdrawn(address indexed recipient, uint256 amount);
 
     // ============ Attestation ============
 

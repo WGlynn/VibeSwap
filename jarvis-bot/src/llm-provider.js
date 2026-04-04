@@ -876,29 +876,14 @@ function createOllamaProvider(providerConfig) {
       const data = await response.json();
       const text = data.message?.content || '';
 
-      // Parse tool calls from structured text (for models without native tool support)
+      // BOT-106: Removed regex-based tool call parsing from Ollama plain text output.
+      // Parsing "[Using tool: X({})]" from model text and executing it is a text-to-code-execution
+      // vector — a weaker local model can be prompt-injected to emit tool call syntax.
+      // Ollama models should use native tool calling if supported, not regex parsing.
       const content = [];
-      const toolCallRegex = /\[Using tool: (\w+)\((.*?)\)\]/g;
-      let match;
-      let cleanText = text;
-      const toolCalls = [];
-
-      while ((match = toolCallRegex.exec(text)) !== null) {
-        try {
-          toolCalls.push({
-            type: 'tool_use',
-            id: `toolu_ollama_${randomUUID().slice(0, 8)}`,
-            name: match[1],
-            input: JSON.parse(match[2]),
-          });
-          cleanText = cleanText.replace(match[0], '').trim();
-        } catch { /* ignore parse failures */ }
+      if (text) {
+        content.push({ type: 'text', text });
       }
-
-      if (cleanText) {
-        content.push({ type: 'text', text: cleanText });
-      }
-      content.push(...toolCalls);
 
       return {
         content,
@@ -1068,7 +1053,8 @@ function createGeminiProvider(providerConfig) {
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`Gemini API error ${response.status}: ${error}`);
+        // BOT-104: Don't include raw error (may echo URL with API key) in thrown message
+        throw new Error(`Gemini API error ${response.status}: ${error.slice(0, 200).replace(/key=[^&\s]+/gi, 'key=REDACTED')}`);
       }
 
       const data = await response.json();
@@ -1418,7 +1404,9 @@ export function tryRestorePrimary() {
 
     const primary = factory(primaryConfig);
     // Prepend current active + remaining fallbacks behind the restored primary
-    fallbackProviders.unshift(activeProvider, ...fallbackProviders);
+    // BOT-111: Fixed exponential duplication — was spreading fallbackProviders into itself
+    const remaining = [...fallbackProviders];
+    fallbackProviders = [activeProvider, ...remaining];
     activeProvider = primary;
     degradedSince = null;
     degradationNotified = false;

@@ -2603,11 +2603,18 @@ bot.command('wallet', async (ctx) => {
   const sub = args[0]?.toLowerCase();
 
   if (sub === 'create') {
+    // BOT-202: Delete the message containing the passphrase immediately
+    ctx.deleteMessage().catch(() => {});
+    if (ctx.chat.type !== 'private') return ctx.reply('Wallet creation must be done in DMs.');
     const passphrase = args.slice(1).join(' ');
     const result = generateWallet(passphrase);
     if (result.error) return ctx.reply(result.error);
-    ctx.reply(`Wallet created: ${result.address}\n\nMNEMONIC (SAVE THIS — shown once):\n${result.mnemonic}\n\n${result.message}`);
+    // BOT-202: Auto-delete mnemonic after 60 seconds
+    const msg = await ctx.reply(`Wallet created: ${result.address}\n\nMNEMONIC (SAVE THIS — auto-deletes in 60s):\n${result.mnemonic}\n\n${result.message}`);
+    setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 60000);
   } else if (sub === 'unlock') {
+    // BOT-202: Delete the message containing the passphrase immediately
+    ctx.deleteMessage().catch(() => {});
     const passphrase = args.slice(1).join(' ');
     const result = unlockWallet(passphrase);
     ctx.reply(result.error || `Wallet unlocked: ${result.address}`);
@@ -2627,11 +2634,14 @@ bot.command('wallet', async (ctx) => {
       ctx.reply(`Whitelist (${info.limits?.whitelistCount || 0}): Owner-only. /wallet whitelist add <addr>`);
     }
   } else if (sub === 'mnemonic' || sub === 'backup') {
+    // BOT-202: Delete passphrase message, DMs only, auto-delete mnemonic
+    ctx.deleteMessage().catch(() => {});
     if (ctx.chat.type !== 'private') return ctx.reply('Mnemonic can only be revealed in DMs.');
     const passphrase = args.slice(1).join(' ');
     const result = revealMnemonic(passphrase);
     if (result.error) return ctx.reply(result.error);
-    ctx.reply(`${result.mnemonic}\n\n${result.warning}`);
+    const msg = await ctx.reply(`${result.mnemonic}\n\n${result.warning}\n\n⚠️ This message auto-deletes in 60 seconds.`);
+    setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 60000);
   } else if (sub === 'balance' || sub === 'bal') {
     const chain = args[1] || 'base';
     const balances = await getAllBalances();
@@ -2817,11 +2827,12 @@ bot.command('gate', async (ctx) => {
     // Run gate against last commit's diff
     ctx.reply('Running primitive gate against HEAD...');
     try {
-      const { execSync } = await import('child_process');
+      // BOT-006: Use execFileSync to avoid shell injection via VIBESWAP_REPO env var
+      const { execFileSync } = await import('child_process');
       const repoPath = process.env.VIBESWAP_REPO || '.';
-      const diff = execSync(`git -C ${repoPath} diff HEAD~1 HEAD`, { encoding: 'utf-8', maxBuffer: 1024 * 1024 });
+      const diff = execFileSync('git', ['-C', repoPath, 'diff', 'HEAD~1', 'HEAD'], { encoding: 'utf-8', maxBuffer: 1024 * 1024 });
       if (!diff.trim()) return ctx.reply('No diff found in last commit.');
-      const commitHash = execSync(`git -C ${repoPath} rev-parse --short HEAD`, { encoding: 'utf-8' }).trim();
+      const commitHash = execFileSync('git', ['-C', repoPath, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf-8' }).trim();
       const result = await runPrimitiveGate(diff, { commitHash });
       ctx.reply(formatGateResult(result));
     } catch (err) {
@@ -3697,7 +3708,8 @@ bot.command('leaderboard', async (ctx) => {
 
 // /batch_rewards — Owner-only: compute and display reward batch
 bot.command('batch_rewards', async (ctx) => {
-  if (String(ctx.from.id) !== config.ownerId) {
+  // BOT-003: Fixed typo — was config.ownerId (undefined), making command open to all users
+  if (String(ctx.from.id) !== String(config.ownerUserId)) {
     return ctx.reply('Owner only.');
   }
   const batch = computeBatch(getAllUsers, getUserStats, getUserWallet);
@@ -6838,7 +6850,8 @@ bot.on('text', async (ctx) => {
   // The troll doesn't get banned — they get boring.
   if (isGroup && isAddressed) {
     // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
-    if (String(ctx.from?.id) !== config.ownerId) {
+    // BOT-004: Fixed typo — was config.ownerId (undefined), throttling owner's own messages
+    if (String(ctx.from?.id) !== String(config.ownerUserId)) {
       const airspace = checkAirspace(ctx.chat.id, ctx.from.id);
       if (!airspace.shouldRespond) {
         // Silently skip — don't even acknowledge. The troll gets nothing.
@@ -7556,12 +7569,20 @@ async function main() {
         return;
       }
 
-      // Proxy processing — primary shard forwards a message for this shard to process
+      // BOT-001: HMAC-authenticated proxy processing — peers must sign with SHARD_SECRET
       if (req.url === '/shard/process' && req.method === 'POST') {
         try {
           const body = await readBody(req);
           const payload = JSON.parse(body);
-          // Process the message with Claude (for CRPC multi-shard response generation)
+          // BOT-001: Verify HMAC signature from peer shard
+          const signature = req.headers['x-shard-signature'];
+          const { processConsensusBody } = await import('./consensus.js');
+          const authResult = await processConsensusBody('shard-process', payload, signature);
+          if (authResult?.error) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Authentication failed' }));
+            return;
+          }
           const { chat: chatFn } = await import('./claude.js');
           const response = await chatFn(
             payload.chatId || 'proxy',
@@ -8312,8 +8333,8 @@ async function main() {
           const body = await readBody(req);
           const payload = JSON.parse(body);
 
-            // Verify webhook secret
-            if (config.transcriptWebhookSecret && payload.secret !== config.transcriptWebhookSecret) {
+            // BOT-007: Fail-closed — reject all requests when no secret is configured
+            if (!config.transcriptWebhookSecret || payload.secret !== config.transcriptWebhookSecret) {
               res.writeHead(401);
               res.end('Unauthorized');
               return;
@@ -8595,11 +8616,30 @@ async function main() {
         }
 
       // ============ GitHub Webhook — Live Push Feed to Telegram ============
-      // Receives push events from GitHub and posts to the Telegram group.
-      // Set up: GitHub repo → Settings → Webhooks → https://jarvis-vibeswap.fly.dev/github
+      // BOT-005: HMAC signature verification required. Set GITHUB_WEBHOOK_SECRET in env.
       } else if (req.url === '/github' && req.method === 'POST') {
         try {
             const body = await readBody(req);
+            // BOT-005: Verify GitHub webhook signature
+            const ghSecret = process.env.GITHUB_WEBHOOK_SECRET;
+            if (ghSecret) {
+              const sig = req.headers['x-hub-signature-256'];
+              if (!sig) {
+                res.writeHead(401);
+                res.end('Missing signature');
+                return;
+              }
+              const { createHmac, timingSafeEqual } = await import('crypto');
+              const expected = 'sha256=' + createHmac('sha256', ghSecret).update(body).digest('hex');
+              if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+                console.warn('[github] Invalid webhook signature');
+                res.writeHead(401);
+                res.end('Invalid signature');
+                return;
+              }
+            } else {
+              console.warn('[github] GITHUB_WEBHOOK_SECRET not set — webhook is unauthenticated');
+            }
             const event = req.headers['x-github-event'];
             const payload = JSON.parse(body);
 
@@ -8904,11 +8944,20 @@ async function main() {
         }
 
       // ============ Shard Proxy Processing ============
-      // Allows any shard (including primary) to process messages forwarded from peers
+      // BOT-001: HMAC-authenticated shard proxy. Only peers with SHARD_SECRET can call.
       } else if (req.url === '/shard/process' && req.method === 'POST') {
         try {
             const body = await readBody(req);
             const payload = JSON.parse(body);
+            // BOT-001: Verify HMAC signature from peer shard
+            const signature = req.headers['x-shard-signature'];
+            const { processConsensusBody } = await import('./consensus.js');
+            const authResult = await processConsensusBody('shard-process', payload, signature);
+            if (authResult?.error) {
+              res.writeHead(401, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Authentication failed' }));
+              return;
+            }
             const response = await chat(
               payload.chatId || 'proxy',
               payload.userName || 'proxy',

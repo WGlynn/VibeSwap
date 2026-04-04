@@ -55,22 +55,28 @@ const DEFAULT_LIMITS = {
 }
 
 // ============ ENCRYPTION ============
-function deriveKey(passphrase) {
-  return scryptSync(passphrase, 'jarvis-vibeswap-salt-v1', 32)
+// BOT-200: Per-wallet random salt instead of static. Falls back to legacy salt for existing wallets.
+const LEGACY_SALT = 'jarvis-vibeswap-salt-v1'
+
+function deriveKey(passphrase, salt) {
+  return scryptSync(passphrase, salt, 32)
 }
 
 function encrypt(data, passphrase) {
-  const key = deriveKey(passphrase)
+  const salt = randomBytes(32) // BOT-200: Fresh random salt per encryption
+  const key = deriveKey(passphrase, salt)
   const iv = randomBytes(16)
   const cipher = createCipheriv('aes-256-gcm', key, iv)
   let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex')
   encrypted += cipher.final('hex')
   const tag = cipher.getAuthTag()
-  return { encrypted, iv: iv.toString('hex'), tag: tag.toString('hex') }
+  return { encrypted, iv: iv.toString('hex'), tag: tag.toString('hex'), salt: salt.toString('hex') }
 }
 
 function decrypt(encData, passphrase) {
-  const key = deriveKey(passphrase)
+  // BOT-200: Use stored salt if present, fall back to legacy static salt for old wallets
+  const salt = encData.salt ? Buffer.from(encData.salt, 'hex') : LEGACY_SALT
+  const key = deriveKey(passphrase, salt)
   const iv = Buffer.from(encData.iv, 'hex')
   const tag = Buffer.from(encData.tag, 'hex')
   const decipher = createDecipheriv('aes-256-gcm', key, iv)
@@ -292,12 +298,22 @@ export async function sendTransaction({ to, value, chain = 'base', data, usdValu
   if (!unlocked) return { error: 'Wallet is locked. Unlock first.' }
   if (!to) return { error: 'No recipient address.' }
   if (!ethers.isAddress(to)) return { error: `Invalid address: ${to}` }
+  // BOT-215: Block arbitrary calldata through sendTransaction — use callContract for contract calls
+  if (data && data !== '0x') return { error: 'Arbitrary calldata not allowed via sendTransaction. Use callContract.' }
 
   const provider = providers[chain]
   if (!provider) return { error: `Unknown chain: ${chain}` }
 
+  // BOT-207: Compute USD value from ETH amount — don't trust caller's usdValue alone
+  let computedUsd = 0
+  try {
+    const ethPrice = global.__vibePriceCache?.ETH?.price || 2000
+    computedUsd = parseFloat(value || 0) * ethPrice
+  } catch { /* use 0 */ }
+  const checkedUsdValue = Math.max(computedUsd, usdValue) // Use higher of computed vs declared
+
   // Enforce spending limits
-  const limitError = checkLimits(to, usdValue)
+  const limitError = checkLimits(to, checkedUsdValue)
   if (limitError) return { error: limitError }
 
   try {
@@ -309,7 +325,7 @@ export async function sendTransaction({ to, value, chain = 'base', data, usdValu
     })
 
     console.log(`[wallet] TX sent: ${tx.hash} on ${chain}`)
-    recordSpend(usdValue, tx.hash, chain, to, value || '0')
+    recordSpend(checkedUsdValue, tx.hash, chain, to, value || '0')
 
     // Wait for confirmation
     const receipt = await tx.wait(1)
@@ -330,10 +346,25 @@ export async function sendTransaction({ to, value, chain = 'base', data, usdValu
 }
 
 // ============ CONTRACT CALLS ============
+// BOT-203: callContract now enforces whitelist and spending limits (previously bypassed both)
 export async function callContract({ chain = 'base', contractAddress, abi, functionName, args = [], value }) {
   if (!unlocked) return { error: 'Wallet is locked.' }
+  if (!contractAddress || !ethers.isAddress(contractAddress)) return { error: `Invalid contract address: ${contractAddress}` }
   const provider = providers[chain]
   if (!provider) return { error: `Unknown chain: ${chain}` }
+
+  // BOT-203: Estimate USD value for spending limit check
+  let usdValue = 0
+  if (value) {
+    try {
+      const ethPrice = global.__vibePriceCache?.ETH?.price || 2000
+      usdValue = parseFloat(value) * ethPrice
+    } catch { /* use 0 */ }
+  }
+
+  // BOT-203: Enforce whitelist and spending limits on contract calls
+  const limitError = checkLimits(contractAddress, usdValue)
+  if (limitError) return { error: limitError }
 
   try {
     const signer = unlocked.connect(provider)
@@ -342,6 +373,7 @@ export async function callContract({ chain = 'base', contractAddress, abi, funct
     const tx = await contract[functionName](...args, overrides)
 
     if (tx.hash) {
+      recordSpend(usdValue, tx.hash, chain, contractAddress, value || '0')
       const receipt = await tx.wait(1)
       return {
         hash: tx.hash,

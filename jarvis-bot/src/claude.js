@@ -483,13 +483,17 @@ async function handleCodeGenTool(toolName, input) {
       return `Edited ${input.path}: replaced ${input.old_string.length} chars with ${input.new_string.length} chars`;
     }
     if (toolName === 'search_code') {
-      const { execSync } = await import('child_process');
+      // BOT-103: Use execFileSync with array args to prevent shell injection via pattern
+      const { execFileSync } = await import('child_process');
       const dir = input.directory ? safeRepoPath(input.directory) : safeRepoPath('.');
       try {
-        const result = execSync(
-          `grep -rn --include="*.sol" --include="*.js" --include="*.jsx" --include="*.ts" --include="*.md" "${input.pattern.replace(/"/g, '\\"')}" "${dir}"`,
-          { timeout: 10000, maxBuffer: 50000, encoding: 'utf-8' }
-        );
+        const args = [
+          '-rn',
+          '--include=*.sol', '--include=*.js', '--include=*.jsx', '--include=*.ts', '--include=*.md',
+          input.pattern,
+          dir,
+        ];
+        const result = execFileSync('grep', args, { timeout: 10000, maxBuffer: 50000, encoding: 'utf-8' });
         const lines = result.split('\n').slice(0, 30);
         return lines.join('\n') || 'No matches found.';
       } catch (err) {
@@ -1744,15 +1748,20 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           }
         } else if (tb.name === 'read_file') {
           try {
-            const filePath = tb.input.path.startsWith('/') || tb.input.path.match(/^[A-Z]:/)
-              ? tb.input.path
-              : join(REPO_PATH, tb.input.path);
-            const content = await readFile(filePath, 'utf-8');
-            // Cap at 8000 chars to avoid context explosion
-            result = content.length > 8000
-              ? content.slice(0, 8000) + `\n\n[... truncated, ${content.length} chars total]`
-              : content;
-            console.log(`[claude] Tool: read_file("${tb.input.path}") → ${content.length} chars`);
+            // BOT-100: Path traversal guard — resolve relative to REPO_PATH, block absolute paths
+            const filePath = join(REPO_PATH, tb.input.path);
+            const resolved = resolve(filePath);
+            const repoResolved = resolve(REPO_PATH);
+            if (!resolved.startsWith(repoResolved)) {
+              result = 'Blocked: read_file path must be within the repository.';
+            } else {
+              const content = await readFile(resolved, 'utf-8');
+              // Cap at 8000 chars to avoid context explosion
+              result = content.length > 8000
+                ? content.slice(0, 8000) + `\n\n[... truncated, ${content.length} chars total]`
+                : content;
+              console.log(`[claude] Tool: read_file("${tb.input.path}") → ${content.length} chars`);
+            }
           } catch (err) {
             result = `Failed to read file: ${err.message}`;
           }
@@ -1777,31 +1786,39 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = `Failed to write file: ${err.message}`;
           }
         } else if (tb.name === 'run_command') {
-          // SECURITY TODO: Blocklist approach is insufficient — should use allowlist of permitted commands.
+          // BOT-101: Allowlist of permitted command prefixes. Blocklist approach was trivially bypassed.
           try {
-            const cmd = tb.input.command;
-            // Safety: block destructive commands
-            const blocked = ['rm -rf /', 'rm -rf ~', 'DROP TABLE', 'DROP DATABASE', 'format c:', 'mkfs', ':(){:|:&};:'];
-            const isBlocked = blocked.some(b => cmd.toLowerCase().includes(b.toLowerCase()));
-            if (isBlocked) {
-              result = 'Blocked: destructive command detected.';
+            const cmd = tb.input.command.trim();
+            const ALLOWED_PREFIXES = [
+              'git ', 'git\t', 'forge ', 'npm ', 'npx ', 'node ', 'python ', 'pip ',
+              'ls ', 'ls\t', 'dir ', 'cat ', 'head ', 'tail ', 'wc ', 'find ',
+              'grep ', 'rg ', 'echo ', 'pwd', 'which ', 'date', 'uptime',
+            ];
+            const isAllowed = ALLOWED_PREFIXES.some(p => cmd.startsWith(p)) || cmd === 'ls' || cmd === 'pwd' || cmd === 'date' || cmd === 'uptime';
+            if (!isAllowed) {
+              result = 'Blocked: only repository-related commands are allowed (git, forge, npm, node, python, ls, grep, etc).';
             } else {
-              const cwd = tb.input.cwd
-                ? (tb.input.cwd.startsWith('/') || tb.input.cwd.match(/^[A-Z]:/) ? tb.input.cwd : join(REPO_PATH, tb.input.cwd))
-                : REPO_PATH;
-              const { execSync } = await import('child_process');
-              const output = execSync(cmd, {
-                cwd,
-                timeout: 60000,
-                encoding: 'utf-8',
-                maxBuffer: 1024 * 1024,
-                env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-              });
-              // Cap output
-              result = output.length > 4000
-                ? output.slice(0, 4000) + `\n\n[... truncated, ${output.length} chars total]`
-                : output || '(no output)';
-              console.log(`[claude] Tool: run_command("${cmd.slice(0, 60)}") → ${output.length} chars output`);
+              // BOT-101: Also block shell chaining operators that bypass the prefix check
+              if (/[;&|`$]|\bsudo\b/.test(cmd)) {
+                result = 'Blocked: shell operators (;, &, |, `, $) and sudo are not allowed.';
+              } else {
+                const cwd = tb.input.cwd
+                  ? (tb.input.cwd.startsWith('/') || tb.input.cwd.match(/^[A-Z]:/) ? tb.input.cwd : join(REPO_PATH, tb.input.cwd))
+                  : REPO_PATH;
+                const { execSync } = await import('child_process');
+                const output = execSync(cmd, {
+                  cwd,
+                  timeout: 60000,
+                  encoding: 'utf-8',
+                  maxBuffer: 1024 * 1024,
+                  env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+                });
+                // Cap output
+                result = output.length > 4000
+                  ? output.slice(0, 4000) + `\n\n[... truncated, ${output.length} chars total]`
+                  : output || '(no output)';
+                console.log(`[claude] Tool: run_command("${cmd.slice(0, 60)}") → ${output.length} chars output`);
+              }
             }
           } catch (err) {
             result = `Command failed: ${err.stderr || err.message || String(err)}`.slice(0, 2000);
@@ -1809,17 +1826,20 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         } else if (tb.name === 'fetch_repo') {
           try {
             const url = tb.input.url.replace(/\.git$/, '');
+            // BOT-102: Validate URL format to prevent command injection
+            if (!/^https?:\/\/[a-zA-Z0-9._\-\/]+$/.test(url)) {
+              result = 'Blocked: URL must be a valid HTTPS git repository URL with no special characters.';
+            } else {
             const repoName = url.split('/').pop();
             const tempDir = join(REPO_PATH, '.claude', 'repo-cache', repoName);
-            const { execSync } = await import('child_process');
+            const { execFileSync } = await import('child_process');
+            const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
             if (existsSync(tempDir)) {
-              execSync('git pull --ff-only', { cwd: tempDir, timeout: 30000, encoding: 'utf-8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+              execFileSync('git', ['pull', '--ff-only'], { cwd: tempDir, timeout: 30000, encoding: 'utf-8', env: gitEnv });
             } else {
               await mkdir(join(REPO_PATH, '.claude', 'repo-cache'), { recursive: true });
-              // SECURITY TODO: url is interpolated into shell command without sanitization.
-              // Should use execFile(['git', 'clone', '--depth', '1', url + '.git', tempDir])
-              // instead of execSync to prevent command injection via malicious URLs.
-              execSync(`git clone --depth 1 ${url}.git ${tempDir}`, { timeout: 60000, encoding: 'utf-8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+              // BOT-102: Use execFileSync with array args — no shell interpretation
+              execFileSync('git', ['clone', '--depth', '1', url + '.git', tempDir], { timeout: 60000, encoding: 'utf-8', env: gitEnv });
             }
             const files = tb.input.files?.length ? tb.input.files : ['README.md'];
             const results = [];
@@ -1834,6 +1854,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             }
             result = results.join('\n\n');
             console.log(`[claude] Tool: fetch_repo("${repoName}") → ${files.length} files read`);
+            } // close BOT-102 else block
           } catch (err) {
             result = `Failed to fetch repo: ${err.message}`;
           }
@@ -2202,10 +2223,20 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           } catch (err) { result = `Failed: ${err.message}`; }
           console.log('[claude] Tool: crypto_quiz');
         } else if (WALLET_TOOL_NAMES.includes(tb.name)) {
-          result = await handleWalletTool(tb.name, tb.input);
+          // BOT-201: Wallet tools are owner-only — gate at tool dispatch, not just Telegram command
+          if (String(userId) !== String(config.ownerUserId)) {
+            result = 'Wallet tools are owner-only.';
+          } else {
+            result = await handleWalletTool(tb.name, tb.input);
+          }
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (TRADING_TOOL_NAMES.includes(tb.name)) {
-          result = await handleTradingTool(tb.name, tb.input);
+          // BOT-201: Trading tools are owner-only
+          if (String(userId) !== String(config.ownerUserId)) {
+            result = 'Trading tools are owner-only.';
+          } else {
+            result = await handleTradingTool(tb.name, tb.input);
+          }
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (SOCIAL_TOOL_NAMES.includes(tb.name)) {
           result = await handleSocialTool(tb.name, tb.input);

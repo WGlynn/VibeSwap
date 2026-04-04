@@ -638,8 +638,11 @@ export async function handleWebRequest(req, res, pathname) {
     try {
       const body = JSON.parse(await readBody(req));
       const { type, message, url, userAgent, vitals } = body;
+      // BOT-303: Sanitize user-controlled fields before logging to prevent log injection
+      const safeMsg = String(message || '').replace(/[\r\n]/g, ' ').slice(0, 200);
+      const safeUrl = String(url || '').replace(/[\r\n]/g, ' ').slice(0, 200);
       if (type === 'error') {
-        console.warn(`[web-report] Error from ${ip}: ${message} @ ${url}`);
+        console.warn(`[web-report] Error from ${ip}: ${safeMsg} @ ${safeUrl}`);
       } else if (type === 'vitals') {
         console.log(`[web-report] Vitals from ${ip}: LCP=${vitals?.lcp}ms FCP=${vitals?.fcp}ms CLS=${vitals?.cls}`);
       }

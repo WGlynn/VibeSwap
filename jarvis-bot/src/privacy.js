@@ -40,7 +40,9 @@ const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;       // GCM recommended IV length
 const TAG_LENGTH = 16;      // GCM auth tag length
 const KEY_LENGTH = 32;      // 256 bits
-const SALT = 'jarvis-privacy-v1'; // Static salt for PBKDF2 (key is already high entropy)
+// BOT-208: If JARVIS_MASTER_KEY looks like 64-char hex (32 bytes), skip PBKDF2 entirely.
+// Static salt is only a risk when input is a low-entropy passphrase.
+const LEGACY_PRIVACY_SALT = 'jarvis-privacy-v1';
 const PBKDF2_ITERATIONS = 100000;
 
 // ============ Init ============
@@ -55,9 +57,16 @@ export async function initPrivacy() {
   const masterKeyHex = config.privacy?.masterKey;
 
   if (masterKeyHex) {
-    // Derive from env var via PBKDF2 (handles both raw hex keys and passphrases)
-    masterKey = pbkdf2Sync(masterKeyHex, SALT, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
-    console.log(`[privacy] Master key loaded from env (fingerprint: ${getKeyFingerprint(masterKey)})`);
+    // BOT-208: If it's 64-char hex (32 bytes raw), use directly — no PBKDF2 needed.
+    // PBKDF2 with static salt is only a risk for low-entropy passphrases.
+    if (/^[0-9a-f]{64}$/i.test(masterKeyHex)) {
+      masterKey = Buffer.from(masterKeyHex, 'hex');
+      console.log(`[privacy] Master key loaded from env (raw hex, fingerprint: ${getKeyFingerprint(masterKey)})`);
+    } else {
+      masterKey = pbkdf2Sync(masterKeyHex, LEGACY_PRIVACY_SALT, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
+      console.warn(`[privacy] Master key derived via PBKDF2 (passphrase mode — consider using 64-char hex instead)`);
+      console.log(`[privacy] Fingerprint: ${getKeyFingerprint(masterKey)}`);
+    }
   } else {
     // Auto-generate on first boot
     masterKey = await loadOrGenerateMasterKey();
@@ -83,13 +92,14 @@ async function loadOrGenerateMasterKey() {
     await mkdir(keyDir, { recursive: true });
     await writeFile(keyFile, key.toString('hex'), { mode: 0o600 });
 
+    // BOT-205: Never log the raw key — it ends up in cloud log aggregators
     console.log('============================================================');
     console.log('[privacy] MASTER KEY GENERATED — BACK THIS UP!');
     console.log(`[privacy] Location: ${keyFile}`);
     console.log(`[privacy] Fingerprint: ${getKeyFingerprint(key)}`);
-    console.log(`[privacy] Hex: ${key.toString('hex')}`);
+    console.log('[privacy] Read the key from the file directly. It is NOT logged here.');
     console.log('[privacy] Set JARVIS_MASTER_KEY env var to persist across deploys.');
-    console.log('[privacy] On Fly.io: fly secrets set JARVIS_MASTER_KEY=<hex>');
+    console.log('[privacy] On Fly.io: fly secrets set JARVIS_MASTER_KEY=<hex from file>');
     console.log('[privacy] LOSING THIS KEY = LOSING ALL ENCRYPTED KNOWLEDGE.');
     console.log('============================================================');
 
@@ -149,8 +159,14 @@ export function decrypt(encryptedB64, key) {
       decipher.final(),
     ]).toString('utf8');
   } catch {
-    // Decryption failed — likely plaintext legacy data
-    return encryptedB64;
+    // BOT-206: Only fall back to plaintext for data that is clearly NOT encrypted.
+    // If data looks encrypted (long enough to have IV+tag) but fails to decrypt,
+    // it's either tampered or wrong key — don't silently return garbage.
+    if (typeof encryptedB64 === 'string' && buf.length >= IV_LENGTH + TAG_LENGTH) {
+      console.warn('[privacy] Decryption failed on data that appears encrypted — possible tampering or wrong key');
+      return '[DECRYPTION_FAILED]';
+    }
+    return encryptedB64; // Short data = legacy plaintext
   }
 }
 

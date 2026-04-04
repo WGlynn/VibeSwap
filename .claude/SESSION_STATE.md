@@ -1,55 +1,44 @@
-# Session Tip — 2026-04-03 (Session 6)
+# Session Tip — 2026-04-04 (NCI 3-Token Implementation)
 
 ## Block Header
-- **Session**: Full Stack RSI — 2 Cycles Complete
-- **Parent**: `60289ee7`
+- **Session**: NCI 3-Token Consensus Implementation
+- **Parent**: `0a5a38a7`
 - **Branch**: `master`
-- **Status**: ALL LOOPS COMPLETE (except R1 Integration)
+- **Status**: ALL PHASES COMPLETE — awaiting commit
 
 ## What Changed This Session
 
-### Cycle 1
+### Phase 1: Foundation
+- `CKBNativeToken.sol` — ERC20Votes, no hard cap, lock/unlock for state rent, circulatingSupply
+- `JULBridge.sol` — One-way JUL→CKB-native, rate-limited, permanently locks JUL
+- 29 tests pass (16 CKBNative + 13 JULBridge)
 
-| Loop | Key Output |
-|------|-----------|
-| R0 (Density) | 17 files deleted, SKB/GKB counts fixed (98→379 contracts, 76→516 tests), protocol chain deduped |
-| R2 (Knowledge) | 6 design primitives + 12-pattern taxonomy paper |
-| R3 (Capability) | 3 TRP scripts (heatmap, regression, round-gen) + heatmap updated to R53 |
-| Loop 2 (Papers) | 3 papers: TRP empirical RSI, GEV resistance, settlement-time binding |
+### Phase 2: Economics
+- `StateRentVault.sol` — Lock CKB-native for CKA cell capacity (1 token = 1 byte)
+- `DAOShelter.sol` — Nervos DAO equivalent, Masterchef-style yield, 7-day withdrawal timelock
+- `SecondaryIssuanceController.sol` — Fixed annual emission, 3-way split (shards/DAO/insurance), NO treasury cut
+- 20 tests pass (7 StateRent + 8 DAOShelter + 5 SecondaryIssuance)
 
-### Cycle 2
+### Phase 3: Integration
+- `ShardOperatorRegistry.sol` — Node registration, heartbeat, geometric-mean reward weight
+- `NakamotoConsensusInfinity.sol` modified — added ckbNativeToken + jouleToken, backwards-compatible
+- `ThreeTokenConsensus.t.sol` — Full lifecycle: mine→bridge→stake→lock→shelter→distribute→claim
+- 56 tests pass (52 existing NCI + 4 integration, ZERO regressions)
 
-| Loop | Key Output |
-|------|-----------|
-| R0 v2 | SKB architecture updated (12→31 dirs) |
-| R1 v2 + R3 v2 | 4 bugs fixed in TRP scripts, 29 issues found |
-| R2 v2 | Trusted-doc-drift primitive, GKB TRP glyph updated |
-| Loop 2 v2 | Section 9.5 (second-order recursion) added to TRP paper |
+### Paper Update
+- Section 9 added: "Why Three Tokens Are Necessary" — proves 1 or 2 tokens create contradictions
+- Section 10 updated: complete contract list for 3-token infrastructure
 
-### New Files Created
-- `memory/primitive_deposit-identity-propagation.md`
-- `memory/primitive_settlement-time-binding.md`
-- `memory/primitive_rate-of-change-guards.md`
-- `memory/primitive_collateral-path-independence.md`
-- `memory/primitive_batch-invariant-verification.md`
-- `memory/primitive_discovery-ceiling.md`
-- `memory/primitive_trusted-doc-drift.md`
-- `docs/papers/trp-pattern-taxonomy.md`
-- `docs/papers/trp-empirical-rsi.md`
-- `docs/papers/from-mev-to-gev.md` (rewritten)
-- `docs/papers/settlement-time-parameter-binding.md`
-- `scripts/trp-heatmap.sh`
-- `scripts/trp-regression.sh`
-- `scripts/trp-round-gen.sh`
+### 3-Token Architecture
+```
+VIBE = PoM (60%) — 21M cap, Shapley-distributed, non-purchasable governance
+JUL  = PoW (10%) — SHA-256 mining, elastic rebase, energy-pegged
+CKBn = PoS (30%) — State rent, DAO shelter, secondary issuance, no hard cap
 
-### Files Modified
-- `JarvisxWill_GKB.md` — counts, sync date, TRP glyph
-- `JarvisxWill_SKB.md` — counts, architecture tree, DEEP$ in TIER 14
-- `MEMORY.md` — reindexed, MIT Expo added, TRP primitives section
-- `docs/trp/efficiency-heatmap.md` — updated to R53, tooling section
-- `~/.claude/CLAUDE.md` — protocol chain compressed
+W(node) = 0.10 × JUL_pow + 0.30 × CKBn_stake + 0.60 × VIBE_mind
+```
 
 ## Pending / Next Session
-- R1 (Integration): Cross-contract adversarial flows (Core→CRA→AMM→Shapley as system)
-- MIT Bitcoin Expo: April 10-12 (7 days)
-- Commit and push this session's work
+- Commit and push all new contracts + tests + paper update
+- Update plan file status (`.claude/plans/imperative-hatching-tide.md`)
+- Phase 4 from plan: Deploy script + `FOUNDRY_PROFILE=full` validation + invariant tests

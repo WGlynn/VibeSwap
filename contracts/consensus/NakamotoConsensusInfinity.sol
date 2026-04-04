@@ -131,9 +131,18 @@ contract NakamotoConsensusInfinity is
     /// @notice VibeAgentReputation — AI agent multi-dimensional reputation
     address public agentReputation;
 
+    // ============ 3-Token NCI State ============
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @notice CKB-native token — PoS dimension (30% weight)
+    /// @dev Replaces vibeToken for staking. VIBE remains for PoM (governance/contribution).
+    IERC20 public ckbNativeToken;
+
+    /// @notice Joule token — PoW dimension (10% weight)
+    /// @dev Read cumulative mining stats from Joule for PoW weight calculation
+    address public jouleToken;
+
+    /// @dev Reserved storage gap for future upgrades (48 remaining after adding 2 vars)
+    uint256[48] private __gap;
 
     // ============ Initializer ============
 
@@ -185,9 +194,11 @@ contract NakamotoConsensusInfinity is
             if (!trinityStatus[msg.sender]) revert NotTrinityNode();
         }
 
-        // Transfer VIBE stake
+        // Transfer CKB-native stake (PoS dimension)
+        // Falls back to vibeToken if ckbNativeToken not set (backwards compatible)
         if (stakeAmount > 0) {
-            vibeToken.transferFrom(msg.sender, address(this), stakeAmount);
+            IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
+            stakeToken.transferFrom(msg.sender, address(this), stakeAmount);
         }
 
         _validators[msg.sender] = Validator({
@@ -226,7 +237,8 @@ contract NakamotoConsensusInfinity is
         if (v.registeredAt == 0) revert NotRegistered();
         if (v.slashed) revert ValidatorSlashedErr();
 
-        vibeToken.transferFrom(msg.sender, address(this), amount);
+        IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
+        stakeToken.transferFrom(msg.sender, address(this), amount);
         v.stakedVibe += amount;
         totalStaked += amount;
 
@@ -245,7 +257,8 @@ contract NakamotoConsensusInfinity is
         v.stakedVibe -= amount;
         totalStaked -= amount;
 
-        vibeToken.transfer(msg.sender, amount);
+        IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
+        stakeToken.transfer(msg.sender, amount);
 
         _recalculateWeights(msg.sender);
 
@@ -569,6 +582,16 @@ contract NakamotoConsensusInfinity is
 
     function setAgentReputation(address addr) external onlyOwner {
         agentReputation = addr;
+    }
+
+    /// @notice Set the CKB-native token for PoS staking
+    function setCKBNativeToken(address addr) external onlyOwner {
+        ckbNativeToken = IERC20(addr);
+    }
+
+    /// @notice Set the Joule token address for PoW weight lookups
+    function setJouleToken(address addr) external onlyOwner {
+        jouleToken = addr;
     }
 
     // ============ View Functions ============

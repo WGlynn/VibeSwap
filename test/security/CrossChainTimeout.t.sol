@@ -219,7 +219,8 @@ contract CrossChainTimeoutTest is Test {
             SWAP_AMOUNT,
             MIN_AMOUNT_OUT,
             SECRET,
-            LZ_OPTIONS
+            LZ_OPTIONS,
+            address(0)
         );
     }
 
@@ -265,7 +266,8 @@ contract CrossChainTimeoutTest is Test {
             SWAP_AMOUNT,
             MIN_AMOUNT_OUT,
             SECRET,
-            LZ_OPTIONS
+            LZ_OPTIONS,
+            address(0)
         );
     }
 

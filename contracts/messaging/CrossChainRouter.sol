@@ -10,6 +10,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../core/interfaces/ICommitRevealAuction.sol";
 
+/// @notice Minimal interface for settlement confirmation callbacks to VibeSwapCore
+interface IVibeSwapCoreSettlement {
+    function markCrossChainSettled(bytes32 commitHash) external;
+}
+
 /**
  * @title CrossChainRouter
  * @author Faraday1 & JARVIS -- vibeswap.org
@@ -58,7 +63,8 @@ contract CrossChainRouter is
         ORDER_REVEAL,
         BATCH_RESULT,
         LIQUIDITY_SYNC,
-        ASSET_TRANSFER
+        ASSET_TRANSFER,
+        SETTLEMENT_CONFIRM  // XC-003: Dest→source confirmation that batch settled
     }
 
     struct CrossChainCommit {
@@ -68,6 +74,7 @@ contract CrossChainRouter is
         uint32 srcChainId;
         uint32 dstChainId;    // FIX #1: Destination chain for replay prevention
         uint256 srcTimestamp; // Timestamp from source chain for consistent commit ID
+        address destinationRecipient; // XC-005: Where tokens/refunds go on dest chain (smart wallet safe)
     }
 
     struct CrossChainReveal {
@@ -87,6 +94,14 @@ contract CrossChainRouter is
         uint256 clearingPrice;
         address[] filledTraders;
         uint256[] filledAmounts;
+        bytes32[] filledCommitHashes; // XC-003: Source-chain commitHashes for settlement confirmation
+    }
+
+    /// @notice XC-003: Settlement confirmation sent from dest chain back to source chain
+    struct SettlementConfirm {
+        bytes32[] commitHashes;  // Original commit hashes (source chain uses these to mark settled)
+        uint64 batchId;
+        uint32 settledOnChain;   // Which chain settled the batch
     }
 
     struct LiquiditySync {
@@ -165,8 +180,11 @@ contract CrossChainRouter is
     ///      mapping so _handleReveal can translate and call CRA with the correct ID.
     mapping(bytes32 => bytes32) public craCommitIds;
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 3 for claimableDeposits + claimableDepositOwner + craCommitIds)
-    uint256[47] private __gap;
+    /// @notice XC-003: VibeSwapCore address for settlement confirmation callbacks
+    address public vibeSwapCore;
+
+    /// @dev Reserved storage gap for future upgrades
+    uint256[46] private __gap;
 
     // ============ Events ============
 
@@ -193,6 +211,10 @@ contract CrossChainRouter is
     );
     /// @notice NEW-04: Emitted when funded-deposit ETH is escrowed after expiry.
     event ClaimableDepositStored(bytes32 indexed commitId, address indexed depositor, uint256 amount);
+    /// @notice XC-003: Emitted when settlement confirmation is received from hub chain
+    event SettlementConfirmReceived(uint64 indexed batchId, uint32 indexed srcEid, uint256 traderCount);
+    /// @notice XC-003: Emitted when settlement confirmation is sent to source chain
+    event SettlementConfirmSent(uint64 indexed batchId, uint32 indexed dstEid);
     /// @notice NEW-04: Emitted when escrowed ETH is claimed by the depositor on this chain.
     event ClaimableDepositClaimed(bytes32 indexed commitId, address indexed recipient, uint256 amount);
 
@@ -282,16 +304,22 @@ contract CrossChainRouter is
      */
     /// @dev TRP-R48-NEW10: Added `depositor` parameter so VibeSwapCore can pass the
     ///      actual user address instead of recording itself (authorized caller) as depositor.
+    /// @param destinationRecipient XC-005: Where tokens/refunds go on dest chain. Use depositor's
+    ///        address if they control the same key on both chains, or a different address for
+    ///        smart contract wallets (Gnosis Safe, AA) that differ across chains.
     function sendCommit(
         uint32 dstEid,
         bytes32 commitHash,
         uint256 depositAmount,
         bytes calldata options,
-        address depositor
+        address depositor,
+        address destinationRecipient
     ) external payable nonReentrant onlyAuthorized {
         bytes32 peer = peers[dstEid];
         if (peer == bytes32(0)) revert InvalidPeer();
         require(depositor != address(0), "Invalid depositor");
+        // XC-005: Default to depositor if no explicit recipient (backwards compatible for EOAs)
+        if (destinationRecipient == address(0)) destinationRecipient = depositor;
 
         uint256 srcTimestamp = block.timestamp;
 
@@ -311,7 +339,8 @@ contract CrossChainRouter is
             depositAmount: depositAmount,  // TRP-R22-H03: Explicit deposit, not msg.value
             srcChainId: localEid,
             dstChainId: dstEid,
-            srcTimestamp: srcTimestamp
+            srcTimestamp: srcTimestamp,
+            destinationRecipient: destinationRecipient
         });
 
         // Store pending commit
@@ -425,6 +454,39 @@ contract CrossChainRouter is
     }
 
     /**
+     * @notice XC-003: Send lightweight settlement confirmation to a specific source chain
+     * @dev Used after batch settlement to prevent double-spend via timeout refund.
+     *      Lighter than broadcastBatchResult when only commit hashes are needed.
+     * @param confirm Settlement confirmation data
+     * @param dstEid Source chain to notify
+     * @param options LayerZero options
+     */
+    function sendSettlementConfirm(
+        SettlementConfirm calldata confirm,
+        uint32 dstEid,
+        bytes calldata options
+    ) external payable nonReentrant onlyAuthorized {
+        bytes32 peer = peers[dstEid];
+        require(peer != bytes32(0), "No peer for destination");
+
+        bytes memory message = abi.encode(
+            MessageType.SETTLEMENT_CONFIRM,
+            abi.encode(confirm)
+        );
+
+        MessagingParams memory params = MessagingParams({
+            dstEid: dstEid,
+            receiver: peer,
+            message: message,
+            options: options,
+            payInLzToken: false
+        });
+
+        _lzSend(params, msg.value);
+        emit SettlementConfirmSent(confirm.batchId, dstEid);
+    }
+
+    /**
      * @notice Sync liquidity state across chains
      * @param sync Liquidity sync data
      * @param dstEids Destination chains
@@ -510,6 +572,8 @@ contract CrossChainRouter is
             _handleBatchResult(payload, _origin.srcEid);
         } else if (msgType == MessageType.LIQUIDITY_SYNC) {
             _handleLiquiditySync(payload, _origin.srcEid);
+        } else if (msgType == MessageType.SETTLEMENT_CONFIRM) {
+            _handleSettlementConfirm(payload, _origin.srcEid);
         } else {
             revert InvalidMessage();
         }
@@ -641,15 +705,48 @@ contract CrossChainRouter is
         emit CrossChainRevealReceived(reveal.commitId, srcEid);
     }
 
-    /// @dev TRP-R22-M05: STUB — decodes and emits but does not execute settlement.
-    ///      Production implementation must: (1) verify batch result against local state,
-    ///      (2) trigger asset transfers back to source chains via OFT/bridge,
-    ///      (3) update local fill records. Without this, cross-chain orders settle
-    ///      on the hub chain but source-chain users never receive their tokens.
+    /// @notice XC-003/XC-004: Process batch settlement results from hub chain.
+    ///      Marks cross-chain orders as settled on the source chain, blocking timeout refunds.
+    ///      This prevents the XC-003 double-spend: user can no longer refund after settlement.
+    ///
+    ///      Asset transfers (OFT/bridge) back to source chain are handled separately by the
+    ///      bridge operator after verifying the batch result. This function only marks state.
     function _handleBatchResult(bytes memory payload, uint32 srcEid) internal {
         BatchResult memory result = abi.decode(payload, (BatchResult));
 
+        // XC-003: Mark each filled order as settled on the source chain.
+        // This calls VibeSwapCore.markCrossChainSettled which sets order.settled = true,
+        // blocking refundExpiredCrossChain for these orders.
+        if (vibeSwapCore != address(0) && result.filledCommitHashes.length > 0) {
+            for (uint256 i = 0; i < result.filledCommitHashes.length;) {
+                // Use try/catch: don't block other settlements if one fails
+                // (commitHash might not exist on this chain if it originated elsewhere)
+                try IVibeSwapCoreSettlement(vibeSwapCore).markCrossChainSettled(
+                    result.filledCommitHashes[i]
+                ) {} catch {}
+                unchecked { ++i; }
+            }
+        }
+
         emit BatchResultReceived(result.batchId, srcEid);
+        emit SettlementConfirmReceived(result.batchId, srcEid, result.filledCommitHashes.length);
+    }
+
+    /// @notice XC-003: Handle direct settlement confirmation from hub chain
+    /// @dev Used when hub sends a lightweight confirmation without full batch results
+    function _handleSettlementConfirm(bytes memory payload, uint32 srcEid) internal {
+        SettlementConfirm memory confirm = abi.decode(payload, (SettlementConfirm));
+
+        if (vibeSwapCore != address(0)) {
+            for (uint256 i = 0; i < confirm.commitHashes.length;) {
+                try IVibeSwapCoreSettlement(vibeSwapCore).markCrossChainSettled(
+                    confirm.commitHashes[i]
+                ) {} catch {}
+                unchecked { ++i; }
+            }
+        }
+
+        emit SettlementConfirmReceived(confirm.batchId, srcEid, confirm.commitHashes.length);
     }
 
     /// @dev TRP-R48-NEW05: Rate-of-change validation prevents spoofed liquidity from a compromised peer.
@@ -845,6 +942,12 @@ contract CrossChainRouter is
         auction = _auction;
     }
 
+    /// @notice XC-003: Set VibeSwapCore address for settlement confirmation callbacks
+    function setVibeSwapCore(address _core) external onlyOwner {
+        require(_core != address(0), "Invalid core");
+        vibeSwapCore = _core;
+    }
+
     /**
      * @notice Update bridged deposit expiry duration
      * @param _expiry New expiry duration in seconds (min 1 hour)
@@ -902,8 +1005,15 @@ contract CrossChainRouter is
             // claimExpiredDeposit() from their destination-chain address.
             totalBridgedDeposits -= depositAmount;
             claimableDeposits[commitId] = depositAmount;
-            claimableDepositOwner[commitId] = commit.depositor;
-            emit ClaimableDepositStored(commitId, commit.depositor, depositAmount);
+            // XC-005: Use destinationRecipient instead of source-chain depositor address.
+            // The depositor address may not exist or be controlled by a different party
+            // on this chain (smart contract wallets). destinationRecipient was explicitly
+            // chosen by the user at commit time for this chain.
+            address escrowOwner = commit.destinationRecipient != address(0)
+                ? commit.destinationRecipient
+                : commit.depositor; // Backwards compat: fallback to depositor
+            claimableDepositOwner[commitId] = escrowOwner;
+            emit ClaimableDepositStored(commitId, escrowOwner, depositAmount);
         } else {
             // UNFUNDED: ETH never arrived — only clean up accounting.
             // The depositor must reclaim on srcChainId.

@@ -119,7 +119,7 @@ contract CrossChainRouterTest is Test {
         bytes memory options = "";
 
         vm.prank(authorized);
-        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, options, authorized);
+        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, options, authorized, authorized);
 
         // Verify pending commit stored (commitId uses localEid, not block.chainid)
         bytes32 commitId = keccak256(abi.encodePacked(
@@ -130,8 +130,8 @@ contract CrossChainRouterTest is Test {
             block.timestamp // srcTimestamp
         ));
 
-        // pendingCommits returns all 6 struct fields
-        (bytes32 storedHash, address depositor, , , , ) =
+        // pendingCommits returns all 7 struct fields
+        (bytes32 storedHash, address depositor, , , , , ) =
             router.pendingCommits(commitId);
 
         assertEq(storedHash, commitHash);
@@ -143,7 +143,7 @@ contract CrossChainRouterTest is Test {
 
         vm.prank(authorized);
         vm.expectRevert(CrossChainRouter.InvalidPeer.selector);
-        router.sendCommit{value: 0.01 ether}(99, commitHash, 0.1 ether, "", authorized); // Non-existent chain
+        router.sendCommit{value: 0.01 ether}(99, commitHash, 0.1 ether, "", authorized, authorized); // Non-existent chain
     }
 
     function test_sendCommit_unauthorized() public {
@@ -152,7 +152,7 @@ contract CrossChainRouterTest is Test {
         vm.deal(treasury, 1 ether);
         vm.prank(treasury);
         vm.expectRevert(CrossChainRouter.Unauthorized.selector);
-        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, "", treasury);
+        router.sendCommit{value: 0.01 ether}(CHAIN_B, commitHash, 0.1 ether, "", treasury, treasury);
     }
 
     // ============ Cross-Chain Reveal Tests ============
@@ -183,7 +183,8 @@ contract CrossChainRouterTest is Test {
             poolId: keccak256("pool"),
             clearingPrice: 1e18,
             filledTraders: new address[](0),
-            filledAmounts: new uint256[](0)
+            filledAmounts: new uint256[](0),
+            filledCommitHashes: new bytes32[](0)
         });
 
         uint32[] memory dstEids = new uint32[](1);
@@ -232,7 +233,8 @@ contract CrossChainRouterTest is Test {
             depositAmount: 0.01 ether,
             srcChainId: CHAIN_B,
             dstChainId: CHAIN_A,  // Must match localEid
-            srcTimestamp: block.timestamp
+            srcTimestamp: block.timestamp,
+            destinationRecipient: authorized
         });
 
         bytes memory message = abi.encode(
@@ -263,7 +265,8 @@ contract CrossChainRouterTest is Test {
             depositAmount: 0.01 ether,
             srcChainId: CHAIN_B,
             dstChainId: CHAIN_A,  // Must match localEid
-            srcTimestamp: block.timestamp
+            srcTimestamp: block.timestamp,
+            destinationRecipient: authorized
         });
 
         bytes memory message = abi.encode(
@@ -298,7 +301,8 @@ contract CrossChainRouterTest is Test {
                 depositAmount: 0.01 ether,
                 srcChainId: CHAIN_B,
                 dstChainId: CHAIN_A,
-                srcTimestamp: block.timestamp
+                srcTimestamp: block.timestamp,
+                destinationRecipient: authorized
             }))
         );
 
@@ -495,7 +499,8 @@ contract CrossChainRouterTest is Test {
             depositAmount: depositAmount,
             srcChainId: CHAIN_B,
             dstChainId: CHAIN_A,
-            srcTimestamp: block.timestamp
+            srcTimestamp: block.timestamp,
+            destinationRecipient: authorized
         });
 
         bytes memory message = abi.encode(
@@ -724,7 +729,8 @@ contract CrossChainRouterTest is Test {
                 depositAmount: 1 ether,
                 srcChainId: CHAIN_B,
                 dstChainId: CHAIN_A,
-                srcTimestamp: ts + i
+                srcTimestamp: ts + i,
+                destinationRecipient: authorized
             });
 
             bytes memory message = abi.encode(
@@ -808,7 +814,8 @@ contract CrossChainRouterTest is Test {
             depositAmount: depositAmount,
             srcChainId: CHAIN_B,
             dstChainId: CHAIN_A,
-            srcTimestamp: block.timestamp
+            srcTimestamp: block.timestamp,
+            destinationRecipient: depositor
         });
 
         bytes memory message = abi.encode(

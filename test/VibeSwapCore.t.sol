@@ -145,7 +145,7 @@ contract MockRouter {
     bytes32 public lastCommitHash;
     uint32 public lastDstChainId;
 
-    function sendCommit(uint32 dstChainId, bytes32 commitHash, uint256, bytes calldata, address) external payable {
+    function sendCommit(uint32 dstChainId, bytes32 commitHash, uint256, bytes calldata, address, address) external payable {
         lastCommitHash = commitHash;
         lastDstChainId = dstChainId;
     }
@@ -582,7 +582,8 @@ contract VibeSwapCoreTest is Test {
             100e18,
             90e18,
             keccak256("secret"),
-            ""
+            "",
+            address(0)
         );
 
         assertEq(core.deposits(trader, address(tokenA)), 100e18);
@@ -596,7 +597,7 @@ contract VibeSwapCoreTest is Test {
 
         vm.prank(trader);
         vm.expectRevert(VibeSwapCore.Blacklisted.selector);
-        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s"), "");
+        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s"), "", address(0));
     }
 
     function test_commitCrossChainSwap_revertsTainted() public {
@@ -606,16 +607,16 @@ contract VibeSwapCoreTest is Test {
 
         vm.prank(trader);
         vm.expectRevert(VibeSwapCore.WalletTainted.selector);
-        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s"), "");
+        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("s"), "", address(0));
     }
 
     function test_commitCrossChainSwap_rateLimitApplies() public {
         vm.prank(trader);
-        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 100_000e18, 0, keccak256("s1"), "");
+        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 100_000e18, 0, keccak256("s1"), "", address(0));
 
         vm.prank(trader);
         vm.expectRevert(VibeSwapCore.RateLimitExceededError.selector);
-        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 1e18, 0, keccak256("s2"), "");
+        core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 1e18, 0, keccak256("s2"), "", address(0));
     }
 
     // ============ View Functions ============

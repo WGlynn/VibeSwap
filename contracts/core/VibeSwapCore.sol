@@ -621,6 +621,9 @@ contract VibeSwapCore is
      * @param minAmountOut Minimum to receive
      * @param secret Commitment secret
      * @param options LayerZero options
+     * @param destinationRecipient XC-005: Where tokens/refunds go on destination chain.
+     *        Use address(0) to default to msg.sender (works for EOAs with same key on both chains).
+     *        Smart contract wallet users MUST specify their dest chain address explicitly.
      */
     function commitCrossChainSwap(
         uint32 dstChainId,
@@ -629,7 +632,8 @@ contract VibeSwapCore is
         uint256 amountIn,
         uint256 minAmountOut,
         bytes32 secret,
-        bytes calldata options
+        bytes calldata options,
+        address destinationRecipient
     ) external payable whenNotPaused whenNotGloballyPaused whenBreakerNotTripped(VOLUME_BREAKER) nonReentrant notBlacklisted notTainted onlyEOAOrWhitelisted
       onlySupported(tokenIn) onlySupported(tokenOut) {
         require(amountIn > 0, "Zero amount");
@@ -674,7 +678,8 @@ contract VibeSwapCore is
         // Send via router
         // TRP-R22-H03: msg.value is the LZ fee. depositAmount passed explicitly.
         // TRP-R48-NEW10: Pass actual user address so destination records correct depositor
-        router.sendCommit{value: msg.value}(dstChainId, commitHash, amountIn, options, msg.sender);
+        // XC-005: Pass destinationRecipient for smart wallet compatibility
+        router.sendCommit{value: msg.value}(dstChainId, commitHash, amountIn, options, msg.sender, destinationRecipient);
 
         emit CrossChainOrderCreated(commitHash, msg.sender, dstChainId, tokenIn, amountIn);
     }

@@ -909,7 +909,8 @@ contract MoneyPathAdversarial is Test {
             1 ether,
             0,
             keccak256("secret"),
-            ""
+            "",
+            address(0)
         );
         vm.stopPrank();
     }
@@ -957,7 +958,8 @@ contract MoneyPathAdversarial is Test {
             1 ether,
             0,
             keccak256("secret"),
-            ""
+            "",
+            address(0)
         );
         vm.stopPrank();
     }
@@ -987,7 +989,8 @@ contract MoneyPathAdversarial is Test {
             1 ether,
             0,
             keccak256("secret1"),
-            ""
+            "",
+            address(0)
         );
 
         // Second commit should fail — rate limit exceeded (no cooldown to trip first)
@@ -999,7 +1002,8 @@ contract MoneyPathAdversarial is Test {
             1 ether,
             0,
             keccak256("secret2"),
-            ""
+            "",
+            address(0)
         );
         vm.stopPrank();
 
@@ -1035,7 +1039,8 @@ contract MoneyPathAdversarial is Test {
             1 ether,
             0,
             keccak256("secret1"),
-            ""
+            "",
+            address(0)
         );
 
         // Immediate second commit — should fail with cooldown
@@ -1047,7 +1052,8 @@ contract MoneyPathAdversarial is Test {
             1 ether,
             0,
             keccak256("secret2"),
-            ""
+            "",
+            address(0)
         );
         vm.stopPrank();
 
@@ -1081,7 +1087,8 @@ contract CrossChainAttackerContract {
             1 ether,
             0,
             keccak256("secret"),
-            ""
+            "",
+            address(0)
         );
     }
 

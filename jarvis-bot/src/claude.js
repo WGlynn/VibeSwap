@@ -2,7 +2,7 @@ import { writeFile, readFile, mkdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, resolve, relative } from 'path';
 import { config } from './config.js';
-import { loadSystemPrompt } from './memory.js';
+import { loadSystemPrompt, getCellContext, getCellStats } from './memory.js';
 import { setFlag, getBehavior } from './behavior.js';
 import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
@@ -849,9 +849,14 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
   // Build knowledge context only for full-tier messages
   let knowledgeContext = '';
+  let cellContext = '';
   if (!isLightContext) {
     try {
       knowledgeContext = await buildKnowledgeContext(effectiveUserId, chatId, chatType, messageText);
+    } catch {}
+    // CKA: Load topic-relevant cells for this message
+    try {
+      cellContext = await getCellContext(messageText);
     } catch {}
   }
 
@@ -932,6 +937,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       cappedSummary,
       cappedGroup,
       cappedKnowledge ? '\n\n' + cappedKnowledge : '',
+      cellContext || '', // CKA: topic-relevant knowledge cells
       systemPrompt.recency,
     ].filter(Boolean).join('\n');
 
@@ -951,7 +957,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     fullSystemPrompt = systemPrompt.full
       + (cappedSummary || '')
       + (cappedGroup || '')
-      + (cappedKnowledge ? '\n\n' + cappedKnowledge : '');
+      + (cappedKnowledge ? '\n\n' + cappedKnowledge : '')
+      + (cellContext ? '\n\n' + cellContext : '');
   }
 
   // ============ Selective Tool Loading ============

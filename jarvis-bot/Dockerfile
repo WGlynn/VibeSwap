@@ -35,6 +35,9 @@ COPY memory/ /app/memory/
 # These are snapshots from build time — live versions come from the cloned repo
 COPY context-fallback/ /app/context-fallback/
 
+# CKA: Cell Knowledge Architecture — knowledge cells for per-topic loading
+COPY knowledge/ /app/knowledge/
+
 # Copy entrypoint
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh

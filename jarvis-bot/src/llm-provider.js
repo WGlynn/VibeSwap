@@ -1507,7 +1507,7 @@ function getProviderConfig(providerName) {
         case 'ollama': return config.llm?.model || 'llama3.1';
         case 'cerebras': return 'llama-3.3-70b';
         case 'groq': return 'llama-3.3-70b-versatile';
-        case 'openrouter': return 'deepseek/deepseek-r1:free';
+        case 'openrouter': return 'qwen/qwen3.6-plus:free';
         case 'mistral': return 'mistral-small-latest';
         case 'together': return 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
         case 'sambanova': return 'Meta-Llama-3.3-70B-Instruct';

@@ -57,8 +57,11 @@ contract CKBNativeToken is
     /// @notice Total ever burned
     uint256 public totalBurned;
 
+    /// @notice MON-007: Per-address locked balance tracking
+    mapping(address => uint256) public lockedBalance;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -134,9 +137,8 @@ contract CKBNativeToken is
     /**
      * @notice Lock tokens for CKA cell capacity (state rent)
      * @dev Only authorized lockers (StateRentVault) can call.
-     *      Locked tokens are transferred to this contract and tracked
-     *      as occupied state. They still exist (totalSupply unchanged)
-     *      but are removed from circulation.
+     *      MON-001: Uses allowance check — lockers cannot drain arbitrary addresses.
+     *      The caller (locker contract) must be approved by the token owner.
      * @param from Token owner
      * @param amount Tokens to lock (1 token = 1 byte of cell capacity)
      */
@@ -144,15 +146,20 @@ contract CKBNativeToken is
         if (!lockers[msg.sender]) revert Unauthorized();
         if (amount == 0) revert ZeroAmount();
 
+        // MON-001: Enforce allowance — locker must be approved by token owner
+        _spendAllowance(from, msg.sender, amount);
         _transfer(from, address(this), amount);
         totalOccupied += amount;
+        // MON-007: Track per-user locked balance
+        lockedBalance[from] += amount;
 
         emit TokensLocked(from, amount);
     }
 
     /**
      * @notice Unlock tokens from CKA cell capacity (cell destroyed)
-     * @dev Returns tokens to the cell owner when they destroy a cell
+     * @dev Returns tokens to the cell owner when they destroy a cell.
+     *      MON-007: Validates per-user locked balance to prevent cross-user unlock.
      * @param to Token recipient (cell owner)
      * @param amount Tokens to unlock
      */
@@ -160,8 +167,11 @@ contract CKBNativeToken is
         if (!lockers[msg.sender]) revert Unauthorized();
         if (amount == 0) revert ZeroAmount();
         if (totalOccupied < amount) revert InsufficientLockedBalance();
+        // MON-007: Validate per-user locked balance
+        if (lockedBalance[to] < amount) revert InsufficientLockedBalance();
 
         totalOccupied -= amount;
+        lockedBalance[to] -= amount;
         _transfer(address(this), to, amount);
 
         emit TokensUnlocked(to, amount);

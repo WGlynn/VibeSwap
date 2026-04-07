@@ -108,22 +108,23 @@ contract JULBridgeTest is Test {
     // ============ Exchange Rate ============
 
     function test_customExchangeRate() public {
-        // Set 2:1 rate (2 CKB per JUL)
+        // MON-004: Rate capped to 10% change per update. Set 1.1:1 rate
         vm.prank(owner);
-        bridge.setExchangeRate(2e18);
+        bridge.setExchangeRate(1.1e18);
 
         vm.startPrank(user1);
         jul.approve(address(bridge), 1000e18);
         uint256 ckbOut = bridge.bridge(1000e18);
         vm.stopPrank();
 
-        assertEq(ckbOut, 2000e18);
-        assertEq(ckb.balanceOf(user1), 2000e18);
+        assertEq(ckbOut, 1100e18);
+        assertEq(ckb.balanceOf(user1), 1100e18);
     }
 
     function test_previewMatchesBridge() public {
+        // MON-004: Use rate within 10% bound
         vm.prank(owner);
-        bridge.setExchangeRate(1.5e18);
+        bridge.setExchangeRate(1.05e18);
 
         uint256 preview = bridge.preview(1000e18);
 

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title ShardOperatorRegistry — CKA Shard Node Management
@@ -26,11 +27,14 @@ contract ShardOperatorRegistry is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============ Constants ============
 
     uint256 public constant HEARTBEAT_INTERVAL = 24 hours;
     uint256 public constant HEARTBEAT_GRACE = 48 hours;
     uint256 public constant MIN_STAKE = 100e18;
+    uint256 public constant MAX_CELLS_SERVED = 1e12; // NCI-011: Cap to prevent overflow in weight calc
     uint256 private constant ACC_PRECISION = 1e18;
 
     // ============ State ============
@@ -65,8 +69,11 @@ contract ShardOperatorRegistry is
     /// @notice Total weight (sum of each shard's cells × stake product)
     uint256 public totalWeight;
 
+    /// @notice NCI-012: Authorized issuance controller (only caller for distributeRewards)
+    address public issuanceController;
+
     /// @dev Reserved storage gap
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -80,10 +87,12 @@ contract ShardOperatorRegistry is
     // ============ Errors ============
 
     error AlreadyRegistered();
+    error ShardIdTaken();
     error NotRegistered();
     error InsufficientStake();
     error NotActive();
     error ZeroAmount();
+    error CellsExceedCap();
 
     // ============ Initializer ============
 
@@ -107,9 +116,11 @@ contract ShardOperatorRegistry is
      */
     function registerShard(bytes32 shardId, uint256 stakeAmount) external nonReentrant {
         if (operatorShard[msg.sender] != bytes32(0)) revert AlreadyRegistered();
+        // NCI-005: Prevent shardId collision — don't overwrite existing operator's shard
+        if (shards[shardId].operator != address(0)) revert ShardIdTaken();
         if (stakeAmount < MIN_STAKE) revert InsufficientStake();
 
-        ckbToken.transferFrom(msg.sender, address(this), stakeAmount);
+        ckbToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
 
         shards[shardId] = Shard({
             operator: msg.sender,
@@ -134,29 +145,33 @@ contract ShardOperatorRegistry is
 
     /**
      * @notice Report cells being served by this shard
+     * @dev NCI-011: Capped to MAX_CELLS_SERVED to prevent overflow in _shardWeight.
+     *      NCI-037: Claims pending rewards before weight change (Masterchef invariant).
      */
     function reportCellsServed(uint256 cellCount) external {
+        // NCI-011: Cap to prevent overflow in sqrt(cellsServed * stake)
+        if (cellCount > MAX_CELLS_SERVED) revert CellsExceedCap();
+
         bytes32 shardId = operatorShard[msg.sender];
         if (shardId == bytes32(0)) revert NotRegistered();
 
         Shard storage shard = shards[shardId];
         if (!shard.active) revert NotActive();
 
+        // NCI-037: Claim pending rewards at OLD weight before changing
+        _claimRewards(shardId);
+
         // Update weight: remove old, add new
         uint256 oldWeight = _shardWeight(shard);
+        uint256 oldCells = shard.cellsServed;
         shard.cellsServed = cellCount;
         uint256 newWeight = _shardWeight(shard);
 
         if (oldWeight > 0) totalWeight -= oldWeight;
         totalWeight += newWeight;
 
-        // Update total cells
-        totalCellsServed = 0;
-        for (uint256 i = 0; i < shardList.length; i++) {
-            if (shards[shardList[i]].active) {
-                totalCellsServed += shards[shardList[i]].cellsServed;
-            }
-        }
+        // Update total cells incrementally (no unbounded loop)
+        totalCellsServed = totalCellsServed - oldCells + cellCount;
 
         emit CellsReported(shardId, cellCount);
     }
@@ -191,11 +206,14 @@ contract ShardOperatorRegistry is
         shard.active = false;
         activeShardCount--;
         totalStaked -= shard.stake;
+        totalCellsServed -= shard.cellsServed;
 
         // Return stake
         uint256 stakeReturn = shard.stake;
         shard.stake = 0;
-        ckbToken.transfer(msg.sender, stakeReturn);
+        // NCI-023: Clear operatorShard so operator can re-register
+        operatorShard[msg.sender] = bytes32(0);
+        ckbToken.safeTransfer(msg.sender, stakeReturn);
 
         emit ShardDeactivated(shardId, "voluntary");
     }
@@ -204,18 +222,28 @@ contract ShardOperatorRegistry is
 
     /**
      * @notice Distribute rewards from SecondaryIssuanceController
-     * @dev Called by the issuance controller with CKB-native tokens
+     * @dev NCI-012: Restricted to issuanceController. Reverts if totalWeight=0
+     *      to prevent tokens from being permanently locked.
      */
     function distributeRewards(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
+        // NCI-012: Only issuance controller can distribute (or owner during setup)
+        require(
+            msg.sender == issuanceController || msg.sender == owner(),
+            "Not authorized"
+        );
+        // NCI-012: Don't accept tokens that can never be claimed
+        require(totalWeight > 0, "No active shards");
 
-        ckbToken.transferFrom(msg.sender, address(this), amount);
-
-        if (totalWeight > 0) {
-            accRewardPerShare += (amount * ACC_PRECISION) / totalWeight;
-        }
+        ckbToken.safeTransferFrom(msg.sender, address(this), amount);
+        accRewardPerShare += (amount * ACC_PRECISION) / totalWeight;
 
         emit RewardsDistributed(amount, accRewardPerShare);
+    }
+
+    /// @notice Set the issuance controller address
+    function setIssuanceController(address controller) external onlyOwner {
+        issuanceController = controller;
     }
 
     /**
@@ -237,7 +265,7 @@ contract ShardOperatorRegistry is
 
         if (pending > 0) {
             shard.rewardDebt = accumulated;
-            ckbToken.transfer(shard.operator, pending);
+            ckbToken.safeTransfer(shard.operator, pending);
             emit RewardClaimed(shard.operator, pending);
         } else {
             shard.rewardDebt = accumulated;

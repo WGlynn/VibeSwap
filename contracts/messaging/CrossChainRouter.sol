@@ -642,9 +642,11 @@ contract CrossChainRouter is
         // TRP-R35-NEW03: Use commitOrderCrossChain to preserve original user as depositor
         // INT-R1-XC001: Capture CRA's commitId (derived from batchId + block.timestamp)
         // and store the mapping so _handleReveal can translate routerCommitId → craCommitId.
+        // XC-005: Pass destinationRecipient so CRA stores it for settlement recipient override.
         bytes32 craCommitId = ICommitRevealAuction(auction).commitOrderCrossChain{value: depositAmount}(
             commit.depositor,
-            commit.commitHash
+            commit.commitHash,
+            commit.destinationRecipient
         );
         craCommitIds[commitId] = craCommitId;
 

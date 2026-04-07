@@ -1,44 +1,41 @@
-# Session Tip — 2026-04-04 (NCI 3-Token Implementation)
+# Session State — 2026-04-07 (RSI Cycle 4: NCI 3-Token Adversarial)
 
 ## Block Header
-- **Session**: NCI 3-Token Consensus Implementation
-- **Commit**: `a442fc5b`
-- **Parent**: `0a5a38a7`
+- **Session**: Full Stack RSI Cycle 4 — NCI 3-Token Adversarial Audit
 - **Branch**: `master`
-- **Status**: COMMITTED + PUSHED
+- **Status**: COMPLETE
 
-## What Changed This Session
+## Completed This Session
+- **R0**: Updated stale RSI memory (Cycle 3 open findings were already fixed)
+- **R1 Audit**: 3 parallel opus agents audited 7 NCI contracts → ~65 unique findings (14 CRIT, 24 HIGH)
+- **R1 Fixes**: 19 fixes across 7 contracts + 6 test files. 174 tests pass, 0 regressions.
+- **R2**: 2 primitives extracted (Slash-Before-Count, Running Total Pattern)
+- **Design discussion**: Consensus-in-smart-contracts is governance + spec + coordination — not mutually exclusive, all valid fork directions
 
-### 3-Token NCI — Full Implementation (6 new contracts)
-```
-VIBE = PoM (60%) — 21M cap, Shapley-distributed, non-purchasable governance
-JUL  = PoW (10%) — SHA-256 mining, elastic rebase, energy-pegged
-CKBn = PoS (30%) — State rent, DAO shelter, secondary issuance, no hard cap
+### CRITICALs Fixed
+- NCI-001: PoW nonce replay (unlimited cumulativePoW)
+- NCI-002: Zero-stake Sybil registration
+- NCI-003/MON-006: Secondary issuance 3-way split underflow
+- NCI-004/MON-002: SafeERC20 across all contracts
+- NCI-005: ShardId collision (stake theft)
+- NCI-006: DAOShelter depositYield brick
+- MON-001: lock() bypasses ERC20 allowance
 
-W(node) = 0.10 × JUL_pow + 0.30 × CKBn_stake + 0.60 × VIBE_mind
-```
-
-| Contract | Purpose |
-|----------|---------|
-| `CKBNativeToken.sol` | State rent token, lock/unlock, circulatingSupply |
-| `JULBridge.sol` | One-way JUL→CKBn burn-to-mint, rate-limited |
-| `StateRentVault.sol` | Lock CKBn for CKA cell capacity (1 token = 1 byte) |
-| `DAOShelter.sol` | Nervos DAO equivalent, Masterchef yield, 7-day timelock |
-| `SecondaryIssuanceController.sol` | Fixed annual emission, 3-way split (shards/DAO/insurance) |
-| `ShardOperatorRegistry.sol` | Node registration, heartbeat, geometric-mean rewards |
-
-### Modified
-- `NakamotoConsensusInfinity.sol` — added ckbNativeToken + jouleToken, backwards-compatible staking
-- `docs/papers/nakamoto-consensus-infinite.md` — Section 9: 3-token necessity proof + Tinbergen's Rule
-
-### Tests: 105 pass, 0 regressions
-- 16 CKBNativeToken + 13 JULBridge + 7 StateRent + 8 DAOShelter + 5 SecondaryIssuance + 4 Integration + 52 existing NCI
-
-### Key Insight (Constitutional Framing)
-Three tokens = separation of powers between capital, compute, and cognition. Same reason democracies have three branches. Every blockchain before NCI concentrates consensus in 1-2 dimensions and eventually gets captured along the undefended axis. NCI is the constitutional moment for consensus design. Tinbergen's Rule proves it: 3 independent policy targets require 3 independent instruments.
+### HIGHs Fixed
+- NCI-007/008: O(1) totalActiveWeight (was unbounded loop DoS)
+- NCI-009: 7-day unbonding period (was instant withdraw → vote-and-run)
+- NCI-010: Slashed validators blocked from withdrawal
+- NCI-011: cellsServed capped (overflow prevention)
+- NCI-012: distributeRewards access control
+- NCI-013: Equivocation check before vote counting
+- MON-004: Exchange rate bounded to 10% per update
+- MON-007: Per-user locked balance tracking
 
 ## Pending / Next Session
-- Phase 4: Deploy script (`DeployNakamotoConsensus.s.sol`) + `FOUNDRY_PROFILE=full` bytecode validation
-- Invariant tests for token conservation
-- Update plan file status (`.claude/plans/imperative-hatching-tide.md`)
-- MIT Bitcoin Expo: April 10-12 (6 days) — NCI is the hackathon build candidate
+1. **Commit** RSI Cycle 4 changes (Will needs to approve)
+2. **Continue Medium pipeline** — "From MEV to GEV" post + Siren Protocol posting
+3. **RSI Cycle 5** candidate: the ~40 remaining MED/LOW findings from Cycle 4 audit
+4. **MIT Bitcoin Expo** prep (April 10-12, 3 days away)
+
+## Previous Session (2026-04-07 earlier)
+- Medium Rollout Plan + Velo Assessment + Community Docs

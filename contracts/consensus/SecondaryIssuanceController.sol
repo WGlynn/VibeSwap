@@ -156,10 +156,23 @@ contract SecondaryIssuanceController is
         uint256 totalOccupied = ckbToken.totalOccupied();
         uint256 totalDAO = daoShelter.totalDeposited();
 
-        // 3-way split (Nervos model)
+        // NCI-003/MON-006: 3-way split with underflow protection.
+        // totalOccupied + totalDAO can exceed totalSupply (DAO deposits are in-supply tokens),
+        // which would cause insuranceShare to underflow. Cap proportionally.
         uint256 shardShare = (emission * totalOccupied) / totalSupply;
         uint256 daoShare = (emission * totalDAO) / totalSupply;
-        uint256 insuranceShare = emission - shardShare - daoShare;
+
+        // Safe underflow guard: if occupied + DAO proportions exceed 100%, scale down
+        uint256 insuranceShare;
+        if (shardShare + daoShare > emission) {
+            // Scale proportionally so total = emission
+            uint256 combinedBefore = shardShare + daoShare;
+            shardShare = (emission * shardShare) / combinedBefore;
+            daoShare = emission - shardShare; // Give remainder to DAO (no dust loss)
+            insuranceShare = 0;
+        } else {
+            insuranceShare = emission - shardShare - daoShare;
+        }
 
         // Mint and distribute
         if (shardShare > 0) {

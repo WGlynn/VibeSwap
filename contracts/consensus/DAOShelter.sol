@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title DAOShelter — Inflation Shelter for CKB-native Holders
@@ -28,6 +29,8 @@ contract DAOShelter is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============ Constants ============
 
     uint256 public constant WITHDRAWAL_TIMELOCK = 7 days;
@@ -108,12 +111,12 @@ contract DAOShelter is
         if (info.amount > 0) {
             uint256 pending = (info.amount * accRewardPerShare) / ACC_PRECISION - info.rewardDebt;
             if (pending > 0) {
-                ckbToken.transfer(msg.sender, pending);
+                ckbToken.safeTransfer(msg.sender, pending);
                 emit YieldClaimed(msg.sender, pending);
             }
         }
 
-        ckbToken.transferFrom(msg.sender, address(this), amount);
+        ckbToken.safeTransferFrom(msg.sender, address(this), amount);
 
         info.amount += amount;
         info.depositedAt = block.timestamp;
@@ -137,7 +140,7 @@ contract DAOShelter is
         // Claim pending yield
         uint256 pending = (info.amount * accRewardPerShare) / ACC_PRECISION - info.rewardDebt;
         if (pending > 0) {
-            ckbToken.transfer(msg.sender, pending);
+            ckbToken.safeTransfer(msg.sender, pending);
             emit YieldClaimed(msg.sender, pending);
         }
 
@@ -163,7 +166,7 @@ contract DAOShelter is
         info.pendingWithdrawal = 0;
         info.withdrawalUnlockTime = 0;
 
-        ckbToken.transfer(msg.sender, amount);
+        ckbToken.safeTransfer(msg.sender, amount);
 
         emit Withdrawn(msg.sender, amount);
     }
@@ -182,20 +185,23 @@ contract DAOShelter is
 
         info.rewardDebt = (info.amount * accRewardPerShare) / ACC_PRECISION;
 
-        ckbToken.transfer(msg.sender, pending);
+        ckbToken.safeTransfer(msg.sender, pending);
 
         emit YieldClaimed(msg.sender, pending);
     }
 
     /**
      * @notice Deposit yield from secondary issuance (called by SecondaryIssuanceController)
-     * @dev Increases accRewardPerShare proportionally
+     * @dev Increases accRewardPerShare proportionally.
+     *      NCI-006: Validates issuanceController is set and amount > 0.
      */
     function depositYield(uint256 amount) external {
+        require(issuanceController != address(0), "Controller not set");
         if (msg.sender != issuanceController) revert Unauthorized();
+        if (amount == 0) revert ZeroAmount();
         if (totalDeposited == 0) return; // No depositors — yield goes nowhere
 
-        ckbToken.transferFrom(msg.sender, address(this), amount);
+        ckbToken.safeTransferFrom(msg.sender, address(this), amount);
         accRewardPerShare += (amount * ACC_PRECISION) / totalDeposited;
 
         emit YieldDeposited(amount, accRewardPerShare);

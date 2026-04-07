@@ -41,7 +41,10 @@ contract MockAuction {
     ) external payable {}
 
     function advancePhase() external { phaseAdvanced = true; }
-    function settleBatch() external { batchSettled = true; }
+    function settleBatch() external { batchSettled = true; _batch.isSettled = true; }
+
+    // XC-005: Mock cross-chain recipient (returns address(0) by default = no override)
+    function getCrossChainRecipient(uint64, uint256) external pure returns (address) { return address(0); }
 
     function getCurrentBatchId() external view returns (uint64) { return currentBatchId; }
     function getCurrentPhase() external view returns (ICommitRevealAuction.BatchPhase) { return currentPhase; }

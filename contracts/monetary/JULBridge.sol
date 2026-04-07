@@ -52,6 +52,9 @@ contract JULBridge is
     /// @dev 1e18 = 1:1 rate. Can be adjusted by governance.
     uint256 public exchangeRate;
 
+    /// @notice MON-004: Maximum rate change per update (10% = 0.1e18)
+    uint256 public constant MAX_RATE_DELTA = 0.1e18;
+
     /// @notice Rate limit: max JUL convertible per epoch
     uint256 public maxPerEpoch;
 
@@ -144,16 +147,17 @@ contract JULBridge is
         ckbAmount = (julAmount * exchangeRate) / 1e18;
         if (ckbAmount == 0) revert ZeroAmount();
 
-        // Pull JUL from sender (permanently locked in this contract)
-        julToken.transferFrom(msg.sender, address(this), julAmount);
-
-        // Mint CKB-native to sender
-        ckbNativeToken.mint(msg.sender, ckbAmount);
-
-        // Update state
+        // MON-014: Update state BEFORE external calls (CEI pattern)
         convertedThisEpoch += julAmount;
         totalJULLocked += julAmount;
         totalCKBMinted += ckbAmount;
+
+        // MON-002: Check transferFrom return value — JUL is custom ERC20
+        bool success = julToken.transferFrom(msg.sender, address(this), julAmount);
+        require(success, "JUL transfer failed");
+
+        // Mint CKB-native to sender
+        ckbNativeToken.mint(msg.sender, ckbAmount);
 
         emit Bridged(msg.sender, julAmount, ckbAmount, exchangeRate);
     }
@@ -163,10 +167,18 @@ contract JULBridge is
     /**
      * @notice Update the exchange rate
      * @dev Only governance. Rate is JUL-denominated: how many CKB-native per JUL.
+     *      MON-004: Bounded to ±10% per update to prevent hyperinflation.
      */
     function setExchangeRate(uint256 newRate) external onlyOwner {
         if (newRate == 0) revert ZeroAmount();
         uint256 oldRate = exchangeRate;
+        // MON-004: Prevent extreme rate changes
+        uint256 maxDelta = (oldRate * MAX_RATE_DELTA) / 1e18;
+        if (maxDelta == 0) maxDelta = 1; // Minimum delta of 1 wei
+        require(
+            newRate <= oldRate + maxDelta && newRate >= (oldRate > maxDelta ? oldRate - maxDelta : 0),
+            "Rate change exceeds 10%"
+        );
         exchangeRate = newRate;
         emit ExchangeRateUpdated(oldRate, newRate);
     }
@@ -206,9 +218,14 @@ contract JULBridge is
 
     // ============ Internal ============
 
+    /// @dev MON-008: Advance by epochDuration increments, not to block.timestamp.
+    ///      Prevents 2x rate limit exploit by timing calls around epoch boundaries.
     function _checkEpoch() internal {
         if (block.timestamp >= currentEpochStart + epochDuration) {
-            currentEpochStart = block.timestamp;
+            // Advance to the latest complete epoch boundary (not current timestamp)
+            uint256 elapsed = block.timestamp - currentEpochStart;
+            uint256 epochsElapsed = elapsed / epochDuration;
+            currentEpochStart += epochsElapsed * epochDuration;
             convertedThisEpoch = 0;
         }
     }

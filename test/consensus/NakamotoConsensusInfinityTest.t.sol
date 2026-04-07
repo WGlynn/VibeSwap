@@ -228,13 +228,11 @@ contract NakamotoConsensusInfinityTest is Test {
         vm.stopPrank();
     }
 
-    function test_RegisterWithZeroStake() public {
+    function test_RegisterWithZeroStake_Reverts() public {
+        // NCI-002: Zero stake now reverts (MIN_STAKE enforced)
         vm.prank(alice);
+        vm.expectRevert(INakamotoConsensusInfinity.InsufficientStake.selector);
         nci.registerValidator(INakamotoConsensusInfinity.NodeType.META, 0);
-
-        INakamotoConsensusInfinity.Validator memory v = nci.getValidator(alice);
-        assertEq(v.stakedVibe, 0);
-        assertTrue(v.active);
     }
 
     // ============ Staking Tests ============
@@ -341,9 +339,8 @@ contract NakamotoConsensusInfinityTest is Test {
     }
 
     function test_PoMDominatesWeight() public {
-        // Alice: low stake, high PoM
-        vm.prank(alice);
-        nci.registerValidator(INakamotoConsensusInfinity.NodeType.META, 0);
+        // Alice: min stake, high PoM
+        _registerValidator(alice, 100e18); // MIN_STAKE
         vm.prank(alice);
         nci.refreshMindScore();
 
@@ -512,13 +509,15 @@ contract NakamotoConsensusInfinityTest is Test {
         vm.prank(bob);
         uint256 prop2 = nci.propose(keccak256("block_B"));
 
-        // Charlie votes for BOTH (equivocation!)
+        // Charlie votes for first proposal (succeeds)
         vm.prank(charlie);
         nci.vote(prop1, true);
-        vm.prank(charlie);
-        nci.vote(prop2, true); // This triggers equivocation detection
 
-        // Charlie should be slashed
+        // NCI-013: Second vote on different dataHash triggers slash + silent return (vote not counted)
+        vm.prank(charlie);
+        nci.vote(prop2, true); // Slashes charlie, vote not counted
+
+        // Charlie should be slashed (slashing happens before revert)
         INakamotoConsensusInfinity.Validator memory v = nci.getValidator(charlie);
         assertTrue(v.slashed, "Should be slashed");
         assertFalse(v.active, "Should be deactivated");
@@ -542,7 +541,7 @@ contract NakamotoConsensusInfinityTest is Test {
         uint256 mindBefore = vBefore.mindScore;
         assertGt(mindBefore, 0, "Should have mind score");
 
-        // Equivocate
+        // Equivocate — NCI-013: second vote slashes + returns (vote not counted)
         vm.prank(alice);
         uint256 prop1 = nci.propose(keccak256("block_X"));
         vm.prank(bob);
@@ -706,7 +705,7 @@ contract NakamotoConsensusInfinityTest is Test {
 
         uint256 weightBefore = nci.getTotalNetworkWeight();
 
-        // Slash charlie via equivocation
+        // Slash charlie via equivocation — NCI-013: second vote slashes + returns
         vm.prank(alice);
         uint256 p1 = nci.propose(keccak256("A"));
         vm.prank(bob);
@@ -948,7 +947,7 @@ contract NakamotoConsensusInfinityTest is Test {
         vm.prank(charlie);
         uint256 p2 = nci.propose(keccak256("fork_B"));
 
-        // Alice equivocates
+        // Alice equivocates — NCI-013: second vote slashes + returns (vote not counted)
         vm.prank(alice);
         nci.vote(p1, true);
         vm.prank(alice);

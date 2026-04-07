@@ -104,6 +104,7 @@ contract ThreeTokenConsensusTest is Test {
         ckb.setLocker(address(vault), true);
         vault.setCellManager(cellManager, true);
         shelter.setIssuanceController(address(issuance));
+        registry.setIssuanceController(address(issuance));
         vm.stopPrank();
     }
 

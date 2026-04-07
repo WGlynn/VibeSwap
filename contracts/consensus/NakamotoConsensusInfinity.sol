@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./INakamotoConsensusInfinity.sol";
 
 /**
@@ -41,6 +42,8 @@ contract NakamotoConsensusInfinity is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============ Dimension Weight Constants (BPS) ============
 
     uint256 public constant POW_WEIGHT_BPS = 1000;    // 10%
@@ -81,6 +84,11 @@ contract NakamotoConsensusInfinity is
     uint256 public constant FINALIZATION_THRESHOLD_BPS = 6667; // 2/3 supermajority
     uint256 public constant PROPOSAL_EXPIRY = 60;      // 60 seconds
 
+    // ============ Staking Constants ============
+
+    uint256 public constant MIN_STAKE = 100e18;  // NCI-002: Minimum stake to register
+    uint256 public constant UNBONDING_PERIOD = 7 days;  // NCI-009: Unbonding delay
+
     // ============ PoW Difficulty ============
 
     uint128 public constant POW_DIFFICULTY = 1 << 12;  // Lighter than Joule's main mining
@@ -112,8 +120,10 @@ contract NakamotoConsensusInfinity is
     uint256 public proposalCount;
     mapping(uint256 => mapping(address => bool)) public hasVotedOn;
 
-    // Equivocation detection: epoch => voter => proposal hashes voted for
-    mapping(uint256 => mapping(address => bytes32[])) private _epochVotes;
+    // Equivocation detection: epoch => voter => dataHash => voted (O(1) lookup)
+    mapping(uint256 => mapping(address => mapping(bytes32 => bool))) private _epochVoteHashes;
+    // Track if validator voted for any hash this epoch (for equivocation detection)
+    mapping(uint256 => mapping(address => bytes32)) private _epochFirstVoteHash;
 
     // ============ State: External Contracts ============
 
@@ -141,8 +151,18 @@ contract NakamotoConsensusInfinity is
     /// @dev Read cumulative mining stats from Joule for PoW weight calculation
     address public jouleToken;
 
-    /// @dev Reserved storage gap for future upgrades (48 remaining after adding 2 vars)
-    uint256[48] private __gap;
+    // NCI-001: Track used nonces per validator per epoch (prevents PoW replay)
+    mapping(address => mapping(uint256 => mapping(bytes32 => bool))) private _usedNonces;
+
+    // NCI-007/008: Running total of active weight (O(1) instead of O(n) loop)
+    uint256 public totalActiveWeight;
+
+    // NCI-009: Unbonding state
+    mapping(address => uint256) public unbondingAmount;
+    mapping(address => uint256) public unbondingUnlockTime;
+
+    /// @dev Reserved storage gap for future upgrades (44 remaining)
+    uint256[44] private __gap;
 
     // ============ Initializer ============
 
@@ -188,6 +208,8 @@ contract NakamotoConsensusInfinity is
     /// @inheritdoc INakamotoConsensusInfinity
     function registerValidator(NodeType nodeType, uint256 stakeAmount) external nonReentrant {
         if (_validators[msg.sender].registeredAt != 0) revert AlreadyRegistered();
+        // NCI-002: Require minimum stake to prevent Sybil + gas DoS
+        if (stakeAmount < MIN_STAKE) revert InsufficientStake();
 
         // Authority nodes require Trinity approval (must already be a trinity node)
         if (nodeType == NodeType.AUTHORITY) {
@@ -196,10 +218,9 @@ contract NakamotoConsensusInfinity is
 
         // Transfer CKB-native stake (PoS dimension)
         // Falls back to vibeToken if ckbNativeToken not set (backwards compatible)
-        if (stakeAmount > 0) {
-            IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
-            stakeToken.transferFrom(msg.sender, address(this), stakeAmount);
-        }
+        IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
+        // NCI-004: SafeERC20 for tokens that return false instead of reverting
+        stakeToken.safeTransferFrom(msg.sender, address(this), stakeAmount);
 
         _validators[msg.sender] = Validator({
             addr: msg.sender,
@@ -222,8 +243,10 @@ contract NakamotoConsensusInfinity is
         activeValidatorCount++;
         totalStaked += stakeAmount;
 
-        // Compute initial weights
+        // Compute initial weights and update running total
         _recalculateWeights(msg.sender);
+        // NCI-007: Track totalActiveWeight incrementally
+        totalActiveWeight += _validators[msg.sender].totalWeight;
 
         emit ValidatorRegistered(msg.sender, nodeType, stakeAmount);
     }
@@ -238,29 +261,77 @@ contract NakamotoConsensusInfinity is
         if (v.slashed) revert ValidatorSlashedErr();
 
         IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
-        stakeToken.transferFrom(msg.sender, address(this), amount);
+        stakeToken.safeTransferFrom(msg.sender, address(this), amount);
         v.stakedVibe += amount;
         totalStaked += amount;
 
+        // NCI-007: Update running total
+        uint256 oldWeight = v.totalWeight;
         _recalculateWeights(msg.sender);
+        if (v.active && !v.slashed) {
+            totalActiveWeight = totalActiveWeight - oldWeight + v.totalWeight;
+        }
 
         emit StakeDeposited(msg.sender, amount, v.stakedVibe);
     }
 
-    /// @inheritdoc INakamotoConsensusInfinity
+    /// @notice NCI-009: Two-phase withdrawal. Request starts unbonding period.
+    /// @dev NCI-010: Slashed validators cannot withdraw.
+    function requestStakeWithdrawal(uint256 amount) external nonReentrant {
+        if (amount == 0) revert ZeroAmount();
+        Validator storage v = _validators[msg.sender];
+        if (v.registeredAt == 0) revert NotRegistered();
+        if (v.slashed) revert ValidatorSlashedErr();
+        if (v.stakedVibe < amount) revert InsufficientStake();
+
+        uint256 oldWeight = v.totalWeight;
+        v.stakedVibe -= amount;
+        totalStaked -= amount;
+
+        _recalculateWeights(msg.sender);
+        if (v.active && !v.slashed) {
+            totalActiveWeight = totalActiveWeight - oldWeight + v.totalWeight;
+        }
+
+        unbondingAmount[msg.sender] += amount;
+        unbondingUnlockTime[msg.sender] = block.timestamp + UNBONDING_PERIOD;
+
+        emit StakeWithdrawn(msg.sender, amount, v.stakedVibe);
+    }
+
+    /// @notice Complete stake withdrawal after unbonding period
+    function completeStakeWithdrawal() external nonReentrant {
+        uint256 amount = unbondingAmount[msg.sender];
+        require(amount > 0, "Nothing unbonding");
+        require(block.timestamp >= unbondingUnlockTime[msg.sender], "Unbonding not complete");
+
+        unbondingAmount[msg.sender] = 0;
+        unbondingUnlockTime[msg.sender] = 0;
+
+        IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
+        stakeToken.safeTransfer(msg.sender, amount);
+    }
+
+    /// @notice Legacy withdrawStake — immediate, kept for backwards compat
+    /// @dev Will be removed in Phase 2. Use requestStakeWithdrawal + completeStakeWithdrawal.
     function withdrawStake(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         Validator storage v = _validators[msg.sender];
         if (v.registeredAt == 0) revert NotRegistered();
+        if (v.slashed) revert ValidatorSlashedErr();
         if (v.stakedVibe < amount) revert InsufficientStake();
 
+        uint256 oldWeight = v.totalWeight;
         v.stakedVibe -= amount;
         totalStaked -= amount;
 
         IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
-        stakeToken.transfer(msg.sender, amount);
+        stakeToken.safeTransfer(msg.sender, amount);
 
         _recalculateWeights(msg.sender);
+        if (v.active) {
+            totalActiveWeight = totalActiveWeight - oldWeight + v.totalWeight;
+        }
 
         emit StakeWithdrawn(msg.sender, amount, v.stakedVibe);
     }
@@ -268,10 +339,15 @@ contract NakamotoConsensusInfinity is
     // ============ Proof of Work ============
 
     /// @inheritdoc INakamotoConsensusInfinity
+    /// @dev NCI-001: Nonce replay prevention. Each nonce is tracked per (validator, epoch).
     function submitPoW(bytes32 nonce) external {
         Validator storage v = _validators[msg.sender];
         if (v.registeredAt == 0) revert NotRegistered();
         if (!v.active) revert NotActive();
+
+        // NCI-001: Prevent nonce replay within the same epoch
+        require(!_usedNonces[msg.sender][currentEpochNumber][nonce], "Nonce already used");
+        _usedNonces[msg.sender][currentEpochNumber][nonce] = true;
 
         // Generate challenge unique to this validator + epoch
         bytes32 challenge = keccak256(abi.encodePacked(
@@ -286,10 +362,15 @@ contract NakamotoConsensusInfinity is
         uint256 hashValue = uint256(hash);
         if (hashValue >= type(uint256).max / POW_DIFFICULTY) revert InvalidPoW();
 
+        uint256 oldWeight = v.totalWeight;
         v.cumulativePoW++;
         totalPoWSubmissions++;
 
         _recalculateWeights(msg.sender);
+        // NCI-007: Update running total
+        if (v.active && !v.slashed) {
+            totalActiveWeight = totalActiveWeight - oldWeight + v.totalWeight;
+        }
 
         emit PoWSubmitted(msg.sender, v.cumulativePoW, v.powWeight);
     }
@@ -304,7 +385,11 @@ contract NakamotoConsensusInfinity is
         uint256 newMindScore = _aggregateMindScore(msg.sender);
         v.mindScore = newMindScore;
 
+        uint256 oldWeight = v.totalWeight;
         _recalculateWeights(msg.sender);
+        if (v.active && !v.slashed) {
+            totalActiveWeight = totalActiveWeight - oldWeight + v.totalWeight;
+        }
 
         emit MindScoreUpdated(msg.sender, newMindScore, v.pomWeight);
     }
@@ -392,6 +477,7 @@ contract NakamotoConsensusInfinity is
         if (!v.active && !v.slashed) {
             v.active = true;
             activeValidatorCount++;
+            totalActiveWeight += v.totalWeight;
         }
 
         emit HeartbeatReceived(msg.sender, block.timestamp);
@@ -403,6 +489,7 @@ contract NakamotoConsensusInfinity is
         if (v.registeredAt == 0) revert NotRegistered();
         if (!v.active) revert NotActive();
 
+        totalActiveWeight -= v.totalWeight;
         v.active = false;
         activeValidatorCount--;
 
@@ -450,6 +537,21 @@ contract NakamotoConsensusInfinity is
             revert ProposalNotVoting();
         }
 
+        // NCI-013: Check equivocation BEFORE counting vote weight.
+        // If equivocating, slash and return — vote is NOT counted, slash persists.
+        bytes32 firstHash = _epochFirstVoteHash[p.epochNumber][msg.sender];
+        if (firstHash != bytes32(0) && firstHash != p.dataHash) {
+            // Equivocation detected — slash, don't count the vote, return (no revert)
+            _slashEquivocator(msg.sender, p.epochNumber, firstHash, p.dataHash);
+            return; // Vote not counted, slashing persists
+        }
+
+        // Track vote hash (O(1) instead of unbounded array)
+        if (firstHash == bytes32(0)) {
+            _epochFirstVoteHash[p.epochNumber][msg.sender] = p.dataHash;
+        }
+        _epochVoteHashes[p.epochNumber][msg.sender][p.dataHash] = true;
+
         hasVotedOn[proposalId][msg.sender] = true;
 
         uint256 weight = v.totalWeight;
@@ -458,21 +560,6 @@ contract NakamotoConsensusInfinity is
             p.weightFor += weight;
         } else {
             p.weightAgainst += weight;
-        }
-
-        // Track votes for equivocation detection
-        _epochVotes[p.epochNumber][msg.sender].push(p.dataHash);
-
-        // Check for equivocation: voting for conflicting proposals in same epoch
-        bytes32[] storage votes = _epochVotes[p.epochNumber][msg.sender];
-        if (votes.length > 1) {
-            // Check if any two votes are for different data hashes
-            for (uint256 i = 0; i < votes.length - 1; i++) {
-                if (votes[i] != votes[votes.length - 1]) {
-                    _slashEquivocator(msg.sender, p.epochNumber, votes[i], votes[votes.length - 1]);
-                    break;
-                }
-            }
         }
 
         emit VoteCast(proposalId, msg.sender, support, weight);
@@ -680,13 +767,9 @@ contract NakamotoConsensusInfinity is
         emit WeightsRecalculated(addr, v.powWeight, v.posWeight, v.pomWeight, v.totalWeight);
     }
 
-    function _getTotalActiveWeight() internal view returns (uint256 total) {
-        for (uint256 i = 0; i < validatorList.length; i++) {
-            Validator storage v = _validators[validatorList[i]];
-            if (v.active && !v.slashed) {
-                total += v.totalWeight;
-            }
-        }
+    /// @dev NCI-007/008: O(1) — returns running total instead of iterating validatorList.
+    function _getTotalActiveWeight() internal view returns (uint256) {
+        return totalActiveWeight;
     }
 
     // ============ Internal: Equivocation & Slashing ============
@@ -699,6 +782,11 @@ contract NakamotoConsensusInfinity is
     ) internal {
         Validator storage v = _validators[validator];
         if (v.slashed) return; // Already slashed
+
+        // NCI-007: Remove weight BEFORE modifying state
+        if (v.active) {
+            totalActiveWeight -= v.totalWeight;
+        }
 
         // Slash 50% of stake
         uint256 stakeSlash = (v.stakedVibe * EQUIVOCATION_STAKE_SLASH_BPS) / BPS;
@@ -717,6 +805,7 @@ contract NakamotoConsensusInfinity is
         activeValidatorCount--;
 
         _recalculateWeights(validator);
+        // Weight is now 0 (slashed + inactive) — no need to re-add to totalActiveWeight
 
         emit EquivocationDetected(validator, epochNumber, hash1, hash2);
         emit ValidatorSlashed(validator, stakeSlash, mindSlash, "equivocation");
@@ -724,11 +813,14 @@ contract NakamotoConsensusInfinity is
 
     // ============ Internal: Heartbeat Checks ============
 
+    /// @dev NCI-008: Still iterates for heartbeat checks, but O(1) weight update.
+    ///      Full decoupling (lazy deactivation) deferred to Phase 2.
     function _checkHeartbeats() internal {
         for (uint256 i = 0; i < validatorList.length; i++) {
             Validator storage v = _validators[validatorList[i]];
             if (v.active && !v.slashed) {
                 if (block.timestamp > v.lastHeartbeat + HEARTBEAT_GRACE) {
+                    totalActiveWeight -= v.totalWeight;
                     v.active = false;
                     activeValidatorCount--;
                     emit ValidatorDeactivated(validatorList[i]);

@@ -210,8 +210,16 @@ contract VibeSwapCore is
     /// @dev Kept to preserve storage layout for UUPS proxy compatibility. Do not use.
     mapping(uint64 => uint256) private _orderRevealCount_DEPRECATED;
 
+    // ============ INT-004: Decoupled Execution ============
+
+    /// @notice Tracks whether a batch's orders have been executed via AMM
+    /// @dev INT-004: Decouples CRA settlement from AMM execution. If settleBatch reverts
+    ///      during execution, CRA can be settled independently (it's permissionless), then
+    ///      executeBatch() retries AMM execution without re-settling the CRA.
+    mapping(uint64 => bool) public batchExecuted;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 
     // ============ Events ============
 
@@ -310,6 +318,9 @@ contract VibeSwapCore is
         uint256 amount
     );
     event CrossChainRefundRequested(bytes32 indexed commitHash, address indexed trader);
+
+    // INT-004: Batch execution decoupled from CRA settlement
+    event BatchExecutionFailed(uint64 indexed batchId, string reason);
 
     // ============ Errors ============
 
@@ -608,11 +619,37 @@ contract VibeSwapCore is
         // Advance phase if needed
         auction.advancePhase();
 
-        // Settle the batch
+        // Settle the batch in CRA (marks settled, computes shuffle, starts new batch)
         auction.settleBatch();
 
+        // Execute orders via AMM. If this reverts, the ENTIRE tx reverts (including CRA
+        // settlement above). INT-004: In that case, the caller should:
+        //   1. Call auction.advancePhase() + auction.settleBatch() directly (permissionless)
+        //   2. Call executeBatch(batchId) to retry AMM execution
+        // This decouples CRA liveness from AMM liveness.
+        _executeBatchOrders(batchId);
+    }
+
+    /**
+     * @notice INT-004: Execute orders for a batch already settled in CRA
+     * @dev Decouples AMM execution from CRA settlement. Use when settleBatch() reverts
+     *      during execution: settle CRA directly (permissionless), then call this.
+     *      Users can also call withdrawDeposit() if execution remains stuck.
+     * @param batchId The settled batch to execute
+     */
+    function executeBatch(uint64 batchId) external whenNotPaused nonReentrant {
+        _executeBatchOrders(batchId);
+    }
+
+    function _executeBatchOrders(uint64 batchId) internal {
+        require(!batchExecuted[batchId], "INT-004: Batch already executed");
+
+        // Verify batch is settled in CRA
+        require(auction.getBatch(batchId).isSettled, "INT-004: Batch not settled in CRA");
+
+        batchExecuted[batchId] = true;
+
         // Get revealed orders for the settled batch
-        // Note: After settleBatch(), a new batch is created, so we need to use batchId we passed in
         ICommitRevealAuction.RevealedOrder[] memory orders = auction.getRevealedOrders(batchId);
 
         if (orders.length == 0) {
@@ -1240,7 +1277,7 @@ contract VibeSwapCore is
             uint256 idx = executionOrder[i];
             ICommitRevealAuction.RevealedOrder memory order = orders[idx];
             address depositor = _getDepositor(batchId, idx, order.trader);
-            address recipient = _resolveRecipient(batchId, depositor);
+            address recipient = _resolveRecipient(batchId, idx, depositor);
 
             IERC20(order.tokenIn).safeTransfer(address(amm), order.amountIn);
 
@@ -1258,9 +1295,17 @@ contract VibeSwapCore is
     }
 
     /**
-     * @notice Resolve recipient for an order — routes to wBAR if receipt was transferred
+     * @notice Resolve recipient for an order
+     * @dev XC-005: Checks CRA for cross-chain recipient override first. Smart contract
+     *      wallets have different addresses per chain — the override ensures settlement
+     *      sends tokens to the user's chosen address on the destination chain.
+     *      Falls back to wBAR routing, then to trader address.
      */
-    function _resolveRecipient(uint64 batchId, address trader) internal view returns (address) {
+    function _resolveRecipient(uint64 batchId, uint256 orderIndex, address trader) internal view returns (address) {
+        // XC-005: Cross-chain recipient takes priority (set at commit time)
+        address xRecipient = auction.getCrossChainRecipient(batchId, orderIndex);
+        if (xRecipient != address(0)) return xRecipient;
+
         if (address(wbar) == address(0)) return trader;
 
         bytes32 traderCommitId = batchTraderCommitId[batchId][trader];

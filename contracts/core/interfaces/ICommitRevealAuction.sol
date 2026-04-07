@@ -192,12 +192,23 @@ interface ICommitRevealAuction {
      * @notice Commit an order on behalf of a cross-chain user (called by authorized router)
      * @param originalUser The actual user who committed on the source chain
      * @param commitHash Hash of (originalUser, tokenIn, tokenOut, amountIn, minAmountOut, secret)
+     * @param destinationRecipient XC-005: Where tokens/refunds go on this chain (smart wallet safe).
+     *        address(0) = fall back to originalUser (EOA same-address assumption).
      * @return commitId Unique identifier for this commitment
      */
     function commitOrderCrossChain(
         address originalUser,
-        bytes32 commitHash
+        bytes32 commitHash,
+        address destinationRecipient
     ) external payable returns (bytes32 commitId);
+
+    /**
+     * @notice XC-005: Get the destination-chain recipient for a cross-chain order in a batch
+     * @param batchId The batch containing the order
+     * @param orderIndex The order's index in revealedOrders
+     * @return recipient The destination-chain recipient (address(0) = use trader field)
+     */
+    function getCrossChainRecipient(uint64 batchId, uint256 orderIndex) external view returns (address recipient);
 
     /**
      * @notice Reveal order on behalf of another address (for cross-chain or aggregator use)

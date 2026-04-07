@@ -191,8 +191,21 @@ contract CommitRevealAuction is
     /// @notice Slashed amounts per user (for recovery if treasury was broken)
     mapping(address => uint256) public userSlashedAmounts;
 
+    // ============ XC-005: Cross-Chain Recipient Override ============
+
+    /// @notice Destination-chain recipient per commitId (set in commitOrderCrossChain)
+    /// @dev Smart contract wallets have different addresses per chain. This stores the
+    ///      user's chosen recipient on the destination chain so settlement sends tokens
+    ///      to the correct address, not the source-chain depositor address.
+    mapping(bytes32 => address) private _xChainRecipients;
+
+    /// @notice Destination-chain recipient indexed by (batchId, orderIndex) for settlement queries
+    /// @dev Populated during revealOrderCrossChain from _xChainRecipients[commitId].
+    ///      VibeSwapCore reads this during _buildPoolSwapOrders to override the AMM recipient.
+    mapping(uint64 => mapping(uint256 => address)) public crossChainRecipientByOrder;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     // ============ Security Fix #7: Excess ETH Refund ============
 
@@ -417,11 +430,14 @@ contract CommitRevealAuction is
      *      can call this. Records originalUser as depositor so revealOrderCrossChain matches correctly.
      * @param originalUser The actual user who committed on the source chain
      * @param commitHash Hash of (originalUser, tokenIn, tokenOut, amountIn, minAmountOut, secret)
+     * @param destinationRecipient XC-005: Where tokens/refunds go on this chain.
+     *        address(0) = fall back to originalUser (assumes same address across chains).
      * @return commitId Unique identifier for this commitment
      */
     function commitOrderCrossChain(
         address originalUser,
-        bytes32 commitHash
+        bytes32 commitHash,
+        address destinationRecipient
     ) external payable nonReentrant onlyAuthorizedSettler inPhase(BatchPhase.COMMIT) returns (bytes32 commitId) {
         if (commitHash == bytes32(0)) revert InvalidHash();
         if (originalUser == address(0)) revert NotOwner();
@@ -452,6 +468,12 @@ contract CommitRevealAuction is
         });
 
         batches[_currentBatchId].orderCount++;
+
+        // XC-005: Store destination-chain recipient for smart wallet compatibility.
+        // Resolved during revealOrderCrossChain → copied to crossChainRecipientByOrder.
+        if (destinationRecipient != address(0)) {
+            _xChainRecipients[commitId] = destinationRecipient;
+        }
 
         emit OrderCommitted(commitId, originalUser, _currentBatchId, msg.value);
     }
@@ -885,6 +907,16 @@ contract CommitRevealAuction is
     }
 
     /**
+     * @notice XC-005: Get the destination-chain recipient override for a cross-chain order
+     * @param batchId The batch containing the order
+     * @param orderIndex The order's index in revealedOrders
+     * @return recipient The destination-chain recipient (address(0) = use trader field as-is)
+     */
+    function getCrossChainRecipient(uint64 batchId, uint256 orderIndex) external view returns (address recipient) {
+        return crossChainRecipientByOrder[batchId][orderIndex];
+    }
+
+    /**
      * @notice Slash unrevealed commitments after batch settlement
      * @param commitId Commitment ID of unrevealed order
      *
@@ -977,6 +1009,15 @@ contract CommitRevealAuction is
             priorityBid: priorityBid,
             srcChainId: uint32(block.chainid)
         }));
+
+        // XC-005: Copy destination-chain recipient to batch/order index for settlement queries.
+        // _xChainRecipients[commitId] was set during commitOrderCrossChain.
+        {
+            address xRecipient = _xChainRecipients[commitId];
+            if (xRecipient != address(0)) {
+                crossChainRecipientByOrder[_currentBatchId][orderIndex] = xRecipient;
+            }
+        }
 
         if (priorityBid > 0) {
             priorityOrderIndices[_currentBatchId].push(orderIndex);
@@ -1451,12 +1492,18 @@ contract CommitRevealAuction is
             }
         }
 
+        // XC-005: Refund to destination-chain recipient if set, otherwise depositor.
+        // For cross-chain orders, commitment.depositor is the SOURCE-chain address which
+        // may not exist on this chain (smart contract wallets).
+        address refundTo = _xChainRecipients[commitId];
+        if (refundTo == address(0)) refundTo = commitment.depositor;
+
         // Refund non-slashed portion to user
         if (refundAmount > 0) {
-            (bool success, ) = commitment.depositor.call{value: refundAmount}("");
+            (bool success, ) = refundTo.call{value: refundAmount}("");
             // If refund fails, accrue to pendingRefunds (pull pattern) — never revert status
             if (!success) {
-                pendingRefunds[commitment.depositor] += refundAmount;
+                pendingRefunds[refundTo] += refundAmount;
             }
         }
 

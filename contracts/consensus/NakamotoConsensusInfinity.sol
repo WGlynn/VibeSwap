@@ -312,28 +312,11 @@ contract NakamotoConsensusInfinity is
         stakeToken.safeTransfer(msg.sender, amount);
     }
 
-    /// @notice Legacy withdrawStake — immediate, kept for backwards compat
-    /// @dev Will be removed in Phase 2. Use requestStakeWithdrawal + completeStakeWithdrawal.
-    function withdrawStake(uint256 amount) external nonReentrant {
-        if (amount == 0) revert ZeroAmount();
-        Validator storage v = _validators[msg.sender];
-        if (v.registeredAt == 0) revert NotRegistered();
-        if (v.slashed) revert ValidatorSlashedErr();
-        if (v.stakedVibe < amount) revert InsufficientStake();
-
-        uint256 oldWeight = v.totalWeight;
-        v.stakedVibe -= amount;
-        totalStaked -= amount;
-
-        IERC20 stakeToken = address(ckbNativeToken) != address(0) ? ckbNativeToken : vibeToken;
-        stakeToken.safeTransfer(msg.sender, amount);
-
-        _recalculateWeights(msg.sender);
-        if (v.active) {
-            totalActiveWeight = totalActiveWeight - oldWeight + v.totalWeight;
-        }
-
-        emit StakeWithdrawn(msg.sender, amount, v.stakedVibe);
+    /// @notice C5-CON-001: Legacy withdrawStake REMOVED — bypassed 7-day unbonding.
+    /// @dev Use requestStakeWithdrawal() + completeStakeWithdrawal() instead.
+    ///      Keeping function signature to avoid interface breakage; it always reverts.
+    function withdrawStake(uint256) external pure {
+        revert("Deprecated: use requestStakeWithdrawal");
     }
 
     // ============ Proof of Work ============

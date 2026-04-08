@@ -348,6 +348,8 @@ contract VibeStable is
     }
 
     /// @notice Repay vUSD debt (burns vUSD from caller)
+    /// @dev C5-MON-006: Only vault owner gets auto-collateral-return on full repay.
+    ///      Third-party repayments clear debt but don't trigger collateral return.
     function repay(uint256 vaultId, uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         Vault storage v = vaults[vaultId];
@@ -362,8 +364,9 @@ contract VibeStable is
 
         _burn(msg.sender, repayAmount);
 
-        // If fully repaid, return all collateral to vault owner
-        if (v.debtAmount == 0 && v.collateralAmount > 0) {
+        // C5-MON-006: Only auto-return collateral if the vault owner is the caller.
+        // Prevents third-party grief where someone repays your debt to force-close your vault.
+        if (v.debtAmount == 0 && v.collateralAmount > 0 && msg.sender == v.owner) {
             uint256 col = v.collateralAmount;
             v.collateralAmount = 0;
             IERC20(v.collateralToken).safeTransfer(v.owner, col);
@@ -606,12 +609,17 @@ contract VibeStable is
         v.lastAccrual = block.timestamp;
     }
 
+    /// @notice Maximum oracle staleness before rejecting price (1 hour)
+    uint256 public constant MAX_ORACLE_STALENESS = 1 hours;
+
     /// @notice Get price from a Chainlink-compatible oracle (18 decimals)
+    /// @dev C5-MON-003: Added staleness check — rejects prices older than MAX_ORACLE_STALENESS
     function _getPrice(address feed) internal view returns (uint256) {
         // Chainlink returns (roundId, answer, startedAt, updatedAt, answeredInRound)
         // answer has `decimals()` precision — we normalize to 18
-        (, int256 answer,,,) = IChainlinkFeed(feed).latestRoundData();
+        (, int256 answer,, uint256 updatedAt,) = IChainlinkFeed(feed).latestRoundData();
         require(answer > 0, "VibeStable: invalid price");
+        require(block.timestamp - updatedAt <= MAX_ORACLE_STALENESS, "VibeStable: stale oracle");
 
         uint8 feedDecimals = IChainlinkFeed(feed).decimals();
         if (feedDecimals < 18) {

@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title SecondaryIssuanceController — CKB-native Emission Engine
@@ -46,6 +48,8 @@ contract SecondaryIssuanceController is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============ State ============
 
     /// @notice CKB-native token
@@ -175,15 +179,16 @@ contract SecondaryIssuanceController is
         }
 
         // Mint and distribute
+        // C5-CON-003: Use SafeERC20 forceApprove (handles approve-to-zero race)
         if (shardShare > 0) {
             ckbToken.mint(address(this), shardShare);
-            ckbToken.approve(address(shardRegistry), shardShare);
+            IERC20(address(ckbToken)).forceApprove(address(shardRegistry), shardShare);
             shardRegistry.distributeRewards(shardShare);
         }
 
         if (daoShare > 0) {
             ckbToken.mint(address(this), daoShare);
-            ckbToken.approve(address(daoShelter), daoShare);
+            IERC20(address(ckbToken)).forceApprove(address(daoShelter), daoShare);
             daoShelter.depositYield(daoShare);
         }
 
@@ -222,6 +227,7 @@ contract SecondaryIssuanceController is
     // ============ View Functions ============
 
     /// @notice Preview next epoch's emission and split
+    /// @dev C5-CON-004: Mirrors distributeEpoch()'s underflow protection
     function previewNextEpoch() external view returns (
         uint256 emission,
         uint256 shardShare,
@@ -239,7 +245,16 @@ contract SecondaryIssuanceController is
 
         shardShare = (emission * totalOccupied) / totalSupply;
         daoShare = (emission * totalDAO) / totalSupply;
-        insuranceShare = emission - shardShare - daoShare;
+
+        // C5-CON-004: Same underflow guard as distributeEpoch()
+        if (shardShare + daoShare > emission) {
+            uint256 combinedBefore = shardShare + daoShare;
+            shardShare = (emission * shardShare) / combinedBefore;
+            daoShare = emission - shardShare;
+            insuranceShare = 0;
+        } else {
+            insuranceShare = emission - shardShare - daoShare;
+        }
     }
 
     /// @notice Time until next distribution is available

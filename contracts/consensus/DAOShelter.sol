@@ -130,7 +130,10 @@ contract DAOShelter is
 
     /**
      * @notice Request withdrawal — starts timelock
-     * @dev Cannot withdraw for WITHDRAWAL_TIMELOCK after request
+     * @dev C5-CON-005: Only sets timelock if no pending withdrawal exists.
+     *      Subsequent requests accumulate amount but keep the ORIGINAL unlock time.
+     *      This prevents the timer-reset griefing vector where a tiny additional request
+     *      delays an already-almost-mature large withdrawal.
      */
     function requestWithdrawal(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
@@ -149,7 +152,10 @@ contract DAOShelter is
         totalDeposited -= amount;
 
         info.pendingWithdrawal += amount;
-        info.withdrawalUnlockTime = block.timestamp + WITHDRAWAL_TIMELOCK;
+        // C5-CON-005: Only set timelock on first request — don't reset on subsequent
+        if (info.withdrawalUnlockTime == 0) {
+            info.withdrawalUnlockTime = block.timestamp + WITHDRAWAL_TIMELOCK;
+        }
 
         emit WithdrawalRequested(msg.sender, amount, info.withdrawalUnlockTime);
     }

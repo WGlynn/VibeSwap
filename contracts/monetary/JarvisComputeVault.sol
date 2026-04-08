@@ -76,6 +76,7 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         bytes32 miningProofHash;     // Links to original PoW submission
         uint256 nonce;               // One-time stamp
         uint256 depositBlock;
+        uint256 depositTimestamp;    // C5-MON-001: Stored for fraud proof reproducibility
         uint256 expiresAt;           // Credits expire after CREDIT_TTL
         bool consumed;               // True if fully used
         bool fraudSlashed;           // True if fraud proof succeeded against this
@@ -282,6 +283,7 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             miningProofHash: miningProofHash,
             nonce: nonce,
             depositBlock: block.number,
+            depositTimestamp: block.timestamp,
             expiresAt: block.timestamp + CREDIT_TTL,
             consumed: false,
             fraudSlashed: false
@@ -355,35 +357,34 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     /**
      * @notice Challenge a fraudulent credit claim
-     * @dev Anyone can submit a fraud proof showing:
-     *      - bindingProof doesn't match on-chain data
-     *      - Receipt data was tampered with
-     *      Successful fraud proof slashes 50% of cheater's active credits.
+     * @dev C5-MON-001 FIX: The fraud proof now actually compares the stored binding
+     *      proof against a recomputation from on-chain data. If they differ, the
+     *      receipt data was tampered with (e.g., via storage corruption or upgrade bug).
+     *
+     *      The previous logic was inverted — anyone could pass any arbitrary bytes32
+     *      and trigger a slash. Now the contract recomputes the proof itself and checks
+     *      that the stored proof matches. External callers cannot influence the check.
+     *
+     *      Note: The binding proof at deposit time includes block.timestamp (line 258),
+     *      which we now store in CreditReceipt.depositTimestamp for reproducibility.
      */
-    function submitFraudProof(
-        uint256 receiptId,
-        bytes32 expectedBindingProof
-    ) external {
+    function submitFraudProof(uint256 receiptId) external {
         CreditReceipt storage receipt = receipts[receiptId];
         require(!receipt.fraudSlashed, "Already slashed");
         require(receipt.depositor != address(0), "Receipt not found");
 
-        // Recompute binding proof from on-chain data
+        // Recompute binding proof from on-chain receipt data
         bytes32 computedProof = keccak256(abi.encodePacked(
             receipt.depositor,
             receipt.julAmount,
             receipt.nonce,
             receipt.depositBlock,
-            // Note: block.timestamp at deposit time is NOT stored separately,
-            // so fraud proof verifies the other fields match
+            receipt.depositTimestamp,
             receipt.miningProofHash
         ));
 
-        // If the stored binding proof doesn't match recomputed, it's fraud
-        // (This catches data corruption or contract manipulation)
-        // For now, the fraud proof mechanism is for the backend to report
-        // users who present invalid off-chain credit claims
-        require(expectedBindingProof != receipt.bindingProof, "No fraud detected");
+        // C5-MON-001: If stored proof != recomputed proof, data was corrupted
+        require(computedProof != receipt.bindingProof, "No fraud detected");
 
         receipt.fraudSlashed = true;
 
@@ -454,6 +455,7 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     // ============ Internal ============
 
+    /// @dev C5-MON-002: Added address(0) check + EIP-2 s-malleability guard
     function _recoverSigner(bytes32 hash, bytes calldata signature) internal pure returns (address) {
         require(signature.length == 65, "Invalid signature length");
         bytes32 r;
@@ -465,7 +467,11 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             v := byte(0, calldataload(add(signature.offset, 64)))
         }
         if (v < 27) v += 27;
-        return ecrecover(hash, v, r, s);
+        // EIP-2: Reject malleable signatures (s must be in lower half)
+        require(uint256(s) <= 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0, "Malleable signature");
+        address signer = ecrecover(hash, v, r, s);
+        require(signer != address(0), "Invalid signature");
+        return signer;
     }
 
     // ============ Admin ============
@@ -483,7 +489,18 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     }
 
     /// @notice Withdraw deposited JUL (protocol treasury)
+    /// @dev C5-MON-008: Cannot withdraw more than expired/consumed credits' backing.
+    ///      Active credits must remain backed by JUL in the vault.
     function withdrawJul(uint256 amount) external onlyOwner nonReentrant {
+        // Credits still active require JUL backing: 1 credit = 1/CREDITS_PER_JUL * 1e18 JUL
+        uint256 activeCreditsJulBacking = (totalCreditsIssued - totalCreditsConsumed - totalFraudSlashed) * 1e18 / CREDITS_PER_JUL;
+        (bool balOk, bytes memory balData) = julToken.call(
+            abi.encodeWithSignature("balanceOf(address)", address(this))
+        );
+        require(balOk && balData.length >= 32, "Balance check failed");
+        uint256 balance = abi.decode(balData, (uint256));
+        require(balance - amount >= activeCreditsJulBacking, "Would undercollateralize active credits");
+
         (bool ok, bytes memory data) = julToken.call(
             abi.encodeWithSignature("transfer(address,uint256)", owner(), amount)
         );
@@ -507,5 +524,5 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         return (!r.consumed && !r.fraudSlashed && block.timestamp <= r.expiresAt, receiptId);
     }
 
-    receive() external payable {}
+    // C5-MON-007: Removed receive() payable — was an ETH trap with no withdrawal path
 }

@@ -251,23 +251,36 @@ contract NakamotoConsensusInfinityTest is Test {
         assertEq(nci.totalStaked(), STAKE_AMOUNT + additional);
     }
 
-    function test_WithdrawStake() public {
+    /// @dev C5-CON-001: withdrawStake is deprecated — always reverts
+    function test_WithdrawStake_Deprecated() public {
+        _registerValidator(alice, STAKE_AMOUNT);
+
+        vm.prank(alice);
+        vm.expectRevert("Deprecated: use requestStakeWithdrawal");
+        nci.withdrawStake(400e18);
+    }
+
+    /// @dev C5-CON-001: Test two-phase withdrawal flow
+    function test_TwoPhaseWithdrawal() public {
         _registerValidator(alice, STAKE_AMOUNT);
 
         uint256 withdraw = 400e18;
         vm.prank(alice);
-        nci.withdrawStake(withdraw);
+        nci.requestStakeWithdrawal(withdraw);
+
+        // Cannot complete before unbonding period
+        vm.prank(alice);
+        vm.expectRevert("Unbonding not complete");
+        nci.completeStakeWithdrawal();
+
+        // Warp past unbonding period (7 days)
+        vm.warp(block.timestamp + 7 days + 1);
+
+        vm.prank(alice);
+        nci.completeStakeWithdrawal();
 
         INakamotoConsensusInfinity.Validator memory v = nci.getValidator(alice);
         assertEq(v.stakedVibe, STAKE_AMOUNT - withdraw);
-    }
-
-    function test_RevertWithdrawTooMuch() public {
-        _registerValidator(alice, STAKE_AMOUNT);
-
-        vm.prank(alice);
-        vm.expectRevert(INakamotoConsensusInfinity.InsufficientStake.selector);
-        nci.withdrawStake(STAKE_AMOUNT + 1);
     }
 
     function test_RevertDepositZero() public {

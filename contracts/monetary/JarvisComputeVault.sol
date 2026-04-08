@@ -144,6 +144,7 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalCreditsIssued;
     uint256 public totalCreditsConsumed;
     uint256 public totalFraudSlashed;
+    uint256 public totalCreditsExpired;
 
 
     /// @dev Reserved storage gap for future upgrades
@@ -449,6 +450,7 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         } else {
             acct.activeCredits = 0;
         }
+        totalCreditsExpired += expired;
 
         emit CreditExpired(receiptId, expired);
     }
@@ -493,7 +495,7 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     ///      Active credits must remain backed by JUL in the vault.
     function withdrawJul(uint256 amount) external onlyOwner nonReentrant {
         // Credits still active require JUL backing: 1 credit = 1/CREDITS_PER_JUL * 1e18 JUL
-        uint256 activeCreditsJulBacking = (totalCreditsIssued - totalCreditsConsumed - totalFraudSlashed) * 1e18 / CREDITS_PER_JUL;
+        uint256 activeCreditsJulBacking = (totalCreditsIssued - totalCreditsConsumed - totalFraudSlashed - totalCreditsExpired) * 1e18 / CREDITS_PER_JUL;
         (bool balOk, bytes memory balData) = julToken.call(
             abi.encodeWithSignature("balanceOf(address)", address(this))
         );

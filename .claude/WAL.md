@@ -1,11 +1,13 @@
-# Write-Ahead Log — ACTIVE
+# Write-Ahead Log — CLEAN
 
 ## Current Epoch
 - **Started**: 2026-04-08
-- **Intent**: RSI Cycle 5 — Full scope expansion (consensus/ + monetary/)
+- **Ended**: 2026-04-08
+- **Intent**: RSI Cycle 5 + Cycle 6 (test coverage)
 - **Parent Commit**: `847d4ea9`
+- **Final Commit**: `0a4e7930`
 - **Branch**: master
-- **Tasks**: R0 DONE → R1 DONE (10 fixes) → R2 DONE (2 primitives) → COMMIT PENDING
+- **Tasks**: ALL complete — C5 (10 fixes), C6 (61 new tests, 1 bug found)
 
 ## Previous Epochs (most recent first)
 | Epoch | Date | Intent | Parent → Final | Status |
@@ -15,4 +17,4 @@
 | NCI 3-Token Impl | 2026-04-04 | 6 contracts, 6 test files | `0a5a38a7` → `a442fc5b` | CLEAN — all tasks complete |
 
 ## Recovery Notes
-_ACTIVE: RSI Cycle 5 complete but not yet committed. 10 fixes in 5 contracts + 2 test updates. All tests pass. Commit and push to finalize._
+_CLEAN. Cycles 5+6 complete. 231 tests, 0 regressions. Commits: `e63f75c2` (fixes) + `0a4e7930` (tests)._

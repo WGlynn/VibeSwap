@@ -21,6 +21,10 @@
  *   POST /api/mine                  — Submit compression mining job
  *   POST /api/mine/verify           — Verify mining result
  *
+ *   GET  /api/trust/:userId         — Trust analysis for user
+ *   POST /api/trust/batch           — Analyze batch for anomalies
+ *   GET  /api/trust/report          — Full trust report (all users)
+ *
  *   GET  /api/health                — Health check
  */
 
@@ -31,6 +35,7 @@ const { CommitRevealEngine } = require('../commit-reveal/commit-reveal');
 const { CredentialRegistry } = require('../credentials/credential-registry');
 const { ShapleyDistributor } = require('../shapley-dag/shapley');
 const { CompressionMiner, verifyMiningResult } = require('../compression-mining/mine');
+const { BehaviorAnalyzer } = require('../trust/behavior-analyzer');
 
 const app = express();
 app.use(cors());
@@ -40,6 +45,7 @@ app.use(express.json());
 const commitReveal = new CommitRevealEngine();
 const credentials = new CredentialRegistry();
 const miners = new Map();
+const trustAnalyzer = new BehaviorAnalyzer();
 
 // ============ Health ============
 
@@ -68,8 +74,9 @@ app.post('/api/batch/:id/commit', (req, res) => {
 
     const result = commitReveal.commit(batchId, minerId, commitHash);
 
-    // Issue credential
+    // Issue credential + record for trust analysis
     credentials.hookCommit(minerId, batchId, commitHash);
+    trustAnalyzer.recordAction(minerId, { type: 'COMMIT', batchId, commitHash });
 
     res.json(result);
   } catch (err) {
@@ -94,8 +101,9 @@ app.post('/api/batch/:id/reveal', (req, res) => {
 
     const result = commitReveal.reveal(batchId, minerId, output, secret);
 
-    // Issue credential based on validity
+    // Issue credential + record for trust analysis
     credentials.hookReveal(minerId, batchId, result.valid);
+    trustAnalyzer.recordAction(minerId, { type: 'REVEAL', batchId, valid: result.valid });
 
     res.json(result);
   } catch (err) {
@@ -198,8 +206,9 @@ app.post('/api/mine', (req, res) => {
 
     const result = miner.mine(corpus, hash);
 
-    // Issue mining credentials
+    // Issue mining credentials + record for trust analysis
     credentials.hookCompressionMining(minerId, 0, result.ratio, result.density);
+    trustAnalyzer.recordAction(minerId, { type: 'MINE', ratio: result.ratio, density: result.density });
 
     res.json({
       commitHash: result.commitHash,
@@ -222,6 +231,27 @@ app.post('/api/mine/verify', (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// ============ Trust Analysis ============
+
+app.get('/api/trust/:userId', (req, res) => {
+  const report = trustAnalyzer.analyzeUser(req.params.userId);
+  res.json(report);
+});
+
+app.post('/api/trust/batch', (req, res) => {
+  try {
+    const result = trustAnalyzer.analyzeBatch(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/trust/report', (req, res) => {
+  const report = trustAnalyzer.getTrustReport();
+  res.json(report);
 });
 
 // ============ Full Pipeline Demo ============

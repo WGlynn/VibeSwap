@@ -1,5 +1,5 @@
 {
-  "name": "cogcoin-infra",
+  "name": "cogproof",
   "version": "0.1.0",
   "description": "CogCoin Infrastructure Layer — MIT Bitcoin Expo Hackathon 2026",
   "main": "src/index.js",
@@ -10,6 +10,7 @@
     "shapley": "node src/shapley-dag/shapley.js",
     "commit-reveal": "node src/commit-reveal/commit-reveal.js",
     "credentials": "node src/credentials/credential-registry.js",
+    "trust": "node src/trust/behavior-analyzer.js",
     "test": "node --test src/**/*.test.js"
   },
   "dependencies": {

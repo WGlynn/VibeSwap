@@ -122,4 +122,42 @@ STATUS   All modules working. Need: gh auth for push, Bitcoin-native refactor, f
 [2026-04-10T~16:00] CogProof MVP built: 5 modules, 13 API endpoints, all tested.
 [2026-04-10T~16:30] Trust analyzer added: sybil/plagiarism/collusion/churn detection.
 [2026-04-10T~17:00] 2 commits to master: dd4f51e0 (MVP) + 8614a4fe (trust analyzer).
+[2026-04-10T~18:00] Bitcoin OP_RETURN layer + Coglex encoder. All txs = 80 bytes.
+[2026-04-10T~19:00] L402 micropayments + cross-chain bridge (Bitcoin ↔ stablecoins).
+[2026-04-10T~20:00] Incentive engine: 10 mechanisms, 0 protocol changes.
+[2026-04-10T~20:30] Pitch deck (14 slides) + technical paper (10 sections).
+[2026-04-10T~21:00] 20 atomic commits on S0hamJosh1/Cogproof backend-core branch.
+[2026-04-10T~21:00] 3 parallel agents: API wiring, integration tests, deck update.
+[2026-04-10T~21:00] Soham (frontend), Bianca, Amelia onboarded. Will networking at expo.
+[2026-04-10T~21:00] Judge intel: "Why blockchain not web2?" slide added.
+[2026-04-11T~01:00] Compression engine overhauled: 0% → 28-34% ratios, lossless.
+[2026-04-11T~02:00] WebSocket real-time events layer added.
+[2026-04-11T~03:00] Auto-simulation engine: 8 agent archetypes, live demo mode.
+[2026-04-11T~04:00] RSI Cycle 1: 5 parallel agents, 43 findings, 10 CRIT+HIGH fixed.
+[2026-04-11T~05:00] Allium data connector integrated (Ryan Hawkos partnership).
+[2026-04-11T~06:00] Backend migrated into Next.js API routes (single Vercel deploy).
+[2026-04-11T~07:00] Fixed API_BASE: localhost:3001 → /api (relative paths).
+[2026-04-11T~07:30] BLOCKER: Dashboard still shows "Backend Offline" — missing /api/bitcoin/indexer route.
+                     api.indexer() calls /api/bitcoin/indexer which has no Next.js route yet.
+                     Need to create: /api/bitcoin/indexer, possibly other bitcoin/* routes.
+                     Also need to verify api.health() response matches HealthResponse type.
+[2026-04-11T~07:30] CONTEXT REBOOT — saving state.
 ```
+
+### CURRENT BLOCKER (resume here)
+
+Dashboard calls 3 endpoints on load (src/app/dashboard/page.tsx:69-73):
+1. `api.health()` → GET /api/health ✓ (route exists)
+2. `api.indexer()` → GET /api/bitcoin/indexer ✗ (NO ROUTE — needs frontend/src/app/api/bitcoin/indexer/route.ts)
+3. `api.trustReport()` → GET /api/trust/report ✓ (route exists)
+
+FIX: Create /api/bitcoin/indexer route. May also need to check HealthResponse type match (dashboard expects `modules` field).
+
+### REPO STATE
+- Team repo: github.com/S0hamJosh1/Cogproof branch: backend-core
+- Local: /tmp/cogproof-hackathon
+- Vibeswap: /Users/williamglynn/vibeswap (cogproof/ folder + origin pushed)
+- 35+ atomic commits on team repo
+- Frontend deployed on Vercel (Soham's account)
+- All backend modules in frontend/src/lib/
+- 18 Next.js API routes created, missing bitcoin/* routes

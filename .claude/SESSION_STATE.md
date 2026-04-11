@@ -25,12 +25,12 @@
 - **Test updates**: Updated 2 NCI tests (withdrawStake deprecated → TwoPhaseWithdrawal)
 
 ## Pending / Next Session
-1. **Commit + push** RSI Cycle 5 changes
-2. **MIT Bitcoin Expo** — April 10-12 (2 days away). Tactical itinerary ready.
-3. **RSI Cycle 6 candidate**: 3 contracts with ZERO test coverage (ShardOperatorRegistry, Joule, JarvisComputeVault). ~1,400 LOC untested.
-4. **Remaining MED findings**: ~28 unfixed MEDs from Cycle 5. Notable: _checkHeartbeats O(n), unbounded shardList, vote weight snapshots, PSM no debt ceiling, Joule non-upgradeable.
-5. **Job search** — active since 2026-03-29
-6. **Jarvis bot** — needs local setup before MIT
+1. **IMMEDIATE: Fix Vercel "Backend Offline"** — Create missing Next.js API route: `frontend/src/app/api/bitcoin/indexer/route.ts` (GET, returns engine.indexer.getState()). Dashboard loads 3 endpoints on mount: health ✓, bitcoin/indexer ✗, trust/report ✓. This is the only blocker for live deployment.
+2. **Verify HealthResponse type** — Dashboard expects `modules` field from /api/health. Current route may not return it. Check and align.
+3. **Auth setup** — NextAuth.js with Google for judge access.
+4. **Dashboard UI refinement** — update error message text, refine live demo flow.
+5. **Video demo recording** — submission requires video.
+6. **MIT hackathon presentation** — April 12 deadline.
 
 ## Previous Session
 - MIT Final Prep + State Observability Primitive (2026-04-08 earlier)

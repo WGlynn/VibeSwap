@@ -95,9 +95,31 @@ COGSTAB  Stablecoin problems discussed: spoof txs for fake volume.
 SETTLE   CogCoin settles on-chain via Phantom wallet (Solana).
 ```
 
+### PROJECT — CogProof
+
+```
+NAME     CogProof — Proof of Fair Participation Layer
+REPO     vibeswap/cogproof/ (committed to main repo)
+TEAM     Will (backend/protocol) + Soham (credential design/frontend) + Bianca (stats) + Amelia + TBD
+MODULES  5 built and tested:
+         1. commit-reveal/ — fair ordering, Fisher-Yates + XOR secrets
+         2. credentials/   — behavioral W3C VC registry, auto-hooks lifecycle events
+         3. shapley-dag/   — Shapley distribution + Lawson floor
+         4. compression-mining/ — symbolic compression as PoW
+         5. trust/         — fraud detection: sybil, plagiarism, selective reveal, collusion, churn
+API      Express server port 3001, 13 endpoints, full-pipeline demo endpoint
+SOHAM    Credential registry design from his email mapped to our backend. Frontend connects to API.
+STATUS   All modules working. Need: gh auth for push, Bitcoin-native refactor, frontend from Soham.
+```
+
 ## APPEND LOG — Chronological additions below this line
 
 ```
 [2026-04-10T~09:00] Session initialized. All pre-hackathon context compressed.
 [2026-04-10T~11:00] CogCoin SDK installed. Talks: LMSR/DeepFunding, stablecoin spoof volume, Phantom settlement.
+[2026-04-10T~14:00] Team formed: Will, Soham, Bianca, Amelia + 1 TBD.
+[2026-04-10T~15:00] Soham's credential layer design synthesized with our backend.
+[2026-04-10T~16:00] CogProof MVP built: 5 modules, 13 API endpoints, all tested.
+[2026-04-10T~16:30] Trust analyzer added: sybil/plagiarism/collusion/churn detection.
+[2026-04-10T~17:00] 2 commits to master: dd4f51e0 (MVP) + 8614a4fe (trust analyzer).
 ```

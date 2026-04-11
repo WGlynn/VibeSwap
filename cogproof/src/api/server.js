@@ -36,6 +36,7 @@ const { CredentialRegistry } = require('../credentials/credential-registry');
 const { ShapleyDistributor } = require('../shapley-dag/shapley');
 const { CompressionMiner, verifyMiningResult } = require('../compression-mining/mine');
 const { BehaviorAnalyzer } = require('../trust/behavior-analyzer');
+const { CogProofTxBuilder, CogProofIndexer, OpReturnBuilder } = require('../bitcoin/op-return');
 
 const app = express();
 app.use(cors());
@@ -46,6 +47,7 @@ const commitReveal = new CommitRevealEngine();
 const credentials = new CredentialRegistry();
 const miners = new Map();
 const trustAnalyzer = new BehaviorAnalyzer();
+const indexer = new CogProofIndexer();
 
 // ============ Health ============
 
@@ -252,6 +254,78 @@ app.post('/api/trust/batch', (req, res) => {
 app.get('/api/trust/report', (req, res) => {
   const report = trustAnalyzer.getTrustReport();
   res.json(report);
+});
+
+// ============ Bitcoin OP_RETURN ============
+
+app.post('/api/bitcoin/commit', (req, res) => {
+  try {
+    const { commitHash, batchId, amount } = req.body;
+    const tx = CogProofTxBuilder.buildCommit(commitHash, batchId, amount || 1000);
+    const indexed = indexer.processTx(tx.tx, `tx_${Date.now()}`, indexer.blockHeight + 1);
+    res.json({ ...tx, indexed, hex: tx.tx.toString('hex'), size: tx.tx.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/bitcoin/reveal', (req, res) => {
+  try {
+    const { commitHash, secret } = req.body;
+    const tx = CogProofTxBuilder.buildReveal(commitHash, secret);
+    const indexed = indexer.processTx(tx.tx, `tx_${Date.now()}`, indexer.blockHeight + 1);
+    res.json({ ...tx, indexed, hex: tx.tx.toString('hex'), size: tx.tx.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/bitcoin/mine', (req, res) => {
+  try {
+    const { outputHash, originalHash, ratio, density } = req.body;
+    const tx = CogProofTxBuilder.buildMine(outputHash, originalHash, ratio, density);
+    const indexed = indexer.processTx(tx.tx, `tx_${Date.now()}`, indexer.blockHeight + 1);
+    res.json({ ...tx, indexed, hex: tx.tx.toString('hex'), size: tx.tx.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/bitcoin/credential', (req, res) => {
+  try {
+    const { domain, field, value, batchId } = req.body;
+    const tx = CogProofTxBuilder.buildCredential(domain, field, value, batchId);
+    const indexed = indexer.processTx(tx.tx, `tx_${Date.now()}`, indexer.blockHeight + 1);
+    res.json({ ...tx, indexed, hex: tx.tx.toString('hex'), size: tx.tx.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/bitcoin/reputation/burn', (req, res) => {
+  try {
+    const { targetDomain, amount, reason } = req.body;
+    const tx = CogProofTxBuilder.buildReputationBurn(targetDomain, amount, reason);
+    const indexed = indexer.processTx(tx.tx, `tx_${Date.now()}`, indexer.blockHeight + 1);
+    res.json({ ...tx, indexed, hex: tx.tx.toString('hex'), size: tx.tx.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/bitcoin/shapley-anchor', (req, res) => {
+  try {
+    const { distributionHash, totalPool, participantCount, lawsonFloorBps, batchId } = req.body;
+    const tx = CogProofTxBuilder.buildShapleyAnchor(distributionHash, totalPool, participantCount, lawsonFloorBps, batchId);
+    const indexed = indexer.processTx(tx.tx, `tx_${Date.now()}`, indexer.blockHeight + 1);
+    res.json({ ...tx, indexed, hex: tx.tx.toString('hex'), size: tx.tx.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/bitcoin/indexer', (req, res) => {
+  res.json(indexer.getState());
 });
 
 // ============ Full Pipeline Demo ============

@@ -294,6 +294,7 @@ function Drawer({ isOpen, onClose, identity, hasIdentity, isConnected, disconnec
         { path: '/gameswap', label: 'Game Swap', icon: '🎮' },
         { path: '/privacy', label: 'Privacy Pools', icon: '🔒' },
         { path: '/launchpad', label: 'Launchpad', icon: '🚀' },
+        { path: '/intent-market', label: 'Intent Market', icon: '🎪' },
         { path: '/mine', label: 'Mine JUL', icon: '⛏' },
         { path: '/multisend', label: 'Multi-Send', icon: '📨' },
         { path: '/limit', label: 'Limit Orders', icon: '📋' },

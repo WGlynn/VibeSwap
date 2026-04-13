@@ -26,6 +26,7 @@ const COMMANDS = [
   { id: 'insurance', label: 'Insurance', description: 'Protocol insurance pools', path: '/insurance', category: 'DeFi' },
   { id: 'bonds', label: 'Bonds', description: 'Protocol-owned liquidity bonds', path: '/bonds', category: 'DeFi' },
   { id: 'launchpad', label: 'Launchpad', description: 'Fair token launches', path: '/launchpad', category: 'DeFi' },
+  { id: 'intent-market', label: 'Intent Market', description: 'Memecoin launches via commit-reveal auction', path: '/intent-market', category: 'DeFi' },
   { id: 'aggregator', label: 'Aggregator', description: 'Best price routing', path: '/aggregator', category: 'DeFi' },
   { id: 'nft', label: 'NFT Market', description: 'Soulbound badges & auctions', path: '/nft', category: 'DeFi' },
 

@@ -564,3 +564,15 @@ The thesis is simple: **distribute rewards in proportion to actual contribution,
 *Code: [github.com/wglynn/vibeswap](https://github.com/wglynn/vibeswap)*
 *Contract: `contracts/incentives/ShapleyDistributor.sol`*
 *Library: `contracts/libraries/PairwiseFairness.sol`*
+
+---
+
+## See Also
+
+- [Shapley Reward System](../../DOCUMENTATION/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Cross-Domain Shapley](../../DOCUMENTATION/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](../../DOCUMENTATION/COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
+- [Proof of Contribution](../../DOCUMENTATION/PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Atomized Shapley](atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Distribution (Nervos post)](../nervos-talks/shapley-distribution-post.md) — Nervos community post on fair LP reward allocation

@@ -360,3 +360,12 @@ Games involving continuous strategy spaces, search, or pursuit.
 *Direct DeFi relevance: 20 (51%)*
 *Moderate DeFi relevance: 13 (33%)*
 *Low DeFi relevance: 6 (15%)*
+
+---
+
+## See Also
+
+- [Shapley Reward System](../../DOCUMENTATION/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Composable Fairness](../../DOCUMENTATION/COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
+- [Atomized Shapley (paper)](../papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Cooperative Capitalism (paper)](../papers/cooperative-capitalism.md) — Mechanism design applying cooperative game theory to markets

@@ -579,6 +579,15 @@ The best contributors produce the most blocks. That is the entire thesis. The Sh
 
 ---
 
-*Proof of Contribution is part of the VibeSwap protocol suite. For related work, see `SHAPLEY_REWARD_SYSTEM.md` (application-layer Shapley distribution), `TIME_NEUTRAL_TOKENOMICS.md` (formal time neutrality proofs), `FORMAL_FAIRNESS_PROOFS.md` (axiom verification), and `VIBESWAP_FORMAL_PROOFS.md` (complete proof catalogue).*
+---
 
-*The ShapleyVerifier contract is implemented at `contracts/settlement/ShapleyVerifier.sol`. The ShapleyDistributor contract is implemented at `contracts/incentives/ShapleyDistributor.sol`. The ISybilGuard interface is at `contracts/incentives/ISybilGuard.sol`.*
+## See Also
+
+- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Application-layer Shapley distribution with four axioms
+- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](COMPOSABLE_FAIRNESS.md) — Why Shapley values are the unique solution to mechanism composition
+- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Formal time neutrality proofs
+- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms
+- [Game Theory Catalogue](../docs/game-theory-games-catalogue/game-theory-games-catalogue.md) — 39 game theory games with DeFi relevance mapping

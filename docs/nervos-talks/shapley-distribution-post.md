@@ -243,3 +243,13 @@ The formal paper is available in our repo: `docs/papers/shapley-value-distributi
 
 *Full paper: [shapley-value-distribution.md](https://github.com/wglynn/vibeswap/blob/master/docs/papers/shapley-value-distribution.md)*
 *Code: [github.com/wglynn/vibeswap](https://github.com/wglynn/vibeswap)*
+
+---
+
+## See Also
+
+- [Shapley Value Distribution (paper)](../papers/shapley-value-distribution.md) — Full paper with five axioms and CKB cell model
+- [Shapley Reward System](../../DOCUMENTATION/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution
+- [Cross-Domain Shapley](../../DOCUMENTATION/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Atomized Shapley (paper)](../papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs

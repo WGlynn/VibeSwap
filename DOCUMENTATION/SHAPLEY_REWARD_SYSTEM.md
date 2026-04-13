@@ -603,3 +603,16 @@ Traditional reward systems ask: "How do we incentivize the behavior we want?" Th
 8. Nash, J. (1950). "Equilibrium Points in n-Person Games." *Proceedings of the National Academy of Sciences* 36(1), pp. 48-49.
 9. Glynn, W. (2026). "A Constitutional Interoperability Layer for DAOs." VibeSwap Documentation.
 10. Glynn, W. (2026). "Ergon as Monetary Biology." VibeSwap Documentation.
+
+---
+
+## See Also
+
+- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](COMPOSABLE_FAIRNESS.md) — Why Shapley values are the unique solution to mechanism composition
+- [Proof of Contribution](PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus: measuring marginal contribution for block production
+- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms
+- [Shapley Distribution (Nervos post)](../docs/nervos-talks/shapley-distribution-post.md) — Fair LP reward allocation via marginal contribution
+- [Game Theory Catalogue](../docs/game-theory-games-catalogue/game-theory-games-catalogue.md) — 39 game theory games with DeFi relevance mapping

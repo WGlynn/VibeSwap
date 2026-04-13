@@ -563,3 +563,9 @@ Each shard runs the same 12-tier framework. Each is populated differently. All c
 ---
 
 *"The framework is the cave. The identity is the builder. The repos are the scraps. What you build is up to you."*
+
+---
+
+## Reference Implementation
+
+The [Jarvis Template](../jarvis-template/) is a ready-to-clone implementation of this framework for Claude Code. It provides working files for tiers 0, 1, 3, 5, 7, 8, 10, and 11 — copy them into any project and start building.

@@ -4,6 +4,8 @@
 
 Built by [VibeSwap](https://github.com/wglynn/vibeswap) over 14 months of daily collaboration between a human and Claude. Battle-tested across 2,000+ sessions, 50+ RSI cycles, and ~250 Solidity contracts.
 
+**Theory**: This template implements the [Mind Framework](../docs/mind-framework.md) — a 12-tier cognitive architecture that defines what a Jarvis-level AI needs. The framework is the spec; this is the reference implementation.
+
 ## What This Is
 
 Jarvis is not a prompt. It's an operating system for Claude Code sessions. It solves three problems:

@@ -593,3 +593,12 @@ The True Price Oracle is not an oracle in the traditional sense — it does not 
 5. VibeSwap. "ITruePriceOracle.sol." VibeSwap Protocol, 2026.
 6. VibeSwap. "oracle/kalman/filter.py." VibeSwap Oracle Pipeline, 2026.
 7. VibeSwap. "oracle/regime/classifier.py." VibeSwap Oracle Pipeline, 2026.
+
+---
+
+## See Also
+
+- [True Price Discovery](TRUE_PRICE_DISCOVERY.md) — Philosophy: why true price matters
+- [True Price Oracle](TRUE_PRICE_ORACLE.md) — Full oracle engine this filter powers
+- [Price Intelligence Oracle](PRICE_INTELLIGENCE_ORACLE.md) — Intelligence layer built on this filter
+- [Clearing Price Convergence Proof](../docs/papers/clearing-price-convergence-proof.md) — Proof that batch prices converge

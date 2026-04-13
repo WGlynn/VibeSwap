@@ -244,3 +244,12 @@ The mechanism occupies a provably optimal point in the design space: it achieves
 3. Roughgarden, T. "Transaction Fee Mechanism Design." EC, 2021.
 4. Daian, P. et al. "Flash Boys 2.0: Frontrunning in Decentralized Exchanges." IEEE S&P, 2020.
 5. Glynn, W. & JARVIS. "Shards Over Swarms." VibeSwap Docs, 2026.
+
+---
+
+## See Also
+
+- [True Price Discovery](../../DOCUMENTATION/TRUE_PRICE_DISCOVERY.md) — Philosophy this proof validates
+- [True Price Oracle](../../DOCUMENTATION/TRUE_PRICE_ORACLE.md) — Oracle engine implementing convergent pricing
+- [Price Intelligence Oracle](../../DOCUMENTATION/PRICE_INTELLIGENCE_ORACLE.md) — Manipulation detection layer
+- [Kalman Filter Oracle](../../DOCUMENTATION/KALMAN_FILTER_ORACLE.md) — The estimation math behind convergence

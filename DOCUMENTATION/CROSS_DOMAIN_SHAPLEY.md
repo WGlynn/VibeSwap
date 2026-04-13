@@ -815,3 +815,15 @@ The question has never been whether platforms can be fair individually. The ques
 10. Glynn, W. (2026). "Graceful Inversion: Positive-Sum Absorption as Protocol Strategy." VibeSwap Documentation.
 11. Glynn, W. (2026). "Cooperative Markets: A Mathematical Foundation." VibeSwap Documentation.
 12. Glynn, W. (2026). "Ergon as Monetary Biology: An Energy-Backed Token for Decentralized Value." VibeSwap Documentation.
+
+---
+
+## See Also
+
+- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Composable Fairness](COMPOSABLE_FAIRNESS.md) — Why Shapley values are the unique solution to mechanism composition
+- [Proof of Contribution](PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with CKB cell model
+- [Shapley Distribution (Nervos post)](../docs/nervos-talks/shapley-distribution-post.md) — Fair LP reward allocation via marginal contribution

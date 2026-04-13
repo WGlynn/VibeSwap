@@ -660,3 +660,9 @@ This represents a principled tradeoff between theoretical purity and practical s
 - [Omniscient Adversary Proof](../docs/papers/omniscient-adversary-proof.md) — Proof that fairness holds even against omniscient attackers
 - [P-001: No Extraction Ever](../docs/nervos-talks/p001-no-extraction-ever-post.md) — The axiom these proofs formalize
 - [Clawback Cascade](CLAWBACK_CASCADE.md) — Enforcement mechanism when fairness is violated
+- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
+- [Proof of Contribution](PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms

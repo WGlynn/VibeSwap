@@ -208,3 +208,15 @@ Shapley values don't care about your follower count. They care about what would 
 
 *VibeSwap Protocol — github.com/WGlynn/VibeSwap*
 *"The only metric that matters is what would be missing if you weren't here."*
+
+---
+
+## See Also
+
+- [Shapley Reward System](../../DOCUMENTATION/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Cross-Domain Shapley](../../DOCUMENTATION/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](../../DOCUMENTATION/COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
+- [Proof of Contribution](../../DOCUMENTATION/PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Shapley Value Distribution](shapley-value-distribution.md) — On-chain implementation with five axioms and CKB cell model
+- [Shapley Distribution (Nervos post)](../nervos-talks/shapley-distribution-post.md) — Fair LP reward allocation via marginal contribution

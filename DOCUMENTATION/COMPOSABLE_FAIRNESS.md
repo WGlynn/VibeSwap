@@ -1084,3 +1084,14 @@ Suppose there exists another composition rule psi != phi that preserves IIA. The
 **License**: Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)
 
 **Contact**: Faraday1 | vibeswap.io | github.com/wglynn/vibeswap
+
+---
+
+## See Also
+
+- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Proof of Contribution](PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms

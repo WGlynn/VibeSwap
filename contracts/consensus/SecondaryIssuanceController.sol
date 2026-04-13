@@ -31,6 +31,8 @@ interface ICKBNativeMinter {
     function mint(address to, uint256 amount) external;
     function totalSupply() external view returns (uint256);
     function totalOccupied() external view returns (uint256);
+    /// @notice C7-GOV-001: Aggregate off-circulation = totalOccupied + sum of registered holder balances
+    function offCirculation() external view returns (uint256);
     function approve(address spender, uint256 amount) external returns (bool);
 }
 
@@ -157,13 +159,16 @@ contract SecondaryIssuanceController is
             return;
         }
 
-        uint256 totalOccupied = ckbToken.totalOccupied();
+        // C7-GOV-001: Use offCirculation() instead of totalOccupied() so tokens held by
+        // registered staking/collateral contracts (NCI, VibeStable, JCV) count toward
+        // shard share. Previously these were invisible to the split.
+        uint256 offCirc = ckbToken.offCirculation();
         uint256 totalDAO = daoShelter.totalDeposited();
 
         // NCI-003/MON-006: 3-way split with underflow protection.
-        // totalOccupied + totalDAO can exceed totalSupply (DAO deposits are in-supply tokens),
+        // offCirc + totalDAO can exceed totalSupply (DAO deposits are in-supply tokens),
         // which would cause insuranceShare to underflow. Cap proportionally.
-        uint256 shardShare = (emission * totalOccupied) / totalSupply;
+        uint256 shardShare = (emission * offCirc) / totalSupply;
         uint256 daoShare = (emission * totalDAO) / totalSupply;
 
         // Safe underflow guard: if occupied + DAO proportions exceed 100%, scale down
@@ -248,10 +253,11 @@ contract SecondaryIssuanceController is
         uint256 totalSupply = ckbToken.totalSupply();
         if (totalSupply == 0) return (emission, 0, 0, emission);
 
-        uint256 totalOccupied = ckbToken.totalOccupied();
+        // C7-GOV-001: mirror distributeEpoch — use offCirculation() not totalOccupied()
+        uint256 offCirc = ckbToken.offCirculation();
         uint256 totalDAO = daoShelter.totalDeposited();
 
-        shardShare = (emission * totalOccupied) / totalSupply;
+        shardShare = (emission * offCirc) / totalSupply;
         daoShare = (emission * totalDAO) / totalSupply;
 
         // C5-CON-004: Same underflow guard as distributeEpoch()

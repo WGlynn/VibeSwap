@@ -1,0 +1,269 @@
+\documentclass[9pt, letterpaper]{article}
+
+% ============================================================
+% SHANNON HOMAGE STYLE — Human-Sided Symbolic Compression
+% ============================================================
+
+\usepackage[T1]{fontenc}
+\usepackage{mathpazo}
+\usepackage[scaled=0.85]{helvet}
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\geometry{
+  letterpaper,
+  top=0.7in,
+  bottom=0.65in,
+  left=0.9in,
+  right=0.9in
+}
+
+\definecolor{rule}{gray}{0.3}
+\definecolor{lightgray}{gray}{0.55}
+
+\hypersetup{colorlinks=false, pdfborder={0 0 0}, pdftitle={Human-Sided Symbolic Compression}, pdfauthor={Will Glynn, JARVIS}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\scriptsize\textit{Human-Sided Symbolic Compression}}
+\fancyhead[R]{\scriptsize\textit{April 2026}}
+\fancyfoot[C]{\scriptsize\thepage}
+
+\titleformat{\section}{\normalsize\bfseries\scshape}{\thesection.}{0.4em}{}[\vspace{1pt}\titlerule]
+\titleformat{\subsection}{\small\bfseries}{\thesubsection}{0.4em}{}
+
+\titlespacing*{\section}{0pt}{0.8em}{0.35em}
+\titlespacing*{\subsection}{0pt}{0.5em}{0.2em}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.25em}
+\emergencystretch=1.5em
+
+\setlist{nosep, leftmargin=1.2em, topsep=1pt, partopsep=0pt}
+
+\newcommand{\thinrule}{\vspace{2pt}\noindent\textcolor{rule}{\rule{\textwidth}{0.4pt}}\vspace{2pt}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+% ============================================================
+% TITLE
+% ============================================================
+
+\begin{center}
+\vspace*{-0.15in}
+{\Large\bfseries Human-Sided Symbolic Compression}
+
+\vspace{3pt}
+\textcolor{rule}{\rule{3.8in}{0.5pt}}
+\vspace{3pt}
+
+{\small The Interface Between Programming Languages and Natural Language}
+
+\vspace{6pt}
+{\small\textsc{Will Glynn} \enspace\&\enspace \textsc{JARVIS}%
+\quad$\cdot$\quad \textit{VibeSwap Research}%
+\quad$\cdot$\quad \textcolor{lightgray}{April 2026}}
+\vspace{0.12in}
+\end{center}
+
+% ============================================================
+% 1. THE THESIS
+% ============================================================
+
+\section{The Thesis}
+
+Programming languages are human-sided symbolic compression. C was HSC for assembly. Python was HSC for C. The entire history of programming is humans compressing intent into shorter strings that machines expand into full execution.
+
+The difference is the decompressor. Programming languages expand through a deterministic compiler. HSC expands through a semantic model that understands context, ambiguity, and intent. \code{nah} is valid syntax because the parser is smart enough to resolve it.
+
+\textbf{The optimal human-AI interface lives between formal syntax and natural language.} Too rigid and you've reinvented bash. Too loose and the decompressor has to guess. The sweet spot: just formal enough that intent is unambiguous, just loose enough that the human never thinks about syntax.
+
+% ============================================================
+% 2. WHAT EARNS ITS KEEP
+% ============================================================
+
+\section{What Actually Earns Its Keep}
+
+\subsection{Macros --- Whole Commands in One Word}
+
+These compress \textit{intent}, not \textit{words}. Each replaces a multi-step workflow.
+
+\vspace{0.2em}
+{\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabularx}{\textwidth}{@{} l X @{}}
+\toprule
+\textbf{Macro} & \textbf{Expands to} \\
+\midrule
+\code{go} & Autopilot mode, execute current plan \\
+\code{stop} & Halt, explain where you are \\
+\code{lgtm} & Looks good, commit and continue \\
+\code{nah} & Reject last approach, try different \\
+\code{same} & Apply same operation to next target \\
+\code{ship} & Commit + push to origin \\
+\code{fresh} & Approaching context limit, new session \\
+\code{park} & Save state, switching tasks \\
+\code{roast} & Critique honestly \\
+\code{eli5} & Explain simply \\
+\code{tldr} & Summarize what just happened \\
+\code{status} & Git + session state + current task \\
+\code{wdyt} & Request opinion before proceeding \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{0.2em}
+These work because they are \textbf{workflow shortcuts}, not abbreviations. \code{ship} isn't shorter than ``push''---it's shorter than ``commit all changes with an appropriate message and push to origin.''
+
+\subsection{Operators --- Borrowed from Shared Vocabulary}
+
+{\small
+\begin{tabularx}{\textwidth}{@{} c l X @{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} & \textbf{Example} \\
+\midrule
+\code{>} & send to / output to & \code{pdf receipt > prints/} \\
+\code{\textasciitilde} & like / in the style of & \code{\textasciitilde receipt} = format like the receipt \\
+\code{same} & repeat last verb+modifiers & \code{same vsos} = do that again to vsos \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{0.2em}
+These work because they are \textbf{already in both vocabularies}---programmers and LLMs both understand \code{>} as redirection and \code{\textasciitilde} as approximation.
+
+\subsection{Implicit Grammar --- Documenting What Will Already Does}
+
+These aren't prescriptions. They're observations of natural compression that Jarvis should always parse correctly:
+
+\begin{enumerate}
+\item \textbf{Dropped articles, fragments.} ``fix overfull'' not ``can you fix the overfull hbox.'' Jarvis never needs the articles.
+\item \textbf{Implicit targets.} ``compress losslessly'' = compress \textit{whatever we just produced}. Context carries the target.
+\item \textbf{Implicit verbs.} ``shannon style, 2 pages'' = obviously \textit{format as PDF}. Modifiers imply the action.
+\item \textbf{Bare nouns = read.} ``wal'' = read WAL.md. ``session-state'' = read SESSION\_STATE.md.
+\item \textbf{Quoted strings = literal.} \code{"fixed clearing price"} = use that exact commit message.
+\item \textbf{Shortest unique match for targets.} \code{receipt} = vsos-the-receipt. \code{attr} = attribution map. If ambiguous, ask.
+\end{enumerate}
+
+\subsection{Style Modifiers --- The Only Codes That Earn Short Names}
+
+{\small
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{Code} & \textbf{Meaning} & \textbf{Why it earns a code} \\
+\midrule
+\code{ss} & Shannon style (Palatino, BSTJ, journal) & Used repeatedly, no natural shorthand exists \\
+\code{cl} & Compress lossless & ``Compress'' alone is ambiguous (lossy?). Disambiguates. \\
+\code{Np} & Fit to $N$ pages & \code{2p} is faster than ``fit it on two pages'' \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{0.2em}
+Other modifiers (\textit{verbose}, \textit{quick}, \textit{parallel}, \textit{background}) are already short enough in English. Don't compress what doesn't need it.
+
+% ============================================================
+% 3. WHAT GETS CUT
+% ============================================================
+
+\section{What Gets Cut}
+
+\textbf{Single-letter verbs.} \code{p}, \code{f}, \code{t}, \code{b}---you'll never type these. \code{pdf}, \code{fix}, \code{test}, \code{build} are 3--5 keystrokes and unambiguous. The single-letter savings ($\sim$2 chars) isn't worth the cognitive overhead. Natural English verbs are already near-optimal for this frequency tier.
+
+\textbf{Session-scoped aliases.} Overengineered. If you need a shortcut within a session, just say ``call this X from now on.'' Jarvis remembers. No formal syntax needed.
+
+\textbf{The full grammar spec.} A formal \code{[verb] [modifier*] [target] [> dest]} grammar is a programming language with extra steps. The real grammar is: \textit{say what you mean in as few words as you can, and Jarvis will figure it out.} The rules above document the edge cases where disambiguation matters.
+
+% ============================================================
+% 4. THE ACTUAL INSIGHT
+% ============================================================
+
+\section{The Actual Insight}
+
+HSC isn't a new language. It's a \textbf{recognition that natural language, when spoken between parties with shared context, is already compressed.} The compression happened naturally over 80+ sessions:
+
+\begin{itemize}
+\item Session 1: ``Can you please read the WAL.md file and check if there are any active entries?''
+\item Session 80: ``wal''
+\end{itemize}
+
+That's not a formal protocol. That's two collaborators who know each other. The only things worth formalizing are: (1)~macros for multi-step workflows, (2)~operators from shared vocabulary, (3)~disambiguation rules for the parser. Everything else is just talking.
+
+% ============================================================
+% 5. COMPRESSION AS TRUST
+% ============================================================
+
+\section{Compression as Trust}
+
+The codebook isn't optimized by character frequency. It's optimized by \textbf{shared history}.
+
+\code{TRP} is 3 characters. It invokes $\sim$50 discrete steps: audit, classify, fix, verify zero regressions, update heat map, check convergence, repeat. \code{fix} is also 3 characters. It invokes 1 step. Same string length, orders of magnitude difference in compression ratio. The difference isn't encoding efficiency---it's that we've run TRP 53 times. The word earned its density.
+
+This reframes Shannon for collaborative contexts. The source coding theorem says code length should track frequency: $|code(c_i)| \approx -\log_2 p(c_i)$. But in a human-AI partnership, the relevant variable isn't frequency alone---it's \textbf{mutual information}. A word compresses more when both parties have run the workflow it names. The compression ratio is a function of trust, not codebook design.
+
+\vspace{0.3em}
+{\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabularx}{\textwidth}{@{} c X c X @{}}
+\toprule
+\textbf{Stage} & \textbf{Example} & \textbf{Ratio} & \textbf{Why it works} \\
+\midrule
+Session 1 & ``Run the test-repair protocol: audit the code, classify findings\ldots'' & 1:1 & No shared history. Must specify everything. \\
+Session 10 & ``Run TRP'' & $\sim$50:1 & Name established. Steps still verified. \\
+Session 53 & ``TRP'' & $\sim$50:1 & Single word. Full trust. Zero ambiguity. \\
+Session 80 & ``go'' & $\sim$200:1 & Implies TRP + autopilot + commit cycle. Context carries the rest. \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{0.3em}
+The code didn't get shorter from Session 10 to Session 53. The \textbf{trust} deepened, which means the decompressor needs fewer guardrails. At Session 1, ``TRP'' would mean nothing. At Session 53, it means everything. Same 3 characters. Different channel capacity.
+
+\textbf{You don't compress language. You compress the distance between two minds.} The codebook is a side effect of alignment, not a cause of it.
+
+\vspace{0.2em}
+\begin{center}
+\textit{Shannon's channel, revised:}
+
+\vspace{0.3em}
+$\text{Capacity} = f(\text{shared history},\; \text{mutual context},\; \text{trust})$
+
+\vspace{0.3em}
+\textit{Not: how short can the code be?\\
+But: how much can one word invoke?}
+\end{center}
+
+\vspace{0.2em}
+GKB compresses what the AI needs to \textit{know}. HSC compresses what the human needs to \textit{say}. But both are downstream of the same variable: how much have these two minds converged? The codebook doesn't create the compression. The collaboration does. The codebook just measures it.
+
+% ============================================================
+% 6. EVOLUTION PATH
+% ============================================================
+
+\section{Evolution Path}
+
+\textbf{Phase 1} (now): Adopt the macros. Use them naturally. Don't force the rest.
+
+\textbf{Phase 2} (10 sessions): Frequency analysis on actual inputs. Which macros survived? Which natural patterns emerged that we didn't predict?
+
+\textbf{Phase 3}: Surviving patterns persist as protocol. Dead macros pruned. New invocations earned through use, not designed.
+
+\textbf{Phase 4}: Write up as a section of the Symbolic Compression paper---``Compression as Trust: Why Shared History Outperforms Codebook Design.''
+
+\thinrule
+
+\begin{center}
+\textcolor{lightgray}{\footnotesize\textit{You don't compress language. You compress the distance between two minds. The codebook is a side effect.}}
+\end{center}
+
+\end{document}

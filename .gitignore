@@ -68,6 +68,14 @@ __pycache__/
 # Session chain archive
 .session-chain/
 
+# Claude Code internal state (memory lives in ~/.claude/, not repo)
+.claude/projects/
+
+# Runtime data / artifacts
+cogproof/data/*.db*
+data/
+*.tar.gz
+
 # Video files (too large for git)
 *.mp4
 *.mepj

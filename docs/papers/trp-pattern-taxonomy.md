@@ -212,3 +212,14 @@ Discovery Ceiling ←→ ALL
 *53 rounds. 128+ findings. 12 patterns. The patterns are the knowledge. The findings are the evidence.*
 
 *Built in a cave, with a box of scraps.*
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Empirical RSI](trp-empirical-rsi.md) — 53-round empirical evidence (companion paper)
+- [TRP Runner Paper](../trp-runner-paper.md) — Crash-resilient recursive improvement
+- [Efficiency Heat Map](../trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [Loop 1: Adversarial](../trp/loop-1-adversarial-verification.md) — The loop that generated these patterns
+- [Loop 2: Knowledge](../trp/loop-2-common-knowledge.md) — The loop that extracted these patterns

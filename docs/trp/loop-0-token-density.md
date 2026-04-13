@@ -45,3 +45,12 @@ Without Loop 0, the other three loops degrade per-session as context fills with 
 - Session state: 47-line block header captures full session in <1KB
 - Verkle context tree: hierarchical compression inspired by Ethereum Verkle trees
 - HOT/WARM/COLD tiers actively maintained across 60+ sessions
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
+- [TRP Runner Protocol](TRP_RUNNER.md) — Execution protocol with crash mitigation
+- [Efficiency Heat Map](efficiency-heatmap.md) — Per-contract discovery yield tracking

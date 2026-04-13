@@ -60,8 +60,18 @@ contract CKBNativeToken is
     /// @notice MON-007: Per-address locked balance tracking
     mapping(address => uint256) public lockedBalance;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[49] private __gap;
+    /// @notice C7-GOV-001: Off-circulation registry — contracts holding CKB tokens
+    ///         that should count toward off-circulation even though they received
+    ///         via standard ERC20 transfer (NCI staking, VibeStable collateral, JCV credits).
+    mapping(address => bool) public isOffCirculationHolder;
+
+    /// @notice C7-GOV-001: Enumerable list of off-circulation holders.
+    ///         Used by offCirculation() to aggregate balances.
+    address[] public offCirculationHolders;
+
+    /// @dev Reserved storage gap for future upgrades (reduced from 49 to 47 after
+    ///      adding isOffCirculationHolder mapping + offCirculationHolders array)
+    uint256[47] private __gap;
 
     // ============ Events ============
 
@@ -70,6 +80,7 @@ contract CKBNativeToken is
     event TokensLocked(address indexed owner, uint256 amount);
     event TokensUnlocked(address indexed owner, uint256 amount);
     event TokensBurned(address indexed burner, uint256 amount);
+    event OffCirculationHolderSet(address indexed holder, bool enabled);
 
     // ============ Errors ============
 
@@ -191,17 +202,69 @@ contract CKBNativeToken is
         emit LockerUpdated(locker, authorized);
     }
 
+    /**
+     * @notice C7-GOV-001: Register/unregister an off-circulation token holder.
+     * @dev Used for contracts like NCI (staking), VibeStable (collateral), JCV
+     *      (compute credits) that hold CKB tokens via standard ERC20 transfer.
+     *      Their balance counts toward offCirculation() for issuance accounting.
+     * @param holder Contract address holding off-circulation CKB tokens
+     * @param enabled True to register, false to unregister
+     */
+    function setOffCirculationHolder(address holder, bool enabled) external onlyOwner {
+        if (holder == address(0)) revert ZeroAddress();
+
+        if (enabled && !isOffCirculationHolder[holder]) {
+            isOffCirculationHolder[holder] = true;
+            offCirculationHolders.push(holder);
+        } else if (!enabled && isOffCirculationHolder[holder]) {
+            isOffCirculationHolder[holder] = false;
+            // Swap-and-pop: find and remove from array (O(n), n is small)
+            uint256 len = offCirculationHolders.length;
+            for (uint256 i = 0; i < len; i++) {
+                if (offCirculationHolders[i] == holder) {
+                    offCirculationHolders[i] = offCirculationHolders[len - 1];
+                    offCirculationHolders.pop();
+                    break;
+                }
+            }
+        }
+
+        emit OffCirculationHolderSet(holder, enabled);
+    }
+
     // ============ View Functions ============
 
-    /// @notice Circulating supply = totalSupply - totalOccupied
-    /// @dev Tokens locked in cells are not circulating but still exist
+    /// @notice Circulating supply = totalSupply - offCirculation
+    /// @dev Off-circulation includes both cell-locked tokens (totalOccupied) and
+    ///      tokens held by registered staking/collateral contracts (C7-GOV-001).
     function circulatingSupply() external view returns (uint256) {
-        return totalSupply() - totalOccupied;
+        return totalSupply() - offCirculation();
     }
 
     /// @notice How much state is occupied (in tokens = bytes)
     function occupiedState() external view returns (uint256) {
         return totalOccupied;
+    }
+
+    /**
+     * @notice C7-GOV-001: Total off-circulation CKB = cell-locked + registered holder balances.
+     * @dev Aggregates totalOccupied (cell state rent) with balances of all registered
+     *      off-circulation holders (NCI staking, VibeStable collateral, JCV credits).
+     *      Used by SecondaryIssuanceController to compute accurate shard share.
+     * @return Total CKB tokens out of circulation
+     */
+    function offCirculation() public view returns (uint256) {
+        uint256 total = totalOccupied;
+        uint256 len = offCirculationHolders.length;
+        for (uint256 i = 0; i < len; i++) {
+            total += balanceOf(offCirculationHolders[i]);
+        }
+        return total;
+    }
+
+    /// @notice Number of registered off-circulation holders
+    function offCirculationHolderCount() external view returns (uint256) {
+        return offCirculationHolders.length;
     }
 
     // ============ Required Overrides ============

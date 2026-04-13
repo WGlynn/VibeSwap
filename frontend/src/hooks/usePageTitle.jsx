@@ -22,6 +22,7 @@ const TITLES = {
   '/insurance': 'Insurance — VibeSwap',
   '/aggregator': 'Aggregator — VibeSwap',
   '/launchpad': 'Launchpad — VibeSwap',
+  '/intent-market': 'Intent Market — VibeSwap',
   '/nft': 'NFTs — VibeSwap',
   '/predict': 'Predictions — VibeSwap',
   '/gameswap': 'GameSwap — VibeSwap',

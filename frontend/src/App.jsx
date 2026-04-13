@@ -118,6 +118,7 @@ const TradingPage = lazy(() => import('./components/TradingPage'))
 const OptionsPage = lazy(() => import('./components/OptionsPage'))
 const YieldPage = lazy(() => import('./components/YieldPage'))
 const LaunchpadPage = lazy(() => import('./components/LaunchpadPage'))
+const IntentMarketPage = lazy(() => import('./components/IntentMarketPage'))
 const DCAPage = lazy(() => import('./components/DCAPage'))
 const InsurancePage = lazy(() => import('./components/InsurancePage'))
 const AggregatorPage = lazy(() => import('./components/AggregatorPage'))
@@ -317,6 +318,7 @@ function AnimatedRoutes() {
             <Route path="/options" element={<OptionsPage />} />
             <Route path="/yield" element={<YieldPage />} />
             <Route path="/launchpad" element={<LaunchpadPage />} />
+            <Route path="/intent-market" element={<IntentMarketPage />} />
             <Route path="/dca" element={<DCAPage />} />
             <Route path="/insurance" element={<InsurancePage />} />
             <Route path="/aggregator" element={<AggregatorPage />} />

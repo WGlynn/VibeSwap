@@ -328,3 +328,14 @@ This prevents the open items list from growing monotonically. If the same HIGH f
 - **v1.0** (2026-03-27): Initial runner protocol. Staggered loading + context guard.
 - **v2.0** (2026-04-02): Added cure phase as mandatory (Stage 3). Scoring weights closure rate. Anti-patterns codified. Ergonomic sharding clarified as optimization, not safety.
 - **v3.0** (2026-04-03): Added efficiency block (yaml format), heat map integration (pre/post round), round summary template, changelog. Efficiency recursion enables cross-round optimization tracking.
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification (v1.0)
+- [TRP Explained](TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
+- [TRP Runner Paper](../trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
+- [Efficiency Heat Map](efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [Loop 0: Token Density](loop-0-token-density.md) | [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
+- [TRP Verification Report](../TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims

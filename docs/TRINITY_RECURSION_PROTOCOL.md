@@ -215,3 +215,20 @@ This protocol is public domain. Use it, extend it, improve it. If the three loop
 
 > "The true mind can weather all lies and illusions without being lost."
 > — The Lion Turtle
+
+---
+
+## See Also
+
+- [TRP Explained](trp/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
+- [TRP Runner Protocol](trp/TRP_RUNNER.md) — Execution protocol with crash mitigation
+- [TRP Runner Paper](trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
+- [Loop 0: Token Density](trp/loop-0-token-density.md) — Context compression recursion
+- [Loop 1: Adversarial Verification](trp/loop-1-adversarial-verification.md) — Code review recursion
+- [Loop 2: Common Knowledge](trp/loop-2-common-knowledge.md) — Knowledge extraction recursion
+- [Loop 3: Capability Bootstrap](trp/loop-3-capability-bootstrap.md) — Tool-building recursion
+- [Efficiency Heat Map](trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Verification Report](TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
+- [TRP Empirical RSI (paper)](papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
+- [TRP Pattern Taxonomy (paper)](papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
+- [TRP (DOCUMENTATION copy)](../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md) — Canonical copy in DOCUMENTATION/

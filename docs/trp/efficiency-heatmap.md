@@ -107,3 +107,13 @@ When TRP begins a new session, the coordinator:
 4. Prune scope: only dispatch agents for HOT + WARM contracts
 5. If all COLD: TRP focuses on test regressions, knowledge gaps, or new contract additions
 6. Run `./scripts/trp-round-gen.sh <N>` to generate the round summary template
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification (v1.0)
+- [TRP Runner Protocol](TRP_RUNNER.md) — Execution protocol with heat map integration (v3.0)
+- [TRP Empirical RSI (paper)](../papers/trp-empirical-rsi.md) — 53-round empirical evidence
+- [TRP Pattern Taxonomy (paper)](../papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
+- [Loop 1: Adversarial](loop-1-adversarial-verification.md) — The loop that generates heat map data

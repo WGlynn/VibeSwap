@@ -398,3 +398,13 @@ We are building recursive improvement protocols inside context windows the same 
 
 *"We build our way out of it."*
 *--- Will Glynn*
+
+---
+
+## See Also
+
+- [TRP Runner Protocol](trp/TRP_RUNNER.md) — The protocol this paper formalizes (v3.0)
+- [TRP Core Spec](TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Explained](trp/TRP-EXPLAINED.md) — Accessible introduction
+- [TRP Empirical RSI (paper)](papers/trp-empirical-rsi.md) — 53-round empirical evidence
+- [TRP Pattern Taxonomy (paper)](papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns

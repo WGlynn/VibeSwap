@@ -43,3 +43,13 @@ The human writes the search harness once. After that, the loop runs autonomously
 4. Any divergence = potential bug. Any profitable deviation = exploit.
 5. Export exploits as permanent regression tests
 6. Fix, re-run, verify fewer findings. Repeat.
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [Loop 0: Token Density](loop-0-token-density.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
+- [Efficiency Heat Map](efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Pattern Taxonomy (paper)](../papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns from this loop
+- [TRP Empirical RSI (paper)](../papers/trp-empirical-rsi.md) — 53-round empirical evidence

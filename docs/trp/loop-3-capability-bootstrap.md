@@ -47,3 +47,12 @@ Tool 5 couldn't exist without Tool 1. Tool 6 couldn't be useful without Tools 1-
 3. Build tools that produce inputs for other tools (pipelines)
 4. Track coverage: what's tested, what's not, what's the highest-value gap
 5. The coverage gaps ARE the roadmap for the next tool
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [Loop 0: Token Density](loop-0-token-density.md) | [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md)
+- [TRP Runner Protocol](TRP_RUNNER.md) — Execution protocol (built by this loop)
+- [Efficiency Heat Map](efficiency-heatmap.md) — Heat map tool (built by this loop)

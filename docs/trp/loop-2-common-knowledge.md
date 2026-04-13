@@ -38,3 +38,11 @@ The graph grows denser, not just longer. That's the recursive part.
 4. Write new memories when non-obvious knowledge is discovered
 5. Verify stale memories against current state before trusting
 6. Cross-reference: every primitive should link to related primitives
+
+---
+
+## See Also
+
+- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [Loop 0: Token Density](loop-0-token-density.md) | [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
+- [TRP Pattern Taxonomy (paper)](../papers/trp-pattern-taxonomy.md) — Output of this loop: 12 recurring patterns

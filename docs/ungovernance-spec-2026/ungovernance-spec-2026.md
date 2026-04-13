@@ -287,3 +287,11 @@ The deeper insight: any system that can be governed can be captured. The only un
 ---
 
 *The protocol becomes a natural system, not a political one. That's the endgame.*
+
+---
+
+## See Also
+
+- [Augmented Governance](../../DOCUMENTATION/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Constitutional DAO Layer](../../DOCUMENTATION/CONSTITUTIONAL_DAO_LAYER.md) — Layered interoperability framework for DAOs
+- [Cooperative Markets Philosophy](../../DOCUMENTATION/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation for cooperative market design

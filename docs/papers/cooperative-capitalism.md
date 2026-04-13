@@ -383,3 +383,11 @@ Total: 1,200+ Solidity tests passing. Zero invariant violations across millions 
 ---
 
 *"The real VibeSwap is not a DEX. It's not even a blockchain. We created a movement. An idea. VibeSwap is wherever the Minds converge."*
+
+---
+
+## See Also
+
+- [Cooperative Markets Philosophy](../../DOCUMENTATION/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation using multilevel selection theory
+- [Cooperative Intelligence Protocol](../../DOCUMENTATION/COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation and defection resistance
+- [Augmented Governance](../../DOCUMENTATION/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory

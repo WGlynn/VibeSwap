@@ -446,3 +446,13 @@ Total coordination-plane code: ~2,300 lines of JavaScript. Total token cost of c
 
 *VibeSwap Research -- Decentralized AI Consensus Infrastructure*
 *Built in a cave. With a box of scraps.*
+
+---
+
+## See Also
+
+- [Three-Token Economy](../../DOCUMENTATION/THREE_TOKEN_ECONOMY.md) — Token architecture
+- [Economitra](../../DOCUMENTATION/ECONOMITRA.md) — Economic model framework
+- [Economitra (paper)](ECONOMITRA.md) — Academic treatment with formal proofs
+- [Time-Neutral Tokenomics](../../DOCUMENTATION/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness
+- [Cooperative Emission Design](cooperative-emission-design.md) — Emission mechanism design

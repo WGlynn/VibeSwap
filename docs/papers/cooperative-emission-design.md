@@ -224,3 +224,13 @@ The mechanism is fully permissionless in operation (anyone can drip, anyone can 
 ---
 
 *VibeSwap Research — Building the practices that will define the future of development.*
+
+---
+
+## See Also
+
+- [Three-Token Economy](../../DOCUMENTATION/THREE_TOKEN_ECONOMY.md) — Token architecture this emission serves
+- [Economitra](../../DOCUMENTATION/ECONOMITRA.md) — Economic model framework
+- [Economitra (paper)](ECONOMITRA.md) — Academic treatment with formal proofs
+- [Time-Neutral Tokenomics](../../DOCUMENTATION/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness
+- [Near-Zero Token Scaling](near-zero-token-scaling.md) — Minimal-token coordination

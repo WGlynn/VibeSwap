@@ -271,6 +271,13 @@ def get_default_venues() -> List[VenueConfig]:
             rest_url="https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
             requests_per_second=5.0
         ),
+        VenueConfig(
+            name="allium",
+            base_reliability=0.7,
+            is_decentralized=True,
+            rest_url="https://api.allium.so/api/v1",
+            requests_per_second=2.5
+        ),
     ]
 
 
@@ -450,6 +457,7 @@ def _apply_env_overrides(config_dict: Dict) -> Dict:
         "BINANCE_API_SECRET": ("venues", "binance", "api_secret"),
         "COINBASE_API_KEY": ("venues", "coinbase", "api_key"),
         "COINBASE_API_SECRET": ("venues", "coinbase", "api_secret"),
+        "ALLIUM_API_KEY": ("venues", "allium", "api_key"),
 
         # Active chain
         "ACTIVE_CHAIN": ("active_chain",),

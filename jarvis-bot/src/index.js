@@ -628,6 +628,11 @@ const bot = IS_WORKER ? noopBot : new Telegraf(config.telegram.token, {
 const AUTHORIZED_FILE = join(config.dataDir, 'authorized-users.json');
 const MAX_BLESSING_DEPTH = 3; // Will → disciple → disciple's disciple → max
 
+// ============ Demo Mode ============
+// Owner toggles /demo on → anyone can talk to JARVIS (anonymous budget tier).
+// /demo off → back to invite-only. No persistence — reboot resets to off.
+let demoMode = false;
+
 // userId -> { blessedBy: userId|'owner', depth: number, name: string, blessedAt: timestamp }
 const runtimeAuthorized = new Map();
 
@@ -700,6 +705,7 @@ function getAuthorizedList() {
 // Auth middleware (only used in primary mode)
 function isAuthorized(ctx) {
   if (isOwner(ctx)) return true;
+  if (demoMode) return true;
   if (config.authorizedUsers.includes(ctx.from.id)) return true;
   if (runtimeAuthorized.has(ctx.from.id)) return true;
   return false;
@@ -1483,6 +1489,21 @@ bot.command('whoami', (ctx) => {
     ? `\nChat ID: ${ctx.chat.id}\nChat: ${ctx.chat.title || 'unnamed'}\nDirective: ${getChatMode(ctx.chat.id)}`
     : '';
   ctx.reply(`User ID: ${ctx.from.id}\nUsername: ${ctx.from.username || 'none'}\nName: ${ctx.from.first_name}\nAuthorized: ${authorized}${blessingInfo}${chatInfo}`);
+});
+
+// /demo — Owner toggles public demo mode (anyone can talk, anonymous budget tier)
+bot.command('demo', (ctx) => {
+  if (!isOwner(ctx)) return ownerOnly(ctx);
+  const arg = ctx.message.text.replace(/^\/demo\s*/i, '').trim().toLowerCase();
+  if (arg === 'off') {
+    demoMode = false;
+    return ctx.reply('Demo mode OFF. Back to invite-only.');
+  }
+  demoMode = !demoMode;
+  ctx.reply(demoMode
+    ? 'Demo mode ON. Anyone can message JARVIS. Anonymous budget tier (25K tokens/day).'
+    : 'Demo mode OFF. Back to invite-only.');
+  console.log(`[demo] Demo mode ${demoMode ? 'ENABLED' : 'DISABLED'} by owner`);
 });
 
 // /authorize — Owner or trusted authorizers can add a user (direct authority)

@@ -20,6 +20,7 @@ No amnesia. The first message of a new session continues the last message of the
 ```
 READY → PCP Gate → Execute → Verify → Commit → Push
   [Asserting link?] → AHP    [Testing?] → TTT    [Bug?] → FPT    [Status claim?] → Anti-Stale
+  [State changed?] → SSL Gate (write-through SESSION_STATE + WAL — don't defer to REBOOT)
 ```
 
 ### AUTOPILOT ("Run IT" / "autopilot" / "full send")
@@ -37,6 +38,8 @@ PRE-REBOOT CHECKLIST (mandatory, no exceptions):
   □ Context scan: anything discussed that exists ONLY in conversation? → persist to file
   □ Plans: any plan in context not yet in .claude/plans/ or memory/? → write it NOW
   □ SESSION_STATE "Pending" has FULL CONTENT of next steps (not just labels)
+  □ SESSION_STATE "Completed" already current? (SSL Gate = write-through, not write-back)
+  □ Project memory status trackers updated? (State Observability primitive)
   □ WAL reflects current state (ACTIVE if work pending, CLEAN if done)
   □ "Plan's saved" = cite the file path. No path = not saved.
 ```

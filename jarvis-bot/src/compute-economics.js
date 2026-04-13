@@ -34,9 +34,9 @@ const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
 
 // ============ Constants ============
 
-const FREE_BUDGET_ANONYMOUS = 5_000;   // tokens/day for unidentified users
-const FREE_BUDGET_IDENTIFIED = 10_000; // tokens/day for identified users
-const FREE_BUDGET_AUTHORIZED = 25_000; // tokens/day for authorized/blessed users
+const FREE_BUDGET_ANONYMOUS = 25_000;   // tokens/day for unidentified/demo users
+const FREE_BUDGET_IDENTIFIED = 50_000;  // tokens/day for identified users
+const FREE_BUDGET_AUTHORIZED = 100_000; // tokens/day for authorized/blessed users
 const BASE_POOL = 500_000;             // Will's baseline funding (floor)
 
 // ============ JUL Pricing Oracle — Floor/Ceiling Convergence ============

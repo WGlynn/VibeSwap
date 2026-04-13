@@ -1,6 +1,41 @@
 # RSI Cycle 8 — Plan
 
-**Status**: DRAFT (2026-04-13) — pending Will's review before implementation.
+**Status**: PHASES 8.1 + 8.2 COMPLETE (2026-04-13). C7-GOV-001 and C7-GOV-007 closed.
+
+## Progress
+
+| Phase | Description | Status | Tests | Commit |
+|-------|-------------|--------|-------|--------|
+| 8.1 | CKBNativeToken off-circulation registry | DONE | 17/17 passing | `a1f73675` |
+| 8.2 | SecondaryIssuanceController uses offCirculation() | DONE | 3/3 integration + 5/5 existing | `9aee1ee2` |
+| 8.3 | JCV rebase sync (C7-GOV-006) | PENDING | — | — |
+| 8.4 | JULBridge rebased rate limits (C7-GOV-005) | PENDING | — | — |
+
+**Full sweep post-8.2**: 144 monetary + 107 consensus = 251 tests, 0 regressions.
+
+## Findings Status
+
+| ID | Severity | Status |
+|----|----------|--------|
+| C7-GOV-001 | HIGH | CLOSED in Phase 8.1/8.2 |
+| C7-GOV-007 | MED | CLOSED by 8.1/8.2 (needs deploy step: register VibeStable) |
+| C7-GOV-006 | HIGH | OPEN — Phase 8.3 |
+| C7-GOV-005 | MED | OPEN — Phase 8.4 |
+
+## Deployment Sequence for 8.1/8.2
+
+1. Upgrade `CKBNativeToken` proxy (additive, gap-safe: 49→47 reserved slots)
+2. Upgrade `SecondaryIssuanceController` proxy
+3. Run `script/RegisterOffCirculationHolders.s.sol` to register:
+   - NakamotoConsensusInfinity
+   - VibeStable
+   - JarvisComputeVault
+   - (DAOShelter is handled separately via `totalDeposited()` — do NOT register, would double-count)
+
+Must happen within one epoch of upgrade to avoid under-count during transition.
+
+---
+
 
 ## Scope
 

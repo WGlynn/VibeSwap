@@ -651,3 +651,12 @@ This represents a principled tradeoff between theoretical purity and practical s
 
 *Document generated for VibeSwap Protocol*
 *Based on analysis of commit: current HEAD*
+
+---
+
+## See Also
+
+- [IIA Empirical Verification](IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation of these proofs against live code
+- [Omniscient Adversary Proof](../docs/papers/omniscient-adversary-proof.md) — Proof that fairness holds even against omniscient attackers
+- [P-001: No Extraction Ever](../docs/nervos-talks/p001-no-extraction-ever-post.md) — The axiom these proofs formalize
+- [Clawback Cascade](CLAWBACK_CASCADE.md) — Enforcement mechanism when fairness is violated

@@ -137,7 +137,7 @@ There's a free tier. You don't need JUL to talk to JARVIS. But if you want more 
 
 JUL is backed by fixed PoW work (production theory of value), but API tokens change in value as models get cheaper or the dollar loses purchasing power. A fixed ratio would create arbitrage — hoard JUL when tokens are expensive, burn when they're cheap.
 
-The solution is a three-layer pricing oracle inspired by the [Trinomial Stability Theorem](https://github.com/WGlynn/VibeSwap/blob/master/docs/TRINOMIAL_STABILITY_THEOREM.md):
+The solution is a three-layer pricing oracle inspired by the [Trinomial Stability Theorem](https://github.com/WGlynn/VibeSwap/blob/master/docs/TRINOMIAL_STABILITY_THEOREM/TRINOMIAL_STABILITY_THEOREM.md):
 
 > *The production theory of value (energy-backed) gives you the floor. The time adjustments (CPI) keep that floor honest across history. The market gives you the ceiling — what people actually think it's worth in practice. Floor and ceiling converge → price stability.*
 

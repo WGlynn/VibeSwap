@@ -494,8 +494,16 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     /// @dev C5-MON-008: Cannot withdraw more than expired/consumed credits' backing.
     ///      Active credits must remain backed by JUL in the vault.
     function withdrawJul(uint256 amount) external onlyOwner nonReentrant {
-        // Credits still active require JUL backing: 1 credit = 1/CREDITS_PER_JUL * 1e18 JUL
-        uint256 activeCreditsJulBacking = (totalCreditsIssued - totalCreditsConsumed - totalFraudSlashed - totalCreditsExpired) * 1e18 / CREDITS_PER_JUL;
+        // C7-ISS-002: Credit counters can overlap (fraud slash + expiry on same credits),
+        // so use min() to prevent underflow. Total retired may exceed issued due to
+        // double-counting between fraud slashing and subsequent expiry of slashed receipts.
+        uint256 totalRetired = totalCreditsConsumed + totalFraudSlashed + totalCreditsExpired;
+        uint256 activeCreditsJulBacking;
+        if (totalRetired >= totalCreditsIssued) {
+            activeCreditsJulBacking = 0;
+        } else {
+            activeCreditsJulBacking = (totalCreditsIssued - totalRetired) * 1e18 / CREDITS_PER_JUL;
+        }
         (bool balOk, bytes memory balData) = julToken.call(
             abi.encodeWithSignature("balanceOf(address)", address(this))
         );

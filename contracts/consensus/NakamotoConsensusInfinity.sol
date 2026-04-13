@@ -294,12 +294,19 @@ contract NakamotoConsensusInfinity is
         }
 
         unbondingAmount[msg.sender] += amount;
-        unbondingUnlockTime[msg.sender] = block.timestamp + UNBONDING_PERIOD;
+        // C7-GOV-009: Only set timelock on first request — don't reset on subsequent.
+        // Same pattern as DAOShelter C5-CON-005. Prevents timer-reset griefing where
+        // a tiny additional request delays an already-almost-mature withdrawal.
+        if (unbondingUnlockTime[msg.sender] == 0 || block.timestamp >= unbondingUnlockTime[msg.sender]) {
+            unbondingUnlockTime[msg.sender] = block.timestamp + UNBONDING_PERIOD;
+        }
 
         emit StakeWithdrawn(msg.sender, amount, v.stakedVibe);
     }
 
     /// @notice Complete stake withdrawal after unbonding period
+    /// @dev C7-GOV-010: Slashed validators can still withdraw their (reduced) unbonding.
+    ///      The slash already deducted the penalty in _slashEquivocator.
     function completeStakeWithdrawal() external nonReentrant {
         uint256 amount = unbondingAmount[msg.sender];
         require(amount > 0, "Nothing unbonding");
@@ -777,6 +784,14 @@ contract NakamotoConsensusInfinity is
             v.stakedVibe -= stakeSlash;
             totalStaked -= stakeSlash;
             // Slashed stake stays in contract (redistributable by governance)
+        }
+
+        // C7-GOV-010: Also slash unbonding amount — prevents validator from
+        // requesting withdrawal THEN equivocating to avoid the penalty.
+        uint256 unbondSlash = (unbondingAmount[validator] * EQUIVOCATION_STAKE_SLASH_BPS) / BPS;
+        if (unbondSlash > 0) {
+            unbondingAmount[validator] -= unbondSlash;
+            // Slashed unbonding also stays in contract
         }
 
         // Slash 75% of mind score

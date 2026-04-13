@@ -893,3 +893,13 @@ Where:
 ---
 
 **VibeSwap** - True Prices, Detected Manipulation, Ethical Signals
+
+---
+
+## See Also
+
+- [True Price Discovery](TRUE_PRICE_DISCOVERY.md) — Philosophy: cooperative price formation
+- [True Price Oracle](TRUE_PRICE_ORACLE.md) — Core oracle engine with stablecoin awareness
+- [Kalman Filter Oracle](KALMAN_FILTER_ORACLE.md) — The filtering math this intelligence layer uses
+- [Clearing Price Convergence Proof](../docs/papers/clearing-price-convergence-proof.md) — Convergence guarantees
+- Implementation: `oracle/` (Python pipeline)

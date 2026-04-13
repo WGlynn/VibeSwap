@@ -777,3 +777,13 @@ can also be achieved with a mechanism where truth-telling is optimal.
 ---
 
 **VibeSwap** - True Price Discovery Through Cooperative Design
+
+---
+
+## See Also
+
+- [True Price Oracle](TRUE_PRICE_ORACLE.md) — Implementation: stablecoin-aware estimation engine
+- [Price Intelligence Oracle](PRICE_INTELLIGENCE_ORACLE.md) — Manipulation detection and regime classification
+- [Kalman Filter Oracle](KALMAN_FILTER_ORACLE.md) — The filtering math behind true price estimation
+- [Clearing Price Convergence Proof](../docs/papers/clearing-price-convergence-proof.md) — Proof that batch clearing prices converge to true price
+- Implementation: `oracle/` (Python pipeline)

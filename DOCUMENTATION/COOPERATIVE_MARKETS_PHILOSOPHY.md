@@ -427,3 +427,12 @@ The question isn't whether markets work. They always "work" for someone. The que
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | February 2026 | Initial philosophical and mathematical foundation |
+
+---
+
+## See Also
+
+- [Cooperative Capitalism (paper)](../docs/papers/cooperative-capitalism.md) — Mechanism design for mutualized risk and free market competition
+- [Cooperative Intelligence Protocol](COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation and defection resistance
+- [Augmented Governance](AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Constitutional DAO Layer](CONSTITUTIONAL_DAO_LAYER.md) — Layered interoperability framework for DAOs

@@ -557,3 +557,12 @@ The result is a system where DAOs can coordinate like states under a constitutio
 8. Nervos Network. (2019). "Crypto-Economics of the Nervos Common Knowledge Base."
 9. Glynn, W. (2026). "A Cooperative Reward System for Decentralized Networks." VibeSwap Documentation.
 10. Glynn, W. (2026). "A Taxonomy of Cryptoasset Markets." VibeSwap Documentation.
+
+---
+
+## See Also
+
+- [Augmented Governance](AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Ungovernance Spec](../docs/ungovernance-spec-2026/ungovernance-spec-2026.md) — Hardcoded governance decay to protocol autonomy
+- [Cooperative Markets Philosophy](COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation for cooperative market design
+- [Cooperative Intelligence Protocol](COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation

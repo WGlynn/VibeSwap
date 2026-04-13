@@ -951,8 +951,14 @@ This paper is the synthesis. The others are the components.
 
 ---
 
-*For mechanism design proofs, see: FORMAL_FAIRNESS_PROOFS.md*
-*For IIA verification, see: IIA_EMPIRICAL_VERIFICATION.md*
-*For Shapley implementation, see: docs/papers/shapley-value-distribution.md*
-*For CRPC mechanism, see: docs/papers/cognitive-consensus-markets.md*
-*For cooperative markets philosophy, see: COOPERATIVE_MARKETS_PHILOSOPHY.md*
+---
+
+## See Also
+
+- [Cooperative Capitalism (paper)](../docs/papers/cooperative-capitalism.md) — Mechanism design for mutualized risk and free market competition
+- [Cooperative Markets Philosophy](COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation using multilevel selection theory
+- [Augmented Governance](AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Mechanism design proofs and axiom verification
+- [IIA Empirical Verification](IIA_EMPIRICAL_VERIFICATION.md) — Independence of irrelevant alternatives verification
+- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain Shapley implementation
+- [Cognitive Consensus Markets (paper)](../docs/papers/cognitive-consensus-markets.md) — CRPC mechanism

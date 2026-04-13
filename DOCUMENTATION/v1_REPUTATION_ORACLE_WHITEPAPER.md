@@ -128,3 +128,11 @@ Combined with commit-reveal:
 The Reputation Oracle combines all four.
 
 ### 3.2 High-Level Flow
+
+---
+
+## See Also
+
+- [Memecoin Intent Market Seed (paper)](../docs/papers/memecoin-intent-market-seed.md) — Pure intent market with commit-reveal launches and anti-rug mechanisms
+- [Commit-Reveal Batch Auctions (paper)](../docs/papers/commit-reveal-batch-auctions.md) — Core commit-reveal mechanism for MEV elimination
+- [Cooperative Intelligence Protocol](COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation

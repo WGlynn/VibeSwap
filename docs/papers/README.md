@@ -17,8 +17,8 @@ These papers explain HOW VibeSwap works — the mechanisms that make it differen
 | [Commit-Reveal Batch Auctions](commit-reveal-batch-auctions.md) | MEV elimination through temporal decoupling. 10-second batches, Fisher-Yates shuffle, uniform clearing price. The core innovation. |
 | [Five-Layer MEV Defense on CKB](five-layer-mev-defense-ckb.md) | PoW locking, MMR accumulation, forced inclusion, Fisher-Yates shuffle, uniform clearing on Nervos CKB. Defense-in-depth for UTXO chains. |
 | [Autonomous Circuit Breakers](autonomous-circuit-breakers.md) | Multi-dimensional risk detection without human intervention. Volume, price, withdrawal, true price, and cross-validation breakers. |
-| [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM.md) | Three complementary monetary primitives (PoW money + PI-dampened stable + elastic rebase) that converge to minimal volatility. |
-| [Trinomial Stability — Formal](../TRINOMIAL_STABILITY_THEOREM_FORMAL.md) | Mathematical proofs for the Trinomial Stability Theorem. |
+| [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM/TRINOMIAL_STABILITY_THEOREM.md) | Three complementary monetary primitives (PoW money + PI-dampened stable + elastic rebase) that converge to minimal volatility. |
+| [Trinomial Stability — Formal](../TRINOMIAL_STABILITY_THEOREM_FORMAL/TRINOMIAL_STABILITY_THEOREM_FORMAL.md) | Mathematical proofs for the Trinomial Stability Theorem. |
 
 ## Philosophy Papers
 

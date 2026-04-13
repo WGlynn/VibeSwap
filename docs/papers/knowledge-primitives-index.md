@@ -214,7 +214,7 @@ When a new primitive emerges from a build session:
 ### P-028: Stability Requires Three Instruments Operating at Different Timescales
 
 **Source**: Trinomial Stability Theorem (wBAR + PI-dampened stable + elastic rebasing token)
-**Paper**: [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM.md)
+**Paper**: [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM/TRINOMIAL_STABILITY_THEOREM.md)
 
 > One monetary instrument cannot achieve stability. Two can dampen but not eliminate volatility. Three instruments — each operating at a different timescale (PoW anchors to physical cost long-term, PI-controller smooths medium-term oscillations, elastic rebase absorbs short-term demand shocks) — converge to a volatility floor bounded by real-world energy costs.
 
@@ -225,7 +225,7 @@ When a new primitive emerges from a build session:
 ### P-029: The Volatile Base is DeFi's Original Sin
 
 **Source**: Trinomial Stability Theorem, VibeCredit.sol, VibeBonds.sol
-**Paper**: [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM.md)
+**Paper**: [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM/TRINOMIAL_STABILITY_THEOREM.md)
 
 > Every DeFi lending protocol overcollateralizes because the base collateral is volatile. 150% collateral ratios exist because ETH can lose 50% in days. This is not a parameter to optimize — it is a structural defect. Fix the base layer (stable collateral grounded in physical reality), and overcollateralization, liquidation cascades, and adverse selection disappear.
 

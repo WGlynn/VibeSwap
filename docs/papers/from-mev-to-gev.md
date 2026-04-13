@@ -623,3 +623,13 @@ The result is a financial system where the answer to "who extracts?" is "nobody"
 *Corresponding author: William Glynn -- github.com/wglynn/vibeswap*
 
 *The contracts referenced in this paper are open source. The mechanism described here implements the philosophy of Cooperative Capitalism: mutualized risk through uniform clearing prices and insurance pools, combined with free-market competition through transparent priority auctions. GEV is not managed -- it is eliminated by construction.*
+
+---
+
+## See Also
+
+- [Commit-Reveal Batch Auctions (paper)](commit-reveal-batch-auctions.md) — Core mechanism: temporal decoupling for MEV elimination
+- [Five-Layer MEV Defense on CKB](five-layer-mev-defense-ckb.md) — CKB-specific five-layer defense analysis
+- [Recursive Batch Auctions](../../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
+- [Commit-Reveal (Nervos post)](../nervos-talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages and temporal enforcement
+- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the mechanism

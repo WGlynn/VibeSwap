@@ -865,3 +865,13 @@ order does not reveal others' orders, and the level-$n$ clearing price depends o
 at every timescale through recursive application of the same fundamental primitives."*
 
 *P-000: Fairness Above All. At every scale.*
+
+---
+
+## See Also
+
+- [Commit-Reveal Batch Auctions (paper)](../docs/papers/commit-reveal-batch-auctions.md) — Core mechanism: temporal decoupling, Fisher-Yates shuffle, uniform clearing
+- [From MEV to GEV (paper)](../docs/papers/from-mev-to-gev.md) — Nine-component GEV resistance architecture
+- [Five-Layer MEV Defense on CKB](../docs/papers/five-layer-mev-defense-ckb.md) — CKB-specific five-layer defense analysis
+- [Commit-Reveal (Nervos post)](../docs/nervos-talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages and temporal enforcement
+- [How Commit-Reveal Eliminates MEV (blog)](../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the mechanism

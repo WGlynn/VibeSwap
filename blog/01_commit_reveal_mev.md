@@ -144,3 +144,12 @@ These are not theoretical constructs. The contracts are deployed, tested with fu
 ---
 
 *Will Glynn is a smart contract engineer and mechanism designer building VibeSwap, an omnichain DEX on LayerZero V2. The full protocol specification is available in the [VibeSwap whitepaper](https://github.com/wglynn/vibeswap).*
+
+---
+
+## See Also
+
+- [Commit-Reveal Batch Auctions (paper)](../docs/papers/commit-reveal-batch-auctions.md) — Full paper: temporal decoupling, Fisher-Yates shuffle, uniform clearing prices
+- [From MEV to GEV](../docs/papers/from-mev-to-gev.md) — Nine-component GEV resistance architecture
+- [Five-Layer MEV Defense on CKB](../docs/papers/five-layer-mev-defense-ckb.md) — CKB-specific five-layer defense analysis
+- [Recursive Batch Auctions](../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure: nested batches at multiple temporal scales

@@ -16,6 +16,7 @@ from .binance import BinancePriceFeed
 from .coinbase import CoinbasePriceFeed
 from .okx import OKXPriceFeed
 from .kraken import KrakenPriceFeed
+from .allium import AlliumPriceFeed
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class PriceAggregator:
         "okx": 0.5,        # High volume, derivatives-heavy
         "kraken": 0.8,     # Regulated, reliable
         "uniswap": 0.6,    # Decentralized but flash-loan vulnerable
+        "allium": 0.7,     # Cross-chain DEX aggregated — no single-venue bias
     }
 
     def __init__(
@@ -94,6 +96,7 @@ class PriceAggregator:
             "coinbase": CoinbasePriceFeed,
             "okx": OKXPriceFeed,
             "kraken": KrakenPriceFeed,
+            "allium": AlliumPriceFeed,
         }
 
         if venue in feed_classes:

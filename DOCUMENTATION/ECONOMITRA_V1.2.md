@@ -399,3 +399,14 @@ If it is right, then the current financial system is not merely unfair. It is in
 A reference implementation of the mechanisms described in this paper exists as open-source software. Extended proofs, formal specifications, and test suites are available at:
 
 - github.com/wglynn/vibeswap
+
+---
+
+## See Also
+
+- [Economitra v1.0](ECONOMITRA.md) — Original economic model framework
+- [Economitra (paper)](../docs/papers/ECONOMITRA.md) — Academic treatment with formal proofs
+- [Three-Token Economy](THREE_TOKEN_ECONOMY.md) — Token architecture implementing this model
+- [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Mathematical fairness framework
+- [Cooperative Emission Design](../docs/papers/cooperative-emission-design.md) — Emission mechanism design
+- [Near-Zero Token Scaling](../docs/papers/near-zero-token-scaling.md) — Minimal-token coordination

@@ -405,3 +405,14 @@ Implementation details and extended proofs are available in the VibeSwap documen
 - Kalman filter oracle: `DOCUMENTATION/TRUE_PRICE_ORACLE.md`
 - Trinomial stability proof: `docs/TRINOMIAL_STABILITY_THEOREM_FORMAL/`
 - Proportional PoW: `docs/ErgonWP/`
+
+---
+
+## See Also
+
+- [Economitra v1.0](../../DOCUMENTATION/ECONOMITRA.md) — Original framework document
+- [Economitra v1.2](../../DOCUMENTATION/ECONOMITRA_V1.2.md) — Updated with trinomial stability
+- [Three-Token Economy](../../DOCUMENTATION/THREE_TOKEN_ECONOMY.md) — Token architecture
+- [Time-Neutral Tokenomics](../../DOCUMENTATION/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness proofs
+- [Cooperative Emission Design](cooperative-emission-design.md) — Emission mechanism
+- [Near-Zero Token Scaling](near-zero-token-scaling.md) — Minimal-token coordination

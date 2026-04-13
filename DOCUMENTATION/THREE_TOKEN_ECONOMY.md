@@ -498,3 +498,14 @@ Depends on:
   Faraday1 (2026). "The Lawson Constant."
   Glynn, W. (2026). "Ergon Foundation & Voting Integrity Theory."
 ```
+
+---
+
+## See Also
+
+- [Economitra](ECONOMITRA.md) — The economic model framework this token system implements
+- [Economitra v1.2](ECONOMITRA_V1.2.md) — Updated version with trinomial stability
+- [Economitra (paper)](../docs/papers/ECONOMITRA.md) — Academic treatment with formal proofs
+- [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Mathematical framework ensuring no cohort advantage
+- [Cooperative Emission Design](../docs/papers/cooperative-emission-design.md) — Emission mechanism for cooperative token distribution
+- [Near-Zero Token Scaling](../docs/papers/near-zero-token-scaling.md) — Scaling with minimal token overhead

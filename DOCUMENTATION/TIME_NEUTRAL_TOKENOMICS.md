@@ -475,3 +475,14 @@ This progression ensures the protocol achieves credible neutrality: no single pa
 
 *Document authored for VibeSwap Protocol*
 *Mathematical framework for provably fair, time-neutral tokenomics*
+
+---
+
+## See Also
+
+- [Three-Token Economy](THREE_TOKEN_ECONOMY.md) — The token architecture this math underpins
+- [Economitra](ECONOMITRA.md) — Economic model framework
+- [Economitra v1.2](ECONOMITRA_V1.2.md) — Updated with trinomial stability system
+- [Economitra (paper)](../docs/papers/ECONOMITRA.md) — Academic treatment with formal proofs
+- [Cooperative Emission Design](../docs/papers/cooperative-emission-design.md) — Emission curves for cooperative distribution
+- [Near-Zero Token Scaling](../docs/papers/near-zero-token-scaling.md) — Scaling coordination with minimal tokens

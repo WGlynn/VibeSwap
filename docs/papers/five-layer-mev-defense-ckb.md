@@ -523,3 +523,13 @@ Reference implementation: [EfficientMMRinEVM](https://github.com/matt-nervos/Eff
 6. Flashbots. "MEV-Share: Programmable Privacy." https://docs.flashbots.net
 7. Breidenbach, L., Daian, P., Juels, A., et al. "Chainlink 2.0: Next Steps in the Evolution of Decentralized Oracle Networks." 2021.
 8. Buterin, V. "Proposer/Builder Separation (PBS)." Ethereum Research, 2021.
+
+---
+
+## See Also
+
+- [Commit-Reveal Batch Auctions (paper)](commit-reveal-batch-auctions.md) — Core mechanism: temporal decoupling for MEV elimination
+- [From MEV to GEV](from-mev-to-gev.md) — Nine-component GEV resistance architecture
+- [Recursive Batch Auctions](../../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
+- [Commit-Reveal (Nervos post)](../nervos-talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages
+- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough

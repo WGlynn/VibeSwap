@@ -248,3 +248,13 @@ Looking forward to the discussion.
 
 *Full paper: [commit-reveal-batch-auctions.md](https://github.com/wglynn/vibeswap/blob/master/docs/papers/commit-reveal-batch-auctions.md)*
 *Code: [github.com/wglynn/vibeswap](https://github.com/wglynn/vibeswap)*
+
+---
+
+## See Also
+
+- [Commit-Reveal Batch Auctions (paper)](../papers/commit-reveal-batch-auctions.md) — Full paper: temporal decoupling for MEV elimination
+- [From MEV to GEV](../papers/from-mev-to-gev.md) — Nine-component GEV resistance architecture
+- [Five-Layer MEV Defense on CKB](../papers/five-layer-mev-defense-ckb.md) — PoW locking, MMR, forced inclusion, Fisher-Yates, uniform clearing
+- [Recursive Batch Auctions](../../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
+- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the mechanism

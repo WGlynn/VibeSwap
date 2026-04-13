@@ -180,10 +180,18 @@ contract SecondaryIssuanceController is
 
         // Mint and distribute
         // C5-CON-003: Use SafeERC20 forceApprove (handles approve-to-zero race)
+        // C7-ISS-001: try/catch prevents ShardRegistry revert (no active shards)
+        //   from blocking entire epoch. Redirects to insurance if shards unavailable.
         if (shardShare > 0) {
             ckbToken.mint(address(this), shardShare);
             IERC20(address(ckbToken)).forceApprove(address(shardRegistry), shardShare);
-            shardRegistry.distributeRewards(shardShare);
+            try shardRegistry.distributeRewards(shardShare) {
+                // success
+            } catch {
+                // No active shards — clear approval, redirect to insurance
+                IERC20(address(ckbToken)).forceApprove(address(shardRegistry), 0);
+                IERC20(address(ckbToken)).safeTransfer(insurancePool, shardShare);
+            }
         }
 
         if (daoShare > 0) {

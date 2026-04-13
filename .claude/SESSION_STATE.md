@@ -1,44 +1,54 @@
 # Session State — 2026-04-13
 
 ## Block Header
-- **Session**: API Death Shield + CogCoin Miner TRP (7 cycles) + RSI C8 pending
+- **Session**: API Death Shield + CogCoin Miner TRP + RSI C8 (Phases 8.1+8.2 complete)
 - **Branch**: `master`
-- **Commit**: `85f4e09c`
-- **Status**: ACTIVE — pivoting to VibeSwap RSI C8
+- **Commit**: `ce970a21`
+- **Status**: CLEAN — all work committed and tested
 
 ## Completed This Session
 
 ### Infrastructure
 - **API Death Shield** — 4 client-side hooks (StopFailure, UserPromptSubmit, Stop, PreCompact). Script at `~/.claude/session-chain/api-death-shield.py`. Primitive written.
-- **Repo cleanup** — 30 orphaned files committed. Gitignore updated for runtime artifacts.
+- **Repo cleanup** — 30 orphaned files committed. Gitignore updated.
 
 ### CogCoin Outreach
-- [cogcoin/client#1](https://github.com/cogcoin/client/issues/1) — Partnership proposal
-- [cogcoin/scoring#1](https://github.com/cogcoin/scoring/issues/1) — Implementation notes + real block mining result
-- Follow-up comments on both with real Bitcoin tip mining data
+- [cogcoin/client#1](https://github.com/cogcoin/client/issues/1) — Partnership proposal + miner repo follow-up
+- [cogcoin/scoring#1](https://github.com/cogcoin/scoring/issues/1) — Implementation notes + real block mining result (480M on block 944950)
 
-### CogCoin Miner TRP — 7 Cycles Complete
-1. **C1** — Bug fixes: cascade mutation, result persistence, grind mode (3 HIGH, 3 MED, 2 LOW)
-2. **C2** — Coglex pre-filter (`src/coglex.mjs`) + retry with exponential backoff
-3. **C3** — Block watcher (`src/block-watcher.mjs`), per-block stats, atomic writes
-4. **C4** — 13 tests added, caught morphology bug (wrestling → wrestle + ing drops e)
-5. **C5** — Benchmark tool (`src/bench.mjs`), empirical data: Gemini Flash 67% vs Llama 4 Scout 0% gate-pass
-6. **C6** — Medium draft "Mining CogCoin on Free-Tier LLMs"
-7. **C7** — Parallel batch generation (2-3x speedup) + universal escalation fix
+### CogCoin Miner — 7 TRP Cycles
+1. Bug fixes: cascade mutation, result persistence, grind mode
+2. Coglex pre-filter + retry with exponential backoff
+3. Block watcher (mempool.space), per-block stats, atomic writes
+4. 13 tests added, morphology bug fix (wrestling → wrestle + ing)
+5. Benchmark tool: Gemini Flash 67% vs Llama 4 Scout 0% gate-pass
+6. Medium draft "Mining CogCoin on Free-Tier LLMs"
+7. Parallel batches (2-3x speedup) + universal escalation fix
 
-**Miner repo**: https://github.com/WGlynn/cogcoin-miner (public, MIT, 5 commits + README + tests)
+**Repo**: https://github.com/WGlynn/cogcoin-miner (public, 5 commits)
 **Best score**: 494,772,801 on Bitcoin tip 944950
 **Banked winners**: 4+ sentences ready for submission when BTC arrives
 
+### VibeSwap RSI Cycle 8 — Phases 8.1 + 8.2 COMPLETE
+- **Phase 8.1**: CKBNativeToken off-circulation registry (`a1f73675`)
+  - 17 new tests, 17/17 passing
+  - Storage gap reduced 49→47 (upgrade-safe)
+- **Phase 8.2**: SecondaryIssuanceController switched to `offCirculation()` (`9aee1ee2`)
+  - 3 integration tests added, 3/3 passing
+  - Full sweep: 144 monetary + 107 consensus = 251 tests, 0 regressions
+- **Deploy script**: `script/RegisterOffCirculationHolders.s.sol` (`ce970a21`)
+- **Primitive**: Off-Circulation Registry Pattern extracted
+- **Findings closed**: C7-GOV-001 (HIGH), C7-GOV-007 (MED)
+
 ## Pending / Next Session
-1. **VibeSwap RSI C8** — Deferred architectural findings from C7:
-   - C7-GOV-001 HIGH: NCI staking via transfer() invisible to issuance split (systemic design gap — CKB-native tokens locked via standard transfer() don't register with totalOccupied)
-   - C7-GOV-006 HIGH: JarvisComputeVault backing breaks under Joule rebase (needs internal balance API to track rebase-adjusted amounts)
-   - C7-GOV-005 MED: JULBridge rate limit in rebased amounts
-   - C7-GOV-007 MED: CKB-native as VibeStable collateral bypasses totalOccupied
-2. **Miner continued TRP** — CM-013 (resume support), integration tests with mocked APIs
-3. **CogCoin domain registration** — Blocked on $70 BTC (asked dad + cousin)
-4. **Medium rollout** — 8 drafts ready, not yet published
+
+1. **RSI C8 Phase 8.3** — JarvisComputeVault rebase sync (C7-GOV-006 HIGH)
+   - Complex architectural work — needs Will's review of approach before implementation
+   - Issue: JCV backing check uses `balanceOf(this)` (rebased) vs `CREDITS_PER_JUL` (fixed). Positive rebase lets owner withdraw too much; negative rebase fails the check incorrectly.
+2. **RSI C8 Phase 8.4** — JULBridge rate limits in rebased amounts (C7-GOV-005 MED)
+3. **CogCoin domain registration** — Blocked on $70 BTC. Dad + cousin said no. Will not rush — early mining isn't worth $70 without deeper conviction from others.
+4. **Deploy 8.1/8.2** — Upgrade proxies, then run `RegisterOffCirculationHolders.s.sol` for NCI, VibeStable, JCV.
+5. **Medium rollout** — 8 drafts ready, not yet published.
 
 ## Previous Sessions
 - Cross-ref audit + RSI C7 (2026-04-12): 470+ docs, 276 cross-refs, 4 integration seam fixes

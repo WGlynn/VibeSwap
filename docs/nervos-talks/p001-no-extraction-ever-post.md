@@ -249,3 +249,12 @@ The constant doesn't grant power. It records responsibility. Someone had to deci
 ---
 
 *VibeSwap — 1,851 commits, 351 contracts, 15,155 CKB tests, $0 funding. Built in a cave.*
+
+---
+
+## See Also
+
+- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Mathematical formalization of P-001
+- [IIA Empirical Verification](../../DOCUMENTATION/IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation against code
+- [Omniscient Adversary Proof](../papers/omniscient-adversary-proof.md) — P-001 holds even against omniscient attackers
+- [Clawback Cascade](../../DOCUMENTATION/CLAWBACK_CASCADE.md) — Enforcement when extraction is detected

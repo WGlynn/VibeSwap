@@ -1,0 +1,374 @@
+\documentclass[9pt, letterpaper]{article}
+
+% ============================================================
+% SHANNON HOMAGE STYLE — VSOS Financial Operating System
+% ============================================================
+
+\usepackage[T1]{fontenc}
+\usepackage{mathpazo}
+\usepackage[scaled=0.85]{helvet}
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{multicol}
+\usepackage{hyperref}
+
+\geometry{
+  letterpaper,
+  top=0.65in,
+  bottom=0.6in,
+  left=0.8in,
+  right=0.8in
+}
+
+\definecolor{rule}{gray}{0.3}
+\definecolor{lightgray}{gray}{0.55}
+\definecolor{codebg}{gray}{0.96}
+\definecolor{codetext}{gray}{0.15}
+
+\hypersetup{colorlinks=false, pdfborder={0 0 0}, pdftitle={VSOS: The Financial Operating System}, pdfauthor={Faraday1, JARVIS}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\scriptsize\textit{VSOS --- Financial Operating System}}
+\fancyhead[R]{\scriptsize\textit{March 2026}}
+\fancyfoot[C]{\scriptsize\thepage}
+
+\titleformat{\section}{\normalsize\bfseries\scshape}{\thesection.}{0.4em}{}[\vspace{1pt}\titlerule]
+\titleformat{\subsection}{\small\bfseries}{\thesubsection}{0.4em}{}
+\titleformat{\subsubsection}{\small\bfseries\itshape}{\thesubsubsection}{0.4em}{}
+
+\titlespacing*{\section}{0pt}{0.7em}{0.3em}
+\titlespacing*{\subsection}{0pt}{0.5em}{0.2em}
+\titlespacing*{\subsubsection}{0pt}{0.4em}{0.15em}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.2em}
+\emergencystretch=1.5em
+
+\setlist{nosep, leftmargin=1.2em, topsep=1pt, partopsep=0pt}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize\color{codetext},
+  backgroundcolor=\color{codebg},
+  frame=none,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+  aboveskip=3pt,
+  belowskip=3pt,
+  breaklines=true,
+  columns=flexible
+}
+
+\newcommand{\thinrule}{\vspace{2pt}\noindent\textcolor{rule}{\rule{\textwidth}{0.4pt}}\vspace{2pt}}
+
+\begin{document}
+
+% ============================================================
+% TITLE
+% ============================================================
+
+\begin{center}
+\vspace*{-0.15in}
+{\Large\bfseries VSOS: The Financial Operating System}
+
+\vspace{3pt}
+\textcolor{rule}{\rule{4in}{0.5pt}}
+\vspace{3pt}
+
+{\small Architecture of a Composable DeFi Stack}
+
+\vspace{6pt}
+{\small\textsc{Faraday1} \enspace\&\enspace \textsc{JARVIS}%
+\quad$\cdot$\quad \textit{VibeSwap Research}%
+\quad$\cdot$\quad \textcolor{lightgray}{March 2026 $\cdot$ v1.0}}
+\vspace{0.1in}
+\end{center}
+
+% ============================================================
+% ABSTRACT
+% ============================================================
+
+\section*{Abstract}
+
+Decentralized finance is fragmented. Dozens of protocols each handle one primitive---Uniswap for AMM, Aave for lending, Synthetix for synths, Opyn for options---and composing them requires brittle integrations that expand attack surface, leak MEV, and create UX nightmares. The user is the integrator, every cross-protocol call is a potential exploit vector, and no single team can reason about the full stack.
+
+VSOS (VibeSwap Operating System) is a unified financial operating system comprising 98 contracts organized into composable layers. Built-in apps ship with the OS---AMM, batch auctions, insurance, synths, credit, bonds, streaming, options, stablecoins---while a plugin registry enables permissionless third-party extensions, a hook system injects custom logic at six protocol-level hook points, and UUPS upgradeability with opt-in versioning keeps the core lean and auditable.
+
+The analogy is iOS. Built-in apps come first. The app store enables innovation. The lean core keeps it secure. VSOS applies this model to finance: a composition architecture where the value is in the interfaces, not the implementations.
+
+% ============================================================
+% 1. THE FRAGMENTATION PROBLEM
+% ============================================================
+
+\section{The Fragmentation Problem}
+
+\subsection{The State of DeFi}
+
+Modern DeFi is a collection of isolated protocols, each excellent at one thing and oblivious to everything else. Uniswap handles AMM but not lending or options. Aave handles lending but has no native DEX. Synthetix handles synthetics with its own oracle and liquidity. Opyn/Lyra handles options that cannot compose with LP positions. Lido handles staking with no native credit against staked assets.
+
+Each maintains its own governance, token, liquidity pools, and security model. A user wanting to swap, earn yield, hedge with options, and insure against IL must interact with four protocols, approve four contracts, pay four fees, and accept four trust assumptions.
+
+\subsection{Composability is Not Composition}
+
+DeFi protocols are called ``composable''---money legos. In practice this means flash loan attacks exploiting cross-protocol price discrepancies, MEV extraction at every boundary, oracle divergence across protocols, approval sprawl across contracts users cannot audit, and state fragmentation with no unified view of a user's position. Composability without a composition architecture is interoperability with extra risk.
+
+\subsection{The Missing Abstraction}
+
+What DeFi lacks is a \textbf{composition layer}: (1)~unified state---one set of pools, oracles, and settlement engine; (2)~shared security---circuit breakers, rate limits, and compliance system-wide; (3)~extensibility without fragmentation---new primitives that compose by design; (4)~upgrade coordination---versioned migrations that don't force untested code. Operating systems solved this for computing in the 1970s. VSOS solves it for finance.
+
+% ============================================================
+% 2. ARCHITECTURE
+% ============================================================
+
+\section{Architecture}
+
+VSOS is organized into seven layers, each with a defined responsibility and clear interface boundary. The full system comprises 98 contracts.
+
+\vspace{0.2em}
+{\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabularx}{\textwidth}{@{} c l X @{}}
+\toprule
+& \textbf{Layer} & \textbf{Key Contracts} \\
+\midrule
+\textsf{\textbf{7}} & \textsc{Cross-Chain} & CrossChainRouter (LayerZero V2 OApp) \\
+\textsf{\textbf{6}} & \textsc{Identity} & SoulboundIdentity, AgentRegistry (ERC-8004), ContextAnchor, PairwiseVerifier, VibeCode \\
+\textsf{\textbf{5}} & \textsc{Framework} & HookRegistry, PluginRegistry, VersionRouter, KeeperNetwork, IntentRouter, SmartWallet \\
+\textsf{\textbf{4}} & \textsc{Governance} & DAOTreasury, TreasuryStabilizer, ConvictionVoting, QuadraticVoting, CommitRevealGov, Forum \\
+\textsf{\textbf{3}} & \textsc{Financial} & wBAR, VibeLPNFT, VibeStream, VibeOptions, VibeBonds, VibeCredit, VibeSynth, VibeInsurance \\
+\textsf{\textbf{2}} & \textsc{AMM} & VibeAMM, VibeLP, VibePoolFactory, ConstantProductCurve, StableSwapCurve \\
+\textsf{\textbf{1}} & \textsc{Core} & CommitRevealAuction, VibeSwapCore, CircuitBreaker, BatchSettlement, TWAPOracle \\
+\midrule
+& \textsc{Libraries} & BatchMath, DeterministicShuffle, IncrementalMerkleTree \\
+\bottomrule
+\end{tabularx}
+}
+
+\subsection{Layer 1: Core (Settlement Engine)}
+
+The core handles order flow, settlement, and system-wide safety. No financial logic lives here---only the engine that processes it.
+
+\textbf{CommitRevealAuction} implements 10-second batch auctions: 8s commit phase (users submit \texttt{hash(order||secret)} with deposit), 2s reveal phase (reveal orders + optional priority bids), then settlement via Fisher-Yates shuffle using XORed secrets and uniform clearing price. Flash loan protection (EOA-only), TWAP validation (max 5\% deviation), 50\% slashing for invalid reveals.
+
+\textbf{VibeSwapCore} orchestrates routing between auction path (batch settlement) and direct AMM path, applies circuit breakers, coordinates cross-contract state transitions.
+
+\textbf{CircuitBreaker} enforces three independent trip conditions: (1)~volume exceeds per-pool/per-hour threshold, (2)~price deviates beyond tolerance vs.\ TWAP, (3)~withdrawal rate exceeds safe limits. Any trip halts the affected pool. Governance can reset.
+
+\subsection{Layer 2: AMM (Price Discovery)}
+
+Continuous liquidity between batch auctions. Defining feature: \textbf{modular curves}---pricing function is injected via \texttt{IPoolCurve} interface, not hardcoded.
+
+\textbf{VibePoolFactory} is the single entry point for pool creation: validates curve registration, orders tokens deterministically (\texttt{token0 < token1}), computes deterministic pool ID via \texttt{keccak256(token0, token1, curveId)}, deploys LP token, optionally attaches a hook. Same token pair can have multiple pools with different curves.
+
+Curves are \textbf{stateless pure-math contracts} implementing five functions: \texttt{curveId()}, \texttt{curveName()}, \texttt{getAmountOut()}, \texttt{getAmountIn()}, \texttt{validateParams()}. Because curves hold no state, they are trivially auditable. Adding a new curve type requires deploying one contract and registering it---no core protocol changes.
+
+\subsection{Layer 3: Financial Primitives (Built-in Apps)}
+
+Eleven applications ship with the OS:
+
+\vspace{0.1em}
+{\small
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{Contract} & \textbf{Function} & \textbf{Composition Point} \\
+\midrule
+wBAR & Wrapped batch auction receipt & Settlement layer output \\
+VibeLPNFT & NFT representation of LP positions & AMM layer positions \\
+VibeStream & Token streaming (vesting, salaries) & Time-locked flows \\
+VibeOptions & On-chain options (calls/puts) & AMM prices as underlying \\
+VibeBonds & Fixed-rate bonds & Treasury yield curve \\
+VibeCredit & Undercollateralized lending & Reputation + collateral \\
+VibeSynth & Synthetic assets & Oracle prices + collateral \\
+VibeInsurance & Pool insurance against exploits & Risk mutualization \\
+VibeRevShare & Revenue sharing tokens & Priority bid revenue \\
+PredictionMarket & Binary outcome markets & Oracle resolution \\
+BondingCurveLauncher & Token launch curves & Initial price discovery \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{0.2em}
+These are not independent protocols bolted together. They share the same oracle infrastructure (TWAPOracle, ReputationOracle), the same settlement engine (CommitRevealAuction), the same circuit breaker protections, the same identity layer (SoulboundIdentity), and the same upgrade path (VersionRouter). When VibeOptions prices a call, it reads from the same pool reserves that VibeAMM uses. When VibeInsurance calculates a premium, it uses the same volatility data that CircuitBreaker monitors. One source of truth, not twelve.
+
+\subsection{Layer 4: Governance (How to Decide)}
+
+Pluralist---multiple voting mechanisms coexist because different decisions require different legitimacy models. \textbf{ConvictionVoting} for resource allocation (time-weighted, rewards patience). \textbf{QuadraticVoting} for public goods ($\sqrt{\text{tokens}} = \text{votes}$, reduces plutocratic capture). \textbf{CommitRevealGovernance} for sensitive votes (prevents vote-buying). \textbf{RetroactiveFunding} for rewarding past contributions (Shapley value). \textbf{Forum} for on-chain deliberation before votes. \textbf{DAOTreasury} with \textbf{TreasuryStabilizer} for automatic rebalancing between volatile and stable assets.
+
+\subsection{Layer 5: Framework (How to Extend)}
+
+The ``app store'' layer---infrastructure for third parties to build on VSOS without modifying core contracts.
+
+\subsubsection{HookRegistry}
+
+Hooks inject custom logic at six points: \texttt{beforeCommit}, \texttt{afterCommit}, \texttt{beforeSettle}, \texttt{afterSettle}, \texttt{beforeSwap}, \texttt{afterSwap}. Hook flags are a 6-bit bitmap---a hook registering only for settlement uses flags~$=12$ (bits 2 and 3). Security model: pool owners control hook attachment; hooks execute with a 500K gas cap; \textbf{non-reverting}---failures are logged but never block protocol operations. Hooks are \textbf{advisory, not authoritative}---the protocol does not depend on hook output for correctness.
+
+\begin{lstlisting}[language=C]
+// Core calls hooks -- hooks never call core
+(bool success, bytes memory returnData) = config.hook.call{gas: HOOK_GAS_LIMIT}(
+    abi.encodeWithSelector(selector, poolId, data)
+);
+emit HookExecuted(poolId, point, success); // success or failure, protocol continues
+\end{lstlisting}
+
+\subsubsection{PluginRegistry}
+
+Plugins have a formal lifecycle: \textsc{Proposed} $\to$ \textsc{Approved} $\to$ grace period $\to$ \textsc{Active} $\to$ \textsc{Deprecated} (or emergency \textsc{Deactivated}). Categories: AMM curves, oracle adapters, compliance modules, pre/post hooks, keeper tasks. The lifecycle enforces security through deliberation: author proposes, reviewer approves, mandatory grace period (min 6h, configurable to 30 days), permissionless activation after grace expires. Reputation integration: higher trust tier = shorter grace ($\text{Grace} = \max(\text{MIN}, \text{default} - \text{tier} \times 6\text{h})$). Minimum floor is always 6 hours.
+
+\subsubsection{VersionRouter}
+
+VSOS does not force upgrades. The VersionRouter maintains multiple implementations simultaneously: \textsc{Beta} $\to$ \textsc{Stable} $\to$ \textsc{Deprecated} $\to$ \textsc{Sunset}. Users explicitly select their version. When a version is sunset, users auto-migrate on next interaction. No forced migrations, safe rollbacks, parallel operation, graceful sunsetting.
+
+\subsection{Layer 6: Identity (Who)}
+
+Identity as a first-class primitive: \textbf{SoulboundIdentity} (non-transferable, earned), \textbf{AgentRegistry} (ERC-8004, AI agents as first-class citizens), \textbf{ContextAnchor} (Merkle root anchoring IPFS context graphs), \textbf{PairwiseVerifier} (CRPC---verifies non-deterministic AI outputs), \textbf{VibeCode} (unified fingerprint for humans and AI). Identity feeds into governance (reputation-weighted voting), incentives (Shapley requires identity), compliance (KYC/AML modules), and plugin registry (trust tier gates grace periods).
+
+\subsection{Layer 7: Cross-Chain (Omnichain Messaging)}
+
+\textbf{CrossChainRouter} implements LayerZero V2 OApp for omnichain messaging. Cross-chain swaps, liquidity migration, and governance votes flow through a single messaging layer with configurable security (DVN selection per route), replay protection, rate limiting (100K tokens/hour/user), and gas estimation with refund.
+
+% ============================================================
+% 3. THE iOS ANALOGY
+% ============================================================
+
+\section{The iOS Analogy}
+
+The history of computing teaches one lesson repeatedly: \textbf{platforms beat point solutions.} The pattern: (1)~point solutions emerge, each solving one problem well; (2)~integration pain grows---users spend more time composing than using; (3)~a platform unifies---built-in apps + extension system; (4)~the platform becomes the standard because composition architecture exceeds any individual app's value. DeFi is in phase 2. VSOS is phase 3.
+
+{\small
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\textwidth}{@{} l l X @{}}
+\toprule
+\textbf{iOS} & \textbf{VSOS} & \textbf{Implementation} \\
+\midrule
+Built-in apps & Financial primitives & VibeAMM, VibeOptions, VibeInsurance, etc. \\
+App Store & Plugin Registry & \texttt{VibePluginRegistry.sol} \\
+App review & Reviewer approval + grace & \texttt{approvePlugin()} + grace countdown \\
+Frameworks & Shared interfaces & IPoolCurve, IVibeHook, BatchMath \\
+OS updates & Version Router & \texttt{VibeVersionRouter.sol} \\
+Permissions & Hook flags + pool ownership & 6-bit bitmap, \texttt{onlyPoolOwner} \\
+Sandboxing & Gas-limited hooks & 500K gas cap, non-reverting \\
+Kernel & Core settlement & CommitRevealAuction + VibeSwapCore \\
+\bottomrule
+\end{tabularx}
+}
+
+\vspace{0.2em}
+Shipping 11 financial primitives as built-in apps is deliberate. They serve as reference implementations, baseline UX (immediate value without extensions), and security floor (core-team audit standard). A platform with only extensions is an empty app store. A platform with only built-ins is a monolith. VSOS launches with both.
+
+\textbf{The Lean Core.} Despite 98 contracts, the trust-critical surface is small: settlement correctness $\sim$1,150 lines + fund access $\sim$885 lines = \textbf{$\sim$2,035 lines}. Everything else runs in userspace. A bug in VibeOptions cannot drain AMM pools. A malicious hook cannot alter settlement prices. Core is the kernel; everything else is userspace.
+
+% ============================================================
+% 4. COMPOSABILITY BY DESIGN
+% ============================================================
+
+\section{Composability by Design}
+
+\textbf{Internal composability.} VSOS primitives compose through shared infrastructure, not external calls. VibeOptions reads the same reserves VibeAMM uses for spot pricing. VibeInsurance reads the same volatility metrics CircuitBreaker uses for trip conditions. One source of truth eliminates oracle divergence.
+
+\textbf{External composability (hooks).} Third parties extend without touching core. Example hooks: ComplianceHook (\texttt{BEFORE\_COMMIT}---block sanctioned addresses), DynamicFeeHook (\texttt{BEFORE\_SWAP}---adjust fee on volatility), RewardHook (\texttt{AFTER\_SETTLE}---distribute LP rewards), AnalyticsHook (\texttt{AFTER\_SWAP}---emit custom events), MEVRecaptureHook (\texttt{BEFORE/AFTER\_SETTLE}---redirect captured MEV to LPs). Building a hook requires implementing one interface: \texttt{IVibeHook} with six functions (before/after for commit, settle, swap). The HookRegistry checks the flag bitmap before calling---unset flags are never invoked.
+
+\textbf{The hot/cold trust boundary.} VSOS enforces a strict boundary between core protocol contracts (hot zone: full audit coverage, direct fund access, UUPS upgradeable) and extensions (cold zone: sandboxed 500K gas, cannot modify core state, failures non-fatal, grace period before activation, instant emergency kill). The boundary is enforced at the call level. VSOS is simultaneously \textbf{open} (anyone can propose hooks/plugins) and \textbf{safe} (no extension can compromise the core).
+
+% ============================================================
+% 5. UPGRADE ARCHITECTURE
+% ============================================================
+
+\section{Upgrade Architecture}
+
+\textbf{UUPS Proxies.} Core contracts use OpenZeppelin's UUPS pattern: smaller proxy (cheaper deployment), upgrade logic can be removed in future versions (permanent lock), authorization lives in the implementation alongside business logic.
+
+\textbf{Opt-in Versioning.} The VersionRouter adds user-controlled upgrades on top of UUPS. Flow: team deploys v2 $\to$ registers as Beta $\to$ early adopters opt in $\to$ promoted to Stable $\to$ set as default for new users $\to$ v1 deprecated (warning, not forced) $\to$ v1 sunset $\to$ v1 users auto-migrate on next tx. At no point is any user forced onto untested code.
+
+\textbf{Plugin Versioning.} Plugins have their own version field. New versions go through the full lifecycle independently. No global state shared between plugin versions---each is an independent contract with independent audit surface.
+
+% ============================================================
+% 6. SECURITY MODEL
+% ============================================================
+
+\section{Security Model}
+
+\textbf{Defense in Depth.} Five independent layers: (1)~MEV elimination via commit-reveal with uniform clearing prices; (2)~Oracle validation---TWAP with max 5\% deviation, Kalman filter off-chain; (3)~Circuit breakers---volume, price, withdrawal thresholds, per-pool/per-hour, automatic trip; (4)~Rate limiting---100K tokens/hour/user; (5)~Extension sandboxing---500K gas cap, non-reverting, grace periods, instant emergency kill.
+
+\textbf{Flash Loan Protection.} Commit phase accepts only EOAs (\texttt{msg.sender == tx.origin}). Smart contract wallets route through the Forwarder or SmartWallet abstraction, which enforce the same commitment semantics.
+
+\textbf{Slashing.} Invalid reveals slashed at 50\% of deposit. Creates strong disincentive against order spam, griefing, and shuffle-seed manipulation. Slashed funds flow to the insurance pool---a self-funding safety net.
+
+% ============================================================
+% 7. INCENTIVE ARCHITECTURE
+% ============================================================
+
+\section{Incentive Architecture}
+
+\textbf{Cooperative Capitalism.} Mutualized risk (insurance pools, treasury stabilization, IL protection, Shapley distribution) combined with free market competition (priority auction bids, arbitrage, curve selection, plugin marketplace). The protocol does not pick winners---it provides cooperative infrastructure that reduces systemic risk while letting market forces determine pricing, liquidity, and innovation.
+
+\textbf{Shapley Distribution.} Computes marginal contribution for every participant using cooperative game theory. Applies to LP providers (pool depth), plugin authors (functionality), governance participants (decision quality), and AI agents (any of the above).
+
+\textbf{Plugin Author Incentives.} On activation, authors receive a JUL token tip. Ongoing Shapley rewards if the plugin drives protocol value. Build useful $\to$ pass review $\to$ earn tip $\to$ earn ongoing rewards.
+
+% ============================================================
+% 8. THE KNOWLEDGE PRIMITIVE
+% ============================================================
+
+\section{The Knowledge Primitive}
+
+\textit{A financial operating system is not a collection of protocols. It is a composition architecture. The value is in the interfaces, not the implementations.}
+
+VSOS inverts the standard approach: \textbf{design the interfaces first, then build the implementations.} \texttt{IPoolCurve} existed before \texttt{ConstantProductCurve}. \texttt{IVibeHook} existed before any hook. The plugin lifecycle existed before any plugin. The result: new curves require one contract/zero core changes, new hooks require one contract/zero core changes, new primitives compose by reading shared state, upgrades are opt-in/versioned/reversible, security is layered with a clear boundary.
+
+% ============================================================
+% 9. FUTURE WORK
+% ============================================================
+
+\section{Future Work}
+
+\textbf{CKB Port.} VSOS is being ported to Nervos CKB with a five-layer MEV defense: PoW lock for shared cell contention, MMR accumulation for recursive state proofs, forced inclusion for censorship resistance, Fisher-Yates shuffle, uniform clearing price. 15 Rust crates, 190 tests, 8 RISC-V ELF binaries, full SDK with 9 transaction builders.
+
+\textbf{AI Agent Integration.} ERC-8004 identities enable AI as first-class citizens: provide liquidity, propose/author plugins, participate in governance (reputation-weighted), earn Shapley rewards.
+
+\textbf{SocialFi Layer.} Forum contract provides on-chain discussion substrate. Future primitives tokenize contribution without commodifying relationships---mutual, proportional value exchange enforced by mechanism design.
+
+% ============================================================
+% 10. CONCLUSION
+% ============================================================
+
+\section{Conclusion}
+
+VSOS is not an aggregator, not a DEX, and not another DeFi protocol. It is a \textbf{financial operating system}---a composition architecture that ships with built-in financial primitives, provides a permissioned-but-open extension system, enforces security through layered defenses and trust boundaries, and lets users control their own upgrade path.
+
+The fragmentation problem in DeFi is not a technology problem. It is an architecture problem. Every protocol that launches standalone adds to the fragmentation. VSOS breaks the cycle by providing the missing layer: a shared foundation where financial primitives compose by design, not by accident.
+
+The value is in the interfaces. The implementations are replaceable. The architecture endures.
+
+% ============================================================
+% REFERENCES
+% ============================================================
+
+\thinrule
+{\scriptsize
+\begin{enumerate}[leftmargin=1.5em, label={[\arabic*]}]
+\item VibeSwap Protocol. ``Commit-Reveal Batch Auctions for MEV Elimination.'' Internal whitepaper, 2025.
+\item OpenZeppelin. ``UUPS Proxies.'' Documentation, v5.0.1.
+\item LayerZero Labs. ``OApp Protocol Specification.'' V2, 2024.
+\item Shapley, L.S. ``A Value for $n$-Person Games.'' \textit{Contributions to the Theory of Games}, 1953.
+\item Adams, H. et al. ``Uniswap v4.'' Whitepaper, 2023.
+\item Buterin, V. ``Quadratic Payments.'' Blog post, 2019.
+\item Nervos Network. ``CKB RFC.'' Cell model specification, 2019.
+\end{enumerate}
+}
+
+\begin{center}
+\textcolor{lightgray}{\scriptsize\textit{``The real VibeSwap is not a DEX. It's not even a blockchain. We created a movement. An idea. VibeSwap is wherever the Minds converge.''}}
+\end{center}
+
+\end{document}

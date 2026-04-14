@@ -134,4 +134,73 @@ contract StateRentVaultTest is Test {
 
         assertEq(ckb.balanceOf(manager), balBefore);
     }
+
+    // ============ C10-AUDIT-6: Cross-manager destroy blocked ============
+
+    /// @notice A different cell manager can NO LONGER destroy cells it didn't create.
+    ///         Previously, any registered cellManager could destroy any cell.
+    function test_cellManager_cannotDestroyOthersCells() public {
+        address manager2 = makeAddr("cellManager2");
+        vm.prank(owner);
+        vault.setCellManager(manager2, true);
+
+        // manager1 creates a cell
+        bytes32 cellId = keccak256("cell-owned-by-manager1");
+        vm.prank(manager);
+        vault.createCell(cellId, 500e18, keccak256("c"));
+
+        // manager2 attempts to destroy — must revert
+        vm.prank(manager2);
+        vm.expectRevert(StateRentVault.NotCellOwner.selector);
+        vault.destroyCell(cellId);
+
+        // Cell still active
+        assertTrue(vault.getCell(cellId).active);
+    }
+
+    // ============ C10-AUDIT-8: ownerCells array purge ============
+
+    /// @notice After destroying a cell, its ID is removed from ownerCells (swap-and-pop),
+    ///         so the array doesn't grow unboundedly and enumeration is accurate.
+    function test_ownerCells_purgedOnDestroy() public {
+        bytes32 c1 = keccak256("c1");
+        bytes32 c2 = keccak256("c2");
+        bytes32 c3 = keccak256("c3");
+
+        vm.startPrank(manager);
+        vault.createCell(c1, 100e18, keccak256("a"));
+        vault.createCell(c2, 100e18, keccak256("b"));
+        vault.createCell(c3, 100e18, keccak256("c"));
+        vm.stopPrank();
+
+        assertEq(vault.getOwnerCellIds(manager).length, 3);
+
+        // Destroy middle one
+        vm.prank(manager);
+        vault.destroyCell(c2);
+
+        bytes32[] memory remaining = vault.getOwnerCellIds(manager);
+        assertEq(remaining.length, 2, "array shrank to 2");
+
+        // Remaining entries are c1 and c3 (order may be swapped due to pop)
+        bool foundC1;
+        bool foundC3;
+        for (uint256 i = 0; i < remaining.length; i++) {
+            if (remaining[i] == c1) foundC1 = true;
+            if (remaining[i] == c3) foundC3 = true;
+            assertNotEq(remaining[i], c2, "c2 purged");
+        }
+        assertTrue(foundC1 && foundC3);
+    }
+
+    /// @notice Full destroy cycle leaves empty array, not stale entries.
+    function test_ownerCells_fullPurge() public {
+        bytes32 c1 = keccak256("c1");
+        vm.prank(manager);
+        vault.createCell(c1, 100e18, keccak256("a"));
+        vm.prank(manager);
+        vault.destroyCell(c1);
+
+        assertEq(vault.getOwnerCellIds(manager).length, 0);
+    }
 }

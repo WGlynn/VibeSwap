@@ -33,6 +33,9 @@ interface ICKBNativeMinter {
     function totalOccupied() external view returns (uint256);
     /// @notice C7-GOV-001: Aggregate off-circulation = totalOccupied + sum of registered holder balances
     function offCirculation() external view returns (uint256);
+    /// @notice C10-AUDIT-5: Used to detect daoShelter double-registration at distribute time
+    function isOffCirculationHolder(address) external view returns (bool);
+    function balanceOf(address) external view returns (uint256);
     function approve(address spender, uint256 amount) external returns (bool);
 }
 
@@ -165,6 +168,15 @@ contract SecondaryIssuanceController is
         uint256 offCirc = ckbToken.offCirculation();
         uint256 totalDAO = daoShelter.totalDeposited();
 
+        // C10-AUDIT-5: Defense-in-depth against daoShelter being mistakenly
+        // registered as an off-circulation holder. Its balance is already
+        // accounted for via daoShelter.totalDeposited() below — counting it
+        // twice would starve insurance. Subtract if double-registered.
+        if (ckbToken.isOffCirculationHolder(address(daoShelter))) {
+            uint256 shelterBalance = ckbToken.balanceOf(address(daoShelter));
+            offCirc = offCirc > shelterBalance ? offCirc - shelterBalance : 0;
+        }
+
         // NCI-003/MON-006: 3-way split with underflow protection.
         // offCirc + totalDAO can exceed totalSupply (DAO deposits are in-supply tokens),
         // which would cause insuranceShare to underflow. Cap proportionally.
@@ -199,10 +211,33 @@ contract SecondaryIssuanceController is
             }
         }
 
+        // C10-AUDIT-4: try/catch the depositYield call (mirrors C7-ISS-001 pattern
+        // for shardRegistry). If shelter reverts or silently declines (e.g., no
+        // depositors edge case) the approved tokens are swept to insurance so no
+        // wei of emission is left stranded on the controller address.
         if (daoShare > 0) {
             ckbToken.mint(address(this), daoShare);
             IERC20(address(ckbToken)).forceApprove(address(daoShelter), daoShare);
-            daoShelter.depositYield(daoShare);
+            uint256 balBefore = IERC20(address(ckbToken)).balanceOf(address(this));
+            try daoShelter.depositYield(daoShare) {
+                // success path — verify the shelter actually pulled the tokens.
+                // If it didn't (silent-return path), reroute to insurance.
+                uint256 balAfter = IERC20(address(ckbToken)).balanceOf(address(this));
+                uint256 actuallyPulled = balBefore - balAfter;
+                if (actuallyPulled < daoShare) {
+                    uint256 stranded = daoShare - actuallyPulled;
+                    IERC20(address(ckbToken)).forceApprove(address(daoShelter), 0);
+                    IERC20(address(ckbToken)).safeTransfer(insurancePool, stranded);
+                    // Redistribute accounting: the stranded slice is insurance, not DAO.
+                    daoShare -= stranded;
+                    insuranceShare += stranded;
+                }
+            } catch {
+                IERC20(address(ckbToken)).forceApprove(address(daoShelter), 0);
+                IERC20(address(ckbToken)).safeTransfer(insurancePool, daoShare);
+                insuranceShare += daoShare;
+                daoShare = 0;
+            }
         }
 
         if (insuranceShare > 0) {

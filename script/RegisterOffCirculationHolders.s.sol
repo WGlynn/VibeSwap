@@ -15,6 +15,8 @@ import "../contracts/monetary/CKBNativeToken.sol";
  *   NCI_ADDRESS
  *   VIBE_STABLE_ADDRESS
  *   JCV_ADDRESS
+ *   SOR_ADDRESS (C10-AUDIT-1: ShardOperatorRegistry — holds operator stakes
+ *                and undistributed reward reserves. Must be off-circulation.)
  *   DAO_SHELTER_ADDRESS (optional — has own totalDeposited() accounting)
  *
  * Usage:
@@ -29,6 +31,7 @@ contract RegisterOffCirculationHolders is Script {
         address nci = vm.envOr("NCI_ADDRESS", address(0));
         address vibeStable = vm.envOr("VIBE_STABLE_ADDRESS", address(0));
         address jcv = vm.envOr("JCV_ADDRESS", address(0));
+        address sor = vm.envOr("SOR_ADDRESS", address(0));  // C10-AUDIT-1
         address daoShelter = vm.envOr("DAO_SHELTER_ADDRESS", address(0));
 
         uint256 ownerKey = vm.envUint("OWNER_PRIVATE_KEY");
@@ -47,6 +50,16 @@ contract RegisterOffCirculationHolders is Script {
         if (jcv != address(0) && !ckb.isOffCirculationHolder(jcv)) {
             console.log("Registering JarvisComputeVault as off-circulation holder:", jcv);
             ckb.setOffCirculationHolder(jcv, true);
+        }
+
+        // C10-AUDIT-1: SOR holds operator stakes (MIN_STAKE × active operators)
+        // plus undistributed rewards. These are clearly off-circulation — operators
+        // can't use their staked tokens until deactivateShard is called. Missing
+        // from the original deploy script: staked CKB was being counted as
+        // circulating, systematically under-weighting shardShare.
+        if (sor != address(0) && !ckb.isOffCirculationHolder(sor)) {
+            console.log("Registering ShardOperatorRegistry as off-circulation holder:", sor);
+            ckb.setOffCirculationHolder(sor, true);
         }
 
         // DAOShelter exposes totalDeposited() separately, but registering it

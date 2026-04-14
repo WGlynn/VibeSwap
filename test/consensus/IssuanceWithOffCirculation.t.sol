@@ -184,4 +184,44 @@ contract IssuanceWithOffCirculationTest is Test {
         uint256 expectedMin = totalEmitted * 25 / 100;
         assertGe(totalReceived, expectedMin);
     }
+
+    // ============ C10-AUDIT-5: DAOShelter double-registration guard ============
+
+    /// @notice If an operator mistakenly registers DAOShelter as an off-circulation
+    ///         holder (the deploy script's REGISTER_DAO_SHELTER=true path), the
+    ///         controller now subtracts its balance from offCirc at distribute time
+    ///         to prevent the shelter's CKB from being double-counted.
+    function test_daoShelterDoubleRegistrationIsNeutralized() public {
+        // User deposits 400k to DAOShelter
+        vm.prank(minter);
+        ckb.mint(user, 1_000_000e18);
+
+        vm.prank(user);
+        ckb.approve(address(shelter), type(uint256).max);
+        vm.prank(user);
+        shelter.deposit(400_000e18);
+
+        // Shelter now holds 400k + has totalDeposited=400k
+        assertEq(ckb.balanceOf(address(shelter)), 400_000e18);
+        assertEq(shelter.totalDeposited(), 400_000e18);
+
+        // Mistakenly register shelter as off-circulation holder
+        vm.prank(owner);
+        ckb.setOffCirculationHolder(address(shelter), true);
+        assertEq(ckb.offCirculation(), 400_000e18);
+
+        // Run distribution — without C10-AUDIT-5, shelter balance would be counted
+        // BOTH in shardShare (via offCirc) and in daoShare (via totalDeposited),
+        // summing to 800k on a 1M supply, starving insurance via the scale-down guard.
+        vm.warp(block.timestamp + 365 days);
+        issuance.distributeEpoch();
+
+        uint256 shardReceived = shardRegistry.totalReceived();
+        uint256 totalEmitted = issuance.totalDistributed();
+
+        // With the fix: shelter subtracted from offCirc → shardShare ≈ 0
+        // (no other registered holders). DAO gets ~40% via yield path. Insurance
+        // gets the remainder instead of being zeroed.
+        assertLe(shardReceived, totalEmitted * 5 / 100, "shardShare not inflated by shelter balance");
+    }
 }

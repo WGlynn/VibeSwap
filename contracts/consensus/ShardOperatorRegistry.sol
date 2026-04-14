@@ -83,6 +83,8 @@ contract ShardOperatorRegistry is
     event HeartbeatReceived(bytes32 indexed shardId, uint256 timestamp);
     event RewardClaimed(address indexed operator, uint256 amount);
     event RewardsDistributed(uint256 amount, uint256 newAccRewardPerShare);
+    /// @notice C10-AUDIT-2: emitted when anyone kicks a stale (non-heartbeating) shard
+    event StaleShardReaped(bytes32 indexed shardId, address indexed reaper, uint256 stakeReturned);
 
     // ============ Errors ============
 
@@ -93,6 +95,8 @@ contract ShardOperatorRegistry is
     error NotActive();
     error ZeroAmount();
     error CellsExceedCap();
+    error ShardStale();
+    error ShardNotStale();
 
     // ============ Initializer ============
 
@@ -147,8 +151,10 @@ contract ShardOperatorRegistry is
      * @notice Report cells being served by this shard
      * @dev NCI-011: Capped to MAX_CELLS_SERVED to prevent overflow in _shardWeight.
      *      NCI-037: Claims pending rewards before weight change (Masterchef invariant).
+     *      C10-AUDIT-9: nonReentrant — claims rewards via safeTransfer.
+     *      C10-AUDIT-2: reverts if shard is stale (missed heartbeat grace window).
      */
-    function reportCellsServed(uint256 cellCount) external {
+    function reportCellsServed(uint256 cellCount) external nonReentrant {
         // NCI-011: Cap to prevent overflow in sqrt(cellsServed * stake)
         if (cellCount > MAX_CELLS_SERVED) revert CellsExceedCap();
 
@@ -157,6 +163,9 @@ contract ShardOperatorRegistry is
 
         Shard storage shard = shards[shardId];
         if (!shard.active) revert NotActive();
+        // C10-AUDIT-2: Stale shards cannot mutate weight — forces operators to
+        // heartbeat before extracting rewards. Anyone can reap via deactivateStaleShard.
+        if (_isStale(shard)) revert ShardStale();
 
         // NCI-037: Claim pending rewards at OLD weight before changing
         _claimRewards(shardId);
@@ -248,12 +257,71 @@ contract ShardOperatorRegistry is
 
     /**
      * @notice Claim accumulated rewards
+     * @dev C10-AUDIT-2: Live (heartbeat-fresh) shards only. Prevents zombie
+     *      shards from draining accrued rewards after going offline.
+     *      Operators can reclaim by heartbeating first. If they fail to
+     *      heartbeat within the grace window, any caller can reap the shard
+     *      via deactivateStaleShard and the unclaimed rewards route via the
+     *      standard claim path once reactivated under a new shardId.
      */
     function claimRewards() external nonReentrant {
         bytes32 shardId = operatorShard[msg.sender];
         if (shardId == bytes32(0)) revert NotRegistered();
 
+        Shard storage shard = shards[shardId];
+        if (!shard.active) revert NotActive();
+        if (_isStale(shard)) revert ShardStale();
+
         _claimRewards(shardId);
+    }
+
+    /**
+     * @notice C10-AUDIT-2: Permissionless cleanup of stale (non-heartbeating) shards.
+     *         Any caller can invoke after the grace window. Removes shard's weight
+     *         from the active pool so future rewards flow to live operators, and
+     *         returns the stake to the operator (no slash — this is eviction, not fraud).
+     *
+     * @dev The operator forfeits their accumulated rewardDebt surplus (which would
+     *      have been earnable via heartbeat + claim) as the stake-removal side-effect.
+     *      If you don't want to lose it, heartbeat within the grace window.
+     */
+    function deactivateStaleShard(bytes32 shardId) external nonReentrant {
+        Shard storage shard = shards[shardId];
+        if (shard.operator == address(0)) revert NotRegistered();
+        if (!shard.active) revert NotActive();
+        if (!_isStale(shard)) revert ShardNotStale();
+
+        // Remove weight from active pool. We do NOT credit the stale shard with
+        // pending rewards here — those were forfeited by going silent.
+        totalWeight -= _shardWeight(shard);
+
+        shard.active = false;
+        activeShardCount--;
+        totalStaked -= shard.stake;
+        totalCellsServed -= shard.cellsServed;
+
+        address operator = shard.operator;
+        uint256 stakeReturn = shard.stake;
+        shard.stake = 0;
+        shard.rewardDebt = 0; // forfeit pending surplus
+        operatorShard[operator] = bytes32(0);
+
+        ckbToken.safeTransfer(operator, stakeReturn);
+
+        emit StaleShardReaped(shardId, msg.sender, stakeReturn);
+        emit ShardDeactivated(shardId, "stale");
+    }
+
+    /// @dev C10-AUDIT-2: Shard is stale if its last heartbeat is older than the grace window.
+    function _isStale(Shard storage shard) internal view returns (bool) {
+        return block.timestamp > shard.lastHeartbeat + HEARTBEAT_GRACE;
+    }
+
+    /// @notice View: is this shard currently stale?
+    function isStale(bytes32 shardId) external view returns (bool) {
+        Shard storage shard = shards[shardId];
+        if (shard.operator == address(0) || !shard.active) return false;
+        return block.timestamp > shard.lastHeartbeat + HEARTBEAT_GRACE;
     }
 
     function _claimRewards(bytes32 shardId) internal {

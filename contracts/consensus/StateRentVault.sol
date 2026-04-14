@@ -139,7 +139,11 @@ contract StateRentVault is
     function destroyCell(bytes32 cellId) external nonReentrant {
         Cell storage cell = cells[cellId];
         if (!cell.active) revert CellNotFound();
-        if (cell.owner != msg.sender && !cellManagers[msg.sender]) revert NotCellOwner();
+        // C10-AUDIT-6: Removed the `cellManagers[msg.sender]` override. Any
+        // registered cell manager could previously destroy ANY cell — including
+        // cells created by a different manager. Only the cell's owner (which is
+        // the manager that originally created it) can destroy it now.
+        if (cell.owner != msg.sender) revert NotCellOwner();
 
         uint256 capacity = cell.capacity;
         address cellOwner = cell.owner;
@@ -148,6 +152,18 @@ contract StateRentVault is
         cell.capacity = 0;
         cellCount[cellOwner]--;
         activeCellCount--;
+
+        // C10-AUDIT-8: Swap-and-pop the cellId out of ownerCells so the
+        // enumeration array doesn't grow unboundedly with destroyed entries.
+        bytes32[] storage ids = ownerCells[cellOwner];
+        uint256 n = ids.length;
+        for (uint256 i = 0; i < n; i++) {
+            if (ids[i] == cellId) {
+                ids[i] = ids[n - 1];
+                ids.pop();
+                break;
+            }
+        }
 
         // Unlock CKB-native tokens back to cell owner
         ckbToken.unlock(cellOwner, capacity);

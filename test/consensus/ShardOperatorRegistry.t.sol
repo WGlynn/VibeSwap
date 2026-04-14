@@ -490,4 +490,132 @@ contract ShardOperatorRegistryTest is Test {
         registry.distributeRewards(100e18);
         assertGt(registry.pendingRewards(op1), 0);
     }
+
+    // ============ C10-AUDIT-2: Heartbeat Liveness ============
+
+    /// @notice A shard is not stale immediately after registration.
+    function test_isStale_freshRegistration() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        assertFalse(registry.isStale(shard1));
+    }
+
+    /// @notice A shard becomes stale after HEARTBEAT_GRACE passes without heartbeat.
+    function test_isStale_afterGraceWindow() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        // Warp past grace (48h default)
+        vm.warp(block.timestamp + 48 hours + 1);
+        assertTrue(registry.isStale(shard1));
+    }
+
+    /// @notice Stale shard cannot report cells — forces heartbeat first.
+    function test_reportCellsServed_revertsWhenStale() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.reportCellsServed(100);
+
+        vm.warp(block.timestamp + 48 hours + 1);
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.ShardStale.selector);
+        registry.reportCellsServed(200);
+    }
+
+    /// @notice Stale shard cannot claim — forces heartbeat first.
+    function test_claimRewards_revertsWhenStale() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.reportCellsServed(100);
+        vm.prank(controller);
+        registry.distributeRewards(1000e18);
+
+        vm.warp(block.timestamp + 48 hours + 1);
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.ShardStale.selector);
+        registry.claimRewards();
+    }
+
+    /// @notice Heartbeating refreshes the liveness window.
+    function test_heartbeat_refreshesLiveness() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        vm.warp(block.timestamp + 40 hours); // inside grace still
+        vm.prank(op1);
+        registry.heartbeat();
+
+        // Now 40h + 48h = 88h from start. isStale should be false because
+        // grace is measured from lastHeartbeat, which just got refreshed.
+        vm.warp(block.timestamp + 40 hours);
+        assertFalse(registry.isStale(shard1));
+    }
+
+    /// @notice Anyone can reap a stale shard — no authorization required.
+    function test_deactivateStaleShard_permissionless() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.reportCellsServed(100);
+
+        uint256 activeBefore = registry.activeShardCount();
+        uint256 stakedBefore = registry.totalStaked();
+
+        vm.warp(block.timestamp + 48 hours + 1);
+
+        // Random stranger (op2) reaps the stale shard
+        vm.prank(op2);
+        registry.deactivateStaleShard(shard1);
+
+        assertEq(registry.activeShardCount(), activeBefore - 1);
+        assertEq(registry.totalStaked(), stakedBefore - STAKE);
+        assertEq(registry.operatorShard(op1), bytes32(0), "op1 can re-register");
+        assertFalse(registry.getShard(shard1).active);
+    }
+
+    /// @notice Stake is returned to the reaped operator, not the reaper (no theft vector).
+    function test_deactivateStaleShard_returnsStakeToOperator() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        uint256 op1Before = ckb.balanceOf(op1);
+        uint256 reaperBefore = ckb.balanceOf(op2);
+
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(op2);
+        registry.deactivateStaleShard(shard1);
+
+        assertEq(ckb.balanceOf(op1), op1Before + STAKE, "stake returned to op1");
+        assertEq(ckb.balanceOf(op2), reaperBefore, "reaper got nothing");
+    }
+
+    /// @notice Cannot reap a live (heartbeating) shard.
+    function test_deactivateStaleShard_revertsWhenLive() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        vm.prank(op2);
+        vm.expectRevert(ShardOperatorRegistry.ShardNotStale.selector);
+        registry.deactivateStaleShard(shard1);
+    }
+
+    /// @notice Reaped operator can re-register with a new shardId.
+    function test_deactivateStaleShard_operatorCanReregister() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(op2);
+        registry.deactivateStaleShard(shard1);
+
+        // op1 got stake back — re-approves and registers under new shardId
+        vm.prank(op1);
+        registry.registerShard(shard2, STAKE);
+        assertEq(registry.operatorShard(op1), shard2);
+    }
 }

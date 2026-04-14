@@ -1,9 +1,9 @@
-# Session State — 2026-04-13
+# Session State — 2026-04-14
 
 ## Block Header
-- **Session**: RSI C8 Phase 8.4 (JULBridge rebase-invariant rate limit) — C7 deferred slate fully closed
+- **Session**: RSI C9 — audit of C8 patches + deploy simulation. 1 CRIT + 2 MED + 2 LOW fixed. Post-Upgrade Init Gate primitive extracted.
 - **Branch**: `master`
-- **Commit**: `f8285526`
+- **Commit**: `8af15911`
 - **Status**: CLEAN — committed, pushed (state commit follows)
 
 ## Completed This Session
@@ -39,9 +39,15 @@
 
 ## Pending / Next Session
 
-1. **Deploy 8.1/8.2/8.3/8.4** — Upgrade proxies, then:
-   - Run `RegisterOffCirculationHolders.s.sol` for NCI, VibeStable, JCV
-   - Call `JULBridge.setInternalRateLimit(100_000e18)` post-upgrade (default 0 denies all bridges)
+1. **Deploy C8 + C9** — Upgrade proxies:
+   - Package CKB + Issuance upgrades with `RegisterOffCirculationHolders.s.sol` post-step
+   - Package JCV upgrade as `upgradeToAndCall(newImpl, migrateToInternalBacking.selector)` with active receipt IDs + scalar
+   - Package JULBridge upgrade as `upgradeToAndCall(newImpl, initializeV2.selector)` with `100_000e18`
+   - All `upgradeToAndCall` — never bare `upgradeTo` (avoids unseeded-state window)
+2. **Cycle 10 options** (next RSI loop):
+   - C10-A: LOW-5 (timelock on setOffCirculationHolder) — governance design call, needs Will input
+   - C10-B: Fresh scope — audit DAOShelter + StateRentVault + ShardOperatorRegistry (untouched by C8-C9)
+   - C10-C: Property-based fuzzing for rebase-invariant accounting class
 3. **CogCoin domain registration** — Blocked on 0.001 BTC. Dad + cousin declined. Not rushing — early mining isn't worth $70 without deeper conviction.
 4. **Medium rollout** — 8 drafts ready, pipeline configured, not yet published
 
@@ -61,16 +67,21 @@
 
 ### Modified
 - `.claude/settings.json` (4 new hooks)
-- `contracts/monetary/CKBNativeToken.sol` (off-circulation registry)
+- `contracts/monetary/CKBNativeToken.sol` (off-circulation registry + C9 self/EOA guards)
 - `contracts/consensus/SecondaryIssuanceController.sol` (uses offCirculation)
-- `contracts/monetary/JarvisComputeVault.sol` (rebase-invariant backing)
-- `test/monetary/JarvisComputeVault.t.sol` (MockJUL.internalBalanceOf)
-- `contracts/monetary/JULBridge.sol` (Phase 8.4: rebase-invariant rate limit)
-- `test/monetary/JULBridge.t.sol` (10 new tests + MockJUL scalar support)
+- `contracts/monetary/JarvisComputeVault.sol` (rebase-invariant backing + C9 migration gate + fraud-slashed expire guard)
+- `test/monetary/JarvisComputeVault.t.sol` (MockJUL.internalBalanceOf + C9 migration + fraud tests)
+- `contracts/monetary/JULBridge.sol` (Phase 8.4: rebase-invariant rate limit + C9 initializeV2)
+- `test/monetary/JULBridge.t.sol` (10 C8 tests + 5 C9 initializeV2 tests + MockJUL scalar support)
 - `test/integration/ThreeTokenConsensus.t.sol` (MockJULIntegration.internalBalanceOf)
+- `test/monetary/OffCirculation.t.sol` (etch holder mocks + 3 C9 guard tests)
+- `test/consensus/IssuanceWithOffCirculation.t.sol` (etch nciMock)
 
-### New this phase
-- `memory/primitive_rebase-invariant-accounting.md` (generalizes Phases 8.3 + 8.4)
+### New this session
+- `memory/primitive_rebase-invariant-accounting.md` (C8 8.3 + 8.4)
+- `memory/primitive_post-upgrade-initialization-gate.md` (C9 CRIT-1 + MED-3)
+- `memory/feedback_autonomy-grant-2026-04-13.md` (scope-bounded autonomy rule)
+- `test/deployment/C8DeploySimulation.t.sol` (9 tests)
 
 ## Previous Sessions
 - Cross-ref audit + RSI C7 (2026-04-12): 470+ docs, 276 cross-refs, 4 integration seam fixes

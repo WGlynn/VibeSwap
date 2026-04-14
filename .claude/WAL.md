@@ -1,24 +1,29 @@
-# Write-Ahead Log — CLEAN (C9 in-flight, fixes committed)
+# Write-Ahead Log — CLEAN (C10 fixes committed)
 
 ## Current Epoch
 - **Started**: 2026-04-14
-- **Intent**: RSI C9 — audit C8 patches + deploy simulation
+- **Intent**: RSI C9 + C10 — audit C8 patches, then fresh-scope audit of 3 consensus contracts
 - **Parent Commit**: `7a2ac5fb`
-- **Current Commit**: `8af15911`
+- **Current Commit**: `01530cd8`
 - **Branch**: master
 - **Status**: CLEAN — fix commits pushed; state commit pending
 
-## Tasks — C9
-- [x] Deploy simulation tests (9 tests, commit `6814f38a`)
-- [x] Adversarial audit via opus agent (8 findings returned)
-- [x] CRIT-1 fix: JCV backing migration gate + reinitializer
-- [x] MED-2 fix: expireCredits fraudSlashed guard
-- [x] MED-3 fix: JULBridge initializeV2 reinitializer
-- [x] LOW-4 fix: self-registration blocked in setOffCirculationHolder
-- [x] LOW-6 fix: code.length check on enable path
-- [x] 11 new tests across OffCirculation, JCV, JULBridge, C8DeploySimulation
-- [x] Primitive: Post-Upgrade Initialization Gate
-- [x] Commit `8af15911` + push
+## Tasks — C10
+- [x] C10 adversarial audit via opus agent (10 findings: 4 HIGH + 2 MED + 3 LOW + 1 INFO)
+- [x] AUDIT-1 fix: SOR added to RegisterOffCirculationHolders.s.sol
+- [x] AUDIT-2 fix: heartbeat gates + deactivateStaleShard in SOR
+- [x] AUDIT-4 fix: try/catch daoShare with balance-delta reroute in controller
+- [x] AUDIT-5 fix: shelter double-registration subtract-guard in controller
+- [x] AUDIT-6 fix: destroyCell scoped to owner (removed cellManager override)
+- [x] AUDIT-8 fix: swap-and-pop ownerCells on destroy
+- [x] AUDIT-9 fix: nonReentrant on reportCellsServed
+- [x] 13 new tests across SOR / SRV / IssuanceOffCirc
+- [x] Primitive: Enforced Liveness Signal
+- [x] Commit `01530cd8` + push
+- [ ] DEFERRED: AUDIT-3 HIGH (self-reported cellsServed) — needs Will's design call
+
+## Prior tasks — C9 (complete)
+- See previous epoch section if needed
 
 ## Tasks
 - [x] JULBridge.sol: IJouleInternal interface, internal rate limit state/gate

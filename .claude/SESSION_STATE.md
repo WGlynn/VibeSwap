@@ -1,9 +1,9 @@
 # Session State — 2026-04-14
 
 ## Block Header
-- **Session**: RSI C9 — audit of C8 patches + deploy simulation. 1 CRIT + 2 MED + 2 LOW fixed. Post-Upgrade Init Gate primitive extracted.
+- **Session**: RSI C10 — fresh-scope audit of DAOShelter/StateRentVault/ShardOperatorRegistry. 3 HIGH + 2 MED + 2 LOW fixed. Enforced Liveness Signal extracted. AUDIT-3 deferred for design call.
 - **Branch**: `master`
-- **Commit**: `8af15911`
+- **Commit**: `01530cd8`
 - **Status**: CLEAN — committed, pushed (state commit follows)
 
 ## Completed This Session
@@ -39,15 +39,20 @@
 
 ## Pending / Next Session
 
-1. **Deploy C8 + C9** — Upgrade proxies:
-   - Package CKB + Issuance upgrades with `RegisterOffCirculationHolders.s.sol` post-step
+1. **Deploy C8 + C9 + C10** — Upgrade proxies:
+   - Package CKB + Issuance upgrades with `RegisterOffCirculationHolders.s.sol` post-step (now also registers SOR per C10-AUDIT-1)
    - Package JCV upgrade as `upgradeToAndCall(newImpl, migrateToInternalBacking.selector)` with active receipt IDs + scalar
    - Package JULBridge upgrade as `upgradeToAndCall(newImpl, initializeV2.selector)` with `100_000e18`
    - All `upgradeToAndCall` — never bare `upgradeTo` (avoids unseeded-state window)
-2. **Cycle 10 options** (next RSI loop):
-   - C10-A: LOW-5 (timelock on setOffCirculationHolder) — governance design call, needs Will input
-   - C10-B: Fresh scope — audit DAOShelter + StateRentVault + ShardOperatorRegistry (untouched by C8-C9)
-   - C10-C: Property-based fuzzing for rebase-invariant accounting class
+2. **C10-AUDIT-3 design call** (HIGH, deferred): cellsServed self-reported sybil vector. Needs decision on attestation scheme:
+   - Oracle-signed receipts (1 designated address signs per-epoch reports)
+   - Committee-verified Merkle root (challenge game)
+   - Peer-staked challenge-response (validator-mode extension)
+   - Interim: keep 1e12 overflow cap, accept sybil risk for testnet
+3. **Cycle 11 options**:
+   - C11-A: AUDIT-3 oracle-role implementation (once Will decides)
+   - C11-B: Fresh scope — audit NCI again (rebase-invariant accounting wasn't designed for consensus paths, may have crept in)
+   - C11-C: Property-based fuzzing — offCirculation invariants under registration churn
 3. **CogCoin domain registration** — Blocked on 0.001 BTC. Dad + cousin declined. Not rushing — early mining isn't worth $70 without deeper conviction.
 4. **Medium rollout** — 8 drafts ready, pipeline configured, not yet published
 
@@ -80,8 +85,18 @@
 ### New this session
 - `memory/primitive_rebase-invariant-accounting.md` (C8 8.3 + 8.4)
 - `memory/primitive_post-upgrade-initialization-gate.md` (C9 CRIT-1 + MED-3)
+- `memory/primitive_enforced-liveness-signal.md` (C10 AUDIT-2)
 - `memory/feedback_autonomy-grant-2026-04-13.md` (scope-bounded autonomy rule)
 - `test/deployment/C8DeploySimulation.t.sol` (9 tests)
+
+### C10 modifications
+- `contracts/consensus/ShardOperatorRegistry.sol` (heartbeat gates + deactivateStaleShard + nonReentrant)
+- `contracts/consensus/StateRentVault.sol` (scope destroy to owner + ownerCells purge)
+- `contracts/consensus/SecondaryIssuanceController.sol` (try/catch daoShare + shelter double-reg guard)
+- `script/RegisterOffCirculationHolders.s.sol` (+ SOR registration)
+- `test/consensus/ShardOperatorRegistry.t.sol` (+9 C10 tests)
+- `test/consensus/StateRentVault.t.sol` (+3 C10 tests)
+- `test/consensus/IssuanceWithOffCirculation.t.sol` (+1 C10 test)
 
 ## Previous Sessions
 - Cross-ref audit + RSI C7 (2026-04-12): 470+ docs, 276 cross-refs, 4 integration seam fixes

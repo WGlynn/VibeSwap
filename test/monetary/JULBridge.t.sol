@@ -6,13 +6,32 @@ import "../../contracts/monetary/JULBridge.sol";
 import "../../contracts/monetary/CKBNativeToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/// @notice Mock JUL token for testing (simplified — no rebase)
+/// @notice Mock JUL token for testing.
+/// @dev    Internal balance is the rebase-invariant unit. External (display)
+///         balance = internal * rebaseScalar / 1e18. Default scalar = 1e18 so
+///         legacy tests that ignore rebase still see 1:1 mapping.
 contract MockJUL {
-    mapping(address => uint256) public balanceOf;
+    mapping(address => uint256) internal _internalBalance;
     mapping(address => mapping(address => uint256)) public allowance;
+    uint256 public rebaseScalar = 1e18;
 
+    function balanceOf(address account) public view returns (uint256) {
+        return (_internalBalance[account] * rebaseScalar) / 1e18;
+    }
+
+    function internalBalanceOf(address account) external view returns (uint256) {
+        return _internalBalance[account];
+    }
+
+    /// @dev Test helper: scales the supply (positive or negative rebase).
+    function setRebaseScalar(uint256 newScalar) external {
+        require(newScalar > 0, "zero scalar");
+        rebaseScalar = newScalar;
+    }
+
+    /// @dev Mint by external (display) amount. Internal credit = amount/scalar.
     function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
+        _internalBalance[to] += (amount * 1e18) / rebaseScalar;
     }
 
     function approve(address spender, uint256 amount) external returns (bool) {
@@ -21,11 +40,14 @@ contract MockJUL {
     }
 
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(balanceOf[from] >= amount, "insufficient");
+        require(balanceOf(from) >= amount, "insufficient");
         require(allowance[from][msg.sender] >= amount, "no allowance");
-        balanceOf[from] -= amount;
+        // Convert external amount to internal units for storage
+        uint256 internalAmount = (amount * 1e18) / rebaseScalar;
+        require(_internalBalance[from] >= internalAmount, "insufficient internal");
+        _internalBalance[from] -= internalAmount;
         allowance[from][msg.sender] -= amount;
-        balanceOf[to] += amount;
+        _internalBalance[to] += internalAmount;
         return true;
     }
 }
@@ -38,6 +60,15 @@ contract JULBridgeTest is Test {
     address owner = makeAddr("owner");
     address user1 = makeAddr("user1");
     address user2 = makeAddr("user2");
+
+    // Mirror of the event declared on JULBridge — Solidity requires an accessible
+    // declaration for `emit X(...)` expectations at this call site.
+    event BridgedInternal(
+        address indexed user,
+        uint256 internalJulBurned,
+        uint256 externalJulBurned,
+        uint256 ckbMinted
+    );
 
     function setUp() public {
         // Deploy mock JUL
@@ -139,7 +170,7 @@ contract JULBridgeTest is Test {
     // ============ Rate Limiting ============
 
     function test_rateLimitPreventsExcessiveConversion() public {
-        // Default: 100K per epoch
+        // Default: 100K internal JUL per epoch (C7-GOV-005)
         jul.mint(user1, 200_000e18);
 
         vm.startPrank(user1);
@@ -148,8 +179,8 @@ contract JULBridgeTest is Test {
         // First 100K succeeds
         bridge.bridge(100_000e18);
 
-        // Next 1 fails — rate limited
-        vm.expectRevert(JULBridge.RateLimitExceeded.selector);
+        // Next 1 fails — internal rate limit hit
+        vm.expectRevert(JULBridge.InternalRateLimitExceeded.selector);
         bridge.bridge(1e18);
         vm.stopPrank();
     }
@@ -245,5 +276,184 @@ contract JULBridgeTest is Test {
         assertEq(ckb.balanceOf(user1), ckbOut);
         // Bridge holds the JUL
         assertGe(jul.balanceOf(address(bridge)), amount);
+    }
+
+    // ============ C7-GOV-005: Rebase-Invariant Rate Limiting ============
+
+    /// @notice Under a 2x positive rebase, the OLD (external-units) limit would
+    ///         accommodate HALF as many internal-equivalent JUL, but an attacker
+    ///         bridging 200K display = 100K internal passes the old cap (since
+    ///         100K external default cap would revert before 200K external).
+    ///         Wait — that's the opposite direction. Key insight: with scalar=2x,
+    ///         1 internal = 2 display. An attacker with 200K display (= 100K
+    ///         internal) can only bridge 100K display under the old cap, which
+    ///         is just 50K internal. So positive rebase actually TIGHTENS the old
+    ///         external cap in internal terms — the internal cap lets the full
+    ///         100K internal through.
+    function test_positiveRebaseInternalGateAllowsFull100KInternal() public {
+        // user2 is untouched by setUp. Use it for clean math.
+        jul.mint(user2, 400_000e18); // internal=400K at scalar=1e18
+
+        jul.setRebaseScalar(2e18);
+        // user2 display = 400K * 2 = 800K. internal unchanged.
+        assertEq(jul.balanceOf(user2), 800_000e18);
+
+        vm.startPrank(user2);
+        jul.approve(address(bridge), 800_000e18);
+
+        // Bridge 200K display = 100K internal at 2x scalar. Internal cap = 100K.
+        bridge.bridge(200_000e18);
+        vm.stopPrank();
+
+        assertEq(bridge.internalConvertedThisEpoch(), 100_000e18);
+        assertEq(bridge.convertedThisEpoch(), 200_000e18);
+
+        // Any further bridge must revert on internal cap.
+        vm.startPrank(user2);
+        vm.expectRevert(JULBridge.InternalRateLimitExceeded.selector);
+        bridge.bridge(2e18); // 1 internal unit
+        vm.stopPrank();
+    }
+
+    /// @notice Under a 0.5x negative rebase, 1 internal = 0.5 display. Under the
+    ///         OLD (external) 100K cap, a user could bridge 100K display = 200K
+    ///         internal — DOUBLE the intended limit. The internal gate correctly
+    ///         caps at 100K internal (= 50K display).
+    function test_negativeRebaseInternalGateCapsAt100KInternal() public {
+        jul.mint(user2, 400_000e18); // internal=400K
+
+        jul.setRebaseScalar(0.5e18);
+        // user2 display = 400K * 0.5 = 200K
+        assertEq(jul.balanceOf(user2), 200_000e18);
+
+        vm.startPrank(user2);
+        jul.approve(address(bridge), 200_000e18);
+
+        // 50K display = 100K internal at 0.5x scalar. Hits internal cap exactly.
+        bridge.bridge(50_000e18);
+        vm.stopPrank();
+
+        assertEq(bridge.internalConvertedThisEpoch(), 100_000e18);
+
+        // Under OLD logic user could now bridge another 50K display (still within
+        // 100K external cap) = another 100K internal = 2x intended limit. The
+        // internal gate prevents this.
+        vm.startPrank(user2);
+        vm.expectRevert(JULBridge.InternalRateLimitExceeded.selector);
+        bridge.bridge(1e18); // 2 internal units
+        vm.stopPrank();
+    }
+
+    function test_internalRateLimitResetsNextEpoch() public {
+        jul.mint(user1, 300_000e18);
+
+        vm.startPrank(user1);
+        jul.approve(address(bridge), 300_000e18);
+        bridge.bridge(100_000e18);
+        vm.stopPrank();
+
+        assertEq(bridge.internalConvertedThisEpoch(), 100_000e18);
+        assertEq(bridge.remainingInternalThisEpoch(), 0);
+
+        // Advance past epoch
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        // View reports fresh allowance pre-rollover
+        assertEq(bridge.remainingInternalThisEpoch(), 100_000e18);
+
+        vm.startPrank(user1);
+        bridge.bridge(80_000e18);
+        vm.stopPrank();
+
+        assertEq(bridge.internalConvertedThisEpoch(), 80_000e18);
+    }
+
+    function test_setInternalRateLimit() public {
+        vm.prank(owner);
+        bridge.setInternalRateLimit(50_000e18);
+
+        assertEq(bridge.maxInternalPerEpoch(), 50_000e18);
+
+        jul.mint(user1, 100_000e18);
+        vm.startPrank(user1);
+        jul.approve(address(bridge), 100_000e18);
+        bridge.bridge(50_000e18);
+
+        // Exactly at the new limit
+        vm.expectRevert(JULBridge.InternalRateLimitExceeded.selector);
+        bridge.bridge(1e18);
+        vm.stopPrank();
+    }
+
+    function test_setInternalRateLimitRejectsZero() public {
+        vm.prank(owner);
+        vm.expectRevert(JULBridge.ZeroAmount.selector);
+        bridge.setInternalRateLimit(0);
+    }
+
+    function test_setInternalRateLimitOnlyOwner() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        bridge.setInternalRateLimit(10_000e18);
+    }
+
+    /// @notice Simulates an upgrade where maxInternalPerEpoch defaults to 0.
+    ///         All bridge calls must revert until owner explicitly sets it.
+    function test_zeroInternalLimitDeniesAll() public {
+        // Drop the internal limit to 0 (simulating post-upgrade default)
+        vm.prank(owner);
+        // setInternalRateLimit(0) reverts — use a direct storage write via the
+        // owner-only path: lower to 1 wei, then confirm even 1 internal unit reverts.
+        bridge.setInternalRateLimit(1);
+
+        jul.mint(user1, 10_000e18);
+        vm.startPrank(user1);
+        jul.approve(address(bridge), 10_000e18);
+        // 2e18 external at scalar=1e18 = 2e18 internal > 1 wei cap → reverts
+        vm.expectRevert(JULBridge.InternalRateLimitExceeded.selector);
+        bridge.bridge(2e18);
+        vm.stopPrank();
+    }
+
+    function test_internalTotalsTracked() public {
+        jul.mint(user1, 200_000e18);
+
+        vm.startPrank(user1);
+        jul.approve(address(bridge), 200_000e18);
+        bridge.bridge(10_000e18);
+        bridge.bridge(5_000e18);
+        vm.stopPrank();
+
+        assertEq(bridge.totalJULLocked(), 15_000e18);
+        assertEq(bridge.totalInternalJULLocked(), 15_000e18); // scalar=1e18 → 1:1
+    }
+
+    function test_internalTotalTrackedUnderRebase() public {
+        jul.mint(user1, 200_000e18);
+        jul.setRebaseScalar(2e18);
+
+        vm.startPrank(user1);
+        jul.approve(address(bridge), 200_000e18);
+        // 20_000 display = 10_000 internal under 2x scalar
+        bridge.bridge(20_000e18);
+        vm.stopPrank();
+
+        assertEq(bridge.totalJULLocked(), 20_000e18);         // display units
+        assertEq(bridge.totalInternalJULLocked(), 10_000e18); // rebase-invariant
+    }
+
+    /// @notice BridgedInternal event carries both internal and external amounts
+    ///         for off-chain monitoring.
+    function test_bridgedInternalEventEmitted() public {
+        jul.mint(user1, 10_000e18);
+        jul.setRebaseScalar(2e18); // internal becomes half of display
+
+        vm.startPrank(user1);
+        jul.approve(address(bridge), 10_000e18);
+
+        vm.expectEmit(true, false, false, true, address(bridge));
+        emit BridgedInternal(user1, 500e18, 1000e18, 1000e18);
+        bridge.bridge(1000e18);
+        vm.stopPrank();
     }
 }

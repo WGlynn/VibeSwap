@@ -30,6 +30,13 @@ interface IJULToken {
     function balanceOf(address account) external view returns (uint256);
 }
 
+/// @notice Joule's internal-balance API (pre-rebase scalar). C7-GOV-005: rate
+///         limiting must use rebase-invariant units so the cap doesn't drift
+///         with monetary policy.
+interface IJouleInternal {
+    function internalBalanceOf(address account) external view returns (uint256);
+}
+
 /// @notice Minimal CKB-native interface
 interface ICKBNative {
     function mint(address to, uint256 amount) external;
@@ -55,7 +62,9 @@ contract JULBridge is
     /// @notice MON-004: Maximum rate change per update (10% = 0.1e18)
     uint256 public constant MAX_RATE_DELTA = 0.1e18;
 
-    /// @notice Rate limit: max JUL convertible per epoch
+    /// @notice DEPRECATED (C7-GOV-005): rate limit in EXTERNAL (post-rebase) JUL.
+    /// @dev    Kept in storage for backward-compat views. No longer enforced.
+    ///         The active gate is `maxInternalPerEpoch`.
     uint256 public maxPerEpoch;
 
     /// @notice Epoch duration for rate limiting
@@ -63,9 +72,12 @@ contract JULBridge is
 
     /// @notice Current epoch tracking
     uint256 public currentEpochStart;
+    /// @notice DEPRECATED (C7-GOV-005): tracks EXTERNAL JUL converted this epoch.
+    /// @dev    Still updated for view consumers. The enforcement counter is
+    ///         `internalConvertedThisEpoch`.
     uint256 public convertedThisEpoch;
 
-    /// @notice Total JUL permanently locked in this contract
+    /// @notice Total JUL permanently locked in this contract (external display amount)
     uint256 public totalJULLocked;
 
     /// @notice Total CKB-native minted through this bridge
@@ -74,8 +86,24 @@ contract JULBridge is
     /// @notice Pause flag
     bool public paused;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    // ============ C7-GOV-005: Rebase-invariant rate limit ============
+
+    /// @notice Rate limit in INTERNAL (pre-rebase) JUL units per epoch.
+    /// @dev    The actual enforcement counter. Internal units are rebase-invariant,
+    ///         so the cap reflects the same amount of "work-equivalent" JUL across
+    ///         positive and negative rebases. On upgrades, owner MUST call
+    ///         `setInternalRateLimit` before the first bridge call (default 0
+    ///         denies all conversions).
+    uint256 public maxInternalPerEpoch;
+
+    /// @notice Internal (pre-rebase) JUL converted in the current epoch.
+    uint256 public internalConvertedThisEpoch;
+
+    /// @notice Total internal (pre-rebase) JUL ever locked in this contract.
+    uint256 public totalInternalJULLocked;
+
+    /// @dev Reserved storage gap for future upgrades (50 → 47 after C7-GOV-005)
+    uint256[47] private __gap;
 
     // ============ Events ============
 
@@ -85,16 +113,27 @@ contract JULBridge is
         uint256 ckbMinted,
         uint256 exchangeRate
     );
+    /// @dev `internalJulBurned` field added in C7-GOV-005 for off-chain monitoring
+    ///      of rebase-adjusted bridge volume.
+    event BridgedInternal(
+        address indexed user,
+        uint256 internalJulBurned,
+        uint256 externalJulBurned,
+        uint256 ckbMinted
+    );
     event ExchangeRateUpdated(uint256 oldRate, uint256 newRate);
     event RateLimitUpdated(uint256 maxPerEpoch, uint256 epochDuration);
+    event InternalRateLimitUpdated(uint256 maxInternalPerEpoch);
     event BridgePaused(bool paused);
 
     // ============ Errors ============
 
     error ZeroAmount();
     error RateLimitExceeded();
+    error InternalRateLimitExceeded();
     error BridgeIsPaused();
     error ZeroAddress();
+    error ZeroInternalDelta();
 
     // ============ Initializer ============
 
@@ -118,7 +157,8 @@ contract JULBridge is
         ckbNativeToken = ICKBNative(_ckbNativeToken);
 
         exchangeRate = 1e18; // 1:1 initial rate
-        maxPerEpoch = 100_000e18; // 100K JUL per epoch
+        maxPerEpoch = 100_000e18; // 100K JUL per epoch (DEPRECATED, see maxInternalPerEpoch)
+        maxInternalPerEpoch = 100_000e18; // C7-GOV-005: 100K internal JUL per epoch (active gate)
         epochDuration = 1 hours;
         currentEpochStart = block.timestamp;
     }
@@ -137,29 +177,45 @@ contract JULBridge is
         if (paused) revert BridgeIsPaused();
         if (julAmount == 0) revert ZeroAmount();
 
-        // Epoch rollover
+        // Epoch rollover (resets both external and internal counters)
         _checkEpoch();
 
-        // Rate limit check
-        if (convertedThisEpoch + julAmount > maxPerEpoch) revert RateLimitExceeded();
-
-        // Calculate CKB-native output
+        // Calculate CKB-native output (still based on external display amount —
+        // user is paying with their displayed JUL, exchange rate is in display units)
         ckbAmount = (julAmount * exchangeRate) / 1e18;
         if (ckbAmount == 0) revert ZeroAmount();
 
-        // MON-014: Update state BEFORE external calls (CEI pattern)
-        convertedThisEpoch += julAmount;
-        totalJULLocked += julAmount;
-        totalCKBMinted += ckbAmount;
+        // C7-GOV-005: Measure INTERNAL delta and gate on rebase-invariant units.
+        // Snapshot before, transfer, snapshot after — the difference is independent
+        // of the current rebase scalar, so the rate limit doesn't drift with monetary
+        // policy. The transfer is reverted on failure (require below).
+        uint256 internalBefore = IJouleInternal(address(julToken)).internalBalanceOf(address(this));
 
         // MON-002: Check transferFrom return value — JUL is custom ERC20
         bool success = julToken.transferFrom(msg.sender, address(this), julAmount);
         require(success, "JUL transfer failed");
 
+        uint256 internalAfter = IJouleInternal(address(julToken)).internalBalanceOf(address(this));
+        uint256 internalDelta = internalAfter - internalBefore;
+        if (internalDelta == 0) revert ZeroInternalDelta();
+
+        // C7-GOV-005: Internal-units gate (the actual enforcement)
+        if (internalConvertedThisEpoch + internalDelta > maxInternalPerEpoch) {
+            revert InternalRateLimitExceeded();
+        }
+
+        // Update accounting (CEI ordering already satisfied — only mint() remains)
+        internalConvertedThisEpoch += internalDelta;
+        totalInternalJULLocked += internalDelta;
+        convertedThisEpoch += julAmount;       // backward-compat tracker (display units)
+        totalJULLocked += julAmount;           // backward-compat tracker (display units)
+        totalCKBMinted += ckbAmount;
+
         // Mint CKB-native to sender
         ckbNativeToken.mint(msg.sender, ckbAmount);
 
         emit Bridged(msg.sender, julAmount, ckbAmount, exchangeRate);
+        emit BridgedInternal(msg.sender, internalDelta, julAmount, ckbAmount);
     }
 
     // ============ Admin ============
@@ -184,13 +240,27 @@ contract JULBridge is
     }
 
     /**
-     * @notice Update rate limit parameters
+     * @notice DEPRECATED (C7-GOV-005): updates the legacy display-unit limit which
+     *         is no longer enforced. Kept for migration / view consumers.
+     *         Use `setInternalRateLimit` to change the active gate.
      */
     function setRateLimit(uint256 _maxPerEpoch, uint256 _epochDuration) external onlyOwner {
         if (_maxPerEpoch == 0 || _epochDuration == 0) revert ZeroAmount();
         maxPerEpoch = _maxPerEpoch;
         epochDuration = _epochDuration;
         emit RateLimitUpdated(_maxPerEpoch, _epochDuration);
+    }
+
+    /**
+     * @notice C7-GOV-005: Update the rebase-invariant rate limit (active gate).
+     * @dev    Internal units are pre-rebase JUL — the cap is invariant under
+     *         rebase scalar changes. After upgrading existing proxies, owner
+     *         MUST call this before the next bridge call (default 0 denies all).
+     */
+    function setInternalRateLimit(uint256 _maxInternalPerEpoch) external onlyOwner {
+        if (_maxInternalPerEpoch == 0) revert ZeroAmount();
+        maxInternalPerEpoch = _maxInternalPerEpoch;
+        emit InternalRateLimitUpdated(_maxInternalPerEpoch);
     }
 
     /**
@@ -203,12 +273,25 @@ contract JULBridge is
 
     // ============ View Functions ============
 
-    /// @notice Remaining JUL convertible in the current epoch
+    /// @notice DEPRECATED (C7-GOV-005): legacy display-units remaining.
+    ///         No longer reflects the real gate. Use `remainingInternalThisEpoch`.
     function remainingThisEpoch() external view returns (uint256) {
         if (block.timestamp >= currentEpochStart + epochDuration) {
             return maxPerEpoch; // New epoch would start on next bridge call
         }
         return maxPerEpoch > convertedThisEpoch ? maxPerEpoch - convertedThisEpoch : 0;
+    }
+
+    /// @notice C7-GOV-005: Remaining INTERNAL JUL convertible in the current epoch.
+    /// @dev    This is the actually-enforced limit. Compare against the internal
+    ///         delta a deposit would produce (depositAmount / rebaseScalar at deposit time).
+    function remainingInternalThisEpoch() external view returns (uint256) {
+        if (block.timestamp >= currentEpochStart + epochDuration) {
+            return maxInternalPerEpoch; // Next bridge call rolls the epoch
+        }
+        return maxInternalPerEpoch > internalConvertedThisEpoch
+            ? maxInternalPerEpoch - internalConvertedThisEpoch
+            : 0;
     }
 
     /// @notice Preview how much CKB-native you'd get for a given JUL amount
@@ -227,6 +310,7 @@ contract JULBridge is
             uint256 epochsElapsed = elapsed / epochDuration;
             currentEpochStart += epochsElapsed * epochDuration;
             convertedThisEpoch = 0;
+            internalConvertedThisEpoch = 0; // C7-GOV-005: roll the active counter
         }
     }
 

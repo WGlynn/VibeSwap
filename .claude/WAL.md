@@ -1,12 +1,24 @@
-# Write-Ahead Log — CLEAN
+# Write-Ahead Log — CLEAN (C9 in-flight, fixes committed)
 
 ## Current Epoch
-- **Started**: 2026-04-13 (continuation)
-- **Intent**: RSI C8 Phase 8.4 — JULBridge rebase-invariant rate limit
-- **Parent Commit**: `a97ede2c`
-- **Current Commit**: `f8285526`
+- **Started**: 2026-04-14
+- **Intent**: RSI C9 — audit C8 patches + deploy simulation
+- **Parent Commit**: `7a2ac5fb`
+- **Current Commit**: `8af15911`
 - **Branch**: master
-- **Status**: CLEAN — committed; state commit pending
+- **Status**: CLEAN — fix commits pushed; state commit pending
+
+## Tasks — C9
+- [x] Deploy simulation tests (9 tests, commit `6814f38a`)
+- [x] Adversarial audit via opus agent (8 findings returned)
+- [x] CRIT-1 fix: JCV backing migration gate + reinitializer
+- [x] MED-2 fix: expireCredits fraudSlashed guard
+- [x] MED-3 fix: JULBridge initializeV2 reinitializer
+- [x] LOW-4 fix: self-registration blocked in setOffCirculationHolder
+- [x] LOW-6 fix: code.length check on enable path
+- [x] 11 new tests across OffCirculation, JCV, JULBridge, C8DeploySimulation
+- [x] Primitive: Post-Upgrade Initialization Gate
+- [x] Commit `8af15911` + push
 
 ## Tasks
 - [x] JULBridge.sol: IJouleInternal interface, internal rate limit state/gate

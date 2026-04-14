@@ -1,10 +1,10 @@
 # Session State — 2026-04-13
 
 ## Block Header
-- **Session**: API Death Shield + CogCoin Miner TRP + RSI C8 Phases 8.1/8.2/8.3
+- **Session**: RSI C8 Phase 8.4 (JULBridge rebase-invariant rate limit) — C7 deferred slate fully closed
 - **Branch**: `master`
-- **Commit**: `a97ede2c`
-- **Status**: CLEAN — all work committed, tested, pushed
+- **Commit**: `f8285526`
+- **Status**: CLEAN — committed, pushed (state commit follows)
 
 ## Completed This Session
 
@@ -24,24 +24,24 @@
 - Empirical benchmark: Gemini Flash 67% vs Llama 4 Scout 0% gate-pass (Gemini promoted to primary)
 - Block watcher mode (mempool.space integration)
 
-### VibeSwap RSI Cycle 8 — ALL C7 DEFERRED HIGHs CLOSED
+### VibeSwap RSI Cycle 8 — ALL C7 DEFERRED FINDINGS CLOSED
 - **Phase 8.1** (`a1f73675`): CKBNativeToken off-circulation registry. 17 new tests.
 - **Phase 8.2** (`9aee1ee2`): SecondaryIssuanceController uses offCirculation(). 3 new tests.
 - **Phase 8.3** (`a97ede2c`): JarvisComputeVault rebase-invariant backing. 6 new tests.
-- **Findings closed**: C7-GOV-001 (HIGH), C7-GOV-007 (MED), C7-GOV-006 (HIGH)
-- **Primitives extracted**: Off-Circulation Registry Pattern
+- **Phase 8.4** (this session): JULBridge rebase-invariant rate limit. 10 new tests.
+- **Findings closed**: C7-GOV-001 (HIGH), C7-GOV-007 (MED), C7-GOV-006 (HIGH), C7-GOV-005 (MED)
+- **Primitives extracted**: Off-Circulation Registry Pattern, Rebase-Invariant Accounting
 - **Deploy script**: `script/RegisterOffCirculationHolders.s.sol`
-- **Test totals**: 26 new tests, 150 monetary + 107 consensus = **257 tests, 0 regressions**
+- **Test totals**: 36 new tests, 160 monetary + 107 consensus + 4 integration = **271 tests, 0 regressions**
 
 ### Content
 - Medium draft #8 written: "Mining CogCoin on Free-Tier LLMs"
 
 ## Pending / Next Session
 
-1. **RSI C8 Phase 8.4** (C7-GOV-005 MED): JULBridge rate limits in rebased amounts
-   - Same rebase-invariant pattern as 8.3, lower stakes (weakening of protection, not accounting break)
-   - Straightforward follow-up when energy permits
-2. **Deploy 8.1/8.2/8.3** — Upgrade proxies, then run `RegisterOffCirculationHolders.s.sol` for NCI, VibeStable, JCV
+1. **Deploy 8.1/8.2/8.3/8.4** — Upgrade proxies, then:
+   - Run `RegisterOffCirculationHolders.s.sol` for NCI, VibeStable, JCV
+   - Call `JULBridge.setInternalRateLimit(100_000e18)` post-upgrade (default 0 denies all bridges)
 3. **CogCoin domain registration** — Blocked on 0.001 BTC. Dad + cousin declined. Not rushing — early mining isn't worth $70 without deeper conviction.
 4. **Medium rollout** — 8 drafts ready, pipeline configured, not yet published
 
@@ -65,6 +65,12 @@
 - `contracts/consensus/SecondaryIssuanceController.sol` (uses offCirculation)
 - `contracts/monetary/JarvisComputeVault.sol` (rebase-invariant backing)
 - `test/monetary/JarvisComputeVault.t.sol` (MockJUL.internalBalanceOf)
+- `contracts/monetary/JULBridge.sol` (Phase 8.4: rebase-invariant rate limit)
+- `test/monetary/JULBridge.t.sol` (10 new tests + MockJUL scalar support)
+- `test/integration/ThreeTokenConsensus.t.sol` (MockJULIntegration.internalBalanceOf)
+
+### New this phase
+- `memory/primitive_rebase-invariant-accounting.md` (generalizes Phases 8.3 + 8.4)
 
 ## Previous Sessions
 - Cross-ref audit + RSI C7 (2026-04-12): 470+ docs, 276 cross-refs, 4 integration seam fixes

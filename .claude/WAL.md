@@ -1,23 +1,30 @@
 # Write-Ahead Log — CLEAN
 
 ## Current Epoch
-- **Started**: 2026-04-13
-- **Intent**: API Death Shield + CogCoin Miner TRP + RSI C8 (3 phases)
-- **Parent Commit**: `658a2c4c`
-- **Current Commit**: `a97ede2c`
+- **Started**: 2026-04-13 (continuation)
+- **Intent**: RSI C8 Phase 8.4 — JULBridge rebase-invariant rate limit
+- **Parent Commit**: `a97ede2c`
+- **Current Commit**: `f8285526`
 - **Branch**: master
-- **Status**: CLEAN — all work committed, tested, pushed
+- **Status**: CLEAN — committed; state commit pending
 
 ## Tasks
-- [x] API Death Shield: 4 client-side hooks, primitive written
-- [x] CogCoin GitHub issues: client#1 + scoring#1 + follow-ups
-- [x] CogCoin miner TRP: 7 cycles, published, 13 tests passing
-- [x] Medium draft: "Mining CogCoin on Free-Tier LLMs"
-- [x] RSI C8 Phase 8.1: CKBNativeToken off-circulation registry (17 tests)
-- [x] RSI C8 Phase 8.2: SecondaryIssuanceController uses offCirculation (3 tests)
-- [x] RSI C8 Phase 8.3: JCV rebase-invariant backing (6 tests)
-- [x] Deploy script: RegisterOffCirculationHolders.s.sol
-- [x] Primitives: API Death Shield, Off-Circulation Registry
+- [x] JULBridge.sol: IJouleInternal interface, internal rate limit state/gate
+- [x] JULBridge.sol: setInternalRateLimit setter, remainingInternalThisEpoch view
+- [x] JULBridge.sol: _checkEpoch resets internal counter on rollover
+- [x] JULBridge.sol: BridgedInternal event for off-chain monitoring
+- [x] JULBridge.t.sol: MockJUL with rebase scalar, 10 new tests
+- [x] ThreeTokenConsensus.t.sol: MockJULIntegration.internalBalanceOf
+- [x] Rebase-Invariant Accounting primitive written + indexed in MEMORY.md
+- [x] project_full-stack-rsi.md: Phase 8.4 entry + Cycle 8 closed
+- [x] Commit (`f8285526`) + push pending
+
+## Previous Epoch (Shield+Miner+C8 phases 1-3) — CLEAN
+- API Death Shield: 4 client-side hooks, primitive written
+- CogCoin GitHub issues: client#1 + scoring#1 + follow-ups
+- CogCoin miner TRP: 7 cycles, published, 13 tests passing
+- Medium draft: "Mining CogCoin on Free-Tier LLMs"
+- RSI C8 Phase 8.1/8.2/8.3 committed at `a97ede2c`
 
 ## Previous Epochs (most recent first)
 | Epoch | Date | Intent | Parent → Final | Status |

@@ -5,6 +5,12 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
+/// @notice Minimal interface for Joule's internal-balance API (pre-rebase scalar).
+/// @dev Used by JCV to track JUL backing in rebase-invariant units.
+interface IJouleInternal {
+    function internalBalanceOf(address account) external view returns (uint256);
+}
+
 /**
  * @title JarvisComputeVault — JUL-to-Compute Credit Gateway
  * @notice The ONLY way to get Jarvis compute credits is to deposit JUL here.
@@ -146,9 +152,33 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalFraudSlashed;
     uint256 public totalCreditsExpired;
 
+    // ============ C7-GOV-006: Rebase-Invariant Backing ============
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @notice Internal (pre-rebase) JUL amount captured at deposit time per receipt.
+    /// @dev Parallel mapping — avoids changing CreditReceipt struct layout.
+    ///      Converting: external = internal * rebaseScalar / 1e18 at query time.
+    mapping(uint256 => uint256) public internalJulByReceipt;
+
+    /// @notice Original credits issued per receipt (before any consumption).
+    /// @dev Needed because receipt.computeCredits is decremented on consume,
+    ///      losing the original value. Used to compute proportional internal release.
+    mapping(uint256 => uint256) public originalCreditsByReceipt;
+
+    /// @notice Cumulative internal JUL released per receipt (partial + full combined).
+    /// @dev Used with internalJulByReceipt and originalCreditsByReceipt to compute
+    ///      incremental releases correctly across multiple partial consumes.
+    mapping(uint256 => uint256) public internalReleasedByReceipt;
+
+    /// @notice Total active backing in INTERNAL JUL units (rebase-invariant).
+    /// @dev Increments on deposit, decrements proportionally on consume/fraud/expire.
+    ///      withdrawJul() compares vault's internalBalanceOf(Joule) to this value.
+    uint256 public totalActiveInternalJul;
+
+
+    /// @dev Reserved storage gap for future upgrades (reduced 50→46 for 4 new slots:
+    ///      internalJulByReceipt + originalCreditsByReceipt + internalReleasedByReceipt
+    ///      + totalActiveInternalJul)
+    uint256[46] private __gap;
 
     // ============ Events ============
 
@@ -259,22 +289,19 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             miningProofHash
         ));
 
-        // --- Transfer JUL to vault ---
-        (bool transferOk, bytes memory transferData) = julToken.call(
-            abi.encodeWithSignature(
-                "transferFrom(address,address,uint256)",
-                msg.sender,
-                address(this),
-                amount
-            )
-        );
-        require(transferOk && (transferData.length == 0 || abi.decode(transferData, (bool))), "JUL transfer failed");
+        // --- Transfer JUL and capture internal delta (C7-GOV-006) ---
+        uint256 internalDeposited = _transferAndMeasureInternal(msg.sender, amount);
+        require(internalDeposited > 0, "Internal deposit zero");
 
         // --- Issue credit receipt ---
         uint256 credits = amount * CREDITS_PER_JUL / 1e18;
         require(credits > 0, "Credits would be zero");
 
         receiptCount++;
+        // C7-GOV-006: track internal amount for rebase-invariant backing
+        internalJulByReceipt[receiptCount] = internalDeposited;
+        originalCreditsByReceipt[receiptCount] = credits;
+        totalActiveInternalJul += internalDeposited;
         receipts[receiptCount] = CreditReceipt({
             receiptId: receiptCount,
             depositor: msg.sender,
@@ -351,6 +378,9 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         acct.totalCreditsUsed += creditsToUse;
         totalCreditsConsumed += creditsToUse;
 
+        // C7-GOV-006: Release proportional internal JUL backing
+        _releaseInternalBacking(receiptId);
+
         emit CreditConsumed(receiptId, receipt.depositor, creditsToUse);
     }
 
@@ -395,6 +425,11 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         cheater.fraudCount++;
         totalFraudSlashed += slashAmount;
 
+        // C7-GOV-006: Release the ENTIRE remaining internal backing for this receipt.
+        // The receipt is slashed — its remaining credits are invalid and the backing
+        // is no longer "active" for redemption purposes.
+        _releaseRemainingInternalBacking(receiptId);
+
         if (cheater.fraudCount >= MAX_FRAUD_BEFORE_BAN) {
             banned[receipt.depositor] = true;
         }
@@ -421,6 +456,9 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         acct.activeCredits -= slashAmount;
         acct.fraudCount++;
         totalFraudSlashed += slashAmount;
+
+        // C7-GOV-006: Release remaining internal backing for slashed receipt
+        _releaseRemainingInternalBacking(receiptId);
 
         if (acct.fraudCount >= MAX_FRAUD_BEFORE_BAN) {
             banned[cheater] = true;
@@ -452,10 +490,86 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         }
         totalCreditsExpired += expired;
 
+        // C7-GOV-006: Release remaining internal backing for expired receipt
+        _releaseRemainingInternalBacking(receiptId);
+
         emit CreditExpired(receiptId, expired);
     }
 
     // ============ Internal ============
+
+    /**
+     * @notice C7-GOV-006: Perform the JUL transferFrom and return the INTERNAL delta.
+     * @dev Extracted from deposit() to avoid "stack too deep" compilation error.
+     *      Measures internalBalanceOf before/after the transfer — the difference
+     *      is rebase-scalar-invariant (doesn't depend on current scalar).
+     */
+    function _transferAndMeasureInternal(address from, uint256 externalAmount) internal returns (uint256) {
+        uint256 internalBefore = IJouleInternal(julToken).internalBalanceOf(address(this));
+
+        (bool transferOk, bytes memory transferData) = julToken.call(
+            abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)",
+                from,
+                address(this),
+                externalAmount
+            )
+        );
+        require(transferOk && (transferData.length == 0 || abi.decode(transferData, (bool))), "JUL transfer failed");
+
+        uint256 internalAfter = IJouleInternal(julToken).internalBalanceOf(address(this));
+        return internalAfter - internalBefore;
+    }
+
+    /**
+     * @notice C7-GOV-006: Release proportional internal backing for consumed credits.
+     * @dev Uses cumulative accounting to handle partial consumption correctly.
+     *      internalJulByReceipt[id] is the original deposit (never mutated).
+     *      internalReleasedByReceipt[id] tracks how much has already been released.
+     *
+     *      After this call: released = originalDeposit * creditsRetired / originalCredits
+     *      where creditsRetired = originalCredits - remainingCredits.
+     *
+     *      receipt.computeCredits has ALREADY been decremented by the caller when
+     *      this runs, so it reflects post-consume state.
+     */
+    function _releaseInternalBacking(uint256 receiptId) internal {
+        uint256 original = originalCreditsByReceipt[receiptId];
+        if (original == 0) return;  // Legacy receipts (pre-upgrade) have no tracking
+
+        uint256 remainingCredits = receipts[receiptId].computeCredits;
+        uint256 creditsRetired = original - remainingCredits;
+
+        uint256 internalDeposit = internalJulByReceipt[receiptId];
+        uint256 targetReleased = (internalDeposit * creditsRetired) / original;
+
+        uint256 alreadyReleased = internalReleasedByReceipt[receiptId];
+        if (targetReleased <= alreadyReleased) return;  // Nothing new to release (shouldn't happen but safe)
+
+        uint256 toReleaseNow = targetReleased - alreadyReleased;
+        if (toReleaseNow > totalActiveInternalJul) toReleaseNow = totalActiveInternalJul;
+
+        totalActiveInternalJul -= toReleaseNow;
+        internalReleasedByReceipt[receiptId] = alreadyReleased + toReleaseNow;
+    }
+
+    /**
+     * @notice C7-GOV-006: Release ALL remaining internal backing for a fully-retired receipt.
+     * @dev Called on fraud slash and expire. Releases dust left from partial-consume
+     *      integer division, plus the full amount if the receipt was untouched.
+     */
+    function _releaseRemainingInternalBacking(uint256 receiptId) internal {
+        uint256 internalDeposit = internalJulByReceipt[receiptId];
+        uint256 alreadyReleased = internalReleasedByReceipt[receiptId];
+
+        if (internalDeposit <= alreadyReleased) return;
+
+        uint256 remaining = internalDeposit - alreadyReleased;
+        if (remaining > totalActiveInternalJul) remaining = totalActiveInternalJul;
+
+        totalActiveInternalJul -= remaining;
+        internalReleasedByReceipt[receiptId] = internalDeposit;
+    }
 
     /// @dev C5-MON-002: Added address(0) check + EIP-2 s-malleability guard
     function _recoverSigner(bytes32 hash, bytes calldata signature) internal pure returns (address) {
@@ -492,29 +606,37 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     /// @notice Withdraw deposited JUL (protocol treasury)
     /// @dev C5-MON-008: Cannot withdraw more than expired/consumed credits' backing.
-    ///      Active credits must remain backed by JUL in the vault.
+    ///      C7-GOV-006: Backing check is rebase-invariant. Uses Joule's internal
+    ///                  balance (pre-rebase scalar) compared to totalActiveInternalJul.
+    ///                  After a positive rebase, external balance grows but internal
+    ///                  doesn't — owner cannot withdraw the rebase gain, it belongs
+    ///                  proportionally to depositors.
+    ///
+    ///      The owner's withdrawal request is in external JUL units (natural).
+    ///      We capture internal balance before/after the transfer to determine
+    ///      how much internal was actually sent out, and enforce the invariant:
+    ///      internalBalance_after >= totalActiveInternalJul.
     function withdrawJul(uint256 amount) external onlyOwner nonReentrant {
-        // C7-ISS-002: Credit counters can overlap (fraud slash + expiry on same credits),
-        // so use min() to prevent underflow. Total retired may exceed issued due to
-        // double-counting between fraud slashing and subsequent expiry of slashed receipts.
-        uint256 totalRetired = totalCreditsConsumed + totalFraudSlashed + totalCreditsExpired;
-        uint256 activeCreditsJulBacking;
-        if (totalRetired >= totalCreditsIssued) {
-            activeCreditsJulBacking = 0;
-        } else {
-            activeCreditsJulBacking = (totalCreditsIssued - totalRetired) * 1e18 / CREDITS_PER_JUL;
-        }
-        (bool balOk, bytes memory balData) = julToken.call(
-            abi.encodeWithSignature("balanceOf(address)", address(this))
-        );
-        require(balOk && balData.length >= 32, "Balance check failed");
-        uint256 balance = abi.decode(balData, (uint256));
-        require(balance - amount >= activeCreditsJulBacking, "Would undercollateralize active credits");
+        // Pre-transfer: snapshot internal balance to measure delta (rebase-safe)
+        uint256 internalBefore = IJouleInternal(julToken).internalBalanceOf(address(this));
+
+        // Enforce backing BEFORE transfer to give a clearer revert reason.
+        // We need: internalBefore - internalThatWillBeSent >= totalActiveInternalJul
+        // Since we can't know internalThatWillBeSent exactly without doing the transfer
+        // (Joule applies scalar conversion), we check the worst-case: if `amount` happens
+        // to correspond to more internal than we have spare, we'll fail after the transfer.
+        // The post-transfer check is the authoritative guard.
+        require(internalBefore >= totalActiveInternalJul, "Vault underfunded");
 
         (bool ok, bytes memory data) = julToken.call(
             abi.encodeWithSignature("transfer(address,uint256)", owner(), amount)
         );
         require(ok && (data.length == 0 || abi.decode(data, (bool))), "Withdraw failed");
+
+        // Post-transfer: enforce the rebase-invariant backing constraint.
+        // If this fails, the transfer is reverted entirely (nonReentrant + require).
+        uint256 internalAfter = IJouleInternal(julToken).internalBalanceOf(address(this));
+        require(internalAfter >= totalActiveInternalJul, "Would undercollateralize active credits");
     }
 
     // ============ View ============

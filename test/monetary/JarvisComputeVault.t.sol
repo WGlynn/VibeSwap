@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "../../contracts/monetary/JarvisComputeVault.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/// @dev Minimal mock JUL token for testing
+/// @dev Minimal mock JUL token for testing (no rebase — scalar = 1:1)
 contract MockJUL {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -33,6 +33,12 @@ contract MockJUL {
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
         return true;
+    }
+
+    /// @dev C7-GOV-006: JCV queries this for rebase-invariant backing.
+    ///      In this no-rebase mock, internal == external.
+    function internalBalanceOf(address account) external view returns (uint256) {
+        return balanceOf[account];
     }
 }
 

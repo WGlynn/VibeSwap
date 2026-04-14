@@ -163,6 +163,28 @@ contract JULBridge is
         currentEpochStart = block.timestamp;
     }
 
+    /**
+     * @notice C9-AUDIT-3: One-shot post-upgrade initializer for pre-C8 proxies.
+     *         Seeds maxInternalPerEpoch so upgradeToAndCall atomically brings
+     *         the new internal-unit rate limit online without a forgotten-setter
+     *         brick window.
+     * @param initialInternalLimit Cap in internal (pre-rebase) JUL units per epoch.
+     *                             Typical value: 100_000e18 (matches fresh deploy).
+     * @dev reinitializer(2) — runs exactly once per proxy. Must be packaged into
+     *      the upgradeToAndCall payload so the upgrade does not commit to a live
+     *      implementation with maxInternalPerEpoch == 0 (would revert every
+     *      bridge() call until an owner setter lands, creating a DoS window).
+     */
+    function initializeV2(uint256 initialInternalLimit) external reinitializer(2) onlyOwner {
+        if (initialInternalLimit == 0) revert ZeroAmount();
+        // Fresh deploys already initialized this in initialize() — reinitializer(2)
+        // fires here only on genuine upgrades of pre-C8 proxies.
+        if (maxInternalPerEpoch == 0) {
+            maxInternalPerEpoch = initialInternalLimit;
+            emit InternalRateLimitUpdated(initialInternalLimit);
+        }
+    }
+
     // ============ Bridge ============
 
     /**

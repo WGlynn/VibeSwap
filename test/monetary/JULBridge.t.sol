@@ -456,4 +456,82 @@ contract JULBridgeTest is Test {
         bridge.bridge(1000e18);
         vm.stopPrank();
     }
+
+    // ============ C9-AUDIT-3: initializeV2 post-upgrade reinitializer ============
+
+    /// @notice On a fresh deploy, initialize() already set maxInternalPerEpoch,
+    ///         so initializeV2 is a no-op (reinitializer(2) still consumes the slot).
+    function test_initializeV2_noopOnFreshDeploy() public {
+        uint256 before = bridge.maxInternalPerEpoch();
+        assertEq(before, 100_000e18);
+
+        vm.prank(owner);
+        bridge.initializeV2(50_000e18);
+
+        // Value unchanged — fresh deploys don't need re-seeding
+        assertEq(bridge.maxInternalPerEpoch(), before);
+    }
+
+    /// @notice initializeV2 can only be called once (reinitializer(2) semantics).
+    function test_initializeV2_cannotBeCalledTwice() public {
+        vm.prank(owner);
+        bridge.initializeV2(50_000e18);
+
+        vm.prank(owner);
+        vm.expectRevert(); // InvalidInitialization
+        bridge.initializeV2(50_000e18);
+    }
+
+    /// @notice On an upgraded proxy where maxInternalPerEpoch starts at 0,
+    ///         initializeV2 seeds it atomically with the upgrade payload.
+    function test_initializeV2_seedsOnUpgradedProxy() public {
+        // Deploy fresh bridge
+        JULBridge impl = new JULBridge();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(JULBridge.initialize.selector, address(jul), address(ckb), owner)
+        );
+        JULBridge freshBridge = JULBridge(address(proxy));
+
+        // Simulate post-upgrade slot state: maxInternalPerEpoch = 0
+        // (as if the slot was newly added after a prior upgrade)
+        uint256 slot = _findMaxInternalSlot(address(freshBridge));
+        vm.store(address(freshBridge), bytes32(slot), bytes32(uint256(0)));
+        assertEq(freshBridge.maxInternalPerEpoch(), 0, "slot cleared");
+
+        // initializeV2 seeds it
+        vm.prank(owner);
+        freshBridge.initializeV2(75_000e18);
+        assertEq(freshBridge.maxInternalPerEpoch(), 75_000e18);
+    }
+
+    function test_initializeV2_rejectsZero() public {
+        vm.prank(owner);
+        vm.expectRevert(JULBridge.ZeroAmount.selector);
+        bridge.initializeV2(0);
+    }
+
+    function test_initializeV2_onlyOwner() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        bridge.initializeV2(50_000e18);
+    }
+
+    /// @dev Scans storage for slots holding 100_000e18 and returns the HIGHER
+    ///      one — both `maxPerEpoch` (legacy) and `maxInternalPerEpoch` (new) are
+    ///      seeded to 100_000e18 by initialize(). The new slot was appended, so
+    ///      it has the larger index. Returning the max finds maxInternalPerEpoch.
+    function _findMaxInternalSlot(address target) internal view returns (uint256) {
+        uint256 best;
+        bool found;
+        for (uint256 i = 0; i < 300; i++) {
+            bytes32 raw = vm.load(target, bytes32(i));
+            if (uint256(raw) == 100_000e18) {
+                best = i;
+                found = true;
+            }
+        }
+        require(found, "slot not found");
+        return best;
+    }
 }

@@ -212,6 +212,17 @@ contract CKBNativeToken is
      */
     function setOffCirculationHolder(address holder, bool enabled) external onlyOwner {
         if (holder == address(0)) revert ZeroAddress();
+        // C9-AUDIT-4: prevent double-counting — cell-locked tokens held on
+        // address(this) already count via totalOccupied.
+        require(holder != address(this), "Cannot register self");
+        // C9-AUDIT-6: require real contract code. EOAs can move balance freely
+        // (doesn't match the "locked in a staking/collateral contract"
+        // semantics). Also rules out CREATE2-unverified pre-deploy addresses.
+        // Deregistration path bypasses this check — the enabled == false branch
+        // below runs before this require because we only enforce on enable.
+        if (enabled) {
+            require(holder.code.length > 0, "Not a contract");
+        }
 
         if (enabled && !isOffCirculationHolder[holder]) {
             isOffCirculationHolder[holder] = true;

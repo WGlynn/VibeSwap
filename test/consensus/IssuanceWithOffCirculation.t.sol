@@ -71,6 +71,9 @@ contract IssuanceWithOffCirculationTest is Test {
         ckb.setMinter(address(issuance), true);
         shelter.setIssuanceController(address(issuance));
         vm.stopPrank();
+
+        // C9-AUDIT-6: setOffCirculationHolder requires code.length > 0
+        vm.etch(nciMock, hex"00");
     }
 
     /**

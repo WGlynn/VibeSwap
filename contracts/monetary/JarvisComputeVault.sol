@@ -174,11 +174,18 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     ///      withdrawJul() compares vault's internalBalanceOf(Joule) to this value.
     uint256 public totalActiveInternalJul;
 
+    /// @notice C9-AUDIT-1: Gates withdrawJul to prevent a post-upgrade exploit where
+    ///         totalActiveInternalJul defaults to 0 while legacy receipts still
+    ///         entitle depositors to backing. Fresh deploys set this true via
+    ///         initialize(). Upgrades of pre-C8 proxies must call
+    ///         migrateToInternalBacking() (reinitializer(2)) to seed legacy state.
+    bool public backingMigrationComplete;
 
-    /// @dev Reserved storage gap for future upgrades (reduced 50→46 for 4 new slots:
+
+    /// @dev Reserved storage gap for future upgrades (reduced 50→45 for 5 new slots:
     ///      internalJulByReceipt + originalCreditsByReceipt + internalReleasedByReceipt
-    ///      + totalActiveInternalJul)
-    uint256[46] private __gap;
+    ///      + totalActiveInternalJul + backingMigrationComplete)
+    uint256[45] private __gap;
 
     // ============ Events ============
 
@@ -204,6 +211,52 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
         julToken = _julToken;
         verifier = _verifier;
+
+        // C9-AUDIT-1: Fresh deploys have no legacy receipts — migration is a no-op.
+        // Upgrade path does NOT re-run initialize(); see migrateToInternalBacking().
+        backingMigrationComplete = true;
+    }
+
+    /**
+     * @notice C9-AUDIT-1: One-shot migration for upgrading a pre-C8 JCV proxy.
+     *         Seeds internalJulByReceipt / originalCreditsByReceipt / totalActiveInternalJul
+     *         from existing receipts so the rebase-invariant backing check in
+     *         withdrawJul() holds against real obligations, not 0.
+     * @param receiptIds All unconsumed, unslashed, unexpired receipt IDs. Caller
+     *                   must compile this list off-chain by scanning CreditIssued
+     *                   events and filtering by receipt state.
+     * @param scalarAtMigration Rebase scalar at migration time (IJoule.getRebaseScalar()).
+     *                          Used to compute internal = external * 1e18 / scalar.
+     * @dev reinitializer(2) — runs exactly once per proxy. Packaged with
+     *      upgradeToAndCall() so the upgrade and migration happen atomically.
+     *      Calling this on a fresh deploy is a no-op gated by the initializer
+     *      pattern + backingMigrationComplete already being true.
+     */
+    function migrateToInternalBacking(
+        uint256[] calldata receiptIds,
+        uint256 scalarAtMigration
+    ) external reinitializer(2) onlyOwner {
+        require(scalarAtMigration > 0, "Zero scalar");
+        // Defensive: if initialize() has already flagged migration complete
+        // (fresh deploy path), nothing to do — but reinitializer(2) still claims
+        // the slot so it can't be re-run.
+        if (backingMigrationComplete) return;
+
+        uint256 accumulated;
+        uint256 n = receiptIds.length;
+        for (uint256 i = 0; i < n; i++) {
+            uint256 id = receiptIds[i];
+            CreditReceipt storage r = receipts[id];
+            // Only active receipts contribute active backing
+            if (r.consumed || r.fraudSlashed || block.timestamp > r.expiresAt) continue;
+            if (internalJulByReceipt[id] != 0) continue; // already migrated (safety)
+            uint256 internalAmt = (r.julAmount * 1e18) / scalarAtMigration;
+            internalJulByReceipt[id] = internalAmt;
+            originalCreditsByReceipt[id] = r.computeCredits;
+            accumulated += internalAmt;
+        }
+        totalActiveInternalJul = accumulated;
+        backingMigrationComplete = true;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
@@ -476,6 +529,12 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         CreditReceipt storage receipt = receipts[receiptId];
         require(block.timestamp > receipt.expiresAt, "Not expired");
         require(!receipt.consumed, "Already consumed");
+        // C9-AUDIT-2: Already-slashed receipts must not re-enter expiry. Their
+        // accounting was already settled in submitFraudProof/reportFraud (partial
+        // slash, remaining internal backing released). Re-counting the original
+        // computeCredits here inflates totalCreditsExpired AND zeros the
+        // depositor's activeCredits (wiping credits from their HEALTHY receipts).
+        require(!receipt.fraudSlashed, "Fraud slashed");
         require(receipt.computeCredits > 0, "No credits left");
 
         uint256 expired = receipt.computeCredits;
@@ -617,6 +676,11 @@ contract JarvisComputeVault is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     ///      how much internal was actually sent out, and enforce the invariant:
     ///      internalBalance_after >= totalActiveInternalJul.
     function withdrawJul(uint256 amount) external onlyOwner nonReentrant {
+        // C9-AUDIT-1: Block withdraws until legacy-receipt migration is confirmed.
+        // Prevents post-upgrade rug where totalActiveInternalJul == 0 makes the
+        // backing check trivially pass while real depositors still hold claims.
+        require(backingMigrationComplete, "Legacy migration pending");
+
         // Pre-transfer: snapshot internal balance to measure delta (rebase-safe)
         uint256 internalBefore = IJouleInternal(julToken).internalBalanceOf(address(this));
 

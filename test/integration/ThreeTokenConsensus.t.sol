@@ -10,10 +10,17 @@ import "../../contracts/consensus/SecondaryIssuanceController.sol";
 import "../../contracts/consensus/ShardOperatorRegistry.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/// @notice Mock JUL for integration test
+/// @notice Mock JUL for integration test. C7-GOV-005: exposes `internalBalanceOf`
+///         for JULBridge's rebase-invariant rate limiting. Default scalar=1e18
+///         means internal == display for legacy test paths.
 contract MockJULIntegration {
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+
+    /// @dev Returns the same value as balanceOf (scalar fixed at 1e18 in this mock).
+    function internalBalanceOf(address account) external view returns (uint256) {
+        return balanceOf[account];
+    }
 
     function mint(address to, uint256 amount) external {
         balanceOf[to] += amount;

@@ -40,6 +40,12 @@ contract OffCirculationTest is Test {
         // Seed tokens
         vm.prank(minter);
         ckb.mint(user, 1_000_000e18);
+
+        // C9-AUDIT-6: setOffCirculationHolder now requires holder.code.length > 0.
+        // Give our makeAddr() stand-ins a single STOP byte so the guard passes.
+        vm.etch(nci, hex"00");
+        vm.etch(vibeStable, hex"00");
+        vm.etch(jcv, hex"00");
     }
 
     // ============ Registry Admin ============
@@ -88,6 +94,40 @@ contract OffCirculationTest is Test {
         vm.stopPrank();
 
         assertTrue(ckb.isOffCirculationHolder(nci));
+    }
+
+    // ============ C9-AUDIT-4 / C9-AUDIT-6 Guards ============
+
+    /// @notice C9-AUDIT-4: Registering the CKB token itself would double-count
+    ///         cell-locked tokens (totalOccupied already accounts for them).
+    function test_cannotRegisterSelf() public {
+        vm.prank(owner);
+        vm.expectRevert("Cannot register self");
+        ckb.setOffCirculationHolder(address(ckb), true);
+    }
+
+    /// @notice C9-AUDIT-6: Holder must be a contract. EOAs can move balance
+    ///         freely and don't match the "locked in staking/collateral" semantics.
+    function test_cannotRegisterEOA() public {
+        address eoa = makeAddr("randomEOA"); // no code
+        vm.prank(owner);
+        vm.expectRevert("Not a contract");
+        ckb.setOffCirculationHolder(eoa, true);
+    }
+
+    /// @notice Deregistration still works on a previously-registered contract
+    ///         even if its code was later removed (selfdestruct). The code check
+    ///         only applies to enabling.
+    function test_canDeregisterAfterCodeRemoval() public {
+        vm.prank(owner);
+        ckb.setOffCirculationHolder(nci, true);
+
+        // Simulate contract selfdestruct: wipe code
+        vm.etch(nci, "");
+
+        vm.prank(owner);
+        ckb.setOffCirculationHolder(nci, false); // must still succeed
+        assertFalse(ckb.isOffCirculationHolder(nci));
     }
 
     // ============ Off-Circulation Calculation ============

@@ -73,6 +73,14 @@ contract C8DeploySimulationTest is Test {
 
     uint256 constant INTERNAL_RATE_LIMIT = 100_000e18;
 
+    function setUp() public {
+        // C9-AUDIT-6: setOffCirculationHolder requires code.length > 0.
+        // Etch a single STOP byte so our makeAddr() stand-ins pass the guard.
+        vm.etch(nci, hex"00");
+        vm.etch(vibeStable, hex"00");
+        vm.etch(jcv, hex"00");
+    }
+
     function _deployCkb() internal returns (CKBNativeToken) {
         CKBNativeToken impl = new CKBNativeToken();
         ERC1967Proxy proxy = new ERC1967Proxy(

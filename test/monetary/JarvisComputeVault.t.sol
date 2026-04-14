@@ -357,6 +357,46 @@ contract JarvisComputeVaultTest is Test {
         vault.expireCredits(receiptId);
     }
 
+    /// @notice C9-AUDIT-2: expireCredits on an already-slashed receipt must revert.
+    ///         Pre-fix behavior: the slashed receipt's ORIGINAL computeCredits got
+    ///         double-counted in totalCreditsExpired, and the depositor's activeCredits
+    ///         (holding legitimate credits from OTHER receipts) were incorrectly
+    ///         affected via the activeCredits fallback branch.
+    function test_revert_expireCredits_fraudSlashed() public {
+        uint256 r1 = _commitAndDeposit(user1, 10e18);
+
+        // Slash r1 via fraud report
+        vm.prank(verifier);
+        vault.reportFraud(user1, r1);
+
+        JarvisComputeVault.CreditReceipt memory r1View = vault.getReceipt(r1);
+        assertTrue(r1View.fraudSlashed, "r1 marked slashed");
+        assertFalse(r1View.consumed, "r1 not auto-consumed (stat remains non-terminal)");
+
+        // Capture totalCreditsExpired before
+        uint256 expiredBefore = vault.totalCreditsExpired();
+
+        // Warp past expiry
+        vm.warp(block.timestamp + 31 days);
+
+        // Anyone can call expireCredits — this MUST revert on slashed receipts.
+        vm.expectRevert("Fraud slashed");
+        vault.expireCredits(r1);
+
+        // Global expired counter must NOT have moved
+        assertEq(vault.totalCreditsExpired(), expiredBefore, "no phantom expiry credit");
+    }
+
+    /// @notice Companion test: healthy receipts still expire normally.
+    function test_expireCredits_healthyReceiptUnaffectedByFraudGuard() public {
+        uint256 r1 = _commitAndDeposit(user1, 10e18);
+        // No fraud. Warp past expiry.
+        vm.warp(block.timestamp + 31 days);
+
+        vault.expireCredits(r1);
+        assertTrue(vault.getReceipt(r1).consumed);
+    }
+
     // ============ Fraud Proof (C5-MON-001 Fixed) ============
 
     function test_fraudProof_cannotSlashWithArbitraryHash() public {
@@ -511,5 +551,58 @@ contract JarvisComputeVaultTest is Test {
         vm.prank(user1);
         (bool ok,) = address(vault).call{value: 1 ether}("");
         assertFalse(ok, "ETH send should revert - no receive()");
+    }
+
+    // ============ C9-AUDIT-1: Backing Migration ============
+
+    /// @notice Fresh deploys set backingMigrationComplete = true in initialize().
+    function test_freshDeploySetsMigrationComplete() public view {
+        assertTrue(vault.backingMigrationComplete(), "fresh deploy is pre-migrated");
+    }
+
+    /// @notice withdrawJul must revert if backingMigrationComplete = false.
+    ///         This blocks the post-upgrade rug scenario where totalActiveInternalJul == 0
+    ///         on a proxy with legacy receipts.
+    function test_withdrawJul_blockedUntilMigrationComplete() public {
+        // Simulate upgrade-state: clear the flag via vm.store at the known slot.
+        // backingMigrationComplete is the slot immediately after totalActiveInternalJul.
+        // Rather than hunt the slot, use a different test strategy: verify that the
+        // require on an UNMIGRATED state blocks withdrawJul. We cannot flip the flag
+        // back to false from outside the contract, so instead test the reinitializer
+        // behavior with a fresh vault whose initialize() runs differently...
+        //
+        // Simpler: verify the require text by checking error-selector behavior via
+        // a targeted vm.store on the storage slot.
+
+        // Find the slot for backingMigrationComplete. The contract has specific storage
+        // layout — locate empirically by walking slots.
+        // For test reliability: use a dedicated fresh vault proxy, toggle the slot,
+        // and confirm revert.
+        JarvisComputeVault impl = new JarvisComputeVault();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(JarvisComputeVault.initialize.selector, address(jul), verifier)
+        );
+        JarvisComputeVault freshVault = JarvisComputeVault(address(proxy));
+
+        // Locate slot of backingMigrationComplete by searching for the bool
+        uint256 slot = _findMigrationFlagSlot(address(freshVault));
+        // Set to false (simulate post-upgrade default)
+        vm.store(address(freshVault), bytes32(slot), bytes32(uint256(0)));
+
+        assertFalse(freshVault.backingMigrationComplete(), "slot toggled to false");
+
+        vm.expectRevert("Legacy migration pending");
+        freshVault.withdrawJul(1);
+    }
+
+    /// @dev Scans the first 100 slots for the single-byte bool.
+    function _findMigrationFlagSlot(address target) internal view returns (uint256) {
+        for (uint256 i = 0; i < 300; i++) {
+            bytes32 raw = vm.load(target, bytes32(i));
+            // backingMigrationComplete == true stored as 0x...01
+            if (raw == bytes32(uint256(1))) return i;
+        }
+        revert("flag slot not found");
     }
 }

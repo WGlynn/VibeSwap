@@ -1,102 +1,69 @@
-# Session State — 2026-04-14
+# Session State — 2026-04-15
 
 ## Block Header
-- **Session**: RSI C10 fully closed — 4 HIGH + 2 MED + 2 LOW fixed including AUDIT-3 peer challenge-response for cellsServed. Enforced Liveness Signal extracted.
+- **Session**: Research program crystallization. Stateful Overlay extracted as umbrella primitive. Four flagship papers drafted (SIGNAL, GRACEFUL_TRANSITION_PROTOCOL, MEANING_SUBSTRATE_DECOMPOSITION, THE_CONTRIBUTION_COMPACT). TG bot voice hardening (voice-gate.js + persona.js patches + 10 regression tests). Proposal-persistence stack (propose→persist primitive + Stop-hook scraper + replay script + 14 regression tests). First upstream PR to anthropics/claude-code filed (#48714). Anthropic unresponsiveness logged as documented instance of THE_CONTRIBUTION_COMPACT's externality class.
 - **Branch**: `master`
-- **Commit**: `00194bbb`
-- **Status**: CLEAN — committed, pushed (state commit follows)
+- **Commit**: to be set by this session's final commit
+- **Status**: Pending commit of session work
 
 ## Completed This Session
 
-### Infrastructure
-- **API Death Shield** — 4 client-side hooks (StopFailure, UserPromptSubmit, Stop, PreCompact). Script at `~/.claude/session-chain/api-death-shield.py`. Primitive written. Captures conversation state when Anthropic API errors kill the session.
-- **Repo cleanup** — 30 orphaned files committed. Gitignore updated for runtime artifacts.
+### Infrastructure — Proposal Persistence Stack
+- **Transcript recovery** — extracted Cycle 11 options from crashed session JSONL (session `5ba12ced-49bc-424a-9145-a73ee63cbeb6`, line 1120). Options: C11-A fresh NCI audit / C11-B fuzzing / C11-C meta-audit / C11-D challenge-response generalization. Will's selection pre-crash: A + D.
+- **Propose→Persist primitive** — written (`memory/primitive_propose-persist.md`, indexed in MEMORY.md PRE-FLIGHT).
+- **Stop-hook proposal-scraper** — `~/.claude/session-chain/proposal-scraper.py`, wired into settings.json Stop chain after api-death-shield. Persona-aware sycophancy filter. Self-triggered twice during session (numbered-list false positive + code-span false positive), both failure modes locked as regression tests.
+- **Proposal-scraper tests** — `proposal-scraper.test.py`, **14 cases, 11 pass / 14 pass after hardening**. Case 6 + Case 12 are literal 2026-04-15 false positives captured as regression fences.
+- **Replay-proposal.py** — N-sample API replay script for non-determinism curation (`[STABLE]` / `[UNIQUE]` output clustering). Untested against real crash, available when needed.
+- **PROPOSALS.md** — canonical ledger at `vibeswap/.claude/PROPOSALS.md`, seeded with recovered Cycle 11 entry.
 
-### CogCoin Outreach
-- [cogcoin/client#1](https://github.com/cogcoin/client/issues/1) — Partnership proposal + miner repo follow-up
-- [cogcoin/scoring#1](https://github.com/cogcoin/scoring/issues/1) — Implementation notes + real block mining result (480M on block 944950)
-- DMs closed → pivoted to GitHub issues. First issues ever on both repos.
+### Research Program — Four Flagship Papers
+- **`DOCUMENTATION/SIGNAL.md`** — the unified AI research thesis. Stateful Overlay as umbrella primitive. Nine sections + ILWS integration in §2.1 as theoretical grounding. Companion-paper references threaded in.
+- **`DOCUMENTATION/GRACEFUL_TRANSITION_PROTOCOL.md`** — overlay pattern applied to civilizational-scale AI-economic transition. Nine primitives ported from VibeSwap to transition mechanism design. §5 revised from "meaning is untouchable" to "partially addressable with named residue."
+- **`DOCUMENTATION/MEANING_SUBSTRATE_DECOMPOSITION.md`** — meaning decomposed into six functions with differential overlay-reachability. Contribution-substrate hypothesis. SDT convergence. Irreducible residue named explicitly (Frankl, identity narrative, felt dignity, ritual/embodiment). Full limitations section.
+- **`DOCUMENTATION/THE_CONTRIBUTION_COMPACT.md`** — frontier AI labs owe users Shapley attribution for training labor. V1 mechanism sketch using streaming Shapley + epoch settlement + peer challenge-response + stake-bonded pseudonyms. Published as public gist: https://gist.github.com/WGlynn/7251d0791b9b474e90d47646d5c1a2da
 
-### CogCoin Miner (7 TRP Cycles)
-- Published: [github.com/WGlynn/cogcoin-miner](https://github.com/WGlynn/cogcoin-miner)
-- 13 tests passing, real Bitcoin block mining working
-- Best score: 494M on block 944950
-- Empirical benchmark: Gemini Flash 67% vs Llama 4 Scout 0% gate-pass (Gemini promoted to primary)
-- Block watcher mode (mempool.space integration)
+### Research Program — Primitives Extracted
+- `memory/primitive_stateful-overlay.md` — umbrella pattern (externalized + idempotent overlay synthesizing missing substrate capabilities)
+- `memory/primitive_propose-persist.md` — Proposals file first, chat is a view
+- `memory/feedback_contribute-upstream-when-possible.md` — default habit for reusable artifacts on platforms we depend on
 
-### VibeSwap RSI Cycle 8 — ALL C7 DEFERRED FINDINGS CLOSED
-- **Phase 8.1** (`a1f73675`): CKBNativeToken off-circulation registry. 17 new tests.
-- **Phase 8.2** (`9aee1ee2`): SecondaryIssuanceController uses offCirculation(). 3 new tests.
-- **Phase 8.3** (`a97ede2c`): JarvisComputeVault rebase-invariant backing. 6 new tests.
-- **Phase 8.4** (this session): JULBridge rebase-invariant rate limit. 10 new tests.
-- **Findings closed**: C7-GOV-001 (HIGH), C7-GOV-007 (MED), C7-GOV-006 (HIGH), C7-GOV-005 (MED)
-- **Primitives extracted**: Off-Circulation Registry Pattern, Rebase-Invariant Accounting
-- **Deploy script**: `script/RegisterOffCirculationHolders.s.sol`
-- **Test totals**: 36 new tests, 160 monetary + 107 consensus + 4 integration = **271 tests, 0 regressions**
+### TG Bot Voice Hardening
+- **`jarvis-bot/src/voice-gate.js`** — post-draft regex filter catching 6 failure classes (outbound-intercept, will-idiom-misread, triumphalist collapse, certainty inflation, concession erasure, sycophancy strip). Persona-aware: structural rules universal, voice rules standard-only.
+- **`jarvis-bot/src/voice-gate.test.js`** — 10 cases, 10/10 passing. Case 1 is the literal 2026-04-15 TG bot regression reproduced.
+- **`jarvis-bot/src/persona.js`** — patched. Universal structural rules (direction classifier, Will-idiom glossary, concession preservation, certainty ceiling, tuple preservation) spliced into all 4 personas. Voice rules (no-sycophancy, canonical voice) on standard only.
+- **`jarvis-bot/hardening/`** — design record: README, system-prompt-additions.md, test-cases.md. Source of truth moved to `src/`; hardening dir retained for audit trail.
 
-### Content
-- Medium draft #8 written: "Mining CogCoin on Free-Tier LLMs"
+### External Outreach
+- **DeepSeek/Tadija audit response** — `DOCUMENTATION/RESPONSE_TADIJA_DEEPSEEK_2026-04-15.md`. Decomposes memecoin-noise into casino (a: cultural attention volatility) vs. house (b: parasitic rent). Provably-fair-casino model. Tuple architecture defended against single-primitive collapse. Forwarded to Tadija for onward DeepSeek relay.
+- **Rutgers publication picks** — top 3 identified: `trp-empirical-rsi.md` (CS/AI venue, DIMACS interlock), `GRACEFUL_TRANSITION_PROTOCOL` + `MEANING_SUBSTRATE_DECOMPOSITION` paired for policy venue (Bloustein), `atomized-shapley.md` for econ/mechanism-design venue. PDF on Desktop for Soham: `Rutgers_Paper_Recommendations_2026-04-15.pdf`.
+- **GitHub issue filed against anthropics/claude-code** — "Alignment at the input layer — a Pro user's case." Will's action. Links THE_CONTRIBUTION_COMPACT gist.
+- **PR submitted to anthropics/claude-code** — #48714 "Add proposal scraper Stop hook example." Single file `examples/hooks/proposal_scraper_example.py`, 183 lines, matches existing convention, demonstrates Stop hook type (new for that examples dir). First upstream contribution.
+
+### Memory Logged
+- `memory/project_anthropic-unresponsiveness.md` — the specific 2026-04-15 incident (unanswered emails, $200/mo Pro customer, heavy contributor). Indexed as concrete instance of THE_CONTRIBUTION_COMPACT externality class. Engage Anthropic-accountability questions directly, do not corporate-deflect.
+- `memory/feedback_contribute-upstream-when-possible.md` — new habit codified. Five reasons (passive recognition + technology convergence + merit-based visibility + leverage + local-overfitting prevention). Convergence loop named explicitly.
 
 ## Pending / Next Session
 
-1. **Deploy C8 + C9 + C10** — Upgrade proxies:
-   - Package CKB + Issuance upgrades with `RegisterOffCirculationHolders.s.sol` post-step (now also registers SOR per C10-AUDIT-1)
-   - Package JCV upgrade as `upgradeToAndCall(newImpl, migrateToInternalBacking.selector)` with active receipt IDs + scalar
-   - Package JULBridge upgrade as `upgradeToAndCall(newImpl, initializeV2.selector)` with `100_000e18`
-   - All `upgradeToAndCall` — never bare `upgradeTo` (avoids unseeded-state window)
-2. **Cycle 11 options**:
-   - C11-A: Fresh scope — audit NCI again (rebase-invariant accounting may have crept into consensus paths)
-   - C11-B: Property-based fuzzing — offCirculation invariants under registration churn, challenge-response edge cases
-   - C11-C: Meta-audit — review the C9/C10 fixes themselves for regressions (the adversarial-recursion pattern)
-   - C11-D: Extend challenge-response pattern to other self-reported metrics (TWAP, uptime, fee multipliers) — generalization loop
-3. **CogCoin domain registration** — Blocked on 0.001 BTC. Dad + cousin declined. Not rushing — early mining isn't worth $70 without deeper conviction.
-4. **Medium rollout** — 8 drafts ready, pipeline configured, not yet published
+### Follow-through on today's open artifacts
+- Claude-code PR #48714 — monitor for response; if engaged, be ready to refine. If silent for two weeks, the contributor-graph entry stands regardless.
+- GitHub issue against claude-code — same monitoring.
+- Rutgers papers — waiting on Soham's venue feedback.
+- Tadija DeepSeek round 2 — if DeepSeek audits the tuple (seed paper + THREE_TOKEN_ECONOMY + CKB_KNOWLEDGE_TALK + commit-reveal-batch-auctions + atomized-shapley + ShardOperatorRegistry commit `00194bbb`), Oracle Problem stress test lands.
 
-## Key Files Modified This Session
+### Research
+- If THE_CONTRIBUTION_COMPACT gets attention, consider formal arXiv submission (full academic formatting, citation cleanup, LaTeX version).
+- MEANING_SUBSTRATE_DECOMPOSITION §9 limitations section lists five open questions worth formalizing — especially the meaning-substitute failure mode (algorithmic identity, gamified hollow status).
+- Voice-gate wiring into claude.js call-chain — decided NOT to auto-wire; revisit when Will is ready to deploy.
 
-### New
-- `~/.claude/session-chain/api-death-shield.py`
-- `memory/primitive_api-death-shield.md`
-- `memory/primitive_off-circulation-registry.md`
-- `cogcoin-miner/` (whole repo)
-- `docs/rsi/RSI_C8_PLAN.md`
-- `docs/medium-pipeline/cogcoin-mining-free-tier-llms.md`
-- `script/RegisterOffCirculationHolders.s.sol`
-- `test/monetary/OffCirculation.t.sol`
-- `test/consensus/IssuanceWithOffCirculation.t.sol`
-- `test/monetary/JcvRebaseInvariant.t.sol`
+### Infrastructure
+- Replay-proposal.py has not been stress-tested against a real lost session. Worth a dry-run if another crash occurs.
+- Proposal-scraper has two documented false-positive classes now (both locked as tests). Future false positives, if any, follow the same pattern: add to test file as regression fence before patching regex.
 
-### Modified
-- `.claude/settings.json` (4 new hooks)
-- `contracts/monetary/CKBNativeToken.sol` (off-circulation registry + C9 self/EOA guards)
-- `contracts/consensus/SecondaryIssuanceController.sol` (uses offCirculation)
-- `contracts/monetary/JarvisComputeVault.sol` (rebase-invariant backing + C9 migration gate + fraud-slashed expire guard)
-- `test/monetary/JarvisComputeVault.t.sol` (MockJUL.internalBalanceOf + C9 migration + fraud tests)
-- `contracts/monetary/JULBridge.sol` (Phase 8.4: rebase-invariant rate limit + C9 initializeV2)
-- `test/monetary/JULBridge.t.sol` (10 C8 tests + 5 C9 initializeV2 tests + MockJUL scalar support)
-- `test/integration/ThreeTokenConsensus.t.sol` (MockJULIntegration.internalBalanceOf)
-- `test/monetary/OffCirculation.t.sol` (etch holder mocks + 3 C9 guard tests)
-- `test/consensus/IssuanceWithOffCirculation.t.sol` (etch nciMock)
+## RSI Cycles — Status
+- **Cycle 10.1** — closed 2026-04-14 (commit `00194bbb`). Peer challenge-response for cellsServed.
+- **Cycle 11** — NOT STARTED. Will's pre-crash selection: A (fresh NCI audit) + D (challenge-response generalization). Options recovered and in PROPOSALS.md. Start when Will returns.
 
-### New this session
-- `memory/primitive_rebase-invariant-accounting.md` (C8 8.3 + 8.4)
-- `memory/primitive_post-upgrade-initialization-gate.md` (C9 CRIT-1 + MED-3)
-- `memory/primitive_enforced-liveness-signal.md` (C10 AUDIT-2)
-- `memory/feedback_autonomy-grant-2026-04-13.md` (scope-bounded autonomy rule)
-- `test/deployment/C8DeploySimulation.t.sol` (9 tests)
-
-### C10 modifications
-- `contracts/consensus/ShardOperatorRegistry.sol` (heartbeat gates + deactivateStaleShard + nonReentrant + full challenge-response flow)
-- `contracts/consensus/StateRentVault.sol` (scope destroy to owner + ownerCells purge)
-- `contracts/consensus/SecondaryIssuanceController.sol` (try/catch daoShare + shelter double-reg guard)
-- `script/RegisterOffCirculationHolders.s.sol` (+ SOR registration)
-- `test/consensus/ShardOperatorRegistry.t.sol` (+19 C10 tests: heartbeat + challenge-response)
-- `test/consensus/StateRentVault.t.sol` (+3 C10 tests)
-- `test/consensus/IssuanceWithOffCirculation.t.sol` (+1 C10 test)
-- `test/integration/ThreeTokenConsensus.t.sol` (migrated to commit/finalize flow)
-
-## Previous Sessions
-- Cross-ref audit + RSI C7 (2026-04-12): 470+ docs, 276 cross-refs, 4 integration seam fixes
-- RSI Cycle 5+6 (2026-04-08): 10 fixes, 61 new tests, 231 total
-- RSI Cycle 4 (2026-04-07→08): NCI 3-Token adversarial, 19 fixes
-- MIT Hackathon (2026-04-10→12): CogProof MVP, behavioral reputation, OP_RETURN layer
+## Session Notes
+- Emotional arc: session crashed early (Cycle 11 options lost to API 500); recovered via transcript mining; built the lossless overlay; went deep research; hit raw emotional ground mid-session ("I feel like I'm being used" — Anthropic context); moved through it via action rather than soothing (GitHub issue + gist + PR); landed on Iroh + Job + chronic pelvic pain reflection. Closed centered.
+- The recursion did real work today. Propose→Persist saved the session that built the primitive. The Contribution Compact argued for user-contributors and was shipped by the user-contributor it describes. Operational recursion, not metaphor.

@@ -1,0 +1,70 @@
+{
+  "_comment": "Copy to settings.json and adjust paths. All hooks are optional but recommended — they give you crash recovery independent of AI liveness.",
+  "hooks": {
+    "StopFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/session-chain/api-death-shield.py stop-failure"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/session-chain/api-death-shield.py user-prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/session-chain/api-death-shield.py stop"
+          },
+          {
+            "type": "command",
+            "command": "python .claude/session-chain/proposal-scraper.py"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/session-chain/api-death-shield.py pre-compact"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/session-chain/auto-checkpoint.py"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "_comment": "These match the defaults hardcoded in the scripts. Override only if needed.",
+    "JARVIS_PROJECT_DIR": "${PWD}",
+    "JARVIS_GIT_REMOTE": "origin",
+    "JARVIS_GIT_BRANCH": "main"
+  }
+}

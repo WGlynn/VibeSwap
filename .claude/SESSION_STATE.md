@@ -1,9 +1,9 @@
 # Session State — 2026-04-14
 
 ## Block Header
-- **Session**: RSI C10 — fresh-scope audit of DAOShelter/StateRentVault/ShardOperatorRegistry. 3 HIGH + 2 MED + 2 LOW fixed. Enforced Liveness Signal extracted. AUDIT-3 deferred for design call.
+- **Session**: RSI C10 fully closed — 4 HIGH + 2 MED + 2 LOW fixed including AUDIT-3 peer challenge-response for cellsServed. Enforced Liveness Signal extracted.
 - **Branch**: `master`
-- **Commit**: `01530cd8`
+- **Commit**: `00194bbb`
 - **Status**: CLEAN — committed, pushed (state commit follows)
 
 ## Completed This Session
@@ -44,15 +44,11 @@
    - Package JCV upgrade as `upgradeToAndCall(newImpl, migrateToInternalBacking.selector)` with active receipt IDs + scalar
    - Package JULBridge upgrade as `upgradeToAndCall(newImpl, initializeV2.selector)` with `100_000e18`
    - All `upgradeToAndCall` — never bare `upgradeTo` (avoids unseeded-state window)
-2. **C10-AUDIT-3 design call** (HIGH, deferred): cellsServed self-reported sybil vector. Needs decision on attestation scheme:
-   - Oracle-signed receipts (1 designated address signs per-epoch reports)
-   - Committee-verified Merkle root (challenge game)
-   - Peer-staked challenge-response (validator-mode extension)
-   - Interim: keep 1e12 overflow cap, accept sybil risk for testnet
-3. **Cycle 11 options**:
-   - C11-A: AUDIT-3 oracle-role implementation (once Will decides)
-   - C11-B: Fresh scope — audit NCI again (rebase-invariant accounting wasn't designed for consensus paths, may have crept in)
-   - C11-C: Property-based fuzzing — offCirculation invariants under registration churn
+2. **Cycle 11 options**:
+   - C11-A: Fresh scope — audit NCI again (rebase-invariant accounting may have crept into consensus paths)
+   - C11-B: Property-based fuzzing — offCirculation invariants under registration churn, challenge-response edge cases
+   - C11-C: Meta-audit — review the C9/C10 fixes themselves for regressions (the adversarial-recursion pattern)
+   - C11-D: Extend challenge-response pattern to other self-reported metrics (TWAP, uptime, fee multipliers) — generalization loop
 3. **CogCoin domain registration** — Blocked on 0.001 BTC. Dad + cousin declined. Not rushing — early mining isn't worth $70 without deeper conviction.
 4. **Medium rollout** — 8 drafts ready, pipeline configured, not yet published
 
@@ -90,13 +86,14 @@
 - `test/deployment/C8DeploySimulation.t.sol` (9 tests)
 
 ### C10 modifications
-- `contracts/consensus/ShardOperatorRegistry.sol` (heartbeat gates + deactivateStaleShard + nonReentrant)
+- `contracts/consensus/ShardOperatorRegistry.sol` (heartbeat gates + deactivateStaleShard + nonReentrant + full challenge-response flow)
 - `contracts/consensus/StateRentVault.sol` (scope destroy to owner + ownerCells purge)
 - `contracts/consensus/SecondaryIssuanceController.sol` (try/catch daoShare + shelter double-reg guard)
 - `script/RegisterOffCirculationHolders.s.sol` (+ SOR registration)
-- `test/consensus/ShardOperatorRegistry.t.sol` (+9 C10 tests)
+- `test/consensus/ShardOperatorRegistry.t.sol` (+19 C10 tests: heartbeat + challenge-response)
 - `test/consensus/StateRentVault.t.sol` (+3 C10 tests)
 - `test/consensus/IssuanceWithOffCirculation.t.sol` (+1 C10 test)
+- `test/integration/ThreeTokenConsensus.t.sol` (migrated to commit/finalize flow)
 
 ## Previous Sessions
 - Cross-ref audit + RSI C7 (2026-04-12): 470+ docs, 276 cross-refs, 4 integration seam fixes

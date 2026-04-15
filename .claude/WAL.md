@@ -1,12 +1,12 @@
-# Write-Ahead Log — CLEAN (C10 fixes committed)
+# Write-Ahead Log — CLEAN (C10 fully closed)
 
 ## Current Epoch
 - **Started**: 2026-04-14
-- **Intent**: RSI C9 + C10 — audit C8 patches, then fresh-scope audit of 3 consensus contracts
+- **Intent**: RSI C9 + C10 — audit C8 patches, then fresh-scope audit of 3 consensus contracts, then AUDIT-3 closure
 - **Parent Commit**: `7a2ac5fb`
-- **Current Commit**: `01530cd8`
+- **Current Commit**: `00194bbb`
 - **Branch**: master
-- **Status**: CLEAN — fix commits pushed; state commit pending
+- **Status**: CLEAN — all fixes pushed; state commit pending
 
 ## Tasks — C10
 - [x] C10 adversarial audit via opus agent (10 findings: 4 HIGH + 2 MED + 3 LOW + 1 INFO)
@@ -20,7 +20,7 @@
 - [x] 13 new tests across SOR / SRV / IssuanceOffCirc
 - [x] Primitive: Enforced Liveness Signal
 - [x] Commit `01530cd8` + push
-- [ ] DEFERRED: AUDIT-3 HIGH (self-reported cellsServed) — needs Will's design call
+- [x] AUDIT-3 HIGH (self-reported cellsServed): peer challenge-response implemented (option 3). Commit `00194bbb`.
 
 ## Prior tasks — C9 (complete)
 - See previous epoch section if needed

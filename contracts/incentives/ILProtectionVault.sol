@@ -163,10 +163,17 @@ contract ILProtectionVault is
     }
 
     /**
-     * @notice Update position liquidity (for additions)
+     * @notice Update position liquidity. Accepts a decrement or an equal size;
+     *         any increase must go through registerPosition() which weight-averages
+     *         entryPrice. Otherwise a price-moved increase silently inflates the
+     *         IL claim at exit against a stale entryPrice.
+     * @dev C11-AUDIT-4 (HIGH): rejecting increases here forces the caller
+     *      (IncentiveController) to route top-ups through registerPosition, which
+     *      already re-anchors entryPrice via weight-average. Preserves entry price
+     *      integrity without needing a price argument on this function.
      * @param poolId Pool identifier
      * @param lp LP address
-     * @param newLiquidity New total liquidity
+     * @param newLiquidity New total liquidity (must be <= current)
      */
     function updatePosition(
         bytes32 poolId,
@@ -175,6 +182,9 @@ contract ILProtectionVault is
     ) external override onlyController {
         LPPosition storage position = positions[poolId][lp];
         if (position.liquidity == 0) revert NoPosition();
+        // C11-AUDIT-4: block silent increases. registerPosition is the correct
+        // path for top-ups and handles entryPrice re-anchoring.
+        require(newLiquidity <= position.liquidity, "Use registerPosition for increases");
 
         position.liquidity = newLiquidity;
         emit PositionUpdated(poolId, lp, newLiquidity);
@@ -212,6 +222,23 @@ contract ILProtectionVault is
 
         // Update position
         position.ilAccrued = ilAmount;
+
+        // C11-AUDIT-1 (CRIT): Record that `compensation` has been (or will be)
+        // paid by the caller (IncentiveController). Without this, a subsequent
+        // direct call to claimProtection() by the LP would pay the same amount
+        // again from the vault's reserves. The controller is trusted to actually
+        // transfer compensation to the LP; we update accounting under that
+        // assumption.
+        if (compensation > 0) {
+            position.ilClaimed += compensation;
+            // Decrement reserves too so the vault's on-chain accounting stays
+            // consistent with the off-band transfer the controller is doing.
+            address token = poolQuoteTokens[poolId];
+            if (token != address(0) && reserves[token] >= compensation) {
+                reserves[token] -= compensation;
+                totalILPaid += compensation;
+            }
+        }
 
         emit PositionClosed(poolId, lp, ilAmount, compensation);
     }

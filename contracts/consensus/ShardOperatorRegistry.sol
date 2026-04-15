@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /**
  * @title ShardOperatorRegistry — CKA Shard Node Management
@@ -36,6 +37,20 @@ contract ShardOperatorRegistry is
     uint256 public constant MIN_STAKE = 100e18;
     uint256 public constant MAX_CELLS_SERVED = 1e12; // NCI-011: Cap to prevent overflow in weight calc
     uint256 private constant ACC_PRECISION = 1e18;
+
+    // ============ C10-AUDIT-3: Challenge-Response Constants ============
+
+    /// @notice Delay before a committed cellsReport finalizes into weight.
+    uint256 public constant CHALLENGE_WINDOW = 1 hours;
+
+    /// @notice Operator's window to respond after being challenged.
+    uint256 public constant CHALLENGE_RESPONSE_WINDOW = 30 minutes;
+
+    /// @notice Bond a challenger escrows. Forfeited on losing challenge.
+    uint256 public constant CHALLENGE_BOND = 10e18;
+
+    /// @notice Slash fraction of operator stake on successful challenge (basis points).
+    uint256 public constant CHALLENGE_SLASH_BPS = 1000; // 10%
 
     // ============ State ============
 
@@ -72,8 +87,31 @@ contract ShardOperatorRegistry is
     /// @notice NCI-012: Authorized issuance controller (only caller for distributeRewards)
     address public issuanceController;
 
-    /// @dev Reserved storage gap
-    uint256[49] private __gap;
+    // ============ C10-AUDIT-3: Challenge-Response State ============
+
+    /// @notice A pending cellsServed report awaiting finalization or challenge.
+    /// @dev Operator commits (count, merkleRoot). During CHALLENGE_WINDOW,
+    ///      any caller may challenge by specifying a cellIndex and posting bond.
+    ///      Operator must respond with a Merkle proof of the cell at that index.
+    struct PendingReport {
+        uint256 count;              // Claimed cellsServed
+        bytes32 merkleRoot;         // Root of Merkle tree over leaves = keccak256(abi.encode(i, cellId))
+        uint256 commitAt;
+        uint256 finalizeAt;         // commitAt + CHALLENGE_WINDOW
+        // Challenge state — zero if no active challenge
+        address challenger;
+        uint256 challengeIndex;
+        uint256 challengerBond;
+        uint256 challengeDeadline;  // challenger's commit time + CHALLENGE_RESPONSE_WINDOW
+        bool resolved;              // true once finalized, refuted, or slashed
+    }
+
+    /// @notice Active pending report per shard (at most one in-flight).
+    mapping(bytes32 => PendingReport) public pendingReports;
+
+    /// @dev Reserved storage gap (reduced 49 → 48 after C10-AUDIT-3 mapping addition;
+    ///      the mapping itself consumes just one slot for its base offset).
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -85,6 +123,12 @@ contract ShardOperatorRegistry is
     event RewardsDistributed(uint256 amount, uint256 newAccRewardPerShare);
     /// @notice C10-AUDIT-2: emitted when anyone kicks a stale (non-heartbeating) shard
     event StaleShardReaped(bytes32 indexed shardId, address indexed reaper, uint256 stakeReturned);
+    // C10-AUDIT-3: challenge-response events
+    event CellsReportCommitted(bytes32 indexed shardId, uint256 count, bytes32 merkleRoot, uint256 finalizeAt);
+    event CellsReportFinalized(bytes32 indexed shardId, uint256 count);
+    event ChallengeRaised(bytes32 indexed shardId, address indexed challenger, uint256 cellIndex, uint256 deadline);
+    event ChallengeRefuted(bytes32 indexed shardId, address indexed challenger, uint256 cellIndex);
+    event ChallengeSucceeded(bytes32 indexed shardId, address indexed challenger, uint256 operatorSlashed);
 
     // ============ Errors ============
 
@@ -97,6 +141,15 @@ contract ShardOperatorRegistry is
     error CellsExceedCap();
     error ShardStale();
     error ShardNotStale();
+    // C10-AUDIT-3
+    error PendingReportActive();
+    error NoPendingReport();
+    error ReportNotMature();
+    error ChallengeActive();
+    error ChallengeExpired();
+    error ChallengeNotExpired();
+    error InvalidMerkleProof();
+    error InvalidChallengeIndex();
 
     // ============ Initializer ============
 
@@ -148,41 +201,187 @@ contract ShardOperatorRegistry is
     // ============ Operations ============
 
     /**
-     * @notice Report cells being served by this shard
-     * @dev NCI-011: Capped to MAX_CELLS_SERVED to prevent overflow in _shardWeight.
-     *      NCI-037: Claims pending rewards before weight change (Masterchef invariant).
-     *      C10-AUDIT-9: nonReentrant — claims rewards via safeTransfer.
-     *      C10-AUDIT-2: reverts if shard is stale (missed heartbeat grace window).
+     * @notice C10-AUDIT-3: Commit a cellsServed report. Goes into a pending state
+     *         for CHALLENGE_WINDOW before becoming effective. Any caller can
+     *         challenge by specifying a cellIndex; the operator must respond
+     *         with a Merkle proof that the indexed cell is actually served.
+     * @param count Claimed cellsServed (<= MAX_CELLS_SERVED)
+     * @param merkleRoot Root of Merkle tree where leaf[i] = keccak256(abi.encode(i, cellId[i]))
+     * @dev NCI-011: capped. C10-AUDIT-2: reverts if stale. C10-AUDIT-9: nonReentrant.
+     *      Only one in-flight pending report per shard at a time (must finalize/be-slashed
+     *      before committing again). Weight doesn't update until finalization.
      */
-    function reportCellsServed(uint256 cellCount) external nonReentrant {
-        // NCI-011: Cap to prevent overflow in sqrt(cellsServed * stake)
-        if (cellCount > MAX_CELLS_SERVED) revert CellsExceedCap();
+    function commitCellsReport(uint256 count, bytes32 merkleRoot) external nonReentrant {
+        if (count > MAX_CELLS_SERVED) revert CellsExceedCap();
 
         bytes32 shardId = operatorShard[msg.sender];
         if (shardId == bytes32(0)) revert NotRegistered();
 
         Shard storage shard = shards[shardId];
         if (!shard.active) revert NotActive();
-        // C10-AUDIT-2: Stale shards cannot mutate weight — forces operators to
-        // heartbeat before extracting rewards. Anyone can reap via deactivateStaleShard.
         if (_isStale(shard)) revert ShardStale();
 
-        // NCI-037: Claim pending rewards at OLD weight before changing
+        PendingReport storage p = pendingReports[shardId];
+        // Reject if a prior report is in flight. Operator must call finalizeCellsReport()
+        // (after challenge window) or claimChallengeSlash() (if they lost a challenge)
+        // to clear the slot before committing a new one.
+        if (p.commitAt != 0 && !p.resolved) revert PendingReportActive();
+
+        pendingReports[shardId] = PendingReport({
+            count: count,
+            merkleRoot: merkleRoot,
+            commitAt: block.timestamp,
+            finalizeAt: block.timestamp + CHALLENGE_WINDOW,
+            challenger: address(0),
+            challengeIndex: 0,
+            challengerBond: 0,
+            challengeDeadline: 0,
+            resolved: false
+        });
+
+        emit CellsReportCommitted(shardId, count, merkleRoot, block.timestamp + CHALLENGE_WINDOW);
+    }
+
+    /**
+     * @notice Finalize a committed cellsServed report after the challenge window
+     *         expires without a successful challenge. Updates shard weight.
+     * @dev Permissionless — anyone can call. Claims rewards at OLD weight first
+     *      (NCI-037 Masterchef invariant) before updating.
+     */
+    function finalizeCellsReport(bytes32 shardId) external nonReentrant {
+        PendingReport storage p = pendingReports[shardId];
+        if (p.commitAt == 0 || p.resolved) revert NoPendingReport();
+        if (block.timestamp < p.finalizeAt) revert ReportNotMature();
+        if (p.challenger != address(0)) revert ChallengeActive();
+
+        Shard storage shard = shards[shardId];
+        if (!shard.active) revert NotActive();
+        if (_isStale(shard)) revert ShardStale();
+
+        // NCI-037: claim pending rewards at OLD weight before changing
         _claimRewards(shardId);
 
-        // Update weight: remove old, add new
         uint256 oldWeight = _shardWeight(shard);
         uint256 oldCells = shard.cellsServed;
-        shard.cellsServed = cellCount;
+        shard.cellsServed = p.count;
         uint256 newWeight = _shardWeight(shard);
 
         if (oldWeight > 0) totalWeight -= oldWeight;
         totalWeight += newWeight;
 
-        // Update total cells incrementally (no unbounded loop)
-        totalCellsServed = totalCellsServed - oldCells + cellCount;
+        totalCellsServed = totalCellsServed - oldCells + p.count;
 
-        emit CellsReported(shardId, cellCount);
+        p.resolved = true;
+
+        emit CellsReportFinalized(shardId, p.count);
+        emit CellsReported(shardId, p.count); // legacy event preserved
+    }
+
+    /**
+     * @notice Challenge a pending cellsReport. Post CHALLENGE_BOND in CKB; name a
+     *         cellIndex you believe the operator cannot prove membership of in
+     *         the committed Merkle root.
+     * @dev Only one challenge per pending report. cellIndex must be < pending.count.
+     *      The challenger must have approved this contract for CHALLENGE_BOND.
+     *      Operator has CHALLENGE_RESPONSE_WINDOW from the challenge tx to respond.
+     */
+    function challengeCellsReport(bytes32 shardId, uint256 cellIndex) external nonReentrant {
+        PendingReport storage p = pendingReports[shardId];
+        if (p.commitAt == 0 || p.resolved) revert NoPendingReport();
+        if (block.timestamp >= p.finalizeAt) revert ReportNotMature(); // too late to challenge
+        if (p.challenger != address(0)) revert ChallengeActive();
+        if (cellIndex >= p.count) revert InvalidChallengeIndex();
+
+        ckbToken.safeTransferFrom(msg.sender, address(this), CHALLENGE_BOND);
+
+        p.challenger = msg.sender;
+        p.challengeIndex = cellIndex;
+        p.challengerBond = CHALLENGE_BOND;
+        p.challengeDeadline = block.timestamp + CHALLENGE_RESPONSE_WINDOW;
+
+        emit ChallengeRaised(shardId, msg.sender, cellIndex, p.challengeDeadline);
+    }
+
+    /**
+     * @notice Operator refutes an active challenge by providing a Merkle proof
+     *         that the challenged cellIndex maps to a valid cellId in the committed root.
+     * @param cellId The cellId at the challenged index (operator's data).
+     * @param proof  Merkle proof of membership in pendingReport.merkleRoot.
+     *               Leaf is keccak256(abi.encode(challengeIndex, cellId)).
+     * @dev Successful refutation: challenger's bond is transferred to the operator.
+     *      The report remains pending and can still be finalized after CHALLENGE_WINDOW.
+     *      Anyone could call this technically, but only the operator benefits — the
+     *      refuter's only cost is gas.
+     */
+    function respondToChallenge(
+        bytes32 shardId,
+        bytes32 cellId,
+        bytes32[] calldata proof
+    ) external nonReentrant {
+        PendingReport storage p = pendingReports[shardId];
+        if (p.commitAt == 0 || p.resolved) revert NoPendingReport();
+        if (p.challenger == address(0)) revert NoPendingReport();
+        if (block.timestamp > p.challengeDeadline) revert ChallengeExpired();
+
+        bytes32 leaf = keccak256(abi.encode(p.challengeIndex, cellId));
+        if (!MerkleProof.verify(proof, p.merkleRoot, leaf)) revert InvalidMerkleProof();
+
+        // Challenger loses bond to the operator
+        uint256 bond = p.challengerBond;
+        address challenger = p.challenger;
+        uint256 cIdx = p.challengeIndex;
+
+        // Clear challenge state (report remains pending, finalizer can still run)
+        p.challenger = address(0);
+        p.challengeIndex = 0;
+        p.challengerBond = 0;
+        p.challengeDeadline = 0;
+
+        address operator_ = shards[shardId].operator;
+        ckbToken.safeTransfer(operator_, bond);
+
+        emit ChallengeRefuted(shardId, challenger, cIdx);
+    }
+
+    /**
+     * @notice Called after CHALLENGE_RESPONSE_WINDOW elapses with no valid refutation.
+     *         Slashes CHALLENGE_SLASH_BPS of operator stake. Slashed amount plus the
+     *         challenger's bond are transferred to the challenger. Pending report is
+     *         discarded; cellsServed stays at its prior value.
+     * @dev Permissionless — anyone can call, but funds go to the challenger specifically.
+     *      Also removes the report from the pending slot so the operator can commit anew.
+     */
+    function claimChallengeSlash(bytes32 shardId) external nonReentrant {
+        PendingReport storage p = pendingReports[shardId];
+        if (p.commitAt == 0 || p.resolved) revert NoPendingReport();
+        if (p.challenger == address(0)) revert NoPendingReport();
+        if (block.timestamp <= p.challengeDeadline) revert ChallengeNotExpired();
+
+        Shard storage shard = shards[shardId];
+        uint256 slash = (shard.stake * CHALLENGE_SLASH_BPS) / 10_000;
+        if (slash > shard.stake) slash = shard.stake;
+
+        // Reduce operator's stake — triggers weight reduction via _shardWeight
+        // on next claim/finalize. We update totalWeight here to keep accounting
+        // fresh immediately.
+        uint256 oldWeight = _shardWeight(shard);
+        shard.stake -= slash;
+        uint256 newWeight = _shardWeight(shard);
+        if (oldWeight > 0) totalWeight = totalWeight + newWeight - oldWeight;
+
+        totalStaked -= slash;
+
+        address challenger = p.challenger;
+        uint256 payout = slash + p.challengerBond;
+
+        // Discard pending report without updating cellsServed
+        p.resolved = true;
+        p.challenger = address(0);
+        p.challengerBond = 0;
+
+        ckbToken.safeTransfer(challenger, payout);
+
+        emit ChallengeSucceeded(shardId, challenger, slash);
     }
 
     /**

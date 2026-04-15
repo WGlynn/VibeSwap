@@ -45,6 +45,9 @@
 
 ## Pending / Next Session
 
+### Strategic direction — parallel repo expansion
+Will's standing: <1 year coding, 23 repos, 390+ Solidity contracts, all pure signal. Next-phase strategy is to expand into more repos in parallel — **not** to wash-trade stats, but to legitimately show breadth and demonstrate genuine parallel capacity. Each new repo should be load-bearing work, not filler. Candidate directions worth scoping next session: (a) spin out primitives from VibeSwap into their own libraries where they're general-purpose (Shapley attribution, peer challenge-response, off-circulation registry, stateful-overlay hooks), (b) new research-program repos around the papers drafted today (contribution-compact reference implementation, graceful-transition-protocol simulator, meaning-substrate toolkit), (c) wrap jarvis-bot voice-gate as its own reusable module. Each expansion compounds into the convergence loop via upstream contribution when applicable.
+
 ### Follow-through on today's open artifacts
 - Claude-code PR #48714 — monitor for response; if engaged, be ready to refine. If silent for two weeks, the contributor-graph entry stands regardless.
 - GitHub issue against claude-code — same monitoring.

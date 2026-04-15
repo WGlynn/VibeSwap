@@ -64,6 +64,18 @@ contract ShardOperatorRegistryTest is Test {
         ckb.approve(address(registry), type(uint256).max);
     }
 
+    /// @dev C10-AUDIT-3 helper: commits a cellsServed report with empty merkleRoot,
+    ///      warps past CHALLENGE_WINDOW, and finalizes. Use for test setup where
+    ///      challenges aren't being exercised.
+    function _report(address op, uint256 count) internal returns (bytes32) {
+        vm.prank(op);
+        registry.commitCellsReport(count, bytes32(0));
+        bytes32 sid = registry.operatorShard(op);
+        vm.warp(block.timestamp + 1 hours + 1);
+        registry.finalizeCellsReport(sid);
+        return sid;
+    }
+
     // ============ Registration ============
 
     function test_registerShard() public {
@@ -116,8 +128,7 @@ contract ShardOperatorRegistryTest is Test {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
 
-        vm.prank(op1);
-        registry.reportCellsServed(1000);
+        _report(op1, 1000);
 
         ShardOperatorRegistry.Shard memory s = registry.getShard(shard1);
         assertEq(s.cellsServed, 1000);
@@ -131,8 +142,7 @@ contract ShardOperatorRegistryTest is Test {
         // Weight should be 0 initially (0 cells)
         assertEq(registry.totalWeight(), 0);
 
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         // Weight = sqrt(100 * 500e18) > 0
         assertGt(registry.totalWeight(), 0);
@@ -142,13 +152,11 @@ contract ShardOperatorRegistryTest is Test {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
 
-        vm.prank(op1);
-        registry.reportCellsServed(500);
+        _report(op1, 500);
         assertEq(registry.totalCellsServed(), 500);
 
         // Update to lower value
-        vm.prank(op1);
-        registry.reportCellsServed(200);
+        _report(op1, 200);
         assertEq(registry.totalCellsServed(), 200);
     }
 
@@ -158,13 +166,13 @@ contract ShardOperatorRegistryTest is Test {
 
         vm.prank(op1);
         vm.expectRevert(ShardOperatorRegistry.CellsExceedCap.selector);
-        registry.reportCellsServed(1e12 + 1);
+        registry.commitCellsReport(1e12 + 1, bytes32(0));
     }
 
     function test_revert_reportCells_notRegistered() public {
         vm.prank(op1);
         vm.expectRevert(ShardOperatorRegistry.NotRegistered.selector);
-        registry.reportCellsServed(100);
+        registry.commitCellsReport(100, bytes32(0));
     }
 
     function test_revert_reportCells_afterDeactivate() public {
@@ -177,7 +185,7 @@ contract ShardOperatorRegistryTest is Test {
         // NCI-023: operatorShard cleared on deactivate, so hits NotRegistered
         vm.prank(op1);
         vm.expectRevert(ShardOperatorRegistry.NotRegistered.selector);
-        registry.reportCellsServed(100);
+        registry.commitCellsReport(100, bytes32(0));
     }
 
     // ============ Heartbeat ============
@@ -236,8 +244,7 @@ contract ShardOperatorRegistryTest is Test {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
 
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
         uint256 weightBefore = registry.totalWeight();
         assertGt(weightBefore, 0);
 
@@ -270,8 +277,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_distributeRewards() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         uint256 rewardAmount = 1000e18;
         vm.prank(controller);
@@ -284,8 +290,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_distributeRewards_onlyAuthorized() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         vm.prank(op2);
         vm.expectRevert("Not authorized");
@@ -308,8 +313,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_claimRewards_singleOperator() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         uint256 rewardAmount = 1000e18;
         vm.prank(controller);
@@ -329,14 +333,12 @@ contract ShardOperatorRegistryTest is Test {
         // Op1: stake=500, cells=100 → weight=sqrt(500e18*100)
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         // Op2: same stake and cells → same weight
         vm.prank(op2);
         registry.registerShard(shard2, STAKE);
-        vm.prank(op2);
-        registry.reportCellsServed(100);
+        _report(op2, 100);
 
         uint256 rewardAmount = 2000e18;
         vm.prank(controller);
@@ -352,8 +354,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_claimRewards_afterDeactivation() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         vm.prank(controller);
         registry.distributeRewards(1000e18);
@@ -384,16 +385,14 @@ contract ShardOperatorRegistryTest is Test {
     function test_reportCells_claimsBeforeWeightChange() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         vm.prank(controller);
         registry.distributeRewards(1000e18);
 
         // Op1 has 1000e18 pending. Now report more cells — should claim first.
         uint256 balBefore = ckb.balanceOf(op1);
-        vm.prank(op1);
-        registry.reportCellsServed(200);
+        _report(op1, 200);
 
         // Pending rewards should have been claimed (Masterchef rounding: up to 1 wei)
         assertApproxEqAbs(ckb.balanceOf(op1), balBefore + 1000e18, 1);
@@ -411,8 +410,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_weight_geometricMean() public {
         vm.prank(op1);
         registry.registerShard(shard1, 10000e18); // 10k stake
-        vm.prank(op1);
-        registry.reportCellsServed(10000); // 10k cells
+        _report(op1, 10000); // 10k cells
 
         // weight = sqrt(10000 * 10000e18) = sqrt(1e8 * 1e18) = sqrt(1e26) = 1e13
         uint256 w = registry.totalWeight();
@@ -434,12 +432,9 @@ contract ShardOperatorRegistryTest is Test {
         assertEq(registry.totalStaked(), STAKE * 3);
 
         // All report cells
-        vm.prank(op1);
-        registry.reportCellsServed(100);
-        vm.prank(op2);
-        registry.reportCellsServed(100);
-        vm.prank(op3);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
+        _report(op2, 100);
+        _report(op3, 100);
 
         // Distribute rewards
         vm.prank(controller);
@@ -476,8 +471,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_ownerCanDistribute() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         // Owner should also be authorized to distribute (setup phase)
         vm.prank(owner);
@@ -515,22 +509,20 @@ contract ShardOperatorRegistryTest is Test {
     function test_reportCellsServed_revertsWhenStale() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         vm.warp(block.timestamp + 48 hours + 1);
 
         vm.prank(op1);
         vm.expectRevert(ShardOperatorRegistry.ShardStale.selector);
-        registry.reportCellsServed(200);
+        registry.commitCellsReport(200, bytes32(0));
     }
 
     /// @notice Stale shard cannot claim — forces heartbeat first.
     function test_claimRewards_revertsWhenStale() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
         vm.prank(controller);
         registry.distributeRewards(1000e18);
 
@@ -560,8 +552,7 @@ contract ShardOperatorRegistryTest is Test {
     function test_deactivateStaleShard_permissionless() public {
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
-        vm.prank(op1);
-        registry.reportCellsServed(100);
+        _report(op1, 100);
 
         uint256 activeBefore = registry.activeShardCount();
         uint256 stakedBefore = registry.totalStaked();
@@ -617,5 +608,223 @@ contract ShardOperatorRegistryTest is Test {
         vm.prank(op1);
         registry.registerShard(shard2, STAKE);
         assertEq(registry.operatorShard(op1), shard2);
+    }
+
+    // ============ C10-AUDIT-3: Challenge-Response Tests ============
+
+    /// @dev Build a simple 2-leaf Merkle tree over (index, cellId) pairs.
+    ///      Returns the root and proofs for each leaf.
+    function _build2LeafTree(bytes32 cellId0, bytes32 cellId1)
+        internal
+        pure
+        returns (bytes32 root, bytes32[] memory proof0, bytes32[] memory proof1)
+    {
+        bytes32 leaf0 = keccak256(abi.encode(uint256(0), cellId0));
+        bytes32 leaf1 = keccak256(abi.encode(uint256(1), cellId1));
+        // OZ MerkleProof.verify uses _hashPair which sorts by default
+        root = _hashPair(leaf0, leaf1);
+        proof0 = new bytes32[](1);
+        proof0[0] = leaf1;
+        proof1 = new bytes32[](1);
+        proof1[0] = leaf0;
+    }
+
+    function _hashPair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
+        return a < b ? keccak256(abi.encodePacked(a, b)) : keccak256(abi.encodePacked(b, a));
+    }
+
+    /// @notice commitCellsReport does NOT immediately change weight.
+    function test_commit_doesNotUpdateWeightYet() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        uint256 weightBefore = registry.totalWeight();
+
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+
+        // Weight unchanged — pending, not finalized
+        assertEq(registry.totalWeight(), weightBefore);
+    }
+
+    /// @notice Cannot finalize before challenge window expires.
+    function test_finalize_revertsBeforeWindow() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+
+        // Only 30 min elapsed; window is 1 hour
+        vm.warp(block.timestamp + 30 minutes);
+
+        vm.expectRevert(ShardOperatorRegistry.ReportNotMature.selector);
+        registry.finalizeCellsReport(shard1);
+    }
+
+    /// @notice Cannot commit a new report while one is pending (unresolved).
+    function test_commit_revertsWhilePendingActive() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.PendingReportActive.selector);
+        registry.commitCellsReport(200, bytes32(0));
+    }
+
+    /// @notice A challenger can raise a challenge during the window.
+    function test_challenge_raisedWithinWindow() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, , ) = _build2LeafTree(cellA, cellB);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        // op2 posts bond and challenges
+        vm.prank(op2);
+        ckb.approve(address(registry), type(uint256).max);
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        (, , , , address challenger, uint256 cIdx, , , ) = registry.pendingReports(shard1);
+        assertEq(challenger, op2);
+        assertEq(cIdx, 0);
+    }
+
+    /// @notice Operator refutes successfully with a valid Merkle proof.
+    ///         Challenger's bond is forfeited to the operator.
+    function test_challenge_refutedWithValidProof() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        uint256 op1Before = ckb.balanceOf(op1);
+
+        // op1 refutes with the correct cellId at index 0
+        vm.prank(op1);
+        registry.respondToChallenge(shard1, cellA, proof0);
+
+        // Challenger's bond transferred to op1
+        assertEq(ckb.balanceOf(op1), op1Before + registry.CHALLENGE_BOND());
+
+        // Challenge cleared; operator can finalize after the original window
+        vm.warp(block.timestamp + 1 hours + 1);
+        registry.finalizeCellsReport(shard1);
+        assertEq(registry.getShard(shard1).cellsServed, 2);
+    }
+
+    /// @notice Operator who fails to respond is slashed; challenger collects slash + bond.
+    function test_challenge_slashesNonRespondingOperator() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, , ) = _build2LeafTree(cellA, cellB);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        uint256 op1StakeBefore = registry.getShard(shard1).stake;
+        assertEq(op1StakeBefore, STAKE);
+
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        // op1 ignores the challenge
+        vm.warp(block.timestamp + 30 minutes + 1);
+
+        uint256 challengerBefore = ckb.balanceOf(op2);
+        uint256 expectedSlash = (STAKE * 1000) / 10_000; // 10%
+
+        // Anyone can trigger the slash — op2 does for their own payout
+        registry.claimChallengeSlash(shard1);
+
+        // op1's stake reduced by the slash
+        assertEq(registry.getShard(shard1).stake, STAKE - expectedSlash);
+
+        // op2 received slash + their bond back
+        assertEq(
+            ckb.balanceOf(op2),
+            challengerBefore + expectedSlash + registry.CHALLENGE_BOND()
+        );
+    }
+
+    /// @notice Invalid Merkle proof fails to refute — operator still on the hook.
+    function test_challenge_invalidProofDoesNotRefute() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        // Provide proof that doesn't match the (index, cellId) pair
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.InvalidMerkleProof.selector);
+        registry.respondToChallenge(shard1, keccak256("wrong"), proof0);
+    }
+
+    /// @notice Challenge response after deadline is rejected.
+    function test_challenge_responseAfterDeadlineRejected() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        vm.warp(block.timestamp + 30 minutes + 1);
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.ChallengeExpired.selector);
+        registry.respondToChallenge(shard1, cellA, proof0);
+    }
+
+    /// @notice Cannot challenge after finalization window has elapsed.
+    function test_challenge_afterWindowRejected() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        vm.prank(op2);
+        vm.expectRevert(ShardOperatorRegistry.ReportNotMature.selector);
+        registry.challengeCellsReport(shard1, 0);
+    }
+
+    /// @notice Challenge cellIndex out of range rejected.
+    function test_challenge_outOfRangeIndexRejected() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(5, bytes32(0));
+
+        vm.prank(op2);
+        vm.expectRevert(ShardOperatorRegistry.InvalidChallengeIndex.selector);
+        registry.challengeCellsReport(shard1, 5);
     }
 }

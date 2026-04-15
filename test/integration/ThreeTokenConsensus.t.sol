@@ -144,8 +144,11 @@ contract ThreeTokenConsensusTest is Test {
         vm.startPrank(shardOp);
         ckb.approve(address(registry), 20_000e18);
         registry.registerShard(keccak256("shard-alpha"), 20_000e18);
-        registry.reportCellsServed(100);
+        registry.commitCellsReport(100, bytes32(0));
         vm.stopPrank();
+        // C10-AUDIT-3: warp past challenge window and finalize (no challenge)
+        vm.warp(block.timestamp + 1 hours + 1);
+        registry.finalizeCellsReport(keccak256("shard-alpha"));
 
         assertEq(registry.activeShardCount(), 1);
         assertEq(registry.totalStaked(), 20_000e18);

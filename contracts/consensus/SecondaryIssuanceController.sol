@@ -84,8 +84,21 @@ contract SecondaryIssuanceController is
     /// @notice Minimum emission per distribution (skip if below)
     uint256 public minDistribution;
 
+    /// @notice C11-AUDIT-1: Minimum gas that must remain before the external
+    ///         distributeRewards / depositYield calls. Each try/catch forwards
+    ///         only 63/64 of gasleft() (EIP-150). A hostile upgradeable
+    ///         shardRegistry or daoShelter could burn 63/64*gasleft() to force
+    ///         the catch branch on every epoch, permanently diverting funds.
+    ///         Halting the epoch is safer than silently rerouting.
+    uint256 public constant MIN_DISTRIBUTE_GAS = 200_000;
+
     /// @dev Reserved storage gap
     uint256[50] private __gap;
+
+    // ============ Errors (extended) ============
+
+    error InsufficientGas();
+    error ShelterShortPull();
 
     // ============ Events ============
 
@@ -202,6 +215,9 @@ contract SecondaryIssuanceController is
         if (shardShare > 0) {
             ckbToken.mint(address(this), shardShare);
             IERC20(address(ckbToken)).forceApprove(address(shardRegistry), shardShare);
+            // C11-AUDIT-1: floor so a hostile registry can't 63/64-OOG-grief
+            // into the catch branch.
+            if (gasleft() < MIN_DISTRIBUTE_GAS) revert InsufficientGas();
             try shardRegistry.distributeRewards(shardShare) {
                 // success
             } catch {
@@ -212,26 +228,25 @@ contract SecondaryIssuanceController is
         }
 
         // C10-AUDIT-4: try/catch the depositYield call (mirrors C7-ISS-001 pattern
-        // for shardRegistry). If shelter reverts or silently declines (e.g., no
-        // depositors edge case) the approved tokens are swept to insurance so no
-        // wei of emission is left stranded on the controller address.
+        // for shardRegistry). If shelter reverts (e.g. totalDeposited == 0), the
+        // approved tokens are swept to insurance so no wei of emission is left
+        // stranded on the controller address.
+        // C11-AUDIT-1: if depositYield returns SUCCESSFULLY but pulled less than
+        // daoShare, that's a buggy/hostile shelter — halt the epoch rather than
+        // silently rerouting. Short-pull isn't reachable from a standard OZ
+        // ERC20 (transferFrom reverts or transfers full amount), so the only
+        // way to hit this revert is through a hostile shelter upgrade that
+        // short-transfers. Reverting forces operator intervention.
         if (daoShare > 0) {
             ckbToken.mint(address(this), daoShare);
             IERC20(address(ckbToken)).forceApprove(address(daoShelter), daoShare);
             uint256 balBefore = IERC20(address(ckbToken)).balanceOf(address(this));
+            // C11-AUDIT-1: gas floor — symmetric with the shardRegistry path.
+            if (gasleft() < MIN_DISTRIBUTE_GAS) revert InsufficientGas();
             try daoShelter.depositYield(daoShare) {
-                // success path — verify the shelter actually pulled the tokens.
-                // If it didn't (silent-return path), reroute to insurance.
                 uint256 balAfter = IERC20(address(ckbToken)).balanceOf(address(this));
                 uint256 actuallyPulled = balBefore - balAfter;
-                if (actuallyPulled < daoShare) {
-                    uint256 stranded = daoShare - actuallyPulled;
-                    IERC20(address(ckbToken)).forceApprove(address(daoShelter), 0);
-                    IERC20(address(ckbToken)).safeTransfer(insurancePool, stranded);
-                    // Redistribute accounting: the stranded slice is insurance, not DAO.
-                    daoShare -= stranded;
-                    insuranceShare += stranded;
-                }
+                if (actuallyPulled < daoShare) revert ShelterShortPull();
             } catch {
                 IERC20(address(ckbToken)).forceApprove(address(daoShelter), 0);
                 IERC20(address(ckbToken)).safeTransfer(insurancePool, daoShare);

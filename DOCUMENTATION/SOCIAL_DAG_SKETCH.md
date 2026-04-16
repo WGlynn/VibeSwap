@@ -1,7 +1,7 @@
 # Social DAG — Architecture Sketch
 ## Capturing meta-contributions that don't produce code artifacts
 
-*Drafted 2026-04-16 in response to a live TG chat: Will observed that the Contribution DAG is "basically working perfectly" for code, but meta-contributions (observations, corrections, reframings, relays, cross-pitches) are going undocumented. Proposed as a separate DAG that converges with the existing Contribution DAG rather than replacing it.*
+*Drafted 2026-04-16 in response to a live TG chat: Will observed that the Contribution DAG is "basically working perfectly" for code, but meta-contributions (observations, corrections, reframings, relays, cross-pitches) are going undocumented. Will's directive: **peer-to-peer is the way** — no hierarchical root, no privileged DAG. Each DAG is an equal participant in a converging mesh.*
 
 ---
 
@@ -34,15 +34,22 @@ Winner-take-most attribution misses all of this. The Lawson Floor argument appli
   - `TEACHING` — explained the project to a newcomer in their own vocabulary
 - **Downstream refs**: when a Social DAG node causes a Contribution DAG node — a code change, a paper edit, a memory primitive, a decision — the edge is drawn explicitly.
 
-### Convergence with Contribution DAG
+### Peer-to-peer convergence — no privileged DAG
 
-The two DAGs are **not merged**. They coexist and cross-reference.
+Will's directive: **peer-to-peer is the way.** No hierarchical root, no primary DAG to which others defer. Each DAG is a first-class cell; convergence happens through **bidirectional cross-edges**, not through subordination.
 
-- **Code lives in Contribution DAG.** (Commits, issues, PRs, contracts, tests.)
-- **Meta lives in Social DAG.** (Observations, corrections, reframings, relays.)
-- **Edges cross the boundary** when a meta-contribution causes a code-level change. Tadija's "GEV → Extractive Load" REFRAMING (Social DAG) drew an edge to the `memecoin-intent-market-seed.md` terminology update + the `primitive_extractive-load.md` memory entry (Contribution DAG).
+What this means concretely:
 
-This is Cell Knowledge Architecture applied to attribution. Each DAG is a cell; the cross-DAG edges are how cells compose into larger epistemic artifacts. Generalizes naturally: future DAGs (Research DAG for papers, Ops DAG for infrastructure, Audit DAG for security work) all share the same Lawson Floor invariant and all convergence-link through this cell pattern.
+- **No DAG owns another DAG's truth.** Contribution DAG doesn't "accept" social signals from the Social DAG; the two simply record edges to each other when downstream effects occur. Either direction.
+- **A contributor can exist in one DAG without existing in any other.** A newcomer whose only contribution is a load-bearing observation in TG gets a Social DAG entry and Lawson-Floor share without ever writing code. A silent contract author whose commits never touched chat gets a Contribution DAG entry without a Social DAG profile. Both are legitimate paths.
+- **Shared invariants live at the protocol layer, not inside any DAG.** The Lawson Floor, stake-bonded pseudonym registry, and peer challenge-response oracle are protocol primitives any DAG can compose with. This is the mesh. No DAG implements them internally; every DAG inherits them.
+- **Consensus is NCI, not DAG hierarchy.** The strongest remaining argument for a hierarchical root DAG was "where do disputes between DAGs resolve?" — Nakamoto Consensus Infinity (`contracts/consensus/NakamotoConsensusInfinity.sol`) dissolves that argument entirely. Each DAG posts its state transitions (cross-edge attestations, social signal records, new node commitments) as transactions to NCI. NCI orders them. Canonical history is shared by construction. No DAG needs to be authoritative over any other because the ordering is already canonical. This is the same pattern Bitcoin uses to avoid a "root bank": consensus provides ordering, every node agrees because they agree on the chain. NCI does the same job for the DAG mesh.
+- **Cross-edges are bidirectional by default.** Tadija's "GEV → Extractive Load" REFRAMING (Social DAG) drew an edge to the `memecoin-intent-market-seed.md` terminology update + `primitive_extractive-load.md` memory entry (Contribution DAG) — and those Contribution DAG nodes carry a reverse edge back to the Social DAG node. Either direction can be traversed. Attribution flows either way.
+- **New DAGs are added permissionlessly.** Anyone in the community can propose a new DAG (Research DAG for papers, Audit DAG for security, Ops DAG for infrastructure, Education DAG for workshops, etc.). Adoption doesn't require a governance vote — it requires the shared protocol invariants be respected. New DAGs join the mesh by publishing a merkle-anchored record and opting into the peer challenge-response oracle.
+
+**Claude Code's role in this mesh**: facilitator, not arbiter. The LLM helps draw cross-edges by pattern-matching across DAG records ("this social signal looks related to this commit"), but the edges are recorded with attestation requirements. No LLM output lands as truth without peer attestation. Claude Code is a DAG participant with its own pseudonym and stake, same as any human contributor.
+
+This is Cell Knowledge Architecture applied to attribution. Each DAG is a cell; the cells compose peer-to-peer without a privileged vertex. CKA's UTXO semantics (cells consumed/produced, not mutated) map cleanly: when a meta-contribution is attested, a new Social DAG cell is produced; when it later drives a code change, a cross-edge cell is produced linking the two. Older cells are not rewritten — attribution compounds by addition, not by overwrite.
 
 ### Scoring without subjectivity collapse
 

@@ -6,11 +6,32 @@ import "../../contracts/consensus/ShardOperatorRegistry.sol";
 import "../../contracts/monetary/CKBNativeToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
+/// @dev C11-AUDIT-14 test double. Lets tests mark cellIds active/inactive
+///      without deploying a full StateRentVault. Mimics the Cell struct layout.
+contract MockStateRentVault is IStateRentVaultForRegistry {
+    mapping(bytes32 => bool) public activeCells;
+
+    function setActive(bytes32 cellId, bool active) external {
+        activeCells[cellId] = active;
+    }
+
+    function getCell(bytes32 cellId) external view returns (Cell memory) {
+        return Cell({
+            owner: address(0),
+            capacity: 0,
+            contentHash: bytes32(0),
+            createdAt: 0,
+            active: activeCells[cellId]
+        });
+    }
+}
+
 contract ShardOperatorRegistryTest is Test {
     using stdStorage for StdStorage;
 
     ShardOperatorRegistry public registry;
     CKBNativeToken public ckb;
+    MockStateRentVault public vault;
 
     address owner = makeAddr("owner");
     address minter = makeAddr("minter");
@@ -41,10 +62,16 @@ contract ShardOperatorRegistryTest is Test {
         ERC1967Proxy regProxy = new ERC1967Proxy(address(regImpl), regData);
         registry = ShardOperatorRegistry(address(regProxy));
 
+        // C11-AUDIT-14: mock vault so existing challenge-response tests keep
+        // working. Individual tests opt into unset-vault / inactive-cell
+        // scenarios by either not setting active bits or by not wiring at all.
+        vault = new MockStateRentVault();
+
         // Wire
         vm.startPrank(owner);
         ckb.setMinter(minter, true);
         registry.setIssuanceController(controller);
+        registry.setStateRentVault(address(vault));
         vm.stopPrank();
 
         // Mint tokens to operators and controller
@@ -704,6 +731,9 @@ contract ShardOperatorRegistryTest is Test {
         bytes32 cellB = keccak256("cellB");
         (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
 
+        // C11-AUDIT-14: cellA must be a real active cell in the vault
+        vault.setActive(cellA, true);
+
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
         vm.prank(op1);
@@ -903,6 +933,7 @@ contract ShardOperatorRegistryTest is Test {
         bytes32 cellA = keccak256("cellA");
         bytes32 cellB = keccak256("cellB");
         (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+        vault.setActive(cellA, true);
 
         vm.prank(op1);
         registry.registerShard(shard1, STAKE);
@@ -919,6 +950,54 @@ contract ShardOperatorRegistryTest is Test {
 
         // Operator themselves can still respond successfully.
         vm.prank(op1);
+        registry.respondToChallenge(shard1, cellA, proof0);
+    }
+
+    /// @notice C11-AUDIT-14: refute reverts if StateRentVault isn't wired.
+    ///         Post-upgrade admin must call setStateRentVault before any
+    ///         refute can succeed. Upgrade-path security enforced.
+    function test_C11_respondToChallenge_revertsIfVaultUnset() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+        vault.setActive(cellA, true);
+
+        // Unset the vault to simulate post-upgrade, pre-setup state.
+        vm.prank(owner);
+        registry.setStateRentVault(address(0));
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.VaultNotSet.selector);
+        registry.respondToChallenge(shard1, cellA, proof0);
+    }
+
+    /// @notice C11-AUDIT-14: refute reverts if cellId is not active in vault.
+    ///         Closes the "commit to any preimage" gap from C10-AUDIT-3:
+    ///         operator can no longer commit fabricated cellIds.
+    function test_C11_respondToChallenge_revertsIfCellInactive() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+        // NOTE: cellA is NOT set active in the vault.
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.InactiveCell.selector);
         registry.respondToChallenge(shard1, cellA, proof0);
     }
 

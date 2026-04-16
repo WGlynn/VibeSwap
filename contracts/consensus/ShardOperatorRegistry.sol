@@ -8,6 +8,21 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
+/// @notice C11-AUDIT-14: minimal view over StateRentVault for cell-existence
+///         checks during challenge-response. The vault's Cell struct contains
+///         an `active` field; we reproduce the layout here (view-only) to
+///         avoid a circular import.
+interface IStateRentVaultForRegistry {
+    struct Cell {
+        address owner;
+        uint256 capacity;
+        bytes32 contentHash;
+        uint256 createdAt;
+        bool active;
+    }
+    function getCell(bytes32 cellId) external view returns (Cell memory);
+}
+
 /**
  * @title ShardOperatorRegistry — CKA Shard Node Management
  * @notice Registers shard nodes, tracks cells served, distributes secondary issuance.
@@ -109,9 +124,17 @@ contract ShardOperatorRegistry is
     /// @notice Active pending report per shard (at most one in-flight).
     mapping(bytes32 => PendingReport) public pendingReports;
 
-    /// @dev Reserved storage gap (reduced 49 → 48 after C10-AUDIT-3 mapping addition;
-    ///      the mapping itself consumes just one slot for its base offset).
-    uint256[48] private __gap;
+    /// @notice C11-AUDIT-14: canonical source of truth for cell existence.
+    ///         When non-zero, respondToChallenge requires the refuted cellId to
+    ///         be an active cell in this vault. Closes the "commit to any
+    ///         preimage" gap from C10-AUDIT-3: operators can no longer refute
+    ///         with fabricated cellIds that don't correspond to real cells.
+    ///         Must be set post-upgrade via setStateRentVault; refutes revert
+    ///         with VaultNotSet until then (upgrade-path security enforced).
+    IStateRentVaultForRegistry public stateRentVault;
+
+    /// @dev Reserved storage gap (reduced 48 → 47 for stateRentVault slot).
+    uint256[47] private __gap;
 
     // ============ Events ============
 
@@ -153,6 +176,9 @@ contract ShardOperatorRegistry is
     // C11-AUDIT-8/9: challenge collusion hardening
     error SelfChallenge();
     error NotOperator();
+    // C11-AUDIT-14: cell-existence cross-ref
+    error VaultNotSet();
+    error InactiveCell();
 
     // ============ Initializer ============
 
@@ -338,6 +364,12 @@ contract ShardOperatorRegistry is
         bytes32 leaf = keccak256(abi.encode(p.challengeIndex, cellId));
         if (!MerkleProof.verify(proof, p.merkleRoot, leaf)) revert InvalidMerkleProof();
 
+        // C11-AUDIT-14: prove the cellId is a REAL active cell, not just a
+        // hash the operator committed to. Closes "commit to any preimage"
+        // gap from C10-AUDIT-3. Requires post-upgrade setStateRentVault().
+        if (address(stateRentVault) == address(0)) revert VaultNotSet();
+        if (!stateRentVault.getCell(cellId).active) revert InactiveCell();
+
         // Challenger loses bond to the operator
         uint256 bond = p.challengerBond;
         address challenger = p.challenger;
@@ -476,6 +508,14 @@ contract ShardOperatorRegistry is
     /// @notice Set the issuance controller address
     function setIssuanceController(address controller) external onlyOwner {
         issuanceController = controller;
+    }
+
+    /// @notice C11-AUDIT-14: wire the canonical StateRentVault for
+    ///         cell-existence checks in respondToChallenge. MUST be called
+    ///         post-upgrade before any challenge can be refuted — refutes
+    ///         revert VaultNotSet when the address is zero.
+    function setStateRentVault(address vault) external onlyOwner {
+        stateRentVault = IStateRentVaultForRegistry(vault);
     }
 
     /**

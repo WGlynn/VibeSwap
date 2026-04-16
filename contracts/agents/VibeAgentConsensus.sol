@@ -103,9 +103,14 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalRoundsTimedOut;
     uint256 public totalSlashed;
 
+    /// @notice C14-AUDIT-1: Pull-pattern queue for stake returns that the auto-push could
+    ///         not deliver (contract committer rejects ETH, self-destructed wallet, OOG in
+    ///         recipient fallback). Prevents permanent fund-trap when ac.stake is zeroed
+    ///         before the external call and the call fails.
+    mapping(address => uint256) public pendingStakeWithdrawals;
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -116,6 +121,8 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     event RoundTimedOut(uint256 indexed roundId);
     event AgentSlashed(uint256 indexed roundId, bytes32 indexed agentId, uint256 amount);
     event ReliabilityUpdated(bytes32 indexed agentId, uint256 newScore);
+    event StakeWithdrawalQueued(address indexed committer, uint256 amount);
+    event StakeWithdrawn(address indexed committer, uint256 amount);
 
     // ============ Init ============
 
@@ -318,11 +325,33 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             AgentCommit storage ac = commits[roundId][participants[i]];
             if (ac.revealed && ac.stake > 0 && ac.committer != address(0)) {
                 uint256 returnAmount = ac.stake;
+                address committer = ac.committer;
                 ac.stake = 0;
-                (bool ok, ) = ac.committer.call{value: returnAmount}("");
-                if (!ok) { ac.stake = returnAmount; }
+                (bool ok, ) = committer.call{value: returnAmount}("");
+                if (!ok) {
+                    // C14-AUDIT-1: route failed auto-push to pull-queue instead of
+                    // restoring ac.stake. Restoring created a permanent trap — no
+                    // external function read ac.stake to allow later withdrawal.
+                    pendingStakeWithdrawals[committer] += returnAmount;
+                    emit StakeWithdrawalQueued(committer, returnAmount);
+                }
             }
         }
+    }
+
+    /**
+     * @notice Withdraw stake that the auto-push at finalize() failed to deliver.
+     * @dev C14-AUDIT-1: escape valve for contract committers that reject ETH
+     *      (e.g. multisig, DAO, or a committer-wallet that later self-destructs).
+     *      CEI pattern — map zeroed before external call.
+     */
+    function withdrawPendingStake() external nonReentrant {
+        uint256 amount = pendingStakeWithdrawals[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+        pendingStakeWithdrawals[msg.sender] = 0;
+        (bool ok, ) = msg.sender.call{value: amount}("");
+        require(ok, "Transfer failed");
+        emit StakeWithdrawn(msg.sender, amount);
     }
 
     function _updateReliability(uint256 roundId) internal {

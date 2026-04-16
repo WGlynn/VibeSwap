@@ -711,4 +711,72 @@ contract IncentiveControllerTest is Test {
         (bool success,) = address(controller).call{value: 1 ether}("");
         assertTrue(success);
     }
+
+    // ============ C14-AUDIT-2: pull-path for forfeited auction proceeds ============
+
+    /// @notice Before the fix, a contract LP that rejected ETH during onLiquidityRemoved
+    ///         had its accrued auction proceeds silently emitted-and-forgotten
+    ///         (AuctionProceedsForfeited event only, no recoverability). Because
+    ///         claimAuctionProceeds gates on lpBalance > 0, after full removal the LP
+    ///         could never claim. After the fix: failed auto-push credits
+    ///         pendingForfeitedProceeds for later pull via claimForfeitedAuctionProceeds.
+    function test_C14_FailedPush_CreditsPendingForfeitedProceeds() public {
+        bytes32 poolId = keccak256("c14-pool");
+        EthRejectorLp rejLp = new EthRejectorLp();
+        rejLp.setRejecting(true);
+
+        // Set up LP position so accRewardPerShare and rewardDebt checkpoint correctly
+        mockAMM.setLiquidity(poolId, address(rejLp), 1000e18, 1000e18);
+
+        // Simulate onLiquidityAdded to checkpoint rewardDebt
+        vm.prank(ammAddr);
+        controller.onLiquidityAdded(poolId, address(rejLp), 1000e18, 2000e18);
+
+        // Distribute 10 ETH auction proceeds — pool gets 100% (sole LP)
+        bytes32[] memory poolIds = new bytes32[](1);
+        poolIds[0] = poolId;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 10 ether;
+        vm.deal(coreAddr, 10 ether);
+        vm.prank(coreAddr);
+        controller.distributeAuctionProceeds{value: 10 ether}(1, poolIds, amounts);
+
+        // Remove all liquidity — onLiquidityRemoved should try to push, fail, queue.
+        vm.prank(ammAddr);
+        controller.onLiquidityRemoved(poolId, address(rejLp), 1000e18);
+
+        assertEq(controller.pendingForfeitedProceeds(address(rejLp)), 10 ether, "pending queued");
+        assertEq(address(rejLp).balance, 0, "auto-push did not succeed");
+
+        // Post-removal: lpBalance == 0, so claimAuctionProceeds would revert.
+        mockAMM.setLiquidity(poolId, address(rejLp), 0, 0);
+
+        // Flip rejection OFF — pull path now succeeds.
+        rejLp.setRejecting(false);
+        rejLp.pullForfeited(address(controller));
+
+        assertEq(controller.pendingForfeitedProceeds(address(rejLp)), 0, "pending cleared");
+        assertEq(address(rejLp).balance, 10 ether, "rejector received via pull");
+    }
+
+    function test_C14_ClaimForfeited_RevertsWhenNothing() public {
+        vm.expectRevert(IncentiveController.NothingToClaim.selector);
+        controller.claimForfeitedAuctionProceeds();
+    }
+}
+
+/// @dev LP contract that can toggle ETH acceptance. Used to simulate the contract-LP
+///      case where onLiquidityRemoved's auto-push fails.
+contract EthRejectorLp {
+    bool public rejecting;
+
+    function setRejecting(bool b) external { rejecting = b; }
+
+    receive() external payable {
+        require(!rejecting, "rejecting");
+    }
+
+    function pullForfeited(address c) external {
+        IncentiveController(payable(c)).claimForfeitedAuctionProceeds();
+    }
 }

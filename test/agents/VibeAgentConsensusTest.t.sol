@@ -602,6 +602,71 @@ contract VibeAgentConsensusTest is Test {
         assertEq(agent2Addr.balance, start2 - MIN_STAKE, "non-revealer stays short");
     }
 
+    // ============ C14-AUDIT-1: Pull pattern for failed stake returns ============
+
+    function test_C14_FailedPush_CreditsPendingQueue() public {
+        EthRejector rej = new EthRejector();
+        rej.setRejecting(true);
+        // Fund the rejector so it can pay the commit stake under vm.prank. vm.deal bypasses
+        // the receive() rejection (it's a cheatcode, not a transfer).
+        vm.deal(address(rej), MIN_STAKE);
+
+        uint256 roundId = _createRound();
+        bytes32 salt = keccak256("c14-salt");
+        uint256 value = 50000e18;
+
+        // Committer is the rejecting contract
+        bytes32 ch = _commitHash(value, salt);
+        vm.prank(address(rej));
+        consensus.commit{value: MIN_STAKE}(roundId, AGENT1, ch, 5000);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        vm.prank(address(rej));
+        consensus.reveal(roundId, AGENT1, value, salt, 0);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        // Auto-push failed, pending must equal stake. Pre-fix: stake trapped in ac.stake
+        // with no external withdrawal path.
+        assertEq(consensus.pendingStakeWithdrawals(address(rej)), MIN_STAKE, "pending queued");
+        assertEq(address(rej).balance, 0, "rejector did not auto-receive");
+    }
+
+    function test_C14_PendingWithdrawal_Pullable_AfterRejectorDisables() public {
+        EthRejector rej = new EthRejector();
+        rej.setRejecting(true);
+        vm.deal(address(rej), MIN_STAKE);
+
+        uint256 roundId = _createRound();
+        bytes32 salt = keccak256("c14-salt-2");
+        uint256 value = 50000e18;
+
+        bytes32 ch = _commitHash(value, salt);
+        vm.prank(address(rej));
+        consensus.commit{value: MIN_STAKE}(roundId, AGENT1, ch, 5000);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        vm.prank(address(rej));
+        consensus.reveal(roundId, AGENT1, value, salt, 0);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+        assertEq(consensus.pendingStakeWithdrawals(address(rej)), MIN_STAKE);
+
+        // Rejector flips to accept ETH, then pulls
+        rej.setRejecting(false);
+        rej.pull(address(consensus));
+
+        assertEq(consensus.pendingStakeWithdrawals(address(rej)), 0, "pending cleared");
+        assertEq(address(rej).balance, MIN_STAKE, "rejector got stake");
+    }
+
+    function test_C14_WithdrawPendingStake_RevertsWhenZero() public {
+        vm.expectRevert("Nothing to withdraw");
+        consensus.withdrawPendingStake();
+    }
+
     // ============ Fuzz ============
 
     function testFuzz_Commit_StakeRange(uint256 stake) public {
@@ -632,5 +697,23 @@ contract VibeAgentConsensusTest is Test {
 
         // Single agent: consensus == their value
         assertEq(consensus.getRound(roundId).consensusValue, value);
+    }
+}
+
+// ============ C14 test helpers ============
+
+/// @dev Contract that can toggle ETH acceptance, used to simulate a committer whose
+///      fallback rejects ETH during _returnStakes auto-push.
+contract EthRejector {
+    bool public rejecting;
+
+    function setRejecting(bool b) external { rejecting = b; }
+
+    receive() external payable {
+        require(!rejecting, "rejecting");
+    }
+
+    function pull(address c) external {
+        VibeAgentConsensus(payable(c)).withdrawPendingStake();
     }
 }

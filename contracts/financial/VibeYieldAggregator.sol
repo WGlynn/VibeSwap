@@ -604,7 +604,12 @@ contract VibeYieldAggregator is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
 
         // If Shapley distributor is set, create a cooperative game
         if (address(shapleyDistributor) != address(0)) {
-            IERC20(v.asset).approve(address(shapleyDistributor), fees);
+            // C17-AUDIT-1: ShapleyDistributor.createGame validates via
+            // balanceOf(address(this)) — it does NOT pull via transferFrom. The prior
+            // code (approve + createGame) would ALWAYS revert at the balance gate
+            // because shapleyDistributor never received the fees. Push via safeTransfer
+            // first, then createGame matches the expected pre-funded balance flow.
+            IERC20(v.asset).safeTransfer(address(shapleyDistributor), fees);
             shapleyDistributor.createGame(gameId, fees, v.asset, participants);
         } else {
             // Fallback: send fees to owner

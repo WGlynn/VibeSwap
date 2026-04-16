@@ -233,5 +233,138 @@ contract VibeFeDistributorTest is Test {
         assertTrue(ok);
     }
 
+    // ============ C11 cleanup: staker distribution bug fix ============
+
+    /// @notice Regression: stakers must actually receive their 40% share.
+    ///         Prior to the fix `_distributeToStakers` was an empty stub and
+    ///         stakers got nothing despite distribute() executing.
+    function test_stakerReceivesETHShare_AUDIT_FeeDistStub() public {
+        // Alice stakes 10 ETH, she's the only staker.
+        vm.prank(alice);
+        dist.stake{value: 10 ether}();
+
+        // Collect 100 ETH in fees, advance epoch, distribute.
+        dist.collectETHFees{value: 100 ether}();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(0));
+
+        // 40% of 100 ETH = 40 ETH is the staker pot. Alice is sole staker.
+        assertEq(dist.getClaimable(alice, address(0)), 40 ether, "staker claimable incorrect");
+
+        uint256 aliceBefore = alice.balance;
+        vm.prank(alice);
+        dist.claim(address(0));
+        assertEq(alice.balance, aliceBefore + 40 ether, "claim transfer incorrect");
+        assertEq(dist.getClaimable(alice, address(0)), 0, "post-claim residual");
+    }
+
+    /// @notice Pro-rata split between two stakers, one with 3x the stake.
+    function test_twoStakers_proRataSplit() public {
+        vm.prank(alice);
+        dist.stake{value: 3 ether}();
+        vm.prank(bob);
+        dist.stake{value: 1 ether}();
+
+        // 400 ETH * 40% staker share = 160 ETH pot.
+        dist.collectETHFees{value: 400 ether}();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(0));
+
+        // Alice: 3/4 * 160 = 120; Bob: 1/4 * 160 = 40.
+        assertEq(dist.getClaimable(alice, address(0)), 120 ether);
+        assertEq(dist.getClaimable(bob, address(0)), 40 ether);
+    }
+
+    /// @notice Masterchef invariant: stakers who arrive AFTER distribution
+    ///         don't retroactively earn on past rewards.
+    function test_lateStaker_doesNotEarnPastRewards() public {
+        // Alice stakes first.
+        vm.prank(alice);
+        dist.stake{value: 10 ether}();
+
+        // Distribute with alice as sole staker.
+        dist.collectETHFees{value: 100 ether}();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(0));
+
+        // Bob stakes LATE.
+        vm.prank(bob);
+        dist.stake{value: 10 ether}();
+
+        // Alice gets the full 40 ETH (she was the only staker at distribute time).
+        // Bob gets 0 — his rewardDebt was baselined to the current accPerShare.
+        assertEq(dist.getClaimable(alice, address(0)), 40 ether);
+        assertEq(dist.getClaimable(bob, address(0)), 0);
+    }
+
+    /// @notice Stake-then-distribute-then-stake-again: first distribution
+    ///         belongs to alice, second distribution split pro-rata to the
+    ///         new combined stakes. Tests _settleAllTokens on the second stake.
+    function test_stakerSettlesOnSecondStake() public {
+        vm.prank(alice);
+        dist.stake{value: 10 ether}();
+
+        dist.collectETHFees{value: 100 ether}();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(0));
+        // Alice pending: 40 ETH.
+
+        // Alice stakes MORE — _settleAllTokens must bank the 40 ETH before
+        // re-baselining debt, otherwise she'd lose it when new accPerShare
+        // arrives.
+        vm.prank(alice);
+        dist.stake{value: 10 ether}();
+
+        // Second distribution of 100 ETH. Alice is still sole staker at 20 ETH.
+        dist.collectETHFees{value: 100 ether}();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(0));
+
+        // Total claimable: 40 (banked) + 40 (second epoch, sole staker) = 80.
+        assertEq(dist.getClaimable(alice, address(0)), 80 ether);
+    }
+
+    /// @notice Unstake before claim doesn't lose earned rewards.
+    function test_unstakePreservesEarnedRewards() public {
+        vm.prank(alice);
+        dist.stake{value: 10 ether}();
+
+        dist.collectETHFees{value: 100 ether}();
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(0));
+
+        // Alice fully unstakes before claiming.
+        vm.prank(alice);
+        dist.unstake(10 ether);
+
+        // Earned 40 ETH is still claimable (banked into claimableTokens by settle).
+        assertEq(dist.getClaimable(alice, address(0)), 40 ether);
+
+        uint256 aliceBefore = alice.balance;
+        vm.prank(alice);
+        dist.claim(address(0));
+        assertEq(alice.balance, aliceBefore + 40 ether);
+    }
+
+    /// @notice ERC20 token distribution path works symmetrically.
+    function test_stakerReceivesTokenShare() public {
+        vm.prank(alice);
+        dist.stake{value: 10 ether}();
+
+        token.mint(address(this), 1000e18);
+        token.approve(address(dist), type(uint256).max);
+        dist.collectFees(address(token), 1000e18);
+
+        vm.warp(block.timestamp + 7 days);
+        dist.distribute(address(token));
+
+        // 40% staker share of 1000e18 = 400e18.
+        assertEq(dist.getClaimable(alice, address(token)), 400e18);
+
+        vm.prank(alice);
+        dist.claim(address(token));
+        assertEq(token.balanceOf(alice), 400e18);
+    }
+
     receive() external payable {}
 }

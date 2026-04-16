@@ -827,4 +827,96 @@ contract ShardOperatorRegistryTest is Test {
         vm.expectRevert(ShardOperatorRegistry.InvalidChallengeIndex.selector);
         registry.challengeCellsReport(shard1, 5);
     }
+
+    // ============ C11 Batch A: challenge-lifecycle hardening ============
+
+    /// @notice C11-AUDIT-3: voluntary deactivateShard must revert while a
+    ///         pending report is unresolved. Otherwise operator escapes a
+    ///         pending slash by zeroing their own stake before response window.
+    function test_C11_deactivateShard_revertsWithPendingReport() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.PendingReportActive.selector);
+        registry.deactivateShard();
+    }
+
+    /// @notice C11-AUDIT-2: deactivateStaleShard must revert while a pending
+    ///         report is unresolved. Otherwise an accomplice reaps the shard
+    ///         after 48h stale, zeroing stake and erasing any slash.
+    function test_C11_deactivateStaleShard_revertsWithPendingReport() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        // Commit report, then go silent past the stale grace window.
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+        vm.warp(block.timestamp + 49 hours);
+
+        // op2 tries to reap op1's shard — must revert because of pending report.
+        vm.prank(op2);
+        vm.expectRevert(ShardOperatorRegistry.PendingReportActive.selector);
+        registry.deactivateStaleShard(shard1);
+    }
+
+    /// @notice C11-AUDIT-2 positive path: once the challenge lifecycle resolves
+    ///         (finalize after window), stale-reap works again.
+    function test_C11_deactivateStaleShard_worksAfterReportResolved() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(100, bytes32(0));
+
+        // Finalize the pending report normally — then go silent.
+        vm.warp(block.timestamp + 1 hours + 1);
+        registry.finalizeCellsReport(shard1);
+        vm.warp(block.timestamp + 49 hours);
+
+        vm.prank(op2);
+        registry.deactivateStaleShard(shard1);
+        assertFalse(registry.getShard(shard1).active, "reaped after resolved");
+    }
+
+    /// @notice C11-AUDIT-8: operator cannot challenge their own commit.
+    ///         Prevents self-challenge + self-refute collusion that locks
+    ///         out honest challengers for the full window.
+    function test_C11_selfChallenge_rejected() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(5, bytes32(0));
+
+        // op1 tries to challenge its own commit — rejected.
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.SelfChallenge.selector);
+        registry.challengeCellsReport(shard1, 0);
+    }
+
+    /// @notice C11-AUDIT-9: only the shard operator may respond to a challenge.
+    ///         An accomplice with the cellId data cannot refute on operator's behalf.
+    function test_C11_nonOperatorCannotRespond() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        // op3 (accomplice with knowledge of cellA) tries to refute — rejected.
+        vm.prank(op3);
+        vm.expectRevert(ShardOperatorRegistry.NotOperator.selector);
+        registry.respondToChallenge(shard1, cellA, proof0);
+
+        // Operator themselves can still respond successfully.
+        vm.prank(op1);
+        registry.respondToChallenge(shard1, cellA, proof0);
+    }
 }

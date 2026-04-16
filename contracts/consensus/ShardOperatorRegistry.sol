@@ -150,6 +150,9 @@ contract ShardOperatorRegistry is
     error ChallengeNotExpired();
     error InvalidMerkleProof();
     error InvalidChallengeIndex();
+    // C11-AUDIT-8/9: challenge collusion hardening
+    error SelfChallenge();
+    error NotOperator();
 
     // ============ Initializer ============
 
@@ -291,6 +294,10 @@ contract ShardOperatorRegistry is
         if (block.timestamp >= p.finalizeAt) revert ReportNotMature(); // too late to challenge
         if (p.challenger != address(0)) revert ChallengeActive();
         if (cellIndex >= p.count) revert InvalidChallengeIndex();
+        // C11-AUDIT-8: prevent operator from sybil-challenging their own commit
+        // to lock out the single challenger slot, self-refuting to recycle the
+        // bond, and effectively disabling real adversarial pressure.
+        if (msg.sender == shards[shardId].operator) revert SelfChallenge();
 
         ckbToken.safeTransferFrom(msg.sender, address(this), CHALLENGE_BOND);
 
@@ -310,8 +317,9 @@ contract ShardOperatorRegistry is
      *               Leaf is keccak256(abi.encode(challengeIndex, cellId)).
      * @dev Successful refutation: challenger's bond is transferred to the operator.
      *      The report remains pending and can still be finalized after CHALLENGE_WINDOW.
-     *      Anyone could call this technically, but only the operator benefits — the
-     *      refuter's only cost is gas.
+     *      C11-AUDIT-9: restricted to the operator. Previously any address could
+     *      refute, which combined with C11-AUDIT-8 let colluding pairs simulate
+     *      challenge activity to lock out honest challengers.
      */
     function respondToChallenge(
         bytes32 shardId,
@@ -322,6 +330,10 @@ contract ShardOperatorRegistry is
         if (p.commitAt == 0 || p.resolved) revert NoPendingReport();
         if (p.challenger == address(0)) revert NoPendingReport();
         if (block.timestamp > p.challengeDeadline) revert ChallengeExpired();
+        // C11-AUDIT-9: only the shard operator may refute. Prevents an accomplice
+        // with out-of-band access to the cellId data from rescuing fraudulent
+        // reports on the operator's behalf.
+        if (msg.sender != shards[shardId].operator) revert NotOperator();
 
         bytes32 leaf = keccak256(abi.encode(p.challengeIndex, cellId));
         if (!MerkleProof.verify(proof, p.merkleRoot, leaf)) revert InvalidMerkleProof();
@@ -404,6 +416,14 @@ contract ShardOperatorRegistry is
 
         Shard storage shard = shards[shardId];
         if (!shard.active) revert NotActive();
+
+        // C11-AUDIT-3: block voluntary exit while a pending report is unresolved.
+        // Without this gate an operator could commit a fraudulent report, get
+        // challenged, then deactivate before the response window expires —
+        // zeroing stake and reducing slash to 0. Operator must finalize or be
+        // slashed first.
+        PendingReport storage p_ = pendingReports[shardId];
+        if (p_.commitAt != 0 && !p_.resolved) revert PendingReportActive();
 
         // Claim pending rewards
         _claimRewards(shardId);
@@ -489,6 +509,16 @@ contract ShardOperatorRegistry is
         if (shard.operator == address(0)) revert NotRegistered();
         if (!shard.active) revert NotActive();
         if (!_isStale(shard)) revert ShardNotStale();
+
+        // C11-AUDIT-2: reject stale-reap while a pending report is unresolved.
+        // An operator who committed a fraudulent report could go silent for 48h
+        // and have an accomplice reap the shard — returning full stake and
+        // erasing the slash. Force the challenge lifecycle to complete first:
+        // the challenger can call claimChallengeSlash() after the response
+        // window expires, which slashes and then leaves shard.active=true but
+        // stake reduced; a subsequent stale-reap returns the residual.
+        PendingReport storage p_ = pendingReports[shardId];
+        if (p_.commitAt != 0 && !p_.resolved) revert PendingReportActive();
 
         // Remove weight from active pool. We do NOT credit the stale shard with
         // pending rewards here — those were forfeited by going silent.

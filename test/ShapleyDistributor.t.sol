@@ -722,4 +722,75 @@ contract ShapleyDistributorTest is Test {
 
         vm.stopPrank();
     }
+
+    // ============ N03: Quality Weight Front-Run Protection ============
+
+    /**
+     * @notice N03 regression — quality weights snapshotted at game creation.
+     *
+     * Attack scenario: authorized creator sets low quality for bob before game, creates
+     * the game, then upgrades bob's quality AFTER creation but BEFORE settlement.
+     * Fix: weights are snapshotted at creation; post-creation changes have no effect.
+     */
+    function test_n03_qualityWeightFrontRunBlocked() public {
+        uint256 value = 10 ether;
+        vm.deal(address(distributor), value);
+
+        // Step 1: Set equal quality for alice and bob before game creation
+        distributor.updateQualityWeight(alice, 5000, 5000, 5000);
+        distributor.updateQualityWeight(bob,   5000, 5000, 5000);
+
+        // Step 2: Create game (weights snapshotted here)
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+
+        // Verify snapshot captured the pre-creation weights for both players
+        (uint256 actA,,, ) = distributor.gameQualityWeights(GAME_1, alice);
+        (uint256 actB,,, ) = distributor.gameQualityWeights(GAME_1, bob);
+        assertEq(actA, 5000, "alice snapshot should be 5000");
+        assertEq(actB, 5000, "bob snapshot should be 5000");
+
+        // Step 3: Creator tries to front-run by bumping alice's quality to max AFTER creation
+        distributor.updateQualityWeight(alice, 9999, 9999, 9999);
+
+        // Global state updated…
+        (uint256 globalAct,,,) = distributor.qualityWeights(alice);
+        assertEq(globalAct, 9999, "global quality should reflect new value");
+
+        // …but game snapshot is still the original value
+        (uint256 snapAct,,,) = distributor.gameQualityWeights(GAME_1, alice);
+        assertEq(snapAct, 5000, "game snapshot must NOT change after game creation");
+
+        // Step 4: Settle — distributions should be equal because snapshots are equal
+        distributor.computeShapleyValues(GAME_1);
+
+        uint256 aliceShare = distributor.getShapleyValue(GAME_1, alice);
+        uint256 bobShare   = distributor.getShapleyValue(GAME_1, bob);
+
+        // Both had identical quality snapshots and identical contribution inputs → equal shares
+        assertEq(aliceShare, bobShare, "front-run must not give alice an advantage");
+    }
+
+    /**
+     * @notice Legitimate quality weights set before game creation still take effect.
+     * This ensures the fix doesn't break the intended quality weight feature.
+     */
+    function test_n03_legitimateQualityWeightBeforeCreation() public {
+        uint256 value = 10 ether;
+        vm.deal(address(distributor), value);
+
+        // High quality for alice, none for bob — set BEFORE game
+        distributor.updateQualityWeight(alice, 9000, 8000, 9500);
+        // bob has no quality weight entry (lastUpdate == 0 → multiplier stays 1.0x)
+
+        ShapleyDistributor.Participant[] memory ps = _makeParticipants2(alice, 100 ether, bob, 100 ether);
+        vm.prank(creator);
+        distributor.createGame(GAME_1, value, address(0), ps);
+        distributor.computeShapleyValues(GAME_1);
+
+        // alice should earn more due to higher quality weight
+        assertGt(distributor.getShapleyValue(GAME_1, alice), distributor.getShapleyValue(GAME_1, bob),
+            "legitimate pre-creation quality weight should still increase alice share");
+    }
 }

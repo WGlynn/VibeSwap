@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -33,6 +34,7 @@ import "./FeeController.sol";
  */
 contract VibeAMM is
     Initializable,
+    UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     CircuitBreaker,
@@ -387,6 +389,7 @@ contract VibeAMM is
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         if (_treasury == address(0)) revert InvalidTreasury();
         treasury = _treasury;
@@ -793,6 +796,9 @@ contract VibeAMM is
             batchFeeRate = _computeTruePriceFeeSurcharge(poolId, baseFee);
         }
 
+        // AMM-01: Capture k-invariant before batch execution
+        uint256 kBefore = uint256(pool.reserve0) * uint256(pool.reserve1);
+
         // Execute each order at clearing price
         for (uint256 i = 0; i < orders.length;) {
             SwapOrder calldata order = orders[i];
@@ -809,6 +815,10 @@ contract VibeAMM is
             result.protocolFees += fee;
             unchecked { ++i; }
         }
+
+        // AMM-01: Verify k-invariant — batch must not decrease k
+        // Fees should increase k; if k decreased, the batch math has a bug
+        require(uint256(pool.reserve0) * uint256(pool.reserve1) >= kBefore, "K invariant violated");
 
         // Update circuit breaker with total volume
         _updateBreaker(VOLUME_BREAKER, result.totalTokenInSwapped);
@@ -1414,7 +1424,7 @@ contract VibeAMM is
             // Check minimum output after fees
             if (amountOut < order.minAmountOut) {
                 emit SwapFailed(pid, order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut, "Slippage exceeded");
-                IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
+                IERC20(order.tokenIn).safeTransfer(order.trader, amountIn);
                 return (0, 0, 0);
             }
 
@@ -1423,7 +1433,7 @@ contract VibeAMM is
                 uint256 reserveOut = isToken0 ? pool.reserve1 : pool.reserve0;
                 if (grossOut - protocolFee > reserveOut) {
                     emit SwapFailed(pid, order.trader, order.tokenIn, amountIn, amountOut, order.minAmountOut, "Insufficient liquidity");
-                    IERC20(order.tokenIn).safeTransfer(msg.sender, amountIn);
+                    IERC20(order.tokenIn).safeTransfer(order.trader, amountIn);
                     return (0, 0, 0);
                 }
             }
@@ -2427,4 +2437,9 @@ contract VibeAMM is
     ) external pure returns (uint256 goldenMean) {
         return FibonacciScaling.goldenRatioMean(bidPrice, askPrice);
     }
+
+    // ============ UUPS Upgrade Authorization ============
+
+    /// @notice Authorize contract upgrades — restricted to owner
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

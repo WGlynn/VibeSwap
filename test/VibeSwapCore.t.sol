@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../contracts/core/VibeSwapCore.sol";
+import "../contracts/core/CircuitBreaker.sol";
 import "../contracts/core/interfaces/ICommitRevealAuction.sol";
 import "../contracts/core/interfaces/IVibeAMM.sol";
 import "../contracts/core/interfaces/IDAOTreasury.sol";
@@ -700,7 +701,7 @@ contract VibeSwapCoreTest is Test {
         core.setGuardian(guardian);
 
         vm.prank(trader);
-        vm.expectRevert(VibeSwapCore.NotGuardian.selector);
+        vm.expectRevert(CircuitBreaker.NotGuardian.selector);
         core.emergencyPause();
     }
 

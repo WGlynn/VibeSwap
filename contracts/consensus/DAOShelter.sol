@@ -80,6 +80,7 @@ contract DAOShelter is
     error WithdrawalLocked();
     error NoPendingWithdrawal();
     error Unauthorized();
+    error NoDepositors();
 
     // ============ Initializer ============
 
@@ -205,7 +206,12 @@ contract DAOShelter is
         require(issuanceController != address(0), "Controller not set");
         if (msg.sender != issuanceController) revert Unauthorized();
         if (amount == 0) revert ZeroAmount();
-        if (totalDeposited == 0) return; // No depositors — yield goes nowhere
+        // C14-AUDIT-3: REVERT instead of silent-return when empty. C11-AUDIT-1's short-pull
+        // guard in SecondaryIssuanceController interprets a zero-pull success as a hostile
+        // shelter and reverts the whole epoch. The intended behavior (C10-AUDIT-4) was for
+        // the controller's catch block to absorb this case and reroute daoShare to
+        // insurance. Reverting here restores that path.
+        if (totalDeposited == 0) revert NoDepositors();
 
         ckbToken.safeTransferFrom(msg.sender, address(this), amount);
         accRewardPerShare += (amount * ACC_PRECISION) / totalDeposited;

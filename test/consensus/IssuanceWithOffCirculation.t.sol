@@ -281,4 +281,63 @@ contract IssuanceWithOffCirculationTest is Test {
         assertGe(shardReceived, minShardShare, "yield delta not credited to shardShare");
         assertGt(shardReceived, maxUnderBug, "appears to subtract balanceOf, not totalDeposited");
     }
+
+    // ============ C14-AUDIT-3 + C14-AUDIT-4: empty-shelter reroute, no over-emission ============
+
+    /// @notice C14-AUDIT-3: Before the fix, DAOShelter.depositYield silent-returned
+    ///         when totalDeposited==0, which tripped SecondaryIssuanceController's
+    ///         C11-AUDIT-1 short-pull guard → ShelterShortPull revert → whole epoch
+    ///         bricked whenever shelter was empty (bootstrap, or all depositors withdrew).
+    ///         After the fix: shelter reverts with NoDepositors → controller's catch
+    ///         absorbs and reroutes daoShare to insurance.
+    function test_C14_EmptyShelter_DistributeSucceeds_RoutesToInsurance() public {
+        vm.prank(minter);
+        ckb.mint(user, 1_000_000e18);
+
+        // Don't deposit to shelter. Simulate NCI staking so shardShare is non-zero.
+        vm.prank(user);
+        ckb.transfer(nciMock, 300_000e18);
+        vm.prank(owner);
+        ckb.setOffCirculationHolder(nciMock, true);
+
+        uint256 supplyBefore = ckb.totalSupply();
+        uint256 insuranceBalBefore = ckb.balanceOf(insurance);
+
+        vm.warp(block.timestamp + 365 days);
+        issuance.distributeEpoch();
+
+        uint256 totalEmitted = issuance.totalDistributed();
+        uint256 supplyAfter = ckb.totalSupply();
+        uint256 insuranceBalAfter = ckb.balanceOf(insurance);
+
+        // Core invariant: supply grows by exactly emission, no over-mint.
+        assertEq(supplyAfter - supplyBefore, totalEmitted, "supply conservation - no over-emission");
+
+        // Insurance should have received (originalInsurance + rerouted daoShare).
+        // Neither should exceed emission total.
+        uint256 insuranceDelta = insuranceBalAfter - insuranceBalBefore;
+        assertGt(insuranceDelta, 0, "insurance received rerouted daoShare");
+        assertLe(insuranceDelta, totalEmitted, "insurance <= total emission");
+    }
+
+    /// @notice C14-AUDIT-4: Explicit assertion that the catch path does NOT over-emit.
+    ///         Before the fix, `insuranceShare += daoShare` in the catch caused the
+    ///         subsequent mint(insurancePool, insuranceShare) to mint `daoShare` extra
+    ///         tokens on top of the already-transferred rerouted amount. Net: emission
+    ///         + daoShare per epoch whenever shelter was empty — silent inflation.
+    function test_C14_EmptyShelter_NoOverEmission() public {
+        vm.prank(minter);
+        ckb.mint(user, 1_000_000e18);
+
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 supplyBefore = ckb.totalSupply();
+        issuance.distributeEpoch();
+        uint256 supplyAfter = ckb.totalSupply();
+        uint256 totalEmitted = issuance.totalDistributed();
+
+        // Strict equality — supply growth == emission. Pre-fix: supply grew by
+        // emission + daoShare (~40% extra).
+        assertEq(supplyAfter - supplyBefore, totalEmitted, "no over-emission under catch path");
+    }
 }

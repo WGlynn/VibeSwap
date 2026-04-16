@@ -24,12 +24,19 @@
 
 ## Pending — next session
 - [ ] Push feature branch (or rebase/merge strategy) per Will's decision
-- [ ] C15 density scan: supply-conservation sweep across all catch branches in contracts/ (the C14-AUDIT-4 pattern may recur wherever pre-mint + conditional reroute exists)
+- [ ] Close C15 deferred architectural item: VibeSwapCore.withdrawDeposit(token) gate on pending cross-chain orders (prevents the double-spend window entirely instead of just making it retry-recoverable)
+- [ ] C16 density scan (open): next angle TBD — candidate themes include state-machine transitions under failure paths, or deposit/withdraw auth asymmetry
 - [ ] MIT consulting: formalize Lawson-Floor hackathon proposal
 - [ ] Backlog items (operator-cell assignment, C12-AUDIT-2 slash destination, C7-GOV-008 stale oracle)
 - [ ] Monitor claude-code PR #48714
 - [ ] Soham Rutgers feedback
 - [ ] Tadija DeepSeek round 2 if forthcoming
+
+## C15 Completed this epoch (continuation)
+- [x] C15 scan: 1 HIGH + 3 false positives (triage caught them) + 1 LOW deferred
+- [x] C15-AUDIT-1 HIGH fix: CrossChainRouter settlementFailed tracker + permissionless retry. +5 regression tests.
+- [x] 128 touched-suite tests green (46 CCR + 38 VAC + 7 IssuanceIntegration + 37 IncentiveController)
+- [x] Pre-existing failures (Router invariant, VibeSwapCore 17-of-58, IncentiveControllerFuzz 2-of-5) confirmed unchanged vs clean HEAD — not regressions
 
 ## Notes
 - Cycle 12 validated "audit the audits" meta-loop. Scanning for empty/placeholder bodies caught a CRIT that had been dormant since VibeAgentConsensus was written.

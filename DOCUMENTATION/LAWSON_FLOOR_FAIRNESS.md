@@ -13,7 +13,7 @@ The **Lawson Floor** is a mathematical invariant built into VibeSwap's reward di
 
 Most modern reward systems — hackathons, grant programs, open-source bounties, DAO treasuries, even employer bonus pools — are **winner-take-most**. A small group of top performers captures the majority of the reward, and a long tail of sincere contributors walks away with nothing.
 
-A concrete datapoint from the week this document was written: the 2026 MIT Bitcoin Hackathon distributed rewards to 22 of 48 teams. Twenty-six teams built something — invested weekends, wrote code, shipped demos — and received zero. The filter was elegance, not effort or honesty. From the organizer's perspective, this is efficient. From the standpoint of an honest builder who shipped a working prototype against the clock, it is a spit in the face.
+A concrete datapoint from the week this document was written: the 2026 MIT Bitcoin Hackathon distributed rewards to 22 of 47 teams. Twenty-five teams built something — invested weekends, wrote code, shipped demos — and received zero. The filter was elegance, not effort or honesty. From the organizer's perspective, this is efficient. From the standpoint of an honest builder who shipped a working prototype against the clock, it is a spit in the face.
 
 Winner-take-most distribution pathologies stack:
 - **Discouragement** — first-time contributors see that zero-reward is the modal outcome and stop showing up.
@@ -48,7 +48,7 @@ In TRP audit cycles the Floor survived a vulnerability discovery (Lawson Floor s
 
 The Floor is general. Anywhere a coalition of sincere contributors produces shared output under a reward pot, the pattern applies. Three examples:
 
-**1. Participatory events (hackathons, grant rounds, innovation challenges).** Instead of "22 of 48 teams win, everyone else eats the cost of having shown up," a Lawson-Floor hackathon distributes a guaranteed participation share to every team that meets objective completion criteria (working demo, honest effort, code shipped), while still weighting the bulk of the pot toward top performers by Shapley judgment. Participation becomes sustainable for builders who can't subsidize their own attempts. Over time, the participant pool grows more diverse, more international, more economically heterogeneous.
+**1. Participatory events (hackathons, grant rounds, innovation challenges).** Instead of "22 of 47 teams win, everyone else eats the cost of having shown up," a Lawson-Floor hackathon distributes a guaranteed participation share to every team that meets objective completion criteria (working demo, honest effort, code shipped), while still weighting the bulk of the pot toward top performers by Shapley judgment. Participation becomes sustainable for builders who can't subsidize their own attempts. Over time, the participant pool grows more diverse, more international, more economically heterogeneous.
 
 **2. Cooperative coalitions (protocol DAOs, worker-owned collectives, federated research groups).** In a Shapley-distributed treasury, a contributor who offers a small insight — a code review, a design-pattern suggestion, a one-hour audit relay — is currently dominated by heavy full-time builders and usually receives nothing. The Floor guarantees that their contribution is registered. The Contribution DAG already traces this attribution; the Floor makes sure the trace produces non-zero output. This changes who can afford to contribute. An independent reviewer in São Paulo, a student in Lagos, a retiree in Maine — each can participate in a coalition without needing to match the throughput of its core team.
 
@@ -64,7 +64,7 @@ There is also a moral dimension. Coalitions that zero out sincere contributors a
 
 The competitive implication is simple: protocols that enforce structural fairness will, over long enough time horizons, attract the contributors that protocols without it filter out. The pool deepens. The ideas compound. The long tail becomes the network.
 
-The MIT Bitcoin Hackathon operates a winner-take-most distribution, and 26 honest teams paid for it with their time. VibeSwap is built on the opposite stance — not because we are more generous, but because we read the math differently. Fairness that costs nothing to maintain and compounds over time isn't charity. It's a better architecture.
+The MIT Bitcoin Hackathon operates a winner-take-most distribution, and 25 honest teams paid for it with their time. VibeSwap is built on the opposite stance — not because we are more generous, but because we read the math differently. Fairness that costs nothing to maintain and compounds over time isn't charity. It's a better architecture.
 
 ---
 

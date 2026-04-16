@@ -25,6 +25,8 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     // ============ Constants ============
 
     uint256 public constant BPS_DENOMINATOR = 10000;
+    /// @notice Precision factor for Masterchef-style accPerShare math
+    uint256 private constant ACC_PRECISION = 1e18;
 
     // ============ State ============
 
@@ -69,9 +71,18 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalStaked;
     mapping(address => uint256) public userStake;
 
+    /// @notice Masterchef: accumulated reward per unit stake, per token (scaled by ACC_PRECISION).
+    ///         Bumped in _distributeToStakers. Drives lazy per-user settlement.
+    mapping(address => uint256) public accPerShare;
+
+    /// @notice Masterchef: user's reward-debt per token. Settled on stake/unstake/claim.
+    ///         pending = (userStake * accPerShare[token]) / ACC_PRECISION - rewardDebt[user][token]
+    mapping(address => mapping(address => uint256)) public rewardDebt;
+
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @dev Reduced 50 -> 48 for the two new mappings above.
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -188,10 +199,14 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     /**
      * @notice Stake VIBE to earn protocol revenue
      */
-    function stake() external payable {
+    function stake() external payable nonReentrant {
         require(msg.value > 0, "Zero stake");
+        // Settle prior-period rewards at the OLD stake level before the bump,
+        // then record new debt at the new stake level.
+        _settleAllTokens(msg.sender);
         userStake[msg.sender] += msg.value;
         totalStaked += msg.value;
+        _rebaseDebtAllTokens(msg.sender);
         emit Staked(msg.sender, msg.value);
     }
 
@@ -200,17 +215,35 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
      */
     function unstake(uint256 amount) external nonReentrant {
         require(userStake[msg.sender] >= amount, "Insufficient stake");
+        // Settle at the OLD stake level before the reduction.
+        _settleAllTokens(msg.sender);
         userStake[msg.sender] -= amount;
         totalStaked -= amount;
+        _rebaseDebtAllTokens(msg.sender);
         (bool ok, ) = msg.sender.call{value: amount}("");
         require(ok, "Transfer failed");
         emit Unstaked(msg.sender, amount);
+    }
+
+    /// @dev After userStake changes, re-baseline rewardDebt for every token so
+    ///      future accrual starts from the current accPerShare snapshot.
+    function _rebaseDebtAllTokens(address user) internal {
+        rewardDebt[user][address(0)] = (userStake[user] * accPerShare[address(0)]) / ACC_PRECISION;
+        uint256 n = tokenList.length;
+        for (uint256 i = 0; i < n; ) {
+            address t = tokenList[i];
+            rewardDebt[user][t] = (userStake[user] * accPerShare[t]) / ACC_PRECISION;
+            unchecked { ++i; }
+        }
     }
 
     /**
      * @notice Claim accumulated fee rewards
      */
     function claim(address token) external nonReentrant {
+        // Fold freshly-accrued pending into claimableTokens before reading.
+        _settleOne(msg.sender, token);
+
         uint256 amount = claimableTokens[msg.sender][token];
         require(amount > 0, "Nothing to claim");
         claimableTokens[msg.sender][token] = 0;
@@ -251,18 +284,48 @@ contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     // ============ Internal ============
 
+    /// @dev Masterchef-style accumulator. O(1) regardless of staker count.
+    ///      Users settle lazily via claim() or on stake/unstake via _settleAllTokens.
+    ///      Previously this was an empty stub — stakers' share was silently lost.
     function _distributeToStakers(address token, uint256 amount) internal {
-        // Simple approach: iterate stakers and assign pro-rata
-        // In production, use a checkpoint/snapshot mechanism
-        // For now, increment each staker's claimable balance
-        // This is O(n) but works for reasonable staker counts
-        // TODO: Replace with Merkle distributor for gas efficiency at scale
+        // Guard at call-site: distribute() only calls us when totalStaked > 0.
+        accPerShare[token] += (amount * ACC_PRECISION) / totalStaked;
+    }
+
+    /// @dev Compute pending claimable for a specific token using current userStake.
+    function _pending(address user, address token) internal view returns (uint256) {
+        uint256 stake_ = userStake[user];
+        if (stake_ == 0) return 0;
+        uint256 accumulated = (stake_ * accPerShare[token]) / ACC_PRECISION;
+        uint256 debt = rewardDebt[user][token];
+        return accumulated > debt ? accumulated - debt : 0;
+    }
+
+    /// @dev Settle a single token: move pending into claimableTokens and reset debt.
+    function _settleOne(address user, address token) internal {
+        uint256 pending = _pending(user, token);
+        if (pending > 0) {
+            claimableTokens[user][token] += pending;
+        }
+        rewardDebt[user][token] = (userStake[user] * accPerShare[token]) / ACC_PRECISION;
+    }
+
+    /// @dev Settle every supported token plus native ETH. Called before any
+    ///      userStake change — otherwise a stake bump would over-credit prior
+    ///      distributions (and a stake reduction would under-credit). O(n_tokens).
+    function _settleAllTokens(address user) internal {
+        _settleOne(user, address(0));
+        uint256 n = tokenList.length;
+        for (uint256 i = 0; i < n; ) {
+            _settleOne(user, tokenList[i]);
+            unchecked { ++i; }
+        }
     }
 
     // ============ View ============
 
     function getClaimable(address user, address token) external view returns (uint256) {
-        return claimableTokens[user][token];
+        return claimableTokens[user][token] + _pending(user, token);
     }
 
     function getSupportedTokens() external view returns (address[] memory) {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,6 +18,7 @@ import "../core/interfaces/ICommitRevealAuction.sol";
  */
 contract CrossChainRouter is
     Initializable,
+    UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable
 {
@@ -121,17 +123,24 @@ contract CrossChainRouter is
 
     // ============ Security: Bridged Deposit Tracking (Fix #2) ============
 
-    /// @notice Verified bridged deposits per commit (prevents deposit theft)
+    /// @notice Expected bridged deposits per commit (set on LZ message, cleared on funding)
+    /// @dev TRP-R29-NEW01: This is an UNFUNDED expectation, not actual ETH in the contract
     mapping(bytes32 => uint256) public bridgedDeposits;
 
     /// @notice Timestamp when bridged deposit was created
     mapping(bytes32 => uint256) public bridgedDepositTimestamp;
 
-    /// @notice Total bridged deposits awaiting processing
+    /// @notice Total FUNDED bridged deposits held in this contract awaiting auction forwarding
+    /// @dev TRP-R29-NEW01: Only incremented when ETH actually arrives (fundBridgedDeposit),
+    ///      NOT when the LZ message is received. Prevents phantom ETH inflation.
     uint256 public totalBridgedDeposits;
 
     /// @notice Expiry duration for bridged deposits (default 24 hours)
     uint256 public bridgedDepositExpiry;
+
+    /// @notice Whether a bridged deposit has been funded (ETH actually received)
+    /// @dev TRP-R29-NEW01: Distinguishes funded vs unfunded deposits for recovery logic
+    mapping(bytes32 => bool) public bridgedDepositFunded;
 
     /// @notice Authorized callers (VibeSwapCore)
     mapping(address => bool) public authorized;
@@ -208,6 +217,7 @@ contract CrossChainRouter is
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         require(_lzEndpoint != address(0), "Invalid endpoint");
         require(_auction != address(0), "Invalid auction");
@@ -492,12 +502,12 @@ contract CrossChainRouter is
         // Store for local processing
         pendingCommits[commitId] = commit;
 
-        // FIX #2: Track bridged deposit separately instead of using router balance
-        // The deposit must be bridged via a separate asset bridge (LayerZero OFT, etc.)
-        // For now, record the expected deposit amount - actual bridging happens via fundBridgedDeposit()
+        // TRP-R29-NEW01: Record the EXPECTED deposit amount — no ETH has arrived yet.
+        // totalBridgedDeposits is NOT incremented here. It only increases when actual
+        // ETH arrives via fundBridgedDeposit(). This prevents phantom ETH inflation that
+        // would corrupt available balance calculations in _handleReveal and emergencyWithdrawETH.
         bridgedDeposits[commitId] = commit.depositAmount;
         bridgedDepositTimestamp[commitId] = block.timestamp;
-        totalBridgedDeposits += commit.depositAmount;
 
         emit CrossChainCommitReceived(commitId, srcEid, commit.depositor);
     }
@@ -517,16 +527,21 @@ contract CrossChainRouter is
         uint256 depositAmount = commit.depositAmount;
         uint256 excess = msg.value - depositAmount;
 
-        // Clear the pending bridged deposit BEFORE external calls (Checks-Effects-Interactions)
+        // TRP-R29-NEW01: Clear the pending bridged deposit. No totalBridgedDeposits adjustment
+        // needed — it was never incremented for this deposit (phantom accounting fix).
+        // The ETH passes through to the auction in the same tx, never sitting in the router.
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
-        totalBridgedDeposits -= depositAmount;
+        bridgedDepositFunded[commitId] = true;
         // TRP-R22-NEW08: Clean up pendingCommits after funding to prevent reveal replay
         delete pendingCommits[commitId];
 
-        // Now forward to auction with verified funds
-        ICommitRevealAuction(auction).commitOrder{value: depositAmount}(
-            commit.commitHash
+        // TRP-R29-NEW03: Use commitOrderOnBehalf to register the original trader as depositor.
+        // Without this, commitOrder would set Router as depositor and revealOrderCrossChain
+        // would fail its depositor check (NotOwner).
+        ICommitRevealAuction(auction).commitOrderOnBehalf{value: depositAmount}(
+            commit.commitHash,
+            commit.depositor   // Original trader from source chain
         );
 
         // Refund excess
@@ -770,6 +785,16 @@ contract CrossChainRouter is
      * @dev Only the original depositor or owner can recover. Cleans up totalBridgedDeposits.
      * @param commitId The commit ID whose deposit expired
      */
+    /**
+     * @notice Recover an expired bridged deposit
+     * @dev TRP-R29-NEW01: If the deposit was never funded (no ETH arrived), this only
+     *      cleans up accounting state. No ETH transfer occurs because none exists.
+     *      TRP-R29-NEW04: commit.depositor is a SOURCE-CHAIN address. On the destination
+     *      chain, sending ETH to that address may send to the wrong entity or a contract
+     *      that can't receive. Future: bridge back to source chain or escrow for manual claim.
+     *      For now, only funded deposits can be recovered (ETH exists in router).
+     * @param commitId The commit ID whose deposit expired
+     */
     function recoverExpiredDeposit(bytes32 commitId) external nonReentrant {
         uint256 depositAmount = bridgedDeposits[commitId];
         if (depositAmount == 0) revert NoDepositToRecover();
@@ -787,15 +812,14 @@ contract CrossChainRouter is
         // Clean up state (effects before interactions — CEI pattern)
         bridgedDeposits[commitId] = 0;
         bridgedDepositTimestamp[commitId] = 0;
-        totalBridgedDeposits -= depositAmount;
         delete pendingCommits[commitId];
 
-        // C-03: Dissolve lost deposit attack surface — actually transfer ETH back
-        // Previously this function only cleaned up accounting state but never sent
-        // the depositor's ETH back, permanently locking funds in the contract.
-        // This makes deposit loss structurally impossible.
-        (bool success, ) = commit.depositor.call{value: depositAmount}("");
-        require(success, "C-03: Recovery transfer failed");
+        // TRP-R29-NEW01: No totalBridgedDeposits adjustment — unfunded deposits never
+        // incremented the counter. No ETH was ever received for this deposit, so no
+        // transfer is made. The source-chain bridge should handle refunds on the source chain.
+        // TRP-R29-NEW04: commit.depositor is a source-chain address — sending ETH here
+        // on the destination chain is incorrect. Recovery of actual funds must happen
+        // on the source chain via the bridge protocol.
 
         emit BridgedDepositRecovered(commitId, commit.depositor, depositAmount);
     }
@@ -803,4 +827,9 @@ contract CrossChainRouter is
     // ============ Receive ============
 
     receive() external payable {}
+
+    // ============ UUPS Upgrade Authorization ============
+
+    /// @notice Authorize contract upgrades — restricted to owner
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

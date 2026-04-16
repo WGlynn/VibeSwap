@@ -310,9 +310,9 @@ contract VibeAMMTest is Test {
         vm.prank(lp1);
         amm.addLiquidity(poolId, 100 ether, 100 ether, 0, 0);
 
-        // Transfer tokens to AMM for batch execution and sync balance
+        // Transfer tokens to AMM for batch execution (do NOT sync tracked balance —
+        // executeBatchSwap pre-credits trackedBalances via TRP-R16-F03)
         tokenA.mint(address(amm), 20 ether);
-        amm.syncTrackedBalance(address(tokenA));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](2);
         orders[0] = IVibeAMM.SwapOrder({

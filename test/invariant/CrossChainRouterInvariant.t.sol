@@ -114,7 +114,8 @@ contract CrossChainRouterInvariantTest is StdInvariant, Test {
             CrossChainRouter.initialize.selector,
             owner,
             address(endpoint),
-            address(auctionProxy)
+            address(auctionProxy),
+            uint32(1)  // localEid — was missing, causing setUp to revert
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         router = CrossChainRouter(payable(address(proxy)));

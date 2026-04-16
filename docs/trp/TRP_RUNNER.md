@@ -1,8 +1,8 @@
 # TRP Runner Protocol
 
-**Version**: 2.0
+**Version**: 3.0
 **Date**: 2026-04-02
-**Purpose**: Execute TRP as a full circle — diagnose AND cure — without crashing the context window.
+**Purpose**: Execute TRP as a full circle — diagnose AND cure — without crashing the context window. v3.0 adds the efficiency recursion: the protocol optimizes itself each round.
 
 ---
 
@@ -18,7 +18,10 @@ Never load all TRP context at once. The main context is a **coordinator**, not a
 
 **Stage 0 — Preflight** (coordinator only):
 - Read THIS file (TRP_RUNNER.md) — you're already here
-- Identify the TARGET (contract, module, or subsystem)
+- Read `docs/trp/efficiency-heatmap.md` — the heat map
+- `git diff <last_audited_commit>..<HEAD> -- contracts/` — detect changed files
+- Promote COLD contracts with changes to WARM (update heat map)
+- Identify the TARGET (HOT/WARM contracts only — skip COLD)
 - Run context guard (Mitigation 2)
 
 **Stage 1 — Target Acquisition** (coordinator only):
@@ -26,9 +29,11 @@ Never load all TRP context at once. The main context is a **coordinator**, not a
 - Do NOT read CKB, do NOT read full TRP spec, do NOT read loop docs
 - Summarize target in <10 lines: what it does, key functions, known issues
 
-**Stage 2 — Loop Dispatch** (subagents — Mitigation 4):
-- Dispatch each loop to its own subagent
+**Stage 2 — Loop Dispatch** (subagents — Mitigation 4 + 5):
+- Consult heat map for agent tier: HOT=opus, WARM=sonnet, cleanup=haiku
+- Dispatch each loop to its own subagent at the assigned tier
 - Each subagent loads ONLY what its loop needs (see Sharding Matrix below)
+- Max 2 concurrent subagents (Wardenclyffe rate limit constraint)
 - Coordinator waits for results
 
 **Stage 3 — Cure** (coordinator + subagents):
@@ -38,12 +43,18 @@ Never load all TRP context at once. The main context is a **coordinator**, not a
 - Findings that can't be fixed this cycle (too large, needs design decision, blocked) stay as open items with a reason
 - The goal: the open items list should **shrink** each cycle, not grow
 
-**Stage 4 — Integration** (coordinator only):
+**Stage 4 — Integration + Efficiency Meta-Loop** (coordinator only):
 - Collect all results (discovery + cures)
 - Write findings to SESSION_STATE
 - Update memory if non-obvious knowledge discovered
 - Score the cycle — scoring now counts **closed** findings, not just found ones
 - A cycle that finds 10 issues and fixes 8 scores higher than one that finds 20 and fixes 0
+- **Efficiency meta-loop (v3.0)**:
+  1. Record metrics: agents spawned, tiers used, findings/agent yield, contracts skipped
+  2. Update heat map: promote/demote contracts based on this round's results
+  3. Compare yield to previous round — if declining, narrow scope for next round
+  4. If a contract produced 0 new findings for 2 consecutive rounds, demote it
+  5. Log efficiency block in round summary (see template below)
 
 ### Mitigation 2: Context Guard (50% Rule)
 
@@ -105,6 +116,36 @@ The skipped context isn't lost — it lives in the subagents' context if they ne
 
 **Coordinator load**: TRP_RUNNER.md + target summary + R0 context + R2 integration. ~25% of capacity. The heavy compute (R1, R3) is fully offloaded.
 
+### Mitigation 5: Efficiency Recursion (v3.0) — The Builder Builds The Builder
+
+The protocol optimizes its own resource consumption each round. This is R0 applied to TRP itself.
+
+**Heat Map** (`docs/trp/efficiency-heatmap.md`):
+- Tracks per-contract audit status: HOT / WARM / COLD
+- HOT = open CRITICAL/HIGH or new findings in last 2 rounds → opus
+- WARM = open MEDIUM or no new findings for 2 rounds → sonnet
+- COLD = clean for 3+ rounds, no code changes → skip entirely
+- Contracts auto-promote on code change, auto-demote on clean passes
+
+**Agent Tier Selection**:
+```
+Discovery (fresh audit, unknown attack surface)  → opus
+Verification (re-check known findings)           → sonnet
+Cleanup (NatSpec, dead imports, formatting)       → haiku
+```
+
+**Scope Pruning**:
+- Before dispatch, `git diff` detects which contracts changed since last audit
+- COLD contracts with no changes are skipped — logged but not dispatched
+- This means round N+1 is always scoped tighter than round N (unless new code lands)
+
+**Yield Tracking**:
+- findings_per_agent = new_findings / agents_spawned
+- If yield < 2 for a contract, demote it next round
+- If yield > 5, that contract is HOT — keep opus on it
+
+**Compounding Effect**: By round 10, the heat map has enough signal to skip 60-70% of the codebase. TRP runs in half the tokens of round 1, freeing API capacity for Jarvis and more rounds per session.
+
 ---
 
 ## Invocation
@@ -133,7 +174,7 @@ Then execute Stages 1-4. Stage 3 (Cure) is mandatory — a TRP round that only d
 
 ## Scoring
 
-After each TRP cycle, score on 7 dimensions:
+After each TRP cycle, score on 8 dimensions:
 
 | Dimension | Metric | Score |
 |-----------|--------|-------|
@@ -143,16 +184,35 @@ After each TRP cycle, score on 7 dimensions:
 | **R2 (knowledge)** | Gaps found / documentation health | count |
 | **R3 (capability)** | Tools built or improved | count |
 | **R4 (cure)** | Findings fixed this cycle / closure rate | fixed/found ratio |
+| **Efficiency** | Findings per agent, tier accuracy, scope reduction | yield + tier breakdown |
 | **Integration** | Did loops feed each other? | Y/N + description |
 
 **Overall grade**:
-- S: All loops produced findings + integration + closure rate > 50%
-- A: 3+ loops productive + some fixes applied
+- S: All loops produced findings + integration + closure rate > 50% + efficiency ≥ prior round
+- A: 3+ loops productive + some fixes applied + heat map updated
 - B: 2 loops productive OR diagnosis-only with no fixes
 - C: 1 loop only
 - F: Crash
 
-**Key change (v2.0)**: A cycle that finds 10 issues and fixes 8 (80% closure) outranks one that finds 20 and fixes 0. Diagnosis without cure is a half circle — it does not self-improve, it self-audits. The recursion only works when the system is measurably better at the end of the cycle than the beginning.
+**Key change (v2.0)**: Diagnosis without cure is a half circle.
+**Key change (v3.0)**: A round that achieves the same output with fewer agents/tokens outranks one that throws opus at everything. The efficiency dimension rewards scope pruning, tier demotion, and yield improvement. The builder builds the builder.
+
+### Round Summary Efficiency Block (v3.0 — mandatory)
+
+Every round summary must include:
+
+```yaml
+efficiency:
+  agents_spawned: N
+  agent_tiers: { opus: N, sonnet: N, haiku: N }
+  contracts_in_scope: N
+  contracts_skipped: N (COLD)
+  findings_new: N
+  findings_closed: N
+  closure_rate: N%
+  yield: N (findings / agents, or "—" if no agents)
+  heat_map_changes: "Contract X: HOT→WARM, Contract Y: COLD→WARM (code changed)"
+```
 
 ---
 
@@ -192,3 +252,7 @@ This prevents the open items list from growing monotonically. If the same HIGH f
 - **DON'T** load CKB "just in case." If a subagent needs alignment context, it loads it itself.
 - **DON'T** end a cycle with only diagnosis. If you found it, fix it. A half circle is not recursion.
 - **DON'T** carry forward the same HIGH finding for more than 2 cycles without fixing or escalating.
+- **DON'T** use opus for verification rounds. If you're re-checking known findings, sonnet is sufficient.
+- **DON'T** audit COLD contracts without checking `git diff` first. No changes = no new findings.
+- **DON'T** skip the efficiency block in round summaries. The meta-loop only works with data.
+- **DON'T** spawn 3+ concurrent agents. Wardenclyffe rate limit: max 2 subagents at a time.

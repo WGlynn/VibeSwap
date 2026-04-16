@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/ICommitRevealAuction.sol";
@@ -39,6 +40,7 @@ interface IComplianceRegistry {
  */
 contract CommitRevealAuction is
     Initializable,
+    UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     ICommitRevealAuction
@@ -78,6 +80,7 @@ contract CommitRevealAuction is
     error TradeSizeExceeded();
     error FlashLoanDetected();
     error NoRefundPending();
+    error InsufficientCollateral();
 
     // ============ Protocol Constants (Uniform Fairness) ============
     // These are FIXED for all pools - they define HOW trading works
@@ -225,6 +228,7 @@ contract CommitRevealAuction is
     ) external initializer {
         __Ownable_init(_owner);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
 
         treasury = _treasury;
         complianceRegistry = _complianceRegistry;
@@ -240,6 +244,7 @@ contract CommitRevealAuction is
             phase: BatchPhase.COMMIT,
             shuffleSeed: bytes32(0),
             totalPriorityBids: 0,
+            totalVirtualPriorityBids: 0,
             orderCount: 0,
             isSettled: false
         });
@@ -400,6 +405,56 @@ contract CommitRevealAuction is
     }
 
     /**
+     * @notice Commit an order on behalf of another address (for cross-chain bridge use)
+     * @dev TRP-R29-NEW03: The CrossChainRouter receives the LZ message and then bridges
+     *      the deposit. It needs to register the ORIGINAL trader as the depositor so that
+     *      revealOrderCrossChain's depositor check passes. Without this, the Router would
+     *      be the depositor and the reveal would fail with NotOwner().
+     * @param commitHash Hash of order details
+     * @param originalDepositor The original trader from the source chain
+     * @return commitId Unique identifier for this commitment
+     */
+    function commitOrderOnBehalf(
+        bytes32 commitHash,
+        address originalDepositor
+    ) external payable nonReentrant onlyAuthorizedSettler inPhase(BatchPhase.COMMIT) returns (bytes32 commitId) {
+        if (commitHash == bytes32(0)) revert InvalidHash();
+        if (originalDepositor == address(0)) revert InvalidCommitment();
+
+        // Flash loan protection skipped for authorized settlers (same as commitOrderToPool)
+
+        uint256 requiredDeposit = MIN_DEPOSIT;
+        if (msg.value < requiredDeposit) revert InsufficientDeposit();
+
+        // Gas: cache storage read in memory
+        uint64 _currentBatchId = currentBatchId;
+
+        // Generate commitId using originalDepositor (must match revealOrderCrossChain's check)
+        commitId = keccak256(abi.encodePacked(
+            originalDepositor,
+            commitHash,
+            bytes32(0),        // default pool
+            _currentBatchId,
+            block.timestamp
+        ));
+
+        if (commitments[commitId].status != CommitStatus.NONE) revert AlreadyCommitted();
+
+        commitments[commitId] = OrderCommitment({
+            commitHash: commitHash,
+            poolId: bytes32(0),
+            batchId: _currentBatchId,
+            depositAmount: msg.value,
+            depositor: originalDepositor,   // TRP-R29-NEW03: Original trader, not Router
+            status: CommitStatus.COMMITTED
+        });
+
+        batches[_currentBatchId].orderCount++;
+
+        emit OrderCommitted(commitId, originalDepositor, _currentBatchId, msg.value);
+    }
+
+    /**
      * @notice Reveal a previously committed order
      * @param commitId The commitment ID from commitOrder
      * @param tokenIn Token being sold
@@ -443,6 +498,13 @@ contract CommitRevealAuction is
             // Invalid reveal - slash deposit
             _slashCommitment(commitId);
             return;
+        }
+
+        // R1-F02: Validate deposit covers the revealed trade size at COLLATERAL_BPS (5%)
+        // This closes the gap where a user could commit with MIN_DEPOSIT and reveal a massive trade.
+        uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+        if (requiredCollateral > MIN_DEPOSIT && commitment.depositAmount < requiredCollateral) {
+            revert InsufficientCollateral();
         }
 
         // Verify priority bid payment
@@ -543,6 +605,13 @@ contract CommitRevealAuction is
                 msg.sender, tokenIn, tokenOut, amountIn, minAmountOut, secret
             ));
             if (expectedHash != commitment.commitHash) { _slashCommitment(commitId); return; }
+            // R1-F02: Collateral adequacy check (same logic as revealOrder)
+            {
+                uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+                if (requiredCollateral > MIN_DEPOSIT && commitment.depositAmount < requiredCollateral) {
+                    revert InsufficientCollateral();
+                }
+            }
             if (priorityBid > 0 && msg.value < priorityBid) revert InsufficientPriorityBid();
             commitment.status = CommitStatus.REVEALED;
         }
@@ -550,10 +619,12 @@ contract CommitRevealAuction is
         // Step 2: PoW + store (separate stack frame via _storeRevealedOrder)
         {
             uint256 powValue = _verifyPoW(commitId, _currentBatchId, powNonce, powAlgorithm, claimedDifficulty);
+            // R1-F04 FIX: Pass real ETH bid and virtual PoW value separately so the
+            // ETH-backed totalPriorityBids accumulator is never inflated by PoW.
             _storeRevealedOrder(
                 _currentBatchId, commitId,
                 tokenIn, tokenOut, amountIn, minAmountOut,
-                secret, priorityBid + powValue
+                secret, priorityBid, powValue
             );
         }
 
@@ -563,13 +634,18 @@ contract CommitRevealAuction is
         }
     }
 
-    /// @dev Store revealed order, track priority, store secret, emit event
+    /// @dev Store revealed order, track priority, store secret, emit event.
+    /// @param realPriorityBid  ETH actually sent by the user (backed by msg.value).
+    /// @param virtualPriorityBid PoW-derived virtual priority value (no ETH backing).
+    ///        These are kept in separate batch accumulators so ETH-only accounting
+    ///        (withdrawPriorityBids) is never inflated by virtual PoW values.
     function _storeRevealedOrder(
         uint64 batchId, bytes32 commitId,
         address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut,
-        bytes32 secret, uint256 effectivePriority
+        bytes32 secret, uint256 realPriorityBid, uint256 virtualPriorityBid
     ) internal {
         uint256 orderIndex = revealedOrders[batchId].length;
+        uint256 effectivePriority = realPriorityBid + virtualPriorityBid;
 
         revealedOrders[batchId].push(RevealedOrder({
             trader: msg.sender,
@@ -578,13 +654,16 @@ contract CommitRevealAuction is
             amountIn: amountIn,
             minAmountOut: minAmountOut,
             secret: secret,
-            priorityBid: effectivePriority,
+            priorityBid: effectivePriority, // ordering uses combined value
             srcChainId: uint32(block.chainid)
         }));
 
         if (effectivePriority > 0) {
             priorityOrderIndices[batchId].push(orderIndex);
-            batches[batchId].totalPriorityBids += effectivePriority;
+            // R1-F04 FIX: Only real ETH bids count toward the ETH-backed accumulator.
+            // Virtual PoW bids go to a separate counter and are never paid out as ETH.
+            batches[batchId].totalPriorityBids += realPriorityBid;
+            batches[batchId].totalVirtualPriorityBids += virtualPriorityBid;
         }
 
         batchSecrets[batchId].push(secret);
@@ -698,6 +777,7 @@ contract CommitRevealAuction is
             _currentBatchId,
             revealedOrders[_currentBatchId].length,
             batch.totalPriorityBids,
+            batch.totalVirtualPriorityBids,
             batch.shuffleSeed
         );
 
@@ -847,6 +927,12 @@ contract CommitRevealAuction is
         if (expectedHash != commitment.commitHash) {
             _slashCommitment(commitId);
             return;
+        }
+
+        // R1-F02: Same collateral adequacy check for cross-chain reveals
+        uint256 requiredCollateral = (amountIn * COLLATERAL_BPS) / 10000;
+        if (requiredCollateral > MIN_DEPOSIT && commitment.depositAmount < requiredCollateral) {
+            revert InsufficientCollateral();
         }
 
         commitment.status = CommitStatus.REVEALED;
@@ -1289,6 +1375,7 @@ contract CommitRevealAuction is
             phase: BatchPhase.COMMIT,
             shuffleSeed: bytes32(0),
             totalPriorityBids: 0,
+            totalVirtualPriorityBids: 0,
             orderCount: 0,
             isSettled: false
         });
@@ -1445,4 +1532,9 @@ contract CommitRevealAuction is
      * @notice Receive function for deposits
      */
     receive() external payable {}
+
+    // ============ UUPS Upgrade Authorization ============
+
+    /// @notice Authorize contract upgrades — restricted to owner
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

@@ -50,7 +50,8 @@ interface ICommitRevealAuction {
         uint64 startTimestamp;
         BatchPhase phase;
         bytes32 shuffleSeed;
-        uint256 totalPriorityBids;
+        uint256 totalPriorityBids;        // Real ETH-backed priority bids only
+        uint256 totalVirtualPriorityBids; // PoW-derived virtual priority (no ETH backing)
         uint256 orderCount;
         bool isSettled;
     }
@@ -84,6 +85,7 @@ interface ICommitRevealAuction {
         uint64 indexed batchId,
         uint256 orderCount,
         uint256 totalPriorityBids,
+        uint256 totalVirtualPriorityBids,
         bytes32 shuffleSeed
     );
 
@@ -206,6 +208,20 @@ interface ICommitRevealAuction {
         bytes32 secret,
         uint256 priorityBid
     ) external payable;
+
+    /**
+     * @notice Commit an order on behalf of another address (for cross-chain bridge use)
+     * @dev TRP-R29-NEW03: Allows the CrossChainRouter to commit with the original
+     *      trader as depositor, so revealOrderCrossChain's depositor check passes.
+     *      Only callable by authorized settlers.
+     * @param commitHash Hash of order details
+     * @param originalDepositor The original trader who initiated the cross-chain commit
+     * @return commitId Unique identifier for this commitment
+     */
+    function commitOrderOnBehalf(
+        bytes32 commitHash,
+        address originalDepositor
+    ) external payable returns (bytes32 commitId);
 
     /**
      * @notice Get the current batch ID

@@ -38,6 +38,7 @@ contract CommitRevealAuctionTest is Test {
         uint64 indexed batchId,
         uint256 orderCount,
         uint256 totalPriorityBids,
+        uint256 totalVirtualPriorityBids,
         bytes32 shuffleSeed
     );
 
@@ -128,12 +129,12 @@ contract CommitRevealAuctionTest is Test {
     // ============ Reveal Phase Tests ============
 
     function test_revealOrder() public {
-        // Commit first
+        // Commit first — 1 ETH trade requires 5% collateral = 0.05 ETH deposit (R1-F02)
         bytes32 secret = keccak256("secret1");
         bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(trader1);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(commitHash);
 
         // Move to reveal phase
         vm.warp(block.timestamp + 9);
@@ -155,11 +156,12 @@ contract CommitRevealAuctionTest is Test {
     }
 
     function test_revealOrder_withPriorityBid() public {
+        // 1 ETH trade requires 5% collateral = 0.05 ETH deposit (R1-F02)
         bytes32 secret = keccak256("secret1");
         bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(trader1);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(commitHash);
 
         vm.warp(block.timestamp + 9);
 
@@ -234,14 +236,16 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash2 = _generateCommitHash(trader2, tokenA, tokenB, 2 ether, 1.8 ether, secret2);
         bytes32 commitHash3 = _generateCommitHash(trader3, tokenB, tokenA, 1.5 ether, 1.3 ether, secret3);
 
+        // R1-F02: Deposits must cover 5% collateral of the revealed trade size.
+        // trader1: 1 ETH trade → 0.05 ETH; trader2: 2 ETH trade → 0.1 ETH; trader3: 1.5 ETH trade → 0.075 ETH
         vm.prank(trader1);
-        bytes32 commitId1 = auction.commitOrder{value: 0.01 ether}(commitHash1);
+        bytes32 commitId1 = auction.commitOrder{value: 0.05 ether}(commitHash1);
 
         vm.prank(trader2);
-        bytes32 commitId2 = auction.commitOrder{value: 0.01 ether}(commitHash2);
+        bytes32 commitId2 = auction.commitOrder{value: 0.1 ether}(commitHash2);
 
         vm.prank(trader3);
-        bytes32 commitId3 = auction.commitOrder{value: 0.01 ether}(commitHash3);
+        bytes32 commitId3 = auction.commitOrder{value: 0.075 ether}(commitHash3);
 
         // Move to reveal phase
         vm.warp(block.timestamp + 9);
@@ -282,14 +286,15 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash2 = _generateCommitHash(trader2, tokenA, tokenB, 2 ether, 1.8 ether, secret2);
         bytes32 commitHash3 = _generateCommitHash(trader3, tokenB, tokenA, 1.5 ether, 1.3 ether, secret3);
 
+        // R1-F02: Deposits must cover 5% collateral of the revealed trade size.
         vm.prank(trader1);
-        bytes32 commitId1 = auction.commitOrder{value: 0.01 ether}(commitHash1);
+        bytes32 commitId1 = auction.commitOrder{value: 0.05 ether}(commitHash1);
 
         vm.prank(trader2);
-        bytes32 commitId2 = auction.commitOrder{value: 0.01 ether}(commitHash2);
+        bytes32 commitId2 = auction.commitOrder{value: 0.1 ether}(commitHash2);
 
         vm.prank(trader3);
-        bytes32 commitId3 = auction.commitOrder{value: 0.01 ether}(commitHash3);
+        bytes32 commitId3 = auction.commitOrder{value: 0.075 ether}(commitHash3);
 
         vm.warp(block.timestamp + 9);
 
@@ -409,11 +414,12 @@ contract CommitRevealAuctionTest is Test {
     }
 
     function test_slashUnrevealedCommitment_cannotSlashRevealed() public {
+        // R1-F02: 1 ETH trade requires 0.05 ETH deposit (5% collateral)
         bytes32 secret = keccak256("secret1");
         bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(trader1);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(commitHash);
 
         vm.warp(block.timestamp + 9);
 
@@ -439,6 +445,62 @@ contract CommitRevealAuctionTest is Test {
         // Try to slash before batch is settled
         vm.expectRevert(CommitRevealAuction.BatchNotSettled.selector);
         auction.slashUnrevealedCommitment(commitId);
+    }
+
+    // ============ R1-F02: Collateral Validation Tests ============
+
+    /// @notice Committing with MIN_DEPOSIT then revealing a large trade should revert.
+    function test_revealOrder_insufficientCollateral_reverts() public {
+        // Commit with only MIN_DEPOSIT (0.001 ETH) for a 1 ETH trade.
+        // Required collateral = 1 ETH * 5% = 0.05 ETH — far below 0.001 ETH.
+        bytes32 secret = keccak256("secret1");
+        bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
+
+        vm.prank(trader1);
+        bytes32 commitId = auction.commitOrder{value: 0.001 ether}(commitHash);
+
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(trader1);
+        vm.expectRevert(CommitRevealAuction.InsufficientCollateral.selector);
+        auction.revealOrder(commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret, 0);
+    }
+
+    /// @notice Small trades (below MIN_DEPOSIT threshold) should not require extra collateral.
+    function test_revealOrder_smallTrade_noExtraCollateral() public {
+        // A 0.1 ETH trade needs 0.005 ETH collateral — below MIN_DEPOSIT so no extra check.
+        // Deposit of 0.001 ETH (MIN_DEPOSIT) should be sufficient.
+        bytes32 secret = keccak256("secret1");
+        bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 0.1 ether, 0.09 ether, secret);
+
+        vm.prank(trader1);
+        bytes32 commitId = auction.commitOrder{value: 0.001 ether}(commitHash);
+
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(trader1);
+        auction.revealOrder(commitId, tokenA, tokenB, 0.1 ether, 0.09 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory commitment = auction.getCommitment(commitId);
+        assertEq(uint256(commitment.status), uint256(ICommitRevealAuction.CommitStatus.REVEALED));
+    }
+
+    /// @notice Deposit exactly at the 5% threshold should succeed.
+    function test_revealOrder_exactCollateral_succeeds() public {
+        // 1 ETH trade: exactly 0.05 ETH deposit should pass.
+        bytes32 secret = keccak256("secret1");
+        bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
+
+        vm.prank(trader1);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(commitHash);
+
+        vm.warp(block.timestamp + 9);
+
+        vm.prank(trader1);
+        auction.revealOrder(commitId, tokenA, tokenB, 1 ether, 0.9 ether, secret, 0);
+
+        ICommitRevealAuction.OrderCommitment memory commitment = auction.getCommitment(commitId);
+        assertEq(uint256(commitment.status), uint256(ICommitRevealAuction.CommitStatus.REVEALED));
     }
 
     // ============ Helper Functions ============

@@ -260,8 +260,14 @@ contract ShapleyDistributor is
     ///      instead of computing on-chain. Execution/settlement separation.
     IShapleyVerifier public shapleyVerifier;
 
+    /// @notice Per-game quality weight snapshots — locked at game creation to prevent front-running.
+    /// @dev N03 FIX: quality weights are snapshotted into this mapping during _createGameInternal.
+    ///      Subsequent calls to updateQualityWeight() have no effect on already-created games.
+    ///      Slot cost: 1 (mapping key slot). Gap reduced from 50 → 49 to preserve layout.
+    mapping(bytes32 => mapping(address => QualityWeight)) public gameQualityWeights;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -533,6 +539,16 @@ contract ShapleyDistributor is
             gameParticipants[gameId].push(participants[i]);
         }
 
+        // N03 FIX: Snapshot quality weights at game creation to prevent front-running.
+        // Authorized creators cannot manipulate rewards by calling updateQualityWeight()
+        // after the game exists but before computeShapleyValues() settles it.
+        if (useQualityWeights) {
+            for (uint256 i = 0; i < participants.length; i++) {
+                address p = participants[i].participant;
+                gameQualityWeights[gameId][p] = qualityWeights[p];
+            }
+        }
+
         // Update halving tracking
         uint8 prevEra = totalGamesCreated > 0 ? uint8((totalGamesCreated - 1) / gamesPerEra) : 0;
         totalGamesCreated++;
@@ -780,10 +796,13 @@ contract ShapleyDistributor is
         uint256 scarcityNorm = (p.scarcityScore * PRECISION) / BPS_PRECISION;
         uint256 stabilityNorm = (p.stabilityScore * PRECISION) / BPS_PRECISION;
 
-        // Apply quality weights if enabled
+        // Apply quality weights if enabled.
+        // N03 FIX: Read from per-game snapshot (gameQualityWeights) rather than the global
+        // qualityWeights mapping. Weights are snapshotted at game creation so a creator
+        // cannot call updateQualityWeight() between creation and settlement to front-run rewards.
         uint256 qualityMultiplier = PRECISION;
         if (useQualityWeights) {
-            QualityWeight storage qw = qualityWeights[p.participant];
+            QualityWeight storage qw = gameQualityWeights[gameId][p.participant];
             if (qw.lastUpdate > 0) {
                 // Average of quality scores, scaled to 0.5x - 1.5x multiplier
                 uint256 avgQuality = (qw.activityScore + qw.reputationScore + qw.economicScore) / 3;

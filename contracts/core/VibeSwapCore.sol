@@ -218,8 +218,24 @@ contract VibeSwapCore is
     ///      executeBatch() retries AMM execution without re-settling the CRA.
     mapping(uint64 => bool) public batchExecuted;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[43] private __gap;
+    /// @notice C20: per-user per-token count of cross-chain orders that have NOT yet
+    ///         reached a terminal state (SETTLED or REFUNDED). Closes the double-spend
+    ///         window left open by C15 (CrossChainRouter.settlementFailed retry only
+    ///         made the failure recoverable, not preventable). `withdrawDeposit` now
+    ///         blocks while this count is non-zero for the given (trader, tokenIn) pair.
+    ///
+    ///         State-transition contract:
+    ///           commitCrossChainSwap     → count[trader][tokenIn]++
+    ///           _settleSourceChainOrder  → count[trader][tokenIn]--
+    ///           executeCrossChainRefund  → count[trader][tokenIn]--
+    ///           requestCrossChainRefund  → no change (intermediate state)
+    ///
+    ///         Invariant: count[u][t] == | orders in {PENDING, REFUND_REQUESTED} |
+    ///         withdrawDeposit: deposits[u][t] can only be withdrawn when count == 0.
+    mapping(address => mapping(address => uint256)) public pendingCrossChainCount;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 1 for pendingCrossChainCount)
+    uint256[42] private __gap;
 
     // ============ Events ============
 
@@ -342,6 +358,7 @@ contract VibeSwapCore is
     error CrossChainOrderNotPending();
     error CrossChainOrderNotRequested();
     error CrossChainChallengeWindowActive();
+    error CrossChainOrdersPending();
 
     // ============ Modifiers ============
 
@@ -669,6 +686,18 @@ contract VibeSwapCore is
      * @param token Token to withdraw
      */
     function withdrawDeposit(address token) external nonReentrant {
+        // C20: Close the C15 double-spend window at the deposit-withdrawal layer.
+        // A cross-chain order in PENDING or REFUND_REQUESTED state still has its
+        // deposit "live" — destination chain may still pay out, or the challenge
+        // window may still allow refund cancellation. Blocking withdrawDeposit
+        // while ANY such order exists for this (user, token) pair prevents the
+        // race where a silent settlement failure on the router (C15's class) lets
+        // the user both receive the destination-chain output AND reclaim the
+        // source-chain input. Trader must either wait for SETTLED/REFUNDED, or
+        // go through executeCrossChainRefund (which both decrements the counter
+        // and transfers the refund).
+        if (pendingCrossChainCount[msg.sender][token] > 0) revert CrossChainOrdersPending();
+
         uint256 amount = deposits[msg.sender][token];
         require(amount > 0, "No deposit");
 
@@ -742,6 +771,9 @@ contract VibeSwapCore is
             refundRequestTime: 0
         });
 
+        // C20: increment pending-CCR counter so withdrawDeposit blocks until terminal state.
+        pendingCrossChainCount[msg.sender][tokenIn]++;
+
         // Send via router
         // TRP-R22-H03: msg.value is the LZ fee. depositAmount passed explicitly.
         // TRP-R48-NEW10: Pass actual user address so destination records correct depositor
@@ -792,6 +824,11 @@ contract VibeSwapCore is
         if (block.timestamp <= order.refundRequestTime + CHALLENGE_WINDOW) revert CrossChainChallengeWindowActive();
 
         order.status = CrossChainStatus.REFUNDED;
+
+        // C20: decrement pending-CCR counter — terminal state reached.
+        if (pendingCrossChainCount[order.trader][order.tokenIn] > 0) {
+            pendingCrossChainCount[order.trader][order.tokenIn]--;
+        }
 
         // Release deposit back to original trader
         deposits[order.trader][order.tokenIn] -= order.depositAmount;
@@ -855,6 +892,13 @@ contract VibeSwapCore is
 
         order.status = CrossChainStatus.SETTLED;
         deposits[order.trader][order.tokenIn] -= order.depositAmount;
+
+        // C20: decrement pending-CCR counter — terminal state reached. Guarded
+        // against underflow for the (unlikely) case of an orphaned order that
+        // skipped the increment (e.g. if a reinitializer adds history).
+        if (pendingCrossChainCount[order.trader][order.tokenIn] > 0) {
+            pendingCrossChainCount[order.trader][order.tokenIn]--;
+        }
 
         emit CrossChainOrderSettled(commitHash);
         emit CrossChainDepositReleased(commitHash, order.trader, order.tokenIn, order.depositAmount);

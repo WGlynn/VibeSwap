@@ -622,6 +622,93 @@ contract VibeSwapCoreTest is Test {
         core.commitCrossChainSwap(101, address(tokenA), address(tokenB), 1e18, 0, keccak256("s2"), "", address(0));
     }
 
+    // ============ C20: withdrawDeposit gate on pending cross-chain orders ============
+
+    /// @notice Before C20, a trader could withdrawDeposit(tokenA) even while an
+    ///         unsettled cross-chain order held their deposit — pairing with a
+    ///         silent C15-class settlement failure that left deposits un-decremented,
+    ///         this produced a double-spend (destination output + source refund).
+    ///         After C20: withdrawDeposit reverts CrossChainOrdersPending while any
+    ///         PENDING or REFUND_REQUESTED order exists for the (trader, tokenIn) pair.
+    function test_C20_WithdrawDeposit_RevertsWhilePendingCCR() public {
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("c20-s1"), "", address(0)
+        );
+
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 1);
+        assertEq(core.deposits(trader, address(tokenA)), 100e18);
+
+        // Attempting to withdrawDeposit now MUST revert — funds are "live" on dest chain.
+        vm.prank(trader);
+        vm.expectRevert(VibeSwapCore.CrossChainOrdersPending.selector);
+        core.withdrawDeposit(address(tokenA));
+    }
+
+    function test_C20_WithdrawDeposit_UnblockedAfterSettle() public {
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("c20-s2"), "", address(0)
+        );
+        bytes32 commitHash = router.lastCommitHash();
+
+        // Router simulates the BatchResult callback into settleCrossChainOrder.
+        vm.prank(address(router));
+        core.settleCrossChainOrder(commitHash, keccak256("pool"), 95e18);
+
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 0, "counter cleared on SETTLED");
+        // deposit was already decremented inside settlement; nothing left to withdraw.
+        vm.prank(trader);
+        vm.expectRevert("No deposit");
+        core.withdrawDeposit(address(tokenA));
+    }
+
+    function test_C20_WithdrawDeposit_UnblockedAfterRefund() public {
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("c20-s3"), "", address(0)
+        );
+        bytes32 commitHash = router.lastCommitHash();
+
+        // Request refund, wait challenge window, execute refund.
+        vm.warp(block.timestamp + core.REFUND_TIMEOUT() + 1);
+        core.requestCrossChainRefund(commitHash);
+        vm.warp(block.timestamp + core.CHALLENGE_WINDOW() + 1);
+        core.executeCrossChainRefund(commitHash);
+
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 0, "counter cleared on REFUNDED");
+        // Refund already returned the tokens; deposit is 0 for this entry.
+        vm.prank(trader);
+        vm.expectRevert("No deposit");
+        core.withdrawDeposit(address(tokenA));
+    }
+
+    function test_C20_WithdrawDeposit_MultipleOrdersCompound() public {
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("c20-m1"), "", address(0)
+        );
+        bytes32 h1 = router.lastCommitHash();
+
+        vm.warp(block.timestamp + core.commitCooldown() + 1);
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 50e18, 40e18, keccak256("c20-m2"), "", address(0)
+        );
+
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 2, "both pending");
+
+        // One settles — still blocked because one remains.
+        vm.prank(address(router));
+        core.settleCrossChainOrder(h1, keccak256("pool"), 95e18);
+
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 1, "one down, one to go");
+
+        vm.prank(trader);
+        vm.expectRevert(VibeSwapCore.CrossChainOrdersPending.selector);
+        core.withdrawDeposit(address(tokenA));
+    }
+
     // ============ View Functions ============
 
     function test_getCurrentBatch() public view {

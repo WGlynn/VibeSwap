@@ -1,14 +1,21 @@
 # Memecoins as Pure Intent Markets — Seed Notes
 
-**Status:** Seed. Captured April 9, 2026.
+**Status:** Seed. Captured April 9, 2026. Terminology updated April 16, 2026 (Extractive Load; per DeepSeek Round-2 audit feedback).
 
 ---
 
 ## The Observation
 
-Memecoins are a pure intent market buried under extraction. The signal is real — people expressing what they care about, with capital. That's price discovery for cultural attention. But GEV has made the channel so noisy that the signal is unrecoverable.
+Memecoins are a pure intent market buried under extraction. The signal is real — people expressing what they care about, with capital. That's price discovery for cultural attention. But **Extractive Load** — the structural rent that parasites take before any participant has a chance to win — has made the channel so noisy that the signal is unrecoverable.
 
-## The Noise (GEV Taxonomy for Memecoins)
+## A Note on Terminology
+
+- **Extractive Load** (public-facing): the fraction of potential gains siphoned off by structural parasites before participants compete. MEV sandwiching, sniper bots, slow rugs, wash trading, committee rent capture. Paid by everyone, including winners. Independent of game outcome.
+- **GEV / Generalized Extractable Value** (technical): the superset extraction class that includes MEV and its non-block-ordering variants. Load-bearing term for mechanism designers.
+
+The two terms name the same phenomenon at different altitudes. Extractive Load is the degen-vernacular translation. GEV stays in the whitepapers. This paper uses both as appropriate.
+
+## The Noise (GEV / Extractive Load Taxonomy for Memecoins)
 
 | Noise Source | What It Does | Shannon Translation |
 |-------------|-------------|---------------------|
@@ -82,7 +89,7 @@ The meme market doesn't need to be cleaned up. It needs to be **re-channeled**. 
 
 ## One-Line Pitch
 
-"Memecoins are a pure signal of human intent. We just can't hear it over the extraction. Remove the noise and it becomes the largest cooperative market in crypto."
+"Memecoins are a pure signal of human intent. Current venues bury it under Extractive Load — the rent parasites charge before the game starts. Drop the Load toward its protocol-bounded lower floor and you get the largest cooperative market in crypto. Same meme energy; less rent; more upside stays with the community."
 
 ---
 

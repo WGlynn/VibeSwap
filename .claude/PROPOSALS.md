@@ -61,3 +61,33 @@ What "Jarvis" actually is on this system (quick scan):
 Which? If 1, want it at `wglynn/jarvis-template` or append to vibeswap repo under a `jarvis/` dir?
 
 ---
+
+## P4 scratch inventory — 2026-04-16T10:58:50.886199+00:00
+**Session**: `ea7bb041-d517-4709-a8f7-c9ce32d566fa`
+**Status**: proposed
+
+**P4 scratch inventory** (all in `vibeswap/.claude/`):
+
+| File | Age | Size | Recommendation |
+|------|-----|------|----------------|
+| `TOMORROW_PLAN.md` | 5 wk | 4.5K | Archive — "tomorrow" is 5 wks ago |
+| `TOMORROW_PROMPTS.md` | 5 wk | 2.2K | Archive — same |
+| `Jarvis context retrieval Will's manual.txt` | 5 wk | 4.7K | Likely superseded by SKB — check before delete |
+| `Jarvis context retrieval Will's manual2.txt` | 5 wk | 19.6K | Same |
+| `claude context 3.txt` | 5 wk | 16.5K | Same |
+| `freedom context.txt` | 5 wk | 1.4K | Personal — your call |
+| `refinery-log.md` | 5 wk | ? | Unknown — inspect first |
+| `LIVE_SESSION.md` | 2 wk | 7.3K | Superseded by SESSION_STATE |
+| `MIT_HACKATHON_BOOT.md` | 4 d | 8.9K | Event past, archive |
+| `AGENT_CONTEXT.md` | 3 wk | 0.9K | Inspect before decision |
+| `TRUST_VIOLATIONS.md` | 3 wk | 1.0K | Personal, leave |
+| `alison-armstrong-transcript.md` | 5 wk | 165K | Personal, leave |
+
+I cannot delete personal files. Options:
+1. **Archive sweep**: move the obvious-stale ones (`TOMORROW_*`, `LIVE_SESSION`, `MIT_HACKATHON_BOOT`, old `.txt` context dumps) into `.claude/archive/YYYY-MM/` — reversible, keeps history searchable.
+2. **Surgical**: pick specific files to delete or keep.
+3. **Skip P4 entirely**: cleanup not worth the blast radius.
+
+What's your call?
+
+---

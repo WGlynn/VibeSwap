@@ -1,10 +1,10 @@
 # Session State — 2026-04-16
 
 ## Block Header
-- **Session**: RSI Cycles 13 + 14 + 15 — three density scans in a row. C13 clean 0-finding across amm/messaging/governance/incentives/core (class was localized to consensus/). C14 cross-contract interface boundary (2 HIGH + 1 MED + 1 induced HIGH, commit `de10e847`). C15 supply-conservation + cross-chain settlement (1 HIGH closed + 3 false positives correctly triaged). Earlier in session: Cycle 12 (VibeAgentConsensus stake-theft CRIT). Justin (first external learner) expected to join mid-cycle; worked QUALITY mode per his-specific feedback primitive so the workflow is caught in-flight.
+- **Session**: Ten RSI cycles (C11-C20) + Justin synthesis doc + Lawson Floor formalization + Lawson simulator. Justin meeting happened mid-session, LOI signing — joint work locked in on synthesizing our stateful-overlay stack with his Google-anti-gravity equivalent, with workshop teaching as the payoff. Will also requested more research/proofs on Lawson Floor (objective function of floor fairness is profound but hard to validate). Both threads bootstrapped with concrete artifacts before session parked.
 - **Branch**: `feature/social-dag-phase-1`
-- **Commits today**: 18 + C14 (`de10e847`) + C15 (committing now). Pending push — branch strategy gated.
-- **Status**: C15 code + tests green, committing now. Memory updated (primary project tracker + WAL + SESSION_STATE). Not yet pushed.
+- **Commits today**: 18 baseline + 7 RSI cycles (C14 `de10e847`, C15 `a04bf05d`, C16 `361eca36`, C17 `468a06b8`, C18 `8cc81d27`, C19 `b6ab79da`, C20 `b96c9f41`) + 3 non-RSI (Justin synthesis doc `5ebcd282`, Lawson formalization `1890caa2`, Lawson simulator `56423642`). Branch pending push — strategy still gated on Will's decision.
+- **Status**: 10 cycles + 3 artifacts shipped locally. 4 distinct RSI cycle types demonstrated (finding / 0-finding / patch-audit / deferred-closure). All commits on `feature/social-dag-phase-1`.
 
 ## Completed This Session
 
@@ -66,7 +66,23 @@ C12 on `feature/social-dag-phase-1` — push once branch strategy confirmed.
 - **Cycle 17** — CLOSED 2026-04-16 (`468a06b8`). ERC20 handling correctness scan: 1 HIGH closed (VibeYieldAggregator.distributeFees approve-vs-pull interface mismatch that would've reverted every real call) + 1 architectural HIGH documented (`accumulatedFees` disconnected from actual held balance). 2 false positives correctly triaged, 1 MED subsumed, 1 LOW deferred. Primitive candidate: **Interface Pull/Push Contract Match**. +1 regression test, 56 VibeYieldAggregator tests green.
 - **Cycle 18** — CLOSED 2026-04-16 (no code change). Timestamp/deadline edge-case scan: 0 real findings, 1 FP triaged. DecentralizedTribunal's asymmetric boundary operators form correct half-open `[start, deadline)` interval transition — not a gap. Also confirmed clean: VibeAgentConsensus commit/reveal, VibeGovernanceHub reveal window, DAOShelter timelock, NCI unbonding reset, VibeStable oracle staleness, VibeRouter deadline. Three of eight cycles (C13, C16, C18) are 0-finding — that triad bounds the residual attack surface across bug classes.
 - **Cycle 19** — CLOSED 2026-04-16 (no code change). Precision/rounding scan: 0 real findings, 3 scanner HIGHs triaged as misreads. VibeLimitOrder was already multiply-first (scanner misread). Joule's Moore's Law decay is intentional halving. SecondaryIssuanceController 3-way split dust flows to insurance by construction. Accumulator-to-zero edge cases (DAOShelter, VibeRevShare) not reachable in realistic parameter ranges. Three consecutive 0-finding cycles (C16/C18/C19) after last fix. Signal-to-fix ratio improving — considering a different methodology for C20 (manual deep-read vs pattern-match scan).
-- **Cycle 20** — CLOSED 2026-04-16 (commit pending). Methodology shift: deferred-closure cycle rather than density scan. Closed the C15 architectural follow-up — VibeSwapCore.withdrawDeposit now blocks while any cross-chain order for (trader, tokenIn) pair is in PENDING or REFUND_REQUESTED state, via new `pendingCrossChainCount` counter. Closes the double-spend window at the token-withdrawal layer (layered with C15's router-retry path). +4 regression tests, 0 regressions. Storage gap 43→42. Key insight: 4 distinct cycle types now demonstrated (finding / 0-finding / patch-audit / deferred-closure). RSI loop is richer than "scan until you find."
+- **Cycle 20** — CLOSED 2026-04-16 (`b96c9f41`). Methodology shift: deferred-closure cycle rather than density scan. Closed the C15 architectural follow-up — VibeSwapCore.withdrawDeposit now blocks while any cross-chain order for (trader, tokenIn) pair is in PENDING or REFUND_REQUESTED state, via new `pendingCrossChainCount` counter. Closes the double-spend window at the token-withdrawal layer (layered with C15's router-retry path). +4 regression tests, 0 regressions. Storage gap 43→42. Key insight: 4 distinct cycle types now demonstrated (finding / 0-finding / patch-audit / deferred-closure). RSI loop is richer than "scan until you find."
+
+## Post-RSI Artifacts This Session
+
+- **Justin stateful-overlay synthesis map** (`5ebcd282` — `docs/justin-stateful-overlay-synthesis.md`). 11-row slot-by-slot mapping of our persistent-state primitives (SESSION_STATE, WAL, MEMORY.md, proposal-scraper, replay, typed memory files, SKB/GKB, State Observability, RSI, Ambient Capture, Agent Mitosis) against placeholders for Justin's Google-anti-gravity equivalents. Rough 4-part workshop outline. Six open questions for him to answer in-place. Working doc, awaiting Justin edit.
+- **Lawson Floor formalization** (`1890caa2` — `DOCUMENTATION/LAWSON_FLOOR_FORMALIZATION.md`). Math-first companion to the primer + constant paper. Defines Λ(x; H) = ordered Rawlsian max-min as the objective function distinct from pure Rawlsian (no ordering) and pure Shapley (no floor). Positions as the minimum-perturbation adjustment of Shapley that guarantees nonzero floor. Eight open problems enumerated as validation roadmap (L2 uniqueness proof, incentive-compatibility, attack models, empirical validation, information-geometry duality, floor-fraction selection, multi-round dynamics, envy-freeness comparison). Target submission: FC, AFT, or EC.
+- **Lawson Floor reference simulator** (`56423642` — `sims/lawson_floor_sim.py`). Pure Python 3 stdlib. Implements all 5 mechanisms, 3 scenarios (MIT Hackathon 22-of-48, small 5-person, saturation). Reference output shows Lawson f=0.01 delivering 1.00 floor vs. Shapley's 0.48, with top share only a few points below Shapley's. OP4 initial deliverable.
+
+## Pending / Next Session
+
+- **Push decision** — feature branch has 10 commits ready; Will's call on branch strategy.
+- **Justin synthesis follow-up** — once he fills in the TBD slots on `docs/justin-stateful-overlay-synthesis.md`, lock mapping + start workshop outline draft.
+- **Lawson Floor OP1** — tight L2-distance uniqueness proof (next increment after this session's formalization + simulator).
+- **Lawson Floor OP4 real datasets** — Gitcoin or Optimism RetroPGF loader. Right now simulator has synthetic MIT scenario only.
+- **MIT consulting** — formalize Lawson-Floor hackathon proposal (pairs naturally with the formalization paper).
+- **RSI backlog** — operator-cell assignment layer (C10.1 follow-up), C12-AUDIT-2 slash destination, C7-GOV-008 stale oracle, C17-AUDIT-2 accumulator-balance divorce in VibeYieldAggregator.
+- Routine items unchanged: Soham Rutgers feedback, Tadija DeepSeek round 2, claude-code PR #48714.
 
 ## Session Notes
 - Cleanup-duty meta-loop validated — the VibeAgentConsensus bug had been dormant for weeks.

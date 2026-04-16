@@ -7,6 +7,8 @@ import "../../contracts/monetary/CKBNativeToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract ShardOperatorRegistryTest is Test {
+    using stdStorage for StdStorage;
+
     ShardOperatorRegistry public registry;
     CKBNativeToken public ckb;
 
@@ -918,5 +920,35 @@ contract ShardOperatorRegistryTest is Test {
         // Operator themselves can still respond successfully.
         vm.prank(op1);
         registry.respondToChallenge(shard1, cellA, proof0);
+    }
+
+    /// @notice C11-AUDIT-7: deactivate paths must not revert if state has
+    ///         drifted such that totalCellsServed < shard.cellsServed (e.g.,
+    ///         a future upgrade bug corrupts the counter). Saturating subtract
+    ///         lets operators reclaim stake even in that pathological case.
+    function test_C11_deactivate_saturatesCellsServedUnderflow() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        _report(op1, 100);
+        assertEq(registry.getShard(shard1).cellsServed, 100);
+        assertEq(registry.totalCellsServed(), 100);
+
+        // Force state drift: directly corrupt totalCellsServed so it's less
+        // than shard.cellsServed. Storage slot for totalCellsServed is the
+        // 10th declared state slot in ShardOperatorRegistry (after __gaps
+        // inherited from base contracts it's slot 5 of the own storage —
+        // easier to use stdstore targeting the public getter).
+        stdstore
+            .target(address(registry))
+            .sig("totalCellsServed()")
+            .checked_write(uint256(50));
+        assertEq(registry.totalCellsServed(), 50);
+
+        // Without saturation, this subtraction would underflow in 0.8.20 and
+        // revert, trapping the operator. With AUDIT-7 fix it saturates to 0.
+        vm.prank(op1);
+        registry.deactivateShard();
+        assertEq(registry.totalCellsServed(), 0);
+        assertFalse(registry.getShard(shard1).active);
     }
 }

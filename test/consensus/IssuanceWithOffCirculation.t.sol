@@ -224,4 +224,61 @@ contract IssuanceWithOffCirculationTest is Test {
         // gets the remainder instead of being zeroed.
         assertLe(shardReceived, totalEmitted * 5 / 100, "shardShare not inflated by shelter balance");
     }
+
+    /// @notice C11-AUDIT-10: when the shelter is double-registered and holds
+    ///         yield on top of principal (balance > totalDeposited), the
+    ///         controller's double-count subtract must use totalDeposited
+    ///         (principal), not balanceOf. Using balanceOf over-corrects and
+    ///         strips the yield portion from shardShare that it was entitled
+    ///         to via the offCirculation path.
+    function test_shelterYieldCountedInShardShare_AUDIT10() public {
+        // Mint 1M to user. 400k deposited to shelter as principal.
+        vm.prank(minter);
+        ckb.mint(user, 1_000_000e18);
+        vm.prank(user);
+        ckb.approve(address(shelter), type(uint256).max);
+        vm.prank(user);
+        shelter.deposit(400_000e18);
+
+        // Simulate 50k of yield accrued in the shelter — mint directly so
+        // totalDeposited stays at 400k while balance grows to 450k. This
+        // mirrors the state after depositYield() has been routed to the
+        // shelter over time.
+        vm.prank(minter);
+        ckb.mint(address(shelter), 50_000e18);
+        assertEq(ckb.balanceOf(address(shelter)), 450_000e18);
+        assertEq(shelter.totalDeposited(), 400_000e18);
+
+        // Another 200k lives in NCI as legitimate stake (off-circ) so we
+        // can observe the difference between subtracting principal vs balance.
+        vm.prank(user);
+        ckb.transfer(nciMock, 200_000e18);
+
+        // Double-register: both shelter (wrong, but guarded) AND nci (correct).
+        vm.startPrank(owner);
+        ckb.setOffCirculationHolder(address(shelter), true);
+        ckb.setOffCirculationHolder(nciMock, true);
+        vm.stopPrank();
+
+        // offCirc raw = shelter(450k) + nci(200k) = 650k
+        assertEq(ckb.offCirculation(), 650_000e18);
+
+        vm.warp(block.timestamp + 365 days);
+        issuance.distributeEpoch();
+
+        uint256 shardReceived = shardRegistry.totalReceived();
+        uint256 totalEmitted = issuance.totalDistributed();
+
+        // With AUDIT-10 fix (subtract principal 400k): effective offCirc for
+        // the split is 650k - 400k = 250k. So shardShare ~ 250k/totalSupply.
+        // Without the fix (subtract balance 450k): effective offCirc = 200k.
+        // The 50k yield delta maps to a distinct, assertable shardShare floor.
+        // totalSupply grows across the epoch as new tokens mint, but the floor
+        // based on 250k of offCirc should land comfortably above the
+        // would-be-200k ceiling.
+        uint256 minShardShare = totalEmitted * 22 / 100; // principal path floor
+        uint256 maxUnderBug   = totalEmitted * 21 / 100; // balance path ceiling
+        assertGe(shardReceived, minShardShare, "yield delta not credited to shardShare");
+        assertGt(shardReceived, maxUnderBug, "appears to subtract balanceOf, not totalDeposited");
+    }
 }

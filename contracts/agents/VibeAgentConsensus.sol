@@ -60,6 +60,7 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         uint256 stake;
         uint256 mindScore;
         uint256 powNonce;            // Proof of work
+        address committer;           // msg.sender at commit time — stake return target
         bool committed;
         bool revealed;
         bool slashed;
@@ -182,6 +183,7 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             stake: msg.value,
             mindScore: mindScore,
             powNonce: 0,
+            committer: msg.sender,
             committed: true,
             revealed: false,
             slashed: false
@@ -314,11 +316,10 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         bytes32[] storage participants = roundParticipants[roundId];
         for (uint256 i = 0; i < participants.length; i++) {
             AgentCommit storage ac = commits[roundId][participants[i]];
-            if (ac.revealed && ac.stake > 0) {
+            if (ac.revealed && ac.stake > 0 && ac.committer != address(0)) {
                 uint256 returnAmount = ac.stake;
                 ac.stake = 0;
-                (bool ok, ) = msg.sender.call{value: returnAmount}("");
-                // Best effort return — don't revert on failure
+                (bool ok, ) = ac.committer.call{value: returnAmount}("");
                 if (!ok) { ac.stake = returnAmount; }
             }
         }

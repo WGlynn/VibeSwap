@@ -528,6 +528,80 @@ contract VibeAgentConsensusTest is Test {
         assertEq(rel.reliabilityScore, 0);
     }
 
+    // ============ Stake Return — Regression tests for C12-AUDIT-1 (CRIT) ============
+    //
+    // Previously _returnStakes sent ALL revealed-agent stakes to msg.sender of finalize()
+    // instead of to the committer. Any finalizer could drain the full batch.
+
+    function test_StakeReturn_GoesToCommitter_NotFinalizer() public {
+        uint256 roundId = _createRound();
+        uint256 value = 50000e18;
+        bytes32 salt = keccak256("salt-1");
+
+        uint256 committerStart = agent1Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, value, salt);
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, value, salt);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        // Some unrelated EOA finalizes. Prior to fix, this address would have received the stake.
+        address finalizer = makeAddr("opportunistic-finalizer");
+        vm.deal(finalizer, 0);
+
+        vm.prank(finalizer);
+        consensus.finalize(roundId);
+
+        assertEq(finalizer.balance, 0, "finalizer must NOT receive stake");
+        assertEq(agent1Addr.balance, committerStart, "committer must be made whole");
+    }
+
+    function test_StakeReturn_MultipleCommitters_EachGetsOwnStake() public {
+        uint256 roundId = _createRound();
+        bytes32 salt1 = keccak256("s1");
+        bytes32 salt2 = keccak256("s2");
+
+        uint256 start1 = agent1Addr.balance;
+        uint256 start2 = agent2Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, salt2);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        _revealAgent(roundId, agent2Addr, AGENT2, 51000e18, salt2);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        address finalizer = makeAddr("finalizer");
+        vm.prank(finalizer);
+        consensus.finalize(roundId);
+
+        assertEq(agent1Addr.balance, start1, "agent1 whole");
+        assertEq(agent2Addr.balance, start2, "agent2 whole");
+        assertEq(finalizer.balance, 0, "finalizer gets nothing");
+    }
+
+    function test_StakeReturn_SlashedAgent_NotRefunded() public {
+        uint256 roundId = _createRound();
+        bytes32 salt1 = keccak256("s1");
+        bytes32 salt2 = keccak256("s2");
+
+        uint256 start2 = agent2Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, salt2);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        // agent2 does NOT reveal
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        // agent2 stake is locked by the slash — stays in contract, does not flow back
+        assertEq(agent2Addr.balance, start2 - MIN_STAKE, "non-revealer stays short");
+    }
+
     // ============ Fuzz ============
 
     function testFuzz_Commit_StakeRange(uint256 stake) public {

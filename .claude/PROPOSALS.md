@@ -91,3 +91,23 @@ I cannot delete personal files. Options:
 What's your call?
 
 ---
+
+## Cleanup duty — status — 2026-04-16T11:28:15.956641+00:00
+**Session**: `ea7bb041-d517-4709-a8f7-c9ce32d566fa`
+**Status**: proposed
+
+## Cleanup duty — status
+
+- **P1** ✅ WAL + SESSION_STATE rewritten for 2026-04-16, PROPOSALS.md committed (`11382542`)
+- **P2** ✅ Stash triage reported — **stash@{0} has real unmerged work**, not dropping without your call. stash@{1} is cosmetic docs.
+- **P3** ✅ Deferrals reviewed — 1 finding upgraded: **`VibeFeeDistributor._distributeToStakers` is a latent bug, not a TODO** (stakers' fee share silently zeroed). Recommendations for C9/C10/C11 LOW/INFO items provided.
+- **P4** ✅ Stale scratch moved to `.claude/archive/2026-04/` (`e6a6f037` or similar). Personal files untouched.
+- **P5** ✅ No-op — SKB/GKB/round-summaries don't track Full Stack cycles; `project_full-stack-rsi.md` already current.
+
+**Your outstanding decisions**:
+1. **stash@{0}**: create a branch for review, or park indefinitely?
+2. **VibeFeeDistributor bug**: fix now, file ticket, or park?
+3. **C11-AUDIT-14** cell-existence cross-ref: design cycle on your calendar?
+4. Push the cleanup commits?
+
+---

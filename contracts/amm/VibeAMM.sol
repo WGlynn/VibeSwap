@@ -871,6 +871,11 @@ contract VibeAMM is
         // INT-R1-INT001: Return actual fee rate so Core's SEC-1 detection uses the correct model
         result.batchFeeRate = batchFeeRate;
 
+        // AMM-01: Capture k-invariant before batch execution (from TRP R24,
+        // recovered from stash-2026-04-02). Fees should increase k; any path
+        // where batch execution decreases k is a math bug that drains LP value.
+        uint256 kBefore = uint256(pool.reserve0) * uint256(pool.reserve1);
+
         // Execute each order at clearing price
         for (uint256 i = 0; i < orders.length;) {
             SwapOrder calldata order = orders[i];
@@ -887,6 +892,14 @@ contract VibeAMM is
             result.protocolFees += fee;
             unchecked { ++i; }
         }
+
+        // AMM-01: Verify k-invariant — batch must not decrease k.
+        // Fees accumulate in the reserves on the input side, so k should
+        // strictly increase across the batch. A decrease is a BatchMath bug.
+        require(
+            uint256(pool.reserve0) * uint256(pool.reserve1) >= kBefore,
+            "K invariant violated"
+        );
 
         // Update circuit breaker with total volume
         _updateBreaker(VOLUME_BREAKER, result.totalTokenInSwapped);

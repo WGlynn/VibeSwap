@@ -185,9 +185,13 @@ contract SecondaryIssuanceController is
         // registered as an off-circulation holder. Its balance is already
         // accounted for via daoShelter.totalDeposited() below — counting it
         // twice would starve insurance. Subtract if double-registered.
+        // C11-AUDIT-10: subtract totalDeposited (principal), NOT balanceOf.
+        // balanceOf includes unwithdrawn yield, which is NOT double-counted
+        // by totalDeposited. Subtracting balance over-corrects and silently
+        // under-weights shardShare on every epoch.
         if (ckbToken.isOffCirculationHolder(address(daoShelter))) {
-            uint256 shelterBalance = ckbToken.balanceOf(address(daoShelter));
-            offCirc = offCirc > shelterBalance ? offCirc - shelterBalance : 0;
+            uint256 shelterPrincipal = totalDAO;
+            offCirc = offCirc > shelterPrincipal ? offCirc - shelterPrincipal : 0;
         }
 
         // NCI-003/MON-006: 3-way split with underflow protection.

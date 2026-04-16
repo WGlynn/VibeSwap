@@ -434,7 +434,11 @@ contract ShardOperatorRegistry is
         shard.active = false;
         activeShardCount--;
         totalStaked -= shard.stake;
-        totalCellsServed -= shard.cellsServed;
+        // C11-AUDIT-7: saturating subtraction — guard against state drift that
+        // would otherwise revert the whole deactivate tx and strand operators.
+        totalCellsServed = totalCellsServed >= shard.cellsServed
+            ? totalCellsServed - shard.cellsServed
+            : 0;
 
         // Return stake
         uint256 stakeReturn = shard.stake;
@@ -527,7 +531,10 @@ contract ShardOperatorRegistry is
         shard.active = false;
         activeShardCount--;
         totalStaked -= shard.stake;
-        totalCellsServed -= shard.cellsServed;
+        // C11-AUDIT-7: saturating subtraction (symmetric with deactivateShard)
+        totalCellsServed = totalCellsServed >= shard.cellsServed
+            ? totalCellsServed - shard.cellsServed
+            : 0;
 
         address operator = shard.operator;
         uint256 stakeReturn = shard.stake;

@@ -138,7 +138,17 @@ contract C10DeploySimulationTest is Test {
         ckb.setLocker(address(vault), true);
         shelter.setIssuanceController(address(issuance));
         sor.setIssuanceController(address(issuance));
+        // C11-AUDIT-14: wire the SOR to the canonical StateRentVault so
+        // respondToChallenge can verify cellIds are real active cells.
+        sor.setStateRentVault(address(vault));
+        // Make test contract a cellManager so tests can materialize real cells.
+        vault.setCellManager(address(this), true);
         vm.stopPrank();
+
+        // Test contract funds + approves vault so it can lock capacity on createCell.
+        vm.prank(minter);
+        ckb.mint(address(this), 100_000e18);
+        ckb.approve(address(vault), type(uint256).max);
 
         // Give actors tokens for staking, depositing, challenging.
         vm.startPrank(minter);
@@ -333,6 +343,11 @@ contract C10DeploySimulationTest is Test {
         bytes32 cellA = keccak256("cellA");
         bytes32 cellB = keccak256("cellB");
         (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+
+        // C11-AUDIT-14: materialize cellA/cellB as real cells in the vault
+        // so the refute's cell-existence check passes.
+        vault.createCell(cellA, 100e18, keccak256("content-A"));
+        vault.createCell(cellB, 100e18, keccak256("content-B"));
 
         vm.prank(op1);
         sor.registerShard(keccak256("shard-chal"), STAKE);

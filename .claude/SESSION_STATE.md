@@ -1,69 +1,115 @@
-# Session State — 2026-04-16
+# Session State — 2026-04-16 (end-of-session handoff, pre-reboot)
 
 ## Block Header
-- **Session**: RSI Cycle 11 — meta-audit of C10/C10.1 challenge-response machinery. 4 HIGH + 2 MED closed in Batches A+B. 2 MEDs transitively closed or non-actionable per audit. 1 INFO deferred as architectural (cell-existence cross-ref). Cleanup duty follow-up on repo state.
-- **Branch**: `master`
-- **Commits**: `49e7fa72` (Batch A), `117f3631` (Batch B), pushed to `origin/master` (URL updated `wglynn/vibeswap` → `WGlynn/VibeSwap`).
-- **Status**: RSI work committed and pushed. Cleanup duty in-flight.
+- **Session**: Long. C11 RSI closure (Batches A+B+C), full cleanup duty (P1-P5), DeepSeek Round-2 audit response + Extractive Load naming adoption, first cross-user Contribution-DAG-traced collaboration documented, VibeFeeDistributor latent-bug fix, SDK V0.5 patterns catalog, Lawson Floor 2-pager (three numeric iterations to reach 22/47), Justin PuffPaff + CogCoin call briefs + CogCoin miner paper, Social DAG sketch (peer-to-peer with NCI convergence), Social DAG Phase 1 contracts (local feature branch — not pushed, not authorized).
+- **Branch**: `master` is synced to origin at `bcea5522`. Active feature branch `feature/social-dag-phase-1` at `798e6684` — LOCAL ONLY, NOT PUSHED.
+- **Status**: All state files synced. Feature branch waiting on Will's review + push decision.
 
-## Completed This Session
+## On master (origin-synced, all green)
 
-### RSI Cycle 11 — Meta-audit + fixes
+### RSI Cycle 11 — FULLY CLOSED
+- Batch A (`49e7fa72`): 5 HIGH closed — gas floor on controller externals, deactivate-path gating, self-challenge rejection, non-operator refute rejection.
+- Batch B (`117f3631`): 2 MED + 2 transitive — totalDeposited subtract, saturating cells-served math.
+- Batch C (`61e77e66`): AUDIT-14 — cell-existence cross-ref to StateRentVault.
+- 180+ tests passing across consensus + deploy sim + VibeFeeDistributor.
 
-**Parallel launch**:
-- Opus audit agent on C10/C10.1 new surfaces (~500 LOC across 3 contracts + deploy script). 4 HIGH + 6 MED + 5 LOW/INFO, citeable file:line + attack sketches.
-- Opus deploy-sim agent wrote `test/deployment/C10DeploySimulation.t.sol` (14 tests, all passing).
+### Docs shipped to master
+- `DOCUMENTATION/RESPONSE_TADIJA_DEEPSEEK_2026-04-16.md` — Round-2 response with C11 receipts, Extractive Load adopted, C12 scope, canonicality futures parked.
+- `DOCUMENTATION/FIRST_CROSS_USER_COLLABORATION_2026-04-16.md` — milestone doc (Issues #32, #33 on repo).
+- `DOCUMENTATION/SOCIAL_DAG_SKETCH.md` — peer-to-peer architecture with NCI convergence (two updates: peer-to-peer explicit, NCI named as convergence substrate).
+- `DOCUMENTATION/LAWSON_FLOOR_FAIRNESS.md` — 2-page primer. MIT figure iterated to 22/47 (25 honest teams got zero).
+- `docs/patterns/` — SDK V0.5 catalog: README + 3 detailed one-pagers (commit-reveal batch auctions, fractalized Shapley, peer challenge-response oracle) + 7 stubs.
+- `docs/papers/memecoin-intent-market-seed.md` — Extractive Load terminology threaded in.
 
-**Batch A — commit `49e7fa72` — 5 HIGH closed**:
-- `C11-AUDIT-1` SecondaryIssuanceController: `MIN_DISTRIBUTE_GAS = 200_000` floor before each try/catch external call. Blocks 63/64 OOG-grief. Short-pull (success path, actuallyPulled < daoShare) now reverts `ShelterShortPull` instead of silently rerouting — halting safer than moving funds under inconsistent shelter state.
-- `C11-AUDIT-2` + `C11-AUDIT-3` ShardOperatorRegistry: `deactivateShard` / `deactivateStaleShard` both revert `PendingReportActive` if a report is unresolved. Closes stake-escape: operator can no longer zero stake between challenge + response window.
-- `C11-AUDIT-8` ShardOperatorRegistry: `challengeCellsReport` rejects `msg.sender == operator` (`SelfChallenge`). Prevents self-challenge-then-self-refute lockout of honest challengers.
-- `C11-AUDIT-9` ShardOperatorRegistry: `respondToChallenge` restricted to operator (`NotOperator`). Closes accomplice-rescue of fraudulent reports.
+### Code shipped to master
+- VibeFeeDistributor Masterchef-pattern fix (`eaf7e4ec`): stakers' 40% fee share was silently zeroing; now O(1) accPerShare distribution with settlement on stake/unstake/claim. +6 regression tests.
+- kBefore k-invariant guard cherry-picked from stash branch (`6663ed14`): AMM batch execution can't decrease k.
+- `.claude/archive/2026-04/` — P4 archive of stale scratch files (TOMORROW_*, LIVE_SESSION, MIT_HACKATHON_BOOT, context `.txt` dumps).
+- `.claude/commands/signal-brief.md` — Signal Desk V0 slash command (home dir, not VibeSwap repo).
 
-**Batch B — commit `117f3631` — 2 MED closed + 2 transitive**:
-- `C11-AUDIT-10` SecondaryIssuanceController: shelter double-count subtract uses `daoShelter.totalDeposited()` (principal) not `balanceOf`. Fixes silent shardShare under-weighting by the yield delta.
-- `C11-AUDIT-7` ShardOperatorRegistry: saturating subtraction on `totalCellsServed` in both deactivate paths. Defense-in-depth against future state drift.
-- `C11-AUDIT-5` transitively closed by AUDIT-2 (sequence enforcement).
-- `C11-AUDIT-6` non-actionable per audit ("Low-risk accounting skew", cross-tx ordering noise).
+### Open PR on origin
+- **PR #35** — stash preservation branch (`wip/stash-2026-04-02-trp-r29`), NOT for merge. Documents unmerged 2026-04-02 TRP R29 work. kBefore already cherry-picked. Still unpicked: `commitOrderOnBehalf` + `InsufficientCollateral` + TRP-R29-NEW03 cross-chain lifecycle, R1-F04 ETH-vs-PoW bid separation.
 
-**Tests**: +7 regression tests (6 SOR + 1 issuance). 137/137 consensus + 14/14 deploy sim pass. 0 regressions.
+## On `feature/social-dag-phase-1` (LOCAL ONLY — NOT PUSHED, NOT AUTHORIZED)
 
-**Cycle 11 deferred** (architectural, for Will's design call):
-- `C11-AUDIT-14` INFO: challenge-response proves commit-to-preimage, not cell-existence. Real close of C10-AUDIT-3 needs `StateRentVault.getCell(cellId).active` cross-ref inside `respondToChallenge`. One-cycle design call, not a patch.
+### Commit `798e6684` — Phase 1 contracts + economic invariant tests
 
-**Memory updated**:
-- `memory/project_full-stack-rsi.md` — Cycle 11 entry with Batch A/B breakdown, key insight on gate composition ("audit pipeline compounds — AUDIT-2 transitively closes AUDIT-5 because challenge lifecycle is now sequentially enforced").
+**Contracts (new, `contracts/reputation/`)**
+- `DAGRegistry.sol` — peer-to-peer mesh registry. 10K VIBE registration bond. Activity-weighted scoring algorithm (no governance). Post-Upgrade Init Gate for distributor wiring (one-shot `setDistributor`).
+- `SocialDAG.sol` — first non-code DAG. 7 signal classes. Merkle-root-per-epoch commitments. Stake-bonded attestation (MIN_ATTESTER_STAKE = 1K VIBE). Cross-edge recording. Internal Shapley + Lawson Floor distribution.
+- `ContributionPoolDistributor.sol` — routes VIBE emission across registered DAGs by weight. Fixed parameters (no governance setters). Bitcoin-halving schedule, 100K VIBE/year era-0 (~0.48% of 21M MAX_SUPPLY), weekly epochs. Records activity unconditionally before weight check to avoid MIN_ACTIVITY_EPOCHS bootstrap deadlock. Graceful Distribution Fallback on per-DAG revert.
 
-### Cleanup duty (in-flight)
+**Tests (new, `test/reputation/`)**
+- `SocialDAGEconomicInvariants.t.sol` — all 6 invariants passing:
+  - I1 supply conservation: minted ≤ budget × epochsOwed
+  - I2 active DAGs receive share: post-bootstrap, weight flows correctly
+  - I3 Lawson Floor per-DAG: lowest-attestation contributor still gets floor
+  - I4 Sybil-deterrent structure: min stake, floor cap, registration bond, activity gate all present
+  - I5 NCI-finalized ordering: all mutations are external functions
+  - I6 P-001: sum(claimable) ≤ vibeReceived, no over-distribution
 
-- P1 (this update): WAL + SESSION_STATE write-through, PROPOSALS.md commit.
-- P2: stash triage (stash@{0} has substantial WIP — needs decision).
-- P3: deferrals sweep (C9/C10/C11 LOW + INFO + in-code TODOs).
-- P4: orphaned scratch files in `.claude/` (5-week-stale TOMORROW files, etc.).
-- P5: SKB/GKB update with C11 primitives/outcomes.
+**Per Will's directives**:
+- VIBE is the stake. Value capture aligned.
+- CKB stays consensus + state rights only. Three-token separation preserved.
+- No governance setters. All params fixed at deploy; change only via UUPS upgrade.
+- Peer-to-peer mesh, no privileged root DAG. NCI provides canonical ordering.
+
+**NOT done (explicit gates for Will)**:
+- `VIBEToken.setMinter(ContributionPoolDistributor, true)` — the one line that turns emission on. Deliberately not called.
+- `git push origin feature/social-dag-phase-1` — local only.
+- PR feature → master.
+
+**Will's review path on reboot**:
+1. `git checkout feature/social-dag-phase-1`
+2. Read `contracts/reputation/ContributionPoolDistributor.sol` — economic math in `epochEmission` + `distributeEpoch`.
+3. Read `test/reputation/SocialDAGEconomicInvariants.t.sol` — 6 invariant docstrings describe what each asserts.
+4. If OK: push → open PR → merge → `setMinter` call → start Phase 2 (bot classifier).
+5. If not OK: comment, I'll adjust on the feature branch.
 
 ## Pending / Next Session
 
-### Cleanup duty continues
-- Triage stash@{0} — substantial WIP touching 6 contracts + TRP_RUNNER.md. Apply or drop? Cannot be decided without Will.
-- Close-or-upgrade sweep on C9-AUDIT-5/7/8 (LOW/INFO from 2026-04-14), C10-AUDIT-7 LOW (timelock prebook), in-code TODOs (Merkle distributor, PLONK, STARK integrations).
-- Orphaned scratch files in `.claude/` — TOMORROW_PLAN.md, TOMORROW_PROMPTS.md (Mar 14), LIVE_SESSION.md (Apr 2), MIT_HACKATHON_BOOT.md (event past), `.txt` context dumps from mid-March.
-- SKB/GKB glyph update for C11 outcomes + "gate composition" primitive.
+### Tonight
+- **Justin PuffPaff call** — brief at `C:\Users\Will\Desktop\JUSTIN_CALL_BRIEF_2026-04-16.md`. Three offers (cofounder, referrals, school workshops). Stance: receive, don't sell. Leave with concrete next steps.
 
-### C11-AUDIT-14 architectural decision
-- Cross-ref cell-existence from `respondToChallenge` to `StateRentVault.getCell()`. Closes the "commit to any preimage" gap in C10-AUDIT-3. Needs Will's call on: (a) direct cross-contract call at refute time (simple, adds a dependency), or (b) operator-signed attestation with off-chain challenge (more trust-minimized), or (c) hybrid with oracle layer. Design cycle not patch cycle.
+### Already done today but important for continuity
+- **CogCoin meeting DONE**. Concrete outcome: they'll debug the DPAPI bug (PowerShell 7 vs 5.1, `System.Security.Cryptography.ProtectedData` not in .NET Core) AND give Will a free domain to start mining. Waiting on: their fix shipping, free domain registered, then flush `results/mined.json` via `@cogcoin/client`.
 
-### Follow-through from prior session
-- Claude-code PR #48714 — monitor
-- GitHub issue against claude-code — monitor
-- Rutgers papers — Soham's venue feedback
-- Tadija DeepSeek round 2 if forthcoming
+### Social DAG roadmap (post Phase 1 approval)
+- **Phase 2** (~1 day): Jarvis TG bot classifier extension. Tag CODE_RELATED / SOCIAL_SIGNAL / NOISE. Write to `social_dag_records.jsonl`.
+- **Phase 3** (~2 days): weekly merkle commit + challenge flow (reuses existing peer challenge-response primitive).
+- **Phase 4** (optional): contributor dashboard read-only UI.
+- **Phase 5**: first live epoch + Lawson Floor payout.
+
+### Deferred open items
+- C11-AUDIT-14 follow-up: operator-cell assignment layer (beyond cell-existence). Architectural. Future cycle.
+- C9/C10 LOW/INFO items — batch-close sweep not done. Low priority.
+- SDK V0.6: fill out 7 pattern stubs into full one-pagers.
+- Stash branch cherry-picks: 2 unique pieces remaining (commitOrderOnBehalf + R1-F04). Harder than kBefore because files moved substantially since 2026-04-02.
+- Justin referrals + workshops follow-up (after tonight's call).
+
+### External follow-through (long-horizon)
+- Claude-code PR #48714 monitor
+- GitHub issue against claude-code monitor
+- Soham Rutgers feedback on three-paper pick
+- Tadija DeepSeek Round 3 when C12 ships
+
+## Desktop briefs (all current)
+- `JUSTIN_CALL_BRIEF_2026-04-16.md` — 22/47 corrected
+- `COGCOIN_CALL_BRIEF_2026-04-16.md`
+- `COGCOIN_MINER_PAPER.md`
+- `RESPONSE_TADIJA_DEEPSEEK_2026-04-16.md`
+- `FIRST_CROSS_USER_COLLABORATION_2026-04-16.md`
+- `LAWSON_FLOOR_FAIRNESS.md` — 22/47 corrected
+- `SOCIAL_DAG_SKETCH.md`
 
 ## RSI Cycles — Status
-- **Cycle 10.1** — closed 2026-04-14 (`00194bbb`). Peer challenge-response for cellsServed.
-- **Cycle 11** — CLOSED 2026-04-16 (`49e7fa72`, `117f3631`). 5 HIGH + 2 MED fixed. 1 INFO deferred (architectural).
+- **Cycle 10.1** — closed 2026-04-14 (`00194bbb`)
+- **Cycle 11** — closed 2026-04-16 (A+B+C: `49e7fa72`, `117f3631`, `61e77e66`)
+- **Cycle 12** — scoped, not started. Evidence-bundle hardening per DeepSeek Round 2.
 
 ## Session Notes
-- C11 as meta-audit pattern holds: auditing the patches that closed prior findings surfaces new ones. C9 on C8 found a CRIT; C11 on C10/C10.1 found 5 HIGH. The recursion is unbounded as long as surface is new.
-- Key insight surfaced: small gates compose into larger safety properties. AUDIT-2 alone closes AUDIT-5 at the same time — no code needed for the latter. This is worth watching for across future cycles; gate composition may be a cheaper path than individual fix-per-finding.
-- Deploy-sim + audit agents running in parallel kept pipeline utilization high without overlap. Same pattern used in C9. Keep.
+- Longest session to date. Contracts, docs, papers, memory, external outreach (DeepSeek, CogCoin, Justin), infrastructure.
+- Key primitive: Social DAG as peer-to-peer companion to Contribution DAG. Will's directive "VIBE is the stake, CKB stays consensus + state" locked the three-token separation in explicit form.
+- Key insight: DeepSeek's Round 2 went collaborative because the Round 1 rebuttal was specific. Concession + counterargument + concrete primitive = collaborator, not adversary.
+- Key insight: "It's a TODO" can disguise a latent bug (VibeFeeDistributor staker-share stub). Worth a lint pass: "empty internal function body at a call site."
+- MIT hackathon denominator iterated three times (10 → 22/48 → 22/47, 25 teams zero). Audience focused on the number, not the architecture — that IS the tell the architecture critique was right.

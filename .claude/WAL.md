@@ -1,33 +1,31 @@
-# Write-Ahead Log — CLEAN (session 2026-04-16 in progress)
+# Write-Ahead Log — CLEAN (session 2026-04-16)
 
 ## Current Epoch
 - **Started**: 2026-04-16
-- **Intent**: RSI Cycle 11 meta-audit + cleanup duty
+- **Intent**: RSI Cycle 11 meta-audit + Cycle 12 cleanup-duty density scan
 - **Parent Commit**: `36b02874` (prior session final)
-- **Current Commit**: `117f3631` (Batch B, pushed)
-- **Branch**: master
-- **Status**: RSI committed + pushed. Cleanup duty in-flight.
+- **Current Commit**: `5773b8c2` (C12 CRIT fix, local on feature branch)
+- **Branch**: feature/social-dag-phase-1
+- **Status**: C12 committed locally. Memory + backlog updated. Not yet pushed.
 
 ## Completed this epoch
-- [x] C11 R1 audit (opus agent): 4 HIGH + 6 MED + 5 LOW/INFO across C10/C10.1 surfaces
-- [x] C10DeploySimulation.t.sol written (opus agent, 14 tests, all pass)
-- [x] Batch A: 5 HIGH fixes (AUDIT-1, -2, -3, -8, -9) — commit `49e7fa72`
-- [x] Batch B: 2 MED fixes (AUDIT-7, -10) + 2 transitive (AUDIT-5, -6) — commit `117f3631`
-- [x] +7 regression tests. 137/137 consensus + 14/14 deploy sim, 0 regressions
-- [x] Origin remote URL updated: `wglynn/vibeswap` → `WGlynn/VibeSwap`
-- [x] Pushed both commits to origin
-- [x] P1 cleanup: SESSION_STATE + WAL + PROPOSALS.md commit
+- [x] C11 R1 audit + Batches A/B/C (earlier today)
+- [x] C12 density scan (background Explore agent): 1 CRIT + 1 HIGH found
+- [x] C12-AUDIT-1 CRIT fix: VibeAgentConsensus stake theft — commit `5773b8c2`
+- [x] +3 regression tests, 35/35 consensus tests pass
+- [x] Cleanup-Duty primitive extracted (`memory/primitive_cleanup-duty-density.md`)
+- [x] Project memory + RSI backlog updated
+- [x] MEMORY.md index refreshed
 
-## Pending tasks — next session
-- [ ] P2: git stash triage (stash@{0} substantial WIP, stash@{1} cosmetic)
-- [ ] P3: deferrals sweep (C9-AUDIT-5/7/8, C10-AUDIT-7, in-code TODOs)
-- [ ] P4: orphaned .claude/ scratch files
-- [ ] P5: SKB/GKB update with C11 outcomes
-- [ ] C11-AUDIT-14 architectural: cell-existence cross-ref to StateRentVault (design call)
-- [ ] Monitor claude-code PR #48714 and issue
+## Pending — next session
+- [ ] Push C12 to origin once branch strategy confirmed
+- [ ] MIT consulting: formalize Lawson-Floor hackathon proposal
+- [ ] Backlog items (operator-cell assignment, C12-AUDIT-2 slash destination)
+- [ ] Monitor claude-code PR #48714
 - [ ] Soham Rutgers feedback
 - [ ] Tadija DeepSeek round 2 if forthcoming
 
 ## Notes
-- C11 followed C9 pattern: audit of prior-cycle patches. Holds — 5 HIGH found in code that had been "closed" 2 days prior.
-- Gate composition insight: AUDIT-2 transitively closed AUDIT-5. Composing small gates produces larger safety properties.
+- Cycle 12 validated "audit the audits" meta-loop. Scanning for empty/placeholder bodies caught a CRIT that had been dormant since VibeAgentConsensus was written.
+- Pattern: both C11's cleanup bug (_distributeToStakers) and C12's CRIT (_returnStakes) share root cause — named function implies value-handling, body doesn't, tests pass because no assertion verifies fund destination.
+- Audit-discipline insight: add balance-destination assertions to regression tests, not just execution-success checks.

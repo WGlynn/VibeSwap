@@ -112,6 +112,11 @@ contract VibeAgentMemory is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuard
 
     // ============ Initializer ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _owner) external initializer {
         __Ownable_init(_owner);
         __UUPSUpgradeable_init();

@@ -20,6 +20,11 @@ contract VibeDAVerifier is OwnableUpgradeable, UUPSUpgradeable {
     event DACommitted(uint256 indexed id, uint256 blockNumber, bytes32 dataRoot);
     event DAVerified(uint256 indexed id);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(uint256 _quorum) external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); quorum = _quorum > 0 ? _quorum : 2; }
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         require(newImplementation.code.length > 0, "Not a contract");

@@ -36,6 +36,11 @@ contract VibeBlockRewards is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     event RewardDistributed(address indexed validator, uint256 amount, uint256 blockNumber);
     event EpochAdvanced(uint256 indexed epochId, uint256 newReward);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

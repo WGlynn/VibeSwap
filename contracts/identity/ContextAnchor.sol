@@ -52,6 +52,11 @@ contract ContextAnchor is IContextAnchor, OwnableUpgradeable, UUPSUpgradeable {
 
     // ============ Initializer ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _agentRegistry) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

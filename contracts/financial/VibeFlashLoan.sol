@@ -91,6 +91,11 @@ contract VibeFlashLoan is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
 
     // ============ Init ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _insuranceFund) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

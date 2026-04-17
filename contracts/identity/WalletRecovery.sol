@@ -177,6 +177,11 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
 
     // ============ Initialization ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _identityContract, address _agiGuard) public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

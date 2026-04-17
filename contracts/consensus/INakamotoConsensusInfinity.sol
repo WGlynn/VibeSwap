@@ -107,6 +107,7 @@ interface INakamotoConsensusInfinity {
     error ZeroAmount();
     error ValidatorSlashedErr();
     error Unauthorized();
+    error MaxValidatorsReached();
 
     // ============ Validator Functions ============
 

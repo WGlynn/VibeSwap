@@ -188,6 +188,60 @@ contract HoneypotDefenseTest is Test {
         hp.publishEvidence(attacker, "ipfs://QmEvidence2");
     }
 
+    // ============ C25-F3: Phantom Array closure ============
+
+    function test_C25F3_RevealRemovesFromTrackedList() public {
+        _engageAttacker();
+        assertEq(hp.trackedAttackers(0), attacker);
+
+        // Ensure reveal path clears the tracked list entry
+        vm.prank(sentinel);
+        hp.recordStakeLocked(attacker, 1 ether);
+        vm.warp(block.timestamp + 2 hours);
+        vm.prank(sentinel);
+        hp.revealTrap(attacker);
+
+        // Array should be empty — entry popped via swap-and-pop
+        vm.expectRevert(); // OOB on index 0 after pop
+        hp.trackedAttackers(0);
+
+        // Stats view loop terminates cleanly on empty list
+        (, , , uint256 activeTraps) = hp.getDefenseStats();
+        assertEq(activeTraps, 0);
+    }
+
+    function test_C25F3_RevealSwapAndPop_PreservesOthers() public {
+        address a2 = makeAddr("attacker2");
+        address a3 = makeAddr("attacker3");
+
+        // Three tracked attackers
+        vm.startPrank(sentinel);
+        hp.reportAnomaly(attacker, "pow_rate", 15);
+        hp.reportAnomaly(a2, "pow_rate", 15);
+        hp.reportAnomaly(a3, "pow_rate", 15);
+        // Engage + reveal middle one
+        hp.reportAnomaly(a2, "pow_rate", 15);
+        hp.recordStakeLocked(a2, 1 ether);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 2 hours);
+        vm.prank(sentinel);
+        hp.revealTrap(a2);
+
+        // Remaining list: attacker + a3 (a3 swapped into a2's slot)
+        assertEq(hp.trackedAttackers(0), attacker);
+        assertEq(hp.trackedAttackers(1), a3);
+        vm.expectRevert();
+        hp.trackedAttackers(2);
+    }
+
+    function test_C25F3_MaxTrackedAttackersConstant() public view {
+        // Constant exposed for defense-in-depth cap. Full fill-to-cap test would
+        // require 10,000 escalations — prohibitive in gas. The constant + the
+        // revert-on-push guard in _escalateThreat is audited by code review.
+        assertEq(hp.MAX_TRACKED_ATTACKERS(), 10_000);
+    }
+
     // ============ Helper ============
 
     function _engageAttacker() internal {

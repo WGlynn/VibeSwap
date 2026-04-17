@@ -806,6 +806,66 @@ contract VibeAgentOrchestratorTest is Test {
         assertEq(orch.getActiveWorkflows().length, 0);
     }
 
+    // ============ C25-F4: Phantom Array closure ============
+
+    function test_C25F4_MaxActiveWorkflowsConstant() public view {
+        assertEq(orch.MAX_ACTIVE_WORKFLOWS(), 10_000);
+    }
+
+    function test_C25F4_FailRemovesFromActiveList() public {
+        uint256 wfId = _createWorkflow("WillFail", 5 ether);
+        uint256[] memory noDeps = new uint256[](0);
+        _addStep(wfId, agentA, 1 ether, noDeps);
+        vm.prank(wfCreator);
+        orch.activateWorkflow(wfId);
+        assertEq(orch.getActiveWorkflows().length, 1);
+
+        vm.prank(wfCreator);
+        orch.failStep(wfId, 0);
+
+        assertEq(orch.getActiveWorkflows().length, 0);
+    }
+
+    function test_C25F4_SwapAndPop_PreservesSiblings() public {
+        // Three active workflows, complete the middle one, verify others survive.
+        uint256[] memory noDeps = new uint256[](0);
+
+        uint256 wf0 = _createWorkflow("W0", 2 ether);
+        _addStep(wf0, agentA, 1 ether, noDeps);
+        vm.prank(wfCreator); orch.activateWorkflow(wf0);
+
+        uint256 wf1 = _createWorkflow("W1", 2 ether);
+        _addStep(wf1, agentB, 1 ether, noDeps);
+        vm.prank(wfCreator); orch.activateWorkflow(wf1);
+
+        uint256 wf2 = _createWorkflow("W2", 2 ether);
+        _addStep(wf2, agentC, 1 ether, noDeps);
+        vm.prank(wfCreator); orch.activateWorkflow(wf2);
+
+        assertEq(orch.getActiveWorkflows().length, 3);
+
+        // Complete the middle one
+        vm.prank(agentOp2);
+        orch.executeStep(wf1, 0, keccak256("done"));
+
+        uint256[] memory remaining = orch.getActiveWorkflows();
+        assertEq(remaining.length, 2);
+
+        // Surviving IDs are wf0 and wf2 in some order
+        bool sawW0; bool sawW2;
+        for (uint256 i; i < remaining.length; i++) {
+            if (remaining[i] == wf0) sawW0 = true;
+            if (remaining[i] == wf2) sawW2 = true;
+        }
+        assertTrue(sawW0);
+        assertTrue(sawW2);
+
+        // Neither survivor is wf1
+        for (uint256 i; i < remaining.length; i++) {
+            assertTrue(remaining[i] != wf1);
+        }
+    }
+
     // ============ Fuzz Tests ============
 
     function testFuzz_createWorkflow_variableBudget(uint256 budget) public {

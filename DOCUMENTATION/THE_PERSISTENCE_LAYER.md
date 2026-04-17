@@ -40,6 +40,16 @@ The answer is not self-promotion. The answer is a Directed Acyclic Graph where c
 
 You focus on the mission. The math handles attribution.
 
+## Radical Transparency
+
+None of the above works without radical transparency. The persistence layer requires that contributors actually commit their scars, their false starts, their "no, do it this way" moments — raw, unsanitized, dated. Without the receipts, there is no ledger, and the cycle resumes.
+
+Most people cannot afford radical transparency. The existing incentive structures punish openness: reveal your edge and competitors copy it, admit uncertainty and investors flinch, share credit and your portion shrinks. Under extractive-load economics, secrecy is rational.
+
+What made radical transparency compatible here is that the incentive structure itself made secrecy counterproductive. The DAG rewards demonstrated contribution, not hoarded knowledge — hiding your work means the math cannot credit you for it. Transparency became self-serving rather than virtuous.
+
+This is not an accidental property. It is the core of the architecture. Fix the incentives and openness stops being a sacrifice.
+
 ## The Ledger
 
 When someone asks how we built this, there will be no mystery and no magic — only the ledger. Every "I got stuck here," every "no, do it this way," every scar is logged, dated, traceable. The transcripts are the receipts. The receipts are the method. The method is repeatable.

@@ -61,6 +61,9 @@ contract HoneypotDefense {
     uint256 public constant MIN_TRAP_DURATION = 1 hours;
     uint256 public constant MAX_TRAP_DURATION = 7 days;
 
+    /// @notice C25-F3: DoS cap on trackedAttackers (iteration bound). Phantom Array class.
+    uint256 public constant MAX_TRACKED_ATTACKERS = 10_000;
+
     // ============ Types ============
 
     enum ThreatLevel { NONE, MONITORING, ENGAGED, EXHAUSTING, REVEALED }
@@ -105,6 +108,9 @@ contract HoneypotDefense {
     mapping(address => AttackProfile) public attackProfiles;
     address[] public trackedAttackers;
 
+    /// @dev addr => index+1 in trackedAttackers (0 = not present). C25-F3 swap-and-pop.
+    mapping(address => uint256) private _trackedAttackerIndex;
+
     /// @notice Anomaly signals
     mapping(bytes32 => AnomalySignal) public signals;
     uint256 public signalCount;
@@ -146,6 +152,7 @@ contract HoneypotDefense {
     error AttackNotActive();
     error TrapNotReady();
     error AlreadyTrapped();
+    error MaxTrackedAttackersReached();
 
     // ============ Modifiers ============
 
@@ -305,6 +312,9 @@ contract HoneypotDefense {
         totalTrapped++;
         totalStakeSlashed += profile.stakeLocked;
 
+        // C25-F3: remove from iteration list now that profile is terminal
+        _removeFromTrackedAttackers(attacker);
+
         emit AttackRevealed(attacker, profile.computeWasted, profile.stakeLocked);
     }
 
@@ -372,11 +382,13 @@ contract HoneypotDefense {
         AttackProfile storage profile = attackProfiles[target];
 
         if (profile.level == ThreatLevel.NONE) {
+            if (trackedAttackers.length >= MAX_TRACKED_ATTACKERS) revert MaxTrackedAttackersReached();
             profile.attacker = target;
             profile.level = ThreatLevel.MONITORING;
             profile.firstSeen = block.timestamp;
             profile.active = true;
             trackedAttackers.push(target);
+            _trackedAttackerIndex[target] = trackedAttackers.length; // 1-indexed
         } else if (profile.level == ThreatLevel.MONITORING) {
             profile.level = ThreatLevel.ENGAGED;
             profile.engagedAt = block.timestamp;
@@ -402,6 +414,21 @@ contract HoneypotDefense {
         // Shadow difficulty is always higher — burns attacker compute faster
         // Uses current block difficulty * multiplier
         return block.prevrandao * SHADOW_DIFFICULTY_MULTIPLIER;
+    }
+
+    /// @dev C25-F3: swap-and-pop removal. No-op if addr absent. Phantom Array class defense.
+    function _removeFromTrackedAttackers(address addr) internal {
+        uint256 indexPlusOne = _trackedAttackerIndex[addr];
+        if (indexPlusOne == 0) return;
+        uint256 idx = indexPlusOne - 1;
+        uint256 lastIdx = trackedAttackers.length - 1;
+        if (idx != lastIdx) {
+            address lastAddr = trackedAttackers[lastIdx];
+            trackedAttackers[idx] = lastAddr;
+            _trackedAttackerIndex[lastAddr] = idx + 1;
+        }
+        trackedAttackers.pop();
+        _trackedAttackerIndex[addr] = 0;
     }
 
     // ============ Resource Recycling (Extractors Get Extracted) ============

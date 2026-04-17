@@ -1050,6 +1050,91 @@ contract CrossChainRouterTest is Test {
         vm.prank(address(endpoint));
         router.lzReceive(origin, keccak256(abi.encode("confirm-guid", batchId, commitHash)), message, address(0), "");
     }
+
+    // ============ C24-F2: MAX_SETTLEMENT_BATCH Cap Tests ============
+
+    function test_C24F2_BatchResult_RejectsOversizedPayload() public {
+        uint256 cap = router.MAX_SETTLEMENT_BATCH();
+        uint256 over = cap + 1;
+
+        bytes32[] memory commits = new bytes32[](over);
+        uint256[] memory amounts = new uint256[](over);
+        address[] memory traders = new address[](over);
+        for (uint256 i = 0; i < over; i++) {
+            commits[i] = keccak256(abi.encodePacked("c", i));
+        }
+
+        CrossChainRouter.BatchResult memory result = CrossChainRouter.BatchResult({
+            batchId: 1,
+            poolId: keccak256("p"),
+            clearingPrice: 1e18,
+            filledTraders: traders,
+            filledAmounts: amounts,
+            filledCommitHashes: commits
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.BATCH_RESULT, abi.encode(result));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: 42
+        });
+        vm.prank(address(endpoint));
+        vm.expectRevert(CrossChainRouter.BatchTooLarge.selector);
+        router.lzReceive(origin, keccak256("oversized"), message, address(0), "");
+    }
+
+    function test_C24F2_SettlementConfirm_RejectsOversizedPayload() public {
+        uint256 cap = router.MAX_SETTLEMENT_BATCH();
+        uint256 over = cap + 1;
+
+        bytes32[] memory commits = new bytes32[](over);
+        for (uint256 i = 0; i < over; i++) {
+            commits[i] = keccak256(abi.encodePacked("s", i));
+        }
+
+        CrossChainRouter.SettlementConfirm memory confirm = CrossChainRouter.SettlementConfirm({
+            commitHashes: commits,
+            batchId: 2,
+            settledOnChain: CHAIN_B
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.SETTLEMENT_CONFIRM, abi.encode(confirm));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: 43
+        });
+        vm.prank(address(endpoint));
+        vm.expectRevert(CrossChainRouter.BatchTooLarge.selector);
+        router.lzReceive(origin, keccak256("oversized-confirm"), message, address(0), "");
+    }
+
+    function test_C24F2_BatchResult_AtCap_Accepted() public {
+        uint256 cap = router.MAX_SETTLEMENT_BATCH();
+
+        bytes32[] memory commits = new bytes32[](cap);
+        uint256[] memory amounts = new uint256[](cap);
+        address[] memory traders = new address[](cap);
+        for (uint256 i = 0; i < cap; i++) {
+            commits[i] = keccak256(abi.encodePacked("ok", i));
+            traders[i] = authorized;
+        }
+
+        CrossChainRouter.BatchResult memory result = CrossChainRouter.BatchResult({
+            batchId: 99,
+            poolId: keccak256("p99"),
+            clearingPrice: 1e18,
+            filledTraders: traders,
+            filledAmounts: amounts,
+            filledCommitHashes: commits
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.BATCH_RESULT, abi.encode(result));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: 99
+        });
+        // Should NOT revert at the cap — core is address(0) in default setup so the
+        // inner settleCrossChainOrder call is skipped, but the gate itself must allow
+        // length == cap.
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("at-cap"), message, address(0), "");
+        // Processed flag = gate passed
+        assertTrue(router.isProcessed(keccak256("at-cap")));
+    }
 }
 
 /// @dev Mock VibeSwapCore settlement surface. Toggle reverting to simulate a paused /

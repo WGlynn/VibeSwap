@@ -88,6 +88,7 @@ contract NakamotoConsensusInfinity is
 
     uint256 public constant MIN_STAKE = 100e18;  // NCI-002: Minimum stake to register
     uint256 public constant UNBONDING_PERIOD = 7 days;  // NCI-009: Unbonding delay
+    uint256 public constant MAX_VALIDATORS = 10_000;  // C24-F1: DoS cap on validatorList (iteration bound)
 
     // ============ PoW Difficulty ============
 
@@ -210,6 +211,8 @@ contract NakamotoConsensusInfinity is
         if (_validators[msg.sender].registeredAt != 0) revert AlreadyRegistered();
         // NCI-002: Require minimum stake to prevent Sybil + gas DoS
         if (stakeAmount < MIN_STAKE) revert InsufficientStake();
+        // C24-F1: Hard cap on active validator list to bound _checkHeartbeats iteration
+        if (validatorList.length >= MAX_VALIDATORS) revert MaxValidatorsReached();
 
         // Authority nodes require Trinity approval (must already be a trinity node)
         if (nodeType == NodeType.AUTHORITY) {
@@ -482,6 +485,8 @@ contract NakamotoConsensusInfinity is
         totalActiveWeight -= v.totalWeight;
         v.active = false;
         activeValidatorCount--;
+        // C24-F1: Remove from iteration list to keep _checkHeartbeats bounded
+        _removeFromValidatorList(msg.sender);
 
         emit ValidatorDeactivated(msg.sender);
     }
@@ -801,6 +806,8 @@ contract NakamotoConsensusInfinity is
         v.slashed = true;
         v.active = false;
         activeValidatorCount--;
+        // C24-F1: Remove from iteration list to keep _checkHeartbeats bounded
+        _removeFromValidatorList(validator);
 
         _recalculateWeights(validator);
         // Weight is now 0 (slashed + inactive) — no need to re-add to totalActiveWeight
@@ -811,20 +818,43 @@ contract NakamotoConsensusInfinity is
 
     // ============ Internal: Heartbeat Checks ============
 
-    /// @dev NCI-008: Still iterates for heartbeat checks, but O(1) weight update.
-    ///      Full decoupling (lazy deactivation) deferred to Phase 2.
+    /// @dev NCI-008 + C24-F1: Iterates validatorList; on deactivation, swap-and-pop
+    ///      to keep the list bounded. With MAX_VALIDATORS cap on registration and
+    ///      active-only membership, this loop is bounded by MAX_VALIDATORS at worst
+    ///      and by activeValidatorCount in practice.
     function _checkHeartbeats() internal {
-        for (uint256 i = 0; i < validatorList.length; i++) {
-            Validator storage v = _validators[validatorList[i]];
-            if (v.active && !v.slashed) {
-                if (block.timestamp > v.lastHeartbeat + HEARTBEAT_GRACE) {
-                    totalActiveWeight -= v.totalWeight;
-                    v.active = false;
-                    activeValidatorCount--;
-                    emit ValidatorDeactivated(validatorList[i]);
-                }
+        uint256 i = 0;
+        while (i < validatorList.length) {
+            address addr = validatorList[i];
+            Validator storage v = _validators[addr];
+            if (v.active && !v.slashed && block.timestamp > v.lastHeartbeat + HEARTBEAT_GRACE) {
+                totalActiveWeight -= v.totalWeight;
+                v.active = false;
+                activeValidatorCount--;
+                _removeFromValidatorList(addr);
+                emit ValidatorDeactivated(addr);
+                // Do not increment i — the slot now holds a different validator (or shrank).
+                continue;
             }
+            unchecked { ++i; }
         }
+    }
+
+    /// @dev C24-F1: Swap-and-pop removal from validatorList + clear index.
+    ///      Caller is responsible for all other state updates (active flag, counters).
+    ///      No-op if addr is not in the list (defensive).
+    function _removeFromValidatorList(address addr) internal {
+        uint256 indexPlusOne = _validatorIndex[addr];
+        if (indexPlusOne == 0) return;
+        uint256 idx = indexPlusOne - 1;
+        uint256 lastIdx = validatorList.length - 1;
+        if (idx != lastIdx) {
+            address lastAddr = validatorList[lastIdx];
+            validatorList[idx] = lastAddr;
+            _validatorIndex[lastAddr] = idx + 1;
+        }
+        validatorList.pop();
+        _validatorIndex[addr] = 0;
     }
 
     // ============ Internal: Math ============

@@ -131,6 +131,13 @@ contract CrossChainRouter is
     mapping(uint32 => uint256) public lastResetTime;
     uint256 public maxMessagesPerHour;
 
+    /// @notice C24-F2: Per-message cap on settlement array length. Bounds the
+    ///         inbound loop inside _handleBatchResult / _handleSettlementConfirm.
+    ///         A peer (malicious or compromised) sending oversized payloads would
+    ///         otherwise burn the LZ gas budget iterating, potentially bricking
+    ///         the channel for that srcEid.
+    uint256 public constant MAX_SETTLEMENT_BATCH = 256;
+
     /// @notice Pending cross-chain commits
     mapping(bytes32 => CrossChainCommit) public pendingCommits;
 
@@ -262,6 +269,7 @@ contract CrossChainRouter is
     error DepositNotExpired();
     error NoDepositToRecover();
     error NoClaimableDeposit();
+    error BatchTooLarge();
 
     // ============ Modifiers ============
 
@@ -747,6 +755,8 @@ contract CrossChainRouter is
     ///      bridge operator after verifying the batch result. This function handles state only.
     function _handleBatchResult(bytes memory payload, uint32 srcEid) internal {
         BatchResult memory result = abi.decode(payload, (BatchResult));
+        // C24-F2: cap attacker-supplied array length to bound iteration gas
+        if (result.filledCommitHashes.length > MAX_SETTLEMENT_BATCH) revert BatchTooLarge();
 
         if (vibeSwapCore != address(0) && result.filledCommitHashes.length > 0) {
             for (uint256 i = 0; i < result.filledCommitHashes.length;) {
@@ -789,6 +799,8 @@ contract CrossChainRouter is
     /// @dev Used when hub sends a lightweight confirmation without full batch results
     function _handleSettlementConfirm(bytes memory payload, uint32 srcEid) internal {
         SettlementConfirm memory confirm = abi.decode(payload, (SettlementConfirm));
+        // C24-F2: cap attacker-supplied array length to bound iteration gas
+        if (confirm.commitHashes.length > MAX_SETTLEMENT_BATCH) revert BatchTooLarge();
 
         if (vibeSwapCore != address(0)) {
             for (uint256 i = 0; i < confirm.commitHashes.length;) {

@@ -50,6 +50,14 @@ What made radical transparency compatible here is that the incentive structure i
 
 This is not an accidental property. It is the core of the architecture. Fix the incentives and openness stops being a sacrifice.
 
+## Rate of Revelation
+
+We are not winning because we produce more output per unit time. We are winning because our rate of revealing private information is higher than everyone else's.
+
+Everyone has private information — tacit expertise, half-formed insights, failed experiments, "I tried this and it didn't work" knowledge. Most of it dies undisclosed. Revealed information compounds: the DAG credits it, others build on it, the ledger records it. Hidden information decays: it dies with the person, gets forgotten, never gets attributed. Two people of equal insight but different disclosure velocities end up with vastly different footprints in the record.
+
+Speed is not volume. Speed is the rate at which tacit becomes explicit.
+
 ## The Ledger
 
 When someone asks how we built this, there will be no mystery and no magic — only the ledger. Every "I got stuck here," every "no, do it this way," every scar is logged, dated, traceable. The transcripts are the receipts. The receipts are the method. The method is repeatable.

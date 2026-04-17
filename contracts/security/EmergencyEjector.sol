@@ -60,6 +60,11 @@ contract EmergencyEjector is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
 
     // ============ Initialize ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(uint256 _emergencyThreshold) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

@@ -59,6 +59,11 @@ contract VibeMultisig is Initializable, UUPSUpgradeable {
 
     // ============ Init ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address[] calldata _owners, uint256 _required) external initializer {
         __UUPSUpgradeable_init();
         require(_owners.length >= _required && _required > 0, "Invalid config");

@@ -1,89 +1,66 @@
-# Session State — 2026-04-16
+# Session State — 2026-04-17
 
 ## Block Header
-- **Session**: Ten RSI cycles (C11-C20) + Justin synthesis doc + Lawson Floor formalization + Lawson simulator. Justin meeting happened mid-session, LOI signing — joint work locked in on synthesizing our stateful-overlay stack with his Google-anti-gravity equivalent, with workshop teaching as the payoff. Will also requested more research/proofs on Lawson Floor (objective function of floor fairness is profound but hard to validate). Both threads bootstrapped with concrete artifacts before session parked.
+- **Session**: Full Stack RSI cycles C21-C23. C21 primitive extraction (Settlement State Durability formalized from C15+C20). C22 density scan on UUPS storage/upgrade safety — 1 systemic MEDIUM finding (CVE-2023-26488 class, 131 contracts missing `_disableInitializers()`). C23 batch fix — 125 contracts patched with constructor + `_disableInitializers()`. Build clean (exit 0). Also: first Justin daily report written to `Desktop/Justin_Reports/2026-04-17_daily.md` per new end-of-session habit.
 - **Branch**: `feature/social-dag-phase-1`
-- **Commits today**: 18 baseline + 7 RSI cycles (C14 `de10e847`, C15 `a04bf05d`, C16 `361eca36`, C17 `468a06b8`, C18 `8cc81d27`, C19 `b6ab79da`, C20 `b96c9f41`) + 3 non-RSI (Justin synthesis doc `5ebcd282`, Lawson formalization `1890caa2`, Lawson simulator `56423642`). Branch pending push — strategy still gated on Will's decision.
-- **Status**: 10 cycles + 3 artifacts shipped locally. 4 distinct RSI cycle types demonstrated (finding / 0-finding / patch-audit / deferred-closure). All commits on `feature/social-dag-phase-1`.
+- **Commits today**: pending this commit (C21-C22 are memory-only, no contract changes; C23 is 125-file contract edit).
+- **Status**: 3 cycles shipped. Five distinct RSI cycle types now demonstrated (finding / 0-finding / patch-audit / deferred-closure / primitive-extraction). Justin daily-report discipline established as standing habit.
 
 ## Completed This Session
 
-### RSI Cycle 12 — Cleanup-Duty Density Scan
+### RSI Cycle 21 — Primitive Extraction: Settlement State Durability
+- Lifted the C15+C20 three-layer pattern into `memory/primitive_settlement-state-durability.md`
+- Pattern: silent-catch callback + durable failure flag + permissionless retry + downstream counter gate
+- Applied instances table, state invariants, design traps, cross-refs to Post-Upgrade Init Gate and Triage-Before-Fix
+- MEMORY.md index updated under Integration Primitives
+- `memory/project_full-stack-rsi.md` updated with C21 entry
 
-**Meta-loop chosen over operator-cell assignment layer (saved to backlog)** — higher-ROI because it generalizes past one finding.
+### RSI Cycle 22 — Storage Collision / UUPS Upgrade Safety Scan
+- 209 UUPS-upgradeable contracts scanned against 10 heuristics
+- **1 systemic MEDIUM finding**: 131 contracts missing `_disableInitializers()` in constructor (CVE-2023-26488 class, pre-deploy-blocker)
+- **0 false positives** (first clean scan run — mature UUPS/storage semantics)
+- Gap arithmetic verified clean on 9 spot-checked contracts (VibeSwapCore[42], CrossChainRouter[43], VibeAMM[46], etc.)
+- **1 architectural deferred**: NakamotoConsensusInfinity three-token upgrade needs `reinitializer(2)` packaging pre-deploy (instance of Post-Upgrade Init Gate primitive)
 
-**Method**: Background Explore agent scanned `contracts/` (396 .sol files) for silent-value-drop stubs — empty/placeholder bodies at internal value-flow call sites. Grep heuristics: empty function bodies, empty catches, `return 0/false` at functions named `_distribute/_pay/_credit/_settle/_reward/_claim/_accrue/_return`, TODOs in function bodies.
+### RSI Cycle 23 — Batch Fix: `_disableInitializers()` Systemic Patch
+- Sonnet sub-agent + templated 2-line constructor insertion
+- **125 contracts patched** (6 fewer than C22's 131 — delta from methodology difference, all concrete UUPS implementations covered)
+- 36 skipped with reasons (already had the pattern, or abstract/interface/library)
+- Pre-edit: 78 contracts had pattern. Post-edit: 203 contracts. Delta: +125.
+- 5 files spot-verified by me (VibeAgentConsensus, VibeStateVM, and 3 via sub-agent sample)
+- `forge build --silent` exit 0 — all 125 edits compile cleanly
 
-**Findings**:
-- **C12-AUDIT-1 CRIT** — `VibeAgentConsensus._returnStakes` sent ALL revealed-agent stakes to `msg.sender` of finalize() instead of the committer. Any EOA calling finalize() drained the full batch of honest revealers' stakes. Root cause: `AgentCommit` struct never recorded depositor address; `msg.sender` was the only handle available. **LIVE THEFT VECTOR.**
-- **C12-AUDIT-2 HIGH** → backlog — slashed stakes orphaned in contract, no withdraw path. Not theft, but value-loss. Deferred pending Will's design call on slashPool destination.
-
-**Fix (commit `5773b8c2`)**:
-- Added `address committer` field to `AgentCommit` struct
-- `commit()` records `msg.sender` as committer
-- `_returnStakes` routes to `ac.committer` (non-zero guard)
-
-**Regression tests**: +3 tests — committer-vs-finalizer, multi-committer correctness, slashed-not-refunded. 35/35 consensus tests pass, 0 regressions.
-
-**Triaged benign**: `_authorizeUpgrade` UUPS overrides, `VibeZKVerifier._verifyPlonk/_verifyStark` (intentional), `GPUComputeMarket.findBestProvider` (pure stub), advisory try/catch blocks.
-
-**Memory updates**:
-- `memory/primitive_cleanup-duty-density.md` (new primitive)
-- `memory/project_full-stack-rsi.md` (Cycle 12 entry added)
-- `memory/project_rsi-backlog.md` (operator-cell assignment + C12-AUDIT-2 HIGH)
-- `memory/MEMORY.md` (RSI hook refreshed)
-
-### Key Insight — Meta-loop compounds
-
-Running density scan after the C11 cleanup-duty incident surfaced a second instance of the same bug class: named function implies value movement, body doesn't move value correctly, tests pass because no assertion checks where funds end up. **Audit discipline gap**: tests need to assert WHERE funds go, not just THAT execution succeeded.
+### Justin Daily Reports — Standing Habit Established
+- New feedback memory: `memory/feedback_justin-daily-reports.md`
+- Target: `C:/Users/Will/Desktop/Justin_Reports/YYYY-MM-DD_daily.md`
+- Today's report written: C20/C21/C22 context (C23 will be appended before session close)
+- Workflow-forward framing per Justin's Agile/CSM background — names cycle types, explains 0-finding value, shows decision points not just outcomes
 
 ## Pending / Next Session
 
-### MIT consulting follow-up (2026-04-16 evening)
-MIT person responded favorably to the Lawson Floor critique. Wants to consult on next year's hackathon reward design. Pitch prepared (see session final response). Consider formalizing: (a) 1-pager "Lawson-Floor hackathon proposal" for MIT organizers, (b) reward-distribution pattern catalog doc.
+### Append C23 to today's Justin report
+Current report covers C20/C21/C22. Need to append C23 (batch fix outcome + build-clean) before session-close.
 
 ### RSI Backlog (architectural — needs Will's design call)
-- **Operator-cell assignment layer** (C11-AUDIT-14 follow-up)
-- **C12-AUDIT-2 HIGH** (slash destination)
-- **C7-GOV-008 MED** (stale oracle bricks VibeStable liquidation)
+- **Operator-cell assignment layer** (C11-AUDIT-14 follow-up) — HIGH
+- **C12-AUDIT-2 HIGH** — slashed stakes orphaned in VibeAgentConsensus; slash destination (slashPool / burn / redistribute / treasury)
+- **C7-GOV-008 MED** — stale oracle bricks VibeStable liquidation
+- **C22 D1** — NCI `reinitializer(2)` pre-deploy gate (templates in JarvisComputeVault.sol:238 and JULBridge.sol:178)
 
-### Push decision
-C12 on `feature/social-dag-phase-1` — push once branch strategy confirmed.
+### C24 candidates
+- Fresh density class (events completeness, signature replay, DoS via unbounded loops)
+- One of the HIGH backlog items once Will returns and decides
+- Patch-audit on C23 (re-verify a random sample of the 125 edits)
 
 ### Follow-through
+- MIT consulting: Lawson-Floor hackathon proposal
 - Claude-code PR #48714
-- Rutgers papers — Soham feedback
-- Tadija DeepSeek round 2 if forthcoming
+- Soham Rutgers feedback
+- Tadija DeepSeek round 2
 
 ## RSI Cycles — Status
-- **Cycle 10.1** — closed 2026-04-14 (`00194bbb`).
-- **Cycle 11** — CLOSED 2026-04-16 (A: `49e7fa72`, B: `117f3631`, C: `eaf7e4ec` + `b9378f2e`).
-- **Cycle 12** — CLOSED 2026-04-16 (`5773b8c2`).
-- **Cycle 13** — CLOSED 2026-04-16 — density scan at 8 heuristics across amm/messaging/governance/incentives/core: 0 findings (confirms the class was localized to consensus/, not universal). No commit.
-- **Cycle 14** — CLOSED 2026-04-16 (`de10e847`). Cross-contract interface scan: 2 HIGH + 1 MED + 1 induced HIGH. Contracts patched: VibeAgentConsensus (pull-queue for failed stake returns), DAOShelter (revert on empty to trigger controller catch), SecondaryIssuanceController (fix over-mint in catch + ShareRerouted event), IncentiveController (pull-queue for forfeited auction proceeds). 373+141+172+37+7+3+38 tests green across 7 suites, 0 regressions.
-- **Cycle 15** — CLOSED 2026-04-16 (`a04bf05d`). Supply-conservation + cross-chain settlement scan: 1 HIGH closed, 3 false positives correctly triaged, 1 architectural follow-up documented. CrossChainRouter patched: `settlementFailed` tracker + cached retry args + permissionless `retrySettlementOrder` / `retrySettlementMark`. 46+38+7+37 = 128 touched-suite tests green, 0 regressions. Deferred: `VibeSwapCore.withdrawDeposit(token)` gating on pending cross-chain orders (closes the double-spend window entirely instead of just making it retry-recoverable).
-- **Cycle 16** — CLOSED 2026-04-16 (no code change). Access-control asymmetry scan: 0 real findings, 4 false positives correctly triaged before any code was touched. Spot-check verified discipline in VibeStable + NCI. Extracted "Triage-Before-Fix Discipline" primitive candidate. Scanner FP rate in mature areas ~100% — 0-finding cycles now confirm absence as actively as finding cycles confirm presence.
-- **Cycle 17** — CLOSED 2026-04-16 (`468a06b8`). ERC20 handling correctness scan: 1 HIGH closed (VibeYieldAggregator.distributeFees approve-vs-pull interface mismatch that would've reverted every real call) + 1 architectural HIGH documented (`accumulatedFees` disconnected from actual held balance). 2 false positives correctly triaged, 1 MED subsumed, 1 LOW deferred. Primitive candidate: **Interface Pull/Push Contract Match**. +1 regression test, 56 VibeYieldAggregator tests green.
-- **Cycle 18** — CLOSED 2026-04-16 (no code change). Timestamp/deadline edge-case scan: 0 real findings, 1 FP triaged. DecentralizedTribunal's asymmetric boundary operators form correct half-open `[start, deadline)` interval transition — not a gap. Also confirmed clean: VibeAgentConsensus commit/reveal, VibeGovernanceHub reveal window, DAOShelter timelock, NCI unbonding reset, VibeStable oracle staleness, VibeRouter deadline. Three of eight cycles (C13, C16, C18) are 0-finding — that triad bounds the residual attack surface across bug classes.
-- **Cycle 19** — CLOSED 2026-04-16 (no code change). Precision/rounding scan: 0 real findings, 3 scanner HIGHs triaged as misreads. VibeLimitOrder was already multiply-first (scanner misread). Joule's Moore's Law decay is intentional halving. SecondaryIssuanceController 3-way split dust flows to insurance by construction. Accumulator-to-zero edge cases (DAOShelter, VibeRevShare) not reachable in realistic parameter ranges. Three consecutive 0-finding cycles (C16/C18/C19) after last fix. Signal-to-fix ratio improving — considering a different methodology for C20 (manual deep-read vs pattern-match scan).
-- **Cycle 20** — CLOSED 2026-04-16 (`b96c9f41`). Methodology shift: deferred-closure cycle rather than density scan. Closed the C15 architectural follow-up — VibeSwapCore.withdrawDeposit now blocks while any cross-chain order for (trader, tokenIn) pair is in PENDING or REFUND_REQUESTED state, via new `pendingCrossChainCount` counter. Closes the double-spend window at the token-withdrawal layer (layered with C15's router-retry path). +4 regression tests, 0 regressions. Storage gap 43→42. Key insight: 4 distinct cycle types now demonstrated (finding / 0-finding / patch-audit / deferred-closure). RSI loop is richer than "scan until you find."
-
-## Post-RSI Artifacts This Session
-
-- **Justin stateful-overlay synthesis map** (`5ebcd282` — `docs/justin-stateful-overlay-synthesis.md`). 11-row slot-by-slot mapping of our persistent-state primitives (SESSION_STATE, WAL, MEMORY.md, proposal-scraper, replay, typed memory files, SKB/GKB, State Observability, RSI, Ambient Capture, Agent Mitosis) against placeholders for Justin's Google-anti-gravity equivalents. Rough 4-part workshop outline. Six open questions for him to answer in-place. Working doc, awaiting Justin edit.
-- **Lawson Floor formalization** (`1890caa2` — `DOCUMENTATION/LAWSON_FLOOR_FORMALIZATION.md`). Math-first companion to the primer + constant paper. Defines Λ(x; H) = ordered Rawlsian max-min as the objective function distinct from pure Rawlsian (no ordering) and pure Shapley (no floor). Positions as the minimum-perturbation adjustment of Shapley that guarantees nonzero floor. Eight open problems enumerated as validation roadmap (L2 uniqueness proof, incentive-compatibility, attack models, empirical validation, information-geometry duality, floor-fraction selection, multi-round dynamics, envy-freeness comparison). Target submission: FC, AFT, or EC.
-- **Lawson Floor reference simulator** (`56423642` — `sims/lawson_floor_sim.py`). Pure Python 3 stdlib. Implements all 5 mechanisms, 3 scenarios (MIT Hackathon 22-of-48, small 5-person, saturation). Reference output shows Lawson f=0.01 delivering 1.00 floor vs. Shapley's 0.48, with top share only a few points below Shapley's. OP4 initial deliverable.
-
-## Pending / Next Session
-
-- **Push decision** — feature branch has 10 commits ready; Will's call on branch strategy.
-- **Justin synthesis follow-up** — once he fills in the TBD slots on `docs/justin-stateful-overlay-synthesis.md`, lock mapping + start workshop outline draft.
-- **Lawson Floor OP1** — tight L2-distance uniqueness proof (next increment after this session's formalization + simulator).
-- **Lawson Floor OP4 real datasets** — Gitcoin or Optimism RetroPGF loader. Right now simulator has synthetic MIT scenario only.
-- **MIT consulting** — formalize Lawson-Floor hackathon proposal (pairs naturally with the formalization paper).
-- **RSI backlog** — operator-cell assignment layer (C10.1 follow-up), C12-AUDIT-2 slash destination, C7-GOV-008 stale oracle, C17-AUDIT-2 accumulator-balance divorce in VibeYieldAggregator.
-- Routine items unchanged: Soham Rutgers feedback, Tadija DeepSeek round 2, claude-code PR #48714.
-
-## Session Notes
-- Cleanup-duty meta-loop validated — the VibeAgentConsensus bug had been dormant for weeks.
-- Forge lint / CI check flagging empty function bodies at value-flow sites would catch this class systematically. Deferred as tooling follow-up.
+- **Cycle 10.1** — closed 2026-04-14 (`00194bbb`)
+- **Cycles 11–20** — CLOSED 2026-04-16 (commits `49e7fa72` → `b96c9f41`)
+- **Cycle 21** — CLOSED 2026-04-17 (memory-only, this commit)
+- **Cycle 22** — CLOSED 2026-04-17 (memory-only, this commit)
+- **Cycle 23** — CLOSING this commit (125 contracts patched)

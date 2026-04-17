@@ -111,3 +111,80 @@ What's your call?
 4. Push the cleanup commits?
 
 ---
+
+## Session summary before pivoting: — 2026-04-16T23:17:38.994915+00:00
+**Session**: `86aa75b4-9664-4b47-9d5b-e15a4569c8dd`
+**Status**: proposed
+
+C20 committed as `b96c9f41`. Now addressing your two messages.
+
+**Session summary before pivoting:**
+
+RSI session yield C14-C20 (7 commits this afternoon):
+- C14: 2 HIGH + 1 MED + 1 induced HIGH
+- C15: 1 HIGH + architectural deferred
+- C16: 0 findings (4 FPs triaged)
+- C17: 1 HIGH + 1 architectural deferred
+- C18: 0 findings (1 FP triaged)
+- C19: 0 findings (3 HIGH scanner misreads)
+- C20: C15 deferred CLOSED (double-spend window fully closed)
+
+4 cycle types demonstrated (finding / 0-finding / patch-audit / deferred-closure).
+
+---
+
+**Justin synthesis** — memory saved at `project_justin-loi-and-synthesis.md`. The pattern: two independent stateful-overlay stacks (ours: SESSION_STATE/WAL/MEMORY files + scraper+replay; his: Google anti-gravity), solving the same substrate gap. Workshop opportunity is the payoff.
+
+**Lawson Floor research** — memory saved at `project_lawson-floor-research-agenda.md` with six work-strands: formalization, simulator, attack models, empirical validation, information-geometry connection, position paper.
+
+---
+
+**Proposed forward split** — pick the thread to drive next:
+
+1. **Justin synthesis doc draft** — map our primitives (SESSION_STATE, WAL, proposal-scraper, replay-proposal) 1-to-1 against slots to be filled by Justin's anti-gravity side. Gives him a doc to react to, surfaces the synthesis quickly.
+
+2. **Lawson Floor formalization** — start with the mathematical definition. Objective vs. constraint framing first, then the distribution-class + solution-concept spec. Lines up with MIT consulting thread.
+
+3. **Lawson Floor simulator stub** — Python reference implementation of {uniform, Shapley, Lawson-Floor-optimized} allocations on toy data. Even a rough simulator moves the "hard to validate" bottleneck.
+
+4. **More RSI (C21)** — at your call. The density well is deeper than cycles-to-exhaustion; I just hit a methodology pause point.
+
+My pick if you hand the call back: **option 1** (Justin mapping doc). Fastest path to a document he can mark up, turns the LOI signal into concrete joint artifact. Which?
+
+---
+
+## Proposal — 2026-04-17T00:13:55.393511+00:00
+**Session**: `86aa75b4-9664-4b47-9d5b-e15a4569c8dd`
+**Status**: proposed
+
+Natural pause point. Three honest options:
+
+1. **Stop.** You've been on for hours, LOI cognitive load is real, 11 commits is a day. State is parked, nothing's rotting. Push the branch if you want it backed up; otherwise tomorrow.
+
+2. **MIT hackathon proposal** — short-form doc, ~15 min. The Lawson Floor primer is already great but not in proposal-to-organizer form. Takes the momentum from today's formalization and lands it on the MIT thread before the warm contact cools.
+
+3. **Lawson OP1 L2-uniqueness proof** — deep math, ~30-60 min focused. Unblocks the formalization paper's central claim (Lawson is THE minimum-perturbation mechanism). Most rigorous payoff per hour.
+
+My pick: **option 1 — stop.** LOI signing + synthesis context-load + 10 RSI cycles is a lot for one day. The MIT proposal and OP1 proof are both well-queued in the pending section and SESSION_STATE, they'll still be there tomorrow with a fresher head. Plus Justin may come back with edits on the synthesis map which would refactor the next cycle's priorities anyway.
+
+If you disagree and want option 2 or 3, tell me which. If stopping — want me to do anything before you close? (push branch, write a tomorrow-morning starter note, nothing?)
+
+---
+
+## Proposal — 2026-04-17T01:04:18.406872+00:00
+**Session**: `86aa75b4-9664-4b47-9d5b-e15a4569c8dd`
+**Status**: proposed
+
+Don't have a memory entry specifically about reorganizing your desktop — just lots of notes about Desktop as a drop zone (PDFs, MIT/, Scripts/, Nerf Files/, Press Releases/). If it happened it was a one-shot that didn't get saved as a habit.
+
+Three paths for your friend:
+
+1. **Just ask** — they can open Claude Code / Claude desktop in their home dir and say "look at my Desktop folder and reorganize it into logical subfolders, don't delete anything, dry-run first then confirm before moving." I'd list what I see, propose a structure, wait for approval, then `mv` with a manifest.
+
+2. **Reconstruct what worked** — if you remember roughly when, I can check PowerShell / bash history (`~/.bash_history`, `Get-History`) or look at Desktop subfolder mod times to infer the structure.
+
+3. **I can do it on yours now** — would give your friend a live example to screen-share. Say the word.
+
+Which?
+
+---

@@ -121,6 +121,11 @@ contract AGIResistantRecovery is UUPSUpgradeable, OwnableUpgradeable {
 
     // ============ Initialization ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

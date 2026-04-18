@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/ITruePriceOracle.sol";
 import "./interfaces/IStablecoinFlowRegistry.sol";
+import "./interfaces/IIssuerReputationRegistry.sol";
 import "../libraries/SecurityLib.sol";
 
 /**
@@ -83,9 +84,18 @@ contract TruePriceOracle is
         "StablecoinUpdate(uint256 usdtUsdcRatio,bool usdtDominant,bool usdcDominant,uint256 volatilityMultiplier,uint256 nonce,uint256 deadline)"
     );
 
+    // C12: EvidenceBundle typed data
+    bytes32 public constant EVIDENCE_BUNDLE_TYPEHASH = keccak256(
+        "EvidenceBundle(uint8 version,bytes32 poolId,uint256 price,uint256 confidence,int256 deviationZScore,uint8 regime,uint256 manipulationProb,bytes32 dataHash,bytes32 stablecoinContextHash,bytes32 issuerKey,uint256 nonce,uint256 deadline)"
+    );
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint8 public constant BUNDLE_VERSION = 1;
+
+    /// @notice C12 — Issuer reputation registry for stake-bonded oracle identity.
+    IIssuerReputationRegistry public issuerRegistry;
+
+    /// @dev Reserved storage gap for future upgrades (reduced 50 → 49 for issuerRegistry slot).
+    uint256[49] private __gap;
 
     // ============ Errors ============
 
@@ -97,6 +107,11 @@ contract TruePriceOracle is
     error InvalidNonce();
     error ZeroAddress();
     error NoPriceData();
+    // C12
+    error UnsupportedBundleVersion(uint8 version);
+    error IssuerRegistryNotSet();
+    error IssuerNotActive(bytes32 issuerKey);
+    error StablecoinContextMismatch();
 
     // ============ Modifiers ============
 
@@ -340,6 +355,130 @@ contract TruePriceOracle is
      */
     function setStablecoinRegistry(address registry) external onlyOwner {
         stablecoinRegistry = IStablecoinFlowRegistry(registry);
+    }
+
+    /**
+     * @notice C12 — Set the IssuerReputationRegistry used by updateTruePriceBundle.
+     * @param registry Registry contract address (zero to disable bundle path).
+     */
+    function setIssuerRegistry(address registry) external onlyOwner {
+        issuerRegistry = IIssuerReputationRegistry(registry);
+    }
+
+    // ============ C12: EvidenceBundle Update Path ============
+
+    /// @inheritdoc ITruePriceOracle
+    function updateTruePriceBundle(
+        EvidenceBundle calldata bundle,
+        bytes calldata signature
+    ) external override nonReentrant {
+        if (bundle.version != BUNDLE_VERSION) revert UnsupportedBundleVersion(bundle.version);
+        if (address(issuerRegistry) == address(0)) revert IssuerRegistryNotSet();
+
+        // Check stablecoin context snapshot matches current live context.
+        if (bundle.stablecoinContextHash != _currentStablecoinContextHash()) {
+            revert StablecoinContextMismatch();
+        }
+
+        (address signer, uint256 nonce, uint256 deadline) = _verifyBundleSignature(bundle, signature);
+
+        // Issuer binding — the signer recovered from the signature must match the
+        // signer registered under bundle.issuerKey, and the issuer must be ACTIVE
+        // with reputation >= minReputation. This is the stake-bonded identity check.
+        if (!issuerRegistry.verifyIssuer(bundle.issuerKey, signer)) {
+            revert IssuerNotActive(bundle.issuerKey);
+        }
+
+        if (nonce != signerNonces[signer]) revert InvalidNonce();
+        signerNonces[signer]++;
+        if (block.timestamp > deadline) revert ExpiredSignature();
+
+        // Price jump validation (if existing data).
+        if (truePrices[bundle.poolId].timestamp > 0 && truePrices[bundle.poolId].price > 0) {
+            _validatePriceJump(truePrices[bundle.poolId].price, bundle.price);
+        }
+
+        // Store new data.
+        TruePriceData memory newData;
+        newData.price = bundle.price;
+        newData.confidence = bundle.confidence;
+        newData.deviationZScore = bundle.deviationZScore;
+        newData.regime = bundle.regime;
+        newData.manipulationProb = bundle.manipulationProb;
+        newData.timestamp = uint64(block.timestamp);
+        newData.dataHash = bundle.dataHash;
+
+        truePrices[bundle.poolId] = newData;
+        _addToHistory(bundle.poolId, newData);
+
+        emit TruePriceUpdated(bundle.poolId, bundle.price, bundle.deviationZScore, bundle.regime, bundle.manipulationProb, uint64(block.timestamp));
+    }
+
+    /// @dev Extracted to avoid stack-too-deep in _verifyBundleSignature.
+    function _bundleStructHash(EvidenceBundle calldata bundle, uint256 nonce, uint256 deadline)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(
+            EVIDENCE_BUNDLE_TYPEHASH,
+            bundle.version,
+            bundle.poolId,
+            bundle.price,
+            bundle.confidence,
+            bundle.deviationZScore,
+            uint8(bundle.regime),
+            bundle.manipulationProb,
+            bundle.dataHash,
+            bundle.stablecoinContextHash,
+            bundle.issuerKey,
+            nonce,
+            deadline
+        ));
+    }
+
+    function _verifyBundleSignature(EvidenceBundle calldata bundle, bytes calldata signature)
+        internal
+        view
+        returns (address signer, uint256 nonce, uint256 deadline)
+    {
+        require(signature.length >= 129, "Invalid signature length");
+
+        nonce = abi.decode(signature[65:97], (uint256));
+        deadline = abi.decode(signature[97:129], (uint256));
+
+        bytes32 digest = SecurityLib.toTypedDataHash(
+            DOMAIN_SEPARATOR,
+            _bundleStructHash(bundle, nonce, deadline)
+        );
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+
+        signer = SecurityLib.recoverSigner(digest, v, r, s);
+    }
+
+    /// @notice Snapshot hash of the live stablecoin context. Off-chain issuer
+    ///         must bind to this at attestation time for bundle replay to hold.
+    function _currentStablecoinContextHash() internal view returns (bytes32) {
+        StablecoinContext memory ctx = _getStablecoinContext();
+        return keccak256(abi.encode(
+            ctx.usdtUsdcRatio,
+            ctx.usdtDominant,
+            ctx.usdcDominant,
+            ctx.volatilityMultiplier
+        ));
+    }
+
+    /// @notice External helper so off-chain keepers can query the current hash.
+    function currentStablecoinContextHash() external view returns (bytes32) {
+        return _currentStablecoinContextHash();
     }
 
     /**

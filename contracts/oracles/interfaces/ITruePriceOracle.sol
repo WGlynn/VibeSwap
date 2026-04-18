@@ -37,6 +37,28 @@ interface ITruePriceOracle {
         uint256 volatilityMultiplier; // Observation noise multiplier (18 decimals, 1e18-3e18)
     }
 
+    /**
+     * @notice C12 — Structured evidence bundle for True Price updates.
+     * @dev The full struct is covered by an EIP-712 signature. Unlike the legacy
+     *      flat update where `dataHash` was the only opaque commitment, the
+     *      bundle commits to: (i) a schema version, (ii) a snapshot hash of the
+     *      stablecoin context at attestation time, (iii) the issuer's registered
+     *      key. Fabrication of any field invalidates the signature, and the
+     *      issuer's stake is at risk under the IssuerReputationRegistry.
+     */
+    struct EvidenceBundle {
+        uint8 version;                  // Schema version (= 1 for C12)
+        bytes32 poolId;
+        uint256 price;
+        uint256 confidence;
+        int256 deviationZScore;
+        RegimeType regime;
+        uint256 manipulationProb;
+        bytes32 dataHash;
+        bytes32 stablecoinContextHash;  // keccak256(abi.encode(StablecoinContext at attestation))
+        bytes32 issuerKey;              // Registered issuer identity (binds to signer via registry)
+    }
+
     // ============ Events ============
 
     event TruePriceUpdated(
@@ -141,6 +163,20 @@ interface ITruePriceOracle {
         RegimeType regime,
         uint256 manipulationProb,
         bytes32 dataHash,
+        bytes calldata signature
+    ) external;
+
+    /**
+     * @notice C12 — Update True Price via a structured, issuer-bonded evidence bundle.
+     * @param bundle Structured evidence bundle (EIP-712 signed).
+     * @param signature 129-byte signature with embedded nonce + deadline.
+     * @dev Validates: (1) bundle.version, (2) issuer is ACTIVE in registry,
+     *      (3) signer recovered from signature matches registered issuer signer,
+     *      (4) stablecoinContextHash matches current context snapshot,
+     *      (5) nonce + deadline + price-jump checks (as in legacy path).
+     */
+    function updateTruePriceBundle(
+        EvidenceBundle calldata bundle,
         bytes calldata signature
     ) external;
 

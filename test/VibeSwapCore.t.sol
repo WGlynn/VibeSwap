@@ -709,6 +709,114 @@ contract VibeSwapCoreTest is Test {
         core.withdrawDeposit(address(tokenA));
     }
 
+    /// @notice C20 delta — REFUND_REQUESTED is an INTERMEDIATE state. The counter
+    ///         should stay > 0 until the terminal REFUNDED transition. This was
+    ///         flagged by the Cycle 26 scoping agent as covered-by-design-but-not-tested.
+    function test_C20_WithdrawDeposit_StillBlockedDuringRefundRequested() public {
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("c20-rr"), "", address(0)
+        );
+        bytes32 commitHash = router.lastCommitHash();
+
+        // Request refund — transitions PENDING → REFUND_REQUESTED. No counter change.
+        vm.warp(block.timestamp + core.REFUND_TIMEOUT() + 1);
+        core.requestCrossChainRefund(commitHash);
+
+        // Counter must remain > 0 during the challenge window.
+        assertEq(
+            core.pendingCrossChainCount(trader, address(tokenA)),
+            1,
+            "counter must stay at 1 during REFUND_REQUESTED"
+        );
+
+        // Withdrawal still blocked.
+        vm.prank(trader);
+        vm.expectRevert(VibeSwapCore.CrossChainOrdersPending.selector);
+        core.withdrawDeposit(address(tokenA));
+    }
+
+    /// @notice C20 delta — per-(trader, token) counter isolation. A pending
+    ///         order on tokenA must NOT affect the counter for tokenB, and
+    ///         withdrawDeposit gate evaluates the token-specific counter only.
+    function test_C20_WithdrawDeposit_PerTokenIsolation() public {
+        // Commit a cross-chain order on tokenA.
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenA), address(tokenB), 100e18, 90e18, keccak256("c20-isoA"), "", address(0)
+        );
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 1);
+        assertEq(core.pendingCrossChainCount(trader, address(tokenB)), 0, "tokenB counter unaffected by tokenA order");
+
+        // Now commit one in the OTHER direction (tokenB as input).
+        vm.warp(block.timestamp + core.commitCooldown() + 1);
+        tokenB.mint(trader, 100e18);
+        vm.prank(trader);
+        tokenB.approve(address(core), 100e18);
+        vm.prank(trader);
+        core.commitCrossChainSwap(
+            101, address(tokenB), address(tokenA), 100e18, 90e18, keccak256("c20-isoB"), "", address(0)
+        );
+
+        // Counters advance independently.
+        assertEq(core.pendingCrossChainCount(trader, address(tokenA)), 1, "tokenA counter stays at 1");
+        assertEq(core.pendingCrossChainCount(trader, address(tokenB)), 1, "tokenB counter incremented independently");
+
+        // Both withdrawals blocked by their respective counters.
+        vm.prank(trader);
+        vm.expectRevert(VibeSwapCore.CrossChainOrdersPending.selector);
+        core.withdrawDeposit(address(tokenA));
+        vm.prank(trader);
+        vm.expectRevert(VibeSwapCore.CrossChainOrdersPending.selector);
+        core.withdrawDeposit(address(tokenB));
+    }
+
+    /// @notice C20 delta — light fuzz on counter accounting. Commits N orders
+    ///         on tokenA, settles K of them, asserts counter == N-K throughout.
+    ///         Stateful invariant-style in a single forward path.
+    function testFuzz_C20_CounterMatchesPendingOrders(uint8 n, uint8 k) public {
+        n = uint8(bound(uint256(n), 1, 5));
+        k = uint8(bound(uint256(k), 0, n));
+
+        bytes32[] memory hashes = new bytes32[](n);
+        for (uint256 i = 0; i < n; i++) {
+            vm.warp(block.timestamp + core.commitCooldown() + 1);
+            vm.prank(trader);
+            core.commitCrossChainSwap(
+                101, address(tokenA), address(tokenB), 10e18, 9e18, keccak256(abi.encode("fuzz", i)), "", address(0)
+            );
+            hashes[i] = router.lastCommitHash();
+            assertEq(
+                core.pendingCrossChainCount(trader, address(tokenA)),
+                i + 1,
+                "counter must increment on each commit"
+            );
+        }
+
+        // Settle k of them (first k).
+        for (uint256 i = 0; i < k; i++) {
+            vm.prank(address(router));
+            core.settleCrossChainOrder(hashes[i], keccak256("pool"), 9e18);
+            assertEq(
+                core.pendingCrossChainCount(trader, address(tokenA)),
+                n - (i + 1),
+                "counter must decrement on each SETTLED"
+            );
+        }
+
+        // Final state: counter == n - k. Withdrawal allowed iff counter == 0.
+        if (k == n) {
+            // All settled — deposit fully consumed, withdrawDeposit reverts "No deposit".
+            vm.prank(trader);
+            vm.expectRevert("No deposit");
+            core.withdrawDeposit(address(tokenA));
+        } else {
+            vm.prank(trader);
+            vm.expectRevert(VibeSwapCore.CrossChainOrdersPending.selector);
+            core.withdrawDeposit(address(tokenA));
+        }
+    }
+
     // ============ View Functions ============
 
     function test_getCurrentBatch() public view {

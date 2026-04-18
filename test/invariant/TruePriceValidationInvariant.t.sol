@@ -58,6 +58,7 @@ contract InvMockTruePriceOracle is ITruePriceOracle {
     }
     function updateTruePrice(bytes32, uint256, uint256, int256, RegimeType, uint256, bytes32, bytes calldata) external {}
     function updateStablecoinContext(uint256, bool, bool, uint256, bytes calldata) external {}
+    function updateTruePriceBundle(EvidenceBundle calldata, bytes calldata) external {}
     function setAuthorizedSigner(address, bool) external {}
 }
 

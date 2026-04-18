@@ -3,8 +3,8 @@
 ## Block Header
 - **Session**: Autopilot mode — full autonomy grant from Will, run indefinitely with continuation protocols until REBOOT threshold. Big-small rotation.
 - **Branch**: `feature/social-dag-phase-1`
-- **Commits today**: `5467576d` (Persistence Layer doc), `c4b91357` (Radical Transparency section), `bc1bf2bf` (Rate of Revelation section), `125b01fb` (Oracle C12 — EvidenceBundle + IssuerReputationRegistry, 10 files +1083 LOC).
-- **Status**: C12 shipped with 26 new tests (17 registry + 9 bundle integration), 0 regressions across 142 oracle tests. Oracle primitive R3 gate open — tuple ready for reviewer.
+- **Commits today**: `5467576d` Persistence Layer doc → `c4b91357` Radical Transparency section → `bc1bf2bf` Rate of Revelation section → `125b01fb` Oracle C12 ship (EvidenceBundle + IssuerReputationRegistry, 10 files +1083 LOC) → `6063dc74` SESSION_STATE + WAL refresh → `8cb1d7c7` C20 test deltas (refund-requested, per-token isolation, counter fuzz) → `bb2d18d9` R3 delivery package doc.
+- **Status**: C12 shipped, tested, documented. R3 tuple is `docs/oracle-c12-r3-delivery.md` (`bb2d18d9`) — single markdown Will can hand to the reviewer. All work committed + pushed to origin.
 
 ## Completed This Session
 
@@ -20,14 +20,21 @@ External-audit-gated work closed. Full design authority exercised on 6 open ques
 
 ## Pending / Next Session
 
-### R3 tuple delivery
-Files 1-8 ready per `project_oracle-audit-rounds.md`. When Will is ready, send to reviewer.
+### R3 delivery — hand-off ready
+`docs/oracle-c12-r3-delivery.md` (commit `bb2d18d9`) contains the complete R3 tuple: what C12 closes, file manifest, evidence-bundle spec, IssuerReputationRegistry mechanics, six locked design decisions with rationale, upgrade-path analysis, test evidence, open questions for reviewer. Will can forward this doc directly — no assembly required. Reviewer's R2 expectation: primitive graduates to "deployable" status after R3 passes.
 
-### Autopilot next rotation — SMALL loop
-Candidate: C20 test deltas (invariant fuzz for pendingCrossChainCount + settlement-failure-retry path) per Cycle 26 scoping agent recommendation.
+### Known debt (not C12 scope)
+Pre-existing 48 failing tests in `test/TruePriceValidation.t.sol` (DonationAttackDetected vs. TruePriceFeeSurcharge ordering). AMM-side, unrelated to C12. Not blocking ship — noted in C12 commit. Investigation deferred.
+
+### Next-session candidate loops
+- C13 scope (oracle-side, if reviewer flags additional gaps in R3)
+- Density scan: access-control audit of admin setters across recent contracts (rare fresh-code opportunity after C12 ship)
+- C12-AUDIT-2 HIGH — slashed stakes orphaned in VibeAgentConsensus (slash destination) — from RSI backlog
+- Operator-cell assignment layer — HIGH (C11-AUDIT-14 follow-up) — from RSI backlog
+- Investigation: pre-existing DonationAttack failures in TruePriceValidation.t.sol (might be one-line helper fix, might be 48-test refactor)
 
 ### Follow-ups (from 2026-04-17)
-See prior session block below. Pre-existing DonationAttack failures in `test/TruePriceValidation.t.sol` noted in C12 commit message — unrelated AMM-side ordering issue, not a C12 regression.
+See prior session block below.
 
 ---
 

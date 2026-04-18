@@ -1,12 +1,12 @@
-# Write-Ahead Log — ACTIVE (session 2026-04-18 autopilot)
+# Write-Ahead Log — CLEAN (session 2026-04-18 autopilot complete)
 
 ## Current Epoch
 - **Started**: 2026-04-18 (autopilot mode, full autonomy grant)
-- **Intent**: Big-small rotation. BIG=Oracle C12 (shipped). SMALL=C20 test deltas (next).
-- **Parent Commit**: `125b01fb` (Oracle C12 — EvidenceBundle + IssuerReputationRegistry, 10 files +1083 LOC)
-- **Current Commit**: none pending (C12 committed + pushed; memory/WAL/SESSION_STATE updates in-progress)
+- **Intent**: Big-small rotation with continuation protocols.
+- **Final Commit**: `bb2d18d9` (R3 delivery doc)
 - **Branch**: feature/social-dag-phase-1
-- **Status**: C12 tests green (26 new, 142 total oracle, 0 regressions). R3 tuple ready for reviewer. Rotating to SMALL loop next.
+- **Status**: All work committed + pushed to origin. No pending edits. WAL CLEAN.
+- **Commits (chronological)**: `5467576d` → `c4b91357` → `bc1bf2bf` → `125b01fb` → `6063dc74` → `8cb1d7c7` → `bb2d18d9`. Seven commits. Three docs (Persistence Layer + sections), one BIG cycle (C12), one SMALL cycle (C20 deltas), one delivery artifact (R3 doc), two state refreshes.
 
 ## Prior Epoch (2026-04-17) — archived below
 

@@ -18,6 +18,25 @@ External-audit-gated work closed. Full design authority exercised on 6 open ques
 - **TruePriceOracle.updateTruePriceBundle**: legacy path preserved; new path validates version, context hash, issuer ACTIVE, signer binding, nonce, deadline.
 - **ISocialSlashingTier stub**: enabled=false default; activation deferred to C13+ via DAO.
 
+### Lineage project — new standalone repo, E2E backend (NDA-counterparty-sprint parallel track)
+After Oracle C12 shipped, Will asked for an E2E backend based on the Justin-intake A-3 product ("persistence layer for the how of professional knowledge work"). Stood up at `C:/Users/Will/lineage/` — FastAPI + SQLModel + SQLite, runs without infrastructure.
+
+**Four shipped cycles on Lineage (local only, no remote)**:
+1. **Phase 1 MVP** (`initial`): Decision / Evidence / lineage DAG — the *why* layer. 6 E2E tests.
+2. **Phase 2 substrate** (`substrate:`): Semantic + Artifact + CompileAgent + Translation + TestVector — the *what* layer. Rosetta framing (three-projection metaphor from the Stone). +5 tests.
+3. **Phase 2 execution** (`phase 2:`): translator adapters (StubTranslator / ClaudeTranslator / GeminiTranslator), verification runners (Python exec + C gcc/subprocess). +7 tests.
+4. **Phase 3 sketch** (`docs: Phase 3 CKB sketch`): architectural doc mapping CKB cells + VibeSwap primitive reuse.
+5. **Code-as-Coordination thesis** (`docs: Code as Coordination`): L1/L2 mechanism design mapping, transliteration constraint, GIL as L2 property, CKB VM native parallelism, HPy bridge ABI, Matt's PoW locks.
+6. **Trusted Private Mode** (`trusted mode:`): dual-deployment enforcement. TRUSTED (web2, log-only slashing) vs OPEN (web3, full slashing) via `LINEAGE_TRUST_MODE` env var. Same data model, different enforcement policy. +3 tests, all 20 green.
+
+**PDF on Desktop**: `2026-04-18_Code_As_Coordination_v2.pdf` (70KB) — the thesis Will will forward to Justin for the Gemini-vs-Claude comparison.
+
+**NDA gate incident (mid-session)**:
+- NDA gate caught NDA-counterparty/counterparty-brand-B/counterparty-brand-C proper nouns in `docs/CODE_AS_COORDINATION.md` during `git add`
+- Current HEAD of lineage repo is clean (redacted in commit `f0507e0`)
+- **Prior commit `d247a17` (local only, no remote push) still contains the NDA-counterparty content in git history**
+- **OPEN QUESTION FOR WILL**: rewrite local lineage history to scrub `d247a17`? Requires explicit approval — destructive operation. Current state: NDA-counterparty material exists only in Will's local `.git/objects`, not published anywhere.
+
 ## Pending / Next Session
 
 ### R3 delivery — hand-off ready

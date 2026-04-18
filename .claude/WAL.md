@@ -1,12 +1,14 @@
-# Write-Ahead Log — CLEAN (session 2026-04-17)
+# Write-Ahead Log — ACTIVE (session 2026-04-18 autopilot)
 
 ## Current Epoch
-- **Started**: 2026-04-17
-- **Intent**: RSI Cycles 21–24 (primitive extraction → UUPS scan → systemic batch fix → unbounded-loop scan + fixes + primitive)
-- **Parent Commit**: `53e3a7a1` (C23 close earlier today)
-- **Current Commit**: C24 pending commit (NCI + CCR contracts + tests + SESSION_STATE + WAL + memory updates)
+- **Started**: 2026-04-18 (autopilot mode, full autonomy grant)
+- **Intent**: Big-small rotation. BIG=Oracle C12 (shipped). SMALL=C20 test deltas (next).
+- **Parent Commit**: `125b01fb` (Oracle C12 — EvidenceBundle + IssuerReputationRegistry, 10 files +1083 LOC)
+- **Current Commit**: none pending (C12 committed + pushed; memory/WAL/SESSION_STATE updates in-progress)
 - **Branch**: feature/social-dag-phase-1
-- **Status**: C24 code compiles clean, 56 NCI + 49 CCR tests green, 0 regressions. Committing now.
+- **Status**: C12 tests green (26 new, 142 total oracle, 0 regressions). R3 tuple ready for reviewer. Rotating to SMALL loop next.
+
+## Prior Epoch (2026-04-17) — archived below
 
 ## Completed this epoch
 - [x] C21 primitive extraction: Settlement State Durability

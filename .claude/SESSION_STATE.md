@@ -1,3 +1,36 @@
+# Session State — 2026-04-18
+
+## Block Header
+- **Session**: Autopilot mode — full autonomy grant from Will, run indefinitely with continuation protocols until REBOOT threshold. Big-small rotation.
+- **Branch**: `feature/social-dag-phase-1`
+- **Commits today**: `5467576d` (Persistence Layer doc), `c4b91357` (Radical Transparency section), `bc1bf2bf` (Rate of Revelation section), `125b01fb` (Oracle C12 — EvidenceBundle + IssuerReputationRegistry, 10 files +1083 LOC).
+- **Status**: C12 shipped with 26 new tests (17 registry + 9 bundle integration), 0 regressions across 142 oracle tests. Oracle primitive R3 gate open — tuple ready for reviewer.
+
+## Completed This Session
+
+### Persistence Layer Doc (3 commits)
+Philosophical doc distilled from conversation: scars→substrate, AFK cost corollary, DAG gives credit, radical transparency (incentive-compatible openness), rate of revelation (speed = velocity of disclosure, not volume), the ledger, persistence layer as civilization's first knowledge-compound mechanism. Pushed to `DOCUMENTATION/THE_PERSISTENCE_LAYER.md`.
+
+### Oracle Cycle 12 — BIG loop
+External-audit-gated work closed. Full design authority exercised on 6 open questions (see `memory/project_oracle-audit-rounds.md` R3 section for lock-ins). Shipped:
+- **IssuerReputationRegistry**: standalone contract with stake bonding, permissioned slashing, penalty-only reputation with time-based mean-reversion (MID=5000bps, half-life=30 days), 7-day unbond delay (anti-slash-dodge property preserved).
+- **EvidenceBundle struct**: version + stablecoinContextHash + issuerKey fields added to EIP-712 signature surface. Fabrication of any field invalidates signature.
+- **TruePriceOracle.updateTruePriceBundle**: legacy path preserved; new path validates version, context hash, issuer ACTIVE, signer binding, nonce, deadline.
+- **ISocialSlashingTier stub**: enabled=false default; activation deferred to C13+ via DAO.
+
+## Pending / Next Session
+
+### R3 tuple delivery
+Files 1-8 ready per `project_oracle-audit-rounds.md`. When Will is ready, send to reviewer.
+
+### Autopilot next rotation — SMALL loop
+Candidate: C20 test deltas (invariant fuzz for pendingCrossChainCount + settlement-failure-retry path) per Cycle 26 scoping agent recommendation.
+
+### Follow-ups (from 2026-04-17)
+See prior session block below. Pre-existing DonationAttack failures in `test/TruePriceValidation.t.sol` noted in C12 commit message — unrelated AMM-side ordering issue, not a C12 regression.
+
+---
+
 # Session State — 2026-04-17
 
 ## Block Header

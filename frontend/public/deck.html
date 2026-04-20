@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VibeSwap Intent Markets — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface-1: #080808;
+    --surface-2: #0d0d0d;
+    --surface-3: #181818;
+    --border: #252525;
+    --border-hi: #424242;
+    --matrix: #00ff41;
+    --matrix-dim: #00cc34;
+    --terminal: #00d4ff;
+    --term-dim: #00a8cc;
+    --fg: #e0e0e0;
+    --fg-white: #ffffff;
+    --muted: #808080;
+    --muted-dim: #505050;
+    --danger: #ff3366;
+    --warn: #ffaa00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.4;
+  }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+  .matrix { color: var(--matrix); }
+  .terminal { color: var(--terminal); }
+  .muted { color: var(--muted); }
+  .muted-dim { color: var(--muted-dim); }
+  .danger { color: var(--danger); }
+  .white { color: var(--fg-white); }
+
+  /* Slide container — 16:9 */
+  .deck {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .slide {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 32px;
+    padding: 40px 56px;
+    overflow: hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Header chrome */
+  .chrome {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted-dim);
+  }
+  .brand {
+    color: var(--fg);
+    font-weight: 700;
+  }
+  .brand-accent { color: var(--matrix); }
+  .brand-sep { color: var(--muted-dim); }
+  .page { color: var(--muted-dim); }
+
+  .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--matrix);
+    font-weight: 600;
+    margin-top: 20px;
+    margin-bottom: 16px;
+  }
+  .kicker.cyan { color: var(--terminal); }
+
+  h1.title {
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--fg-white);
+    letter-spacing: -0.02em;
+    line-height: 1.08;
+    white-space: pre-line;
+  }
+
+  /* Footer */
+  .footer {
+    position: absolute;
+    bottom: 20px;
+    left: 56px;
+    right: 56px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted-dim);
+  }
+  .footer .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--matrix);
+    margin-right: 8px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px rgba(0,255,65,0.4);
+    animation: breathe 2s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+
+  /* Gradient divider */
+  .gdivider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+    margin: 12px 0;
+  }
+  .gdivider.cyan { background: linear-gradient(90deg, transparent, rgba(0,212,255,0.35), transparent); }
+
+  /* Cards */
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 24px;
+  }
+  .card.matrix-border { border-color: var(--matrix); box-shadow: 0 0 30px -10px rgba(0,255,65,0.18); }
+  .card.cyan-border { border-color: var(--terminal); box-shadow: 0 0 30px -10px rgba(0,212,255,0.18); }
+  .card.danger-border { border-color: var(--danger); box-shadow: 0 0 30px -10px rgba(255,51,102,0.18); }
+
+  .bracket-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--matrix);
+    letter-spacing: 0.03em;
+    margin-bottom: 10px;
+  }
+  .bracket-label.cyan { color: var(--terminal); }
+  .bracket-label.danger { color: var(--danger); }
+
+  /* Corner brackets */
+  .brackets { position: relative; padding: 24px; }
+  .brackets::before, .brackets::after,
+  .brackets > .tl, .brackets > .tr, .brackets > .bl, .brackets > .br {
+    position: absolute;
+    content: '';
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--matrix);
+  }
+  .brackets::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .brackets::after { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .brackets .bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .brackets .br { bottom: 0; right: 0; border-left: none; border-top: none; }
+  .brackets.cyan::before, .brackets.cyan::after,
+  .brackets.cyan .bl, .brackets.cyan .br {
+    border-color: var(--terminal);
+  }
+
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+  /* Stats */
+  .mega {
+    font-size: 96px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .hero-stat {
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+
+  /* Tables */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: grid;
+    grid-template-columns: 40px 1fr 2fr 1fr;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .num { font-family: 'JetBrains Mono', monospace; color: var(--matrix); font-weight: 700; font-size: 18px; }
+  .row .name { color: var(--fg-white); font-weight: 600; font-size: 15px; }
+  .row .desc { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .row .out { color: var(--terminal); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; text-align: right; }
+
+  /* Ask table */
+  .ask-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 3fr;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ask-row:last-child { border-bottom: none; }
+  .ask-row .amt { font-family: 'JetBrains Mono', monospace; color: var(--matrix); font-weight: 700; font-size: 18px; }
+  .ask-row .use-name { color: var(--fg-white); font-weight: 600; font-size: 14px; }
+  .ask-row .use-desc { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.5; }
+
+  /* Code block */
+  .code {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .code .kw { color: var(--terminal); font-weight: 600; }
+  .code .val { color: var(--matrix); font-weight: 700; }
+
+  /* Caption */
+  .caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--muted);
+  }
+  .caption.hl { color: var(--terminal); font-style: normal; }
+
+  /* Slide 1 hero */
+  .hero-title {
+    font-size: 96px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    margin-top: 4px;
+  }
+  .hero-title .accent { color: var(--matrix); }
+  .tagline {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--terminal);
+    letter-spacing: -0.02em;
+    margin-top: 20px;
+  }
+  .subtagline {
+    font-size: 16px;
+    color: var(--muted);
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+
+  /* Bullets */
+  .arrow-list { list-style: none; }
+  .arrow-list li {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    line-height: 1.45;
+  }
+  .arrow-list li::before {
+    content: '→  ';
+    color: var(--matrix);
+    font-weight: 700;
+  }
+  .arrow-list.cyan li::before { color: var(--terminal); }
+
+  /* Screen-only: controls */
+  .controls {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    background: rgba(8,8,8,0.9);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    z-index: 1000;
+    border-radius: 4px;
+  }
+  .controls kbd {
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--fg-white);
+  }
+
+  /* Print: one slide per page, no margins, no controls */
+  @page {
+    size: 13.333in 7.5in;
+    margin: 0;
+  }
+  @media print {
+    body { background: #000; }
+    .deck { max-width: none; padding: 0; margin: 0; }
+    .controls { display: none; }
+    .slide {
+      width: 13.333in;
+      height: 7.5in;
+      aspect-ratio: auto;
+      margin: 0;
+      border: none;
+      page-break-after: always;
+      padding: 0.5in 0.7in;
+    }
+    .slide:last-child { page-break-after: auto; }
+    .footer { position: absolute; bottom: 0.25in; left: 0.7in; right: 0.7in; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  VibeSwap Pitch Deck  ·  <kbd>Ctrl</kbd>+<kbd>P</kbd> to save as PDF
+</div>
+
+<div class="deck">
+
+<!-- ============ SLIDE 1 — Title ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div>
+      <span class="brand">VIBESWAP</span>
+      <span class="brand-sep">  ::  </span>
+      <span class="brand-accent">INTENT_MARKETS</span>
+    </div>
+    <span class="page">[ SEED // 2026 ]</span>
+  </div>
+
+  <div class="brackets" style="margin-top: 60px; padding: 50px 60px;">
+    <div class="bl"></div><div class="br"></div>
+    <div class="kicker" style="margin-top:0">&gt; the first memecoin launchpad</div>
+    <h1 class="hero-title">Intent <span class="accent">Markets.</span></h1>
+    <div class="tagline">A coordination primitive, not a casino.</div>
+    <div class="subtagline">The first memecoin launchpad where extraction is the exception,<br>not the business model.</div>
+  </div>
+
+  <div class="footer">
+    <div>
+      <span class="brand">Will Glynn</span>
+      <span class="brand-sep">  ·  </span>
+      <span class="terminal">vibeswap.org</span>
+      <span class="brand-sep">  ·  </span>
+      github.com/wglynn/vibeswap
+    </div>
+    <div>[ 00 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 2 — Problem ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 02 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; problem</div>
+  <h1 class="title">A $60B signal, buried under<br>30–40% extractive load.</h1>
+
+  <div class="grid-2" style="margin-top: 50px; align-items: center;">
+    <div>
+      <div class="mega matrix">$60B+</div>
+      <div class="caption" style="margin-top: 14px;">// per-year memecoin volume</div>
+      <div style="color: var(--fg); margin-top: 10px; font-size: 16px; line-height: 1.5;">
+        A pure signal of what people<br>actually care about.
+      </div>
+    </div>
+    <div class="card">
+      <div class="bracket-label">[ WHAT EATS THE SIGNAL ]</div>
+      <div class="rows" style="margin-top: 8px;">
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 15px;"><span class="white">MEV sandwiches</span><span class="matrix mono">≈ 15-20%</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 15px;"><span class="white">Sniper bots</span><span class="matrix mono">≈ 5-10%</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 15px;"><span class="white">Rugs</span><span class="matrix mono">high-var</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 15px;"><span class="white">Wash trading</span><span class="matrix mono">≈ 3-8%</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; font-size: 15px;"><span class="white">Platform rents</span><span class="matrix mono">1-2% per trade</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div class="caption" style="font-style:italic;">// solve extraction, keep intent → largest onboarding funnel in crypto</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 3 — Insight ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 03 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; insight</div>
+  <h1 class="title">Memecoins are a pure intent market.<br>Their venues make them look like casinos.</h1>
+
+  <div class="caption" style="margin-top: 36px; color: var(--matrix); font-style: normal; font-weight: 700;">// shannon channel model</div>
+
+  <div class="grid-2" style="margin-top: 14px;">
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ TODAY ]</div>
+      <div class="mono" style="font-size: 26px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">C = B · log₂(1 + S/N)</div>
+      <div class="mono muted" style="font-size: 16px;">N &gt;&gt; S   →   channel ≈ 0</div>
+      <div class="mono danger" style="font-size: 12px; margin-top: 14px; font-style: italic;">Casino. Bots win, retail funds bots.</div>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label">[ AFTER ]</div>
+      <div class="mono" style="font-size: 26px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">C = B · log₂(1 + S/N)</div>
+      <div class="mono matrix" style="font-size: 16px;">N ≈ 0   →   full bandwidth</div>
+      <div class="mono terminal" style="font-size: 12px; margin-top: 14px; font-style: italic;">Coordination primitive for attention.</div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 32px; color: var(--fg); font-size: 14px; line-height: 1.45;">
+    Same intent. Same participants. Same market size.<br>
+    <span class="white" style="font-weight: 600;">Remove the rent — reveal the signal.</span>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 03 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 4 — Mechanism ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 04 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; mechanism</div>
+  <h1 class="title">Five structural fixes. All in code.</h1>
+
+  <div class="rows" style="margin-top: 36px;">
+    <div class="row">
+      <div class="num">01</div>
+      <div class="name">Commit-reveal batch auction</div>
+      <div class="desc">Hashed orders; uniform clearing price after window.</div>
+      <div class="out">→ Breaks sniping</div>
+    </div>
+    <div class="row">
+      <div class="num">02</div>
+      <div class="name">Shapley consolidation</div>
+      <div class="desc">One canonical token per meme intent; fair share.</div>
+      <div class="out">→ Breaks fragmentation</div>
+    </div>
+    <div class="row">
+      <div class="num">03</div>
+      <div class="name">Creator liquidity lock</div>
+      <div class="desc">50% slash on early withdrawal; bond vests.</div>
+      <div class="out">→ Breaks rugs</div>
+    </div>
+    <div class="row">
+      <div class="num">04</div>
+      <div class="name">Reputation + sybil guard</div>
+      <div class="desc">CogProof tiers gate participation.</div>
+      <div class="out">→ Breaks wash trading</div>
+    </div>
+    <div class="row">
+      <div class="num">05</div>
+      <div class="name">0% protocol fee</div>
+      <div class="desc">100% of trading fees to LPs. Structural invariant.</div>
+      <div class="out">→ Breaks rent capture</div>
+    </div>
+  </div>
+
+  <div class="caption" style="margin-top: 22px; text-align: center;">
+    // ships in <span class="terminal">contracts/intent-markets/</span>  ·
+    <span class="matrix" style="font-weight: 700;">18 green tests</span>  ·
+    <span class="muted">forge test :: 60ms</span>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 04 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 5 — 0% moat ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 05 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; wedge</div>
+  <h1 class="title">The 0% claim is the moat.</h1>
+
+  <div class="grid-2" style="margin-top: 40px; align-items: center; gap: 40px;">
+    <div style="text-align: center;">
+      <div class="matrix" style="font-size: 240px; font-weight: 800; line-height: 1; letter-spacing: -0.06em; text-shadow: 0 0 40px rgba(0,255,65,0.25);">0%</div>
+      <div class="caption" style="text-align: center; margin-top: 10px;">// protocol fee on launch</div>
+    </div>
+    <div>
+      <div style="font-size: 28px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.2;">Not cheaper.<br>Structurally zero.</div>
+      <div class="code" style="margin-top: 20px;">
+        <span>uint256 public constant</span><br>
+        <span class="kw">PROTOCOL_FEE_BPS</span> = <span class="val">0</span>;
+      </div>
+      <div style="color: var(--muted); font-size: 14px; margin-top: 18px; line-height: 1.5;">
+        A contract invariant — not a governance<br>parameter a future vote can dial up.
+      </div>
+      <div class="terminal" style="font-size: 14px; margin-top: 18px; font-weight: 600; line-height: 1.4;">
+        Incumbents can't follow without burning<br>their own revenue model.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 05 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 6 — Revenue ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 06 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; revenue</div>
+  <h1 class="title">How we earn — without extraction.</h1>
+
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card matrix-border">
+      <div class="bracket-label">[ 01 ]  PROTOCOL-OWNED LIQUIDITY</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; margin: 10px 0 16px 0;">Treasury LP, not toll booth.</div>
+      <ul class="arrow-list">
+        <li>Deploys % of protocol capital into every successful launch's AMM pool.</li>
+        <li>Earns LP fees at the same rate as retail LPs.</li>
+        <li>Revenue tracks launch volume — not count.</li>
+      </ul>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label cyan">[ 02 ]  MUTUAL INSURANCE POOL</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; margin: 10px 0 16px 0;">Rugs fund user protection.</div>
+      <ul class="arrow-list cyan">
+        <li>CreatorLiquidityLock slashes 50% on rug attempts.</li>
+        <li>Slashed funds → VibeInsurancePool.</li>
+        <li>Honest creators pay nothing. Surplus → treasury.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="caption hl" style="text-align: center; margin-top: 28px;">
+    // Every treasury dollar: earned as LP alongside retail, or extracted from a bad actor the mechanism caught.
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 06 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 7 — Market ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 07 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; market</div>
+  <h1 class="title">Timing: extractive load at all-time highs.<br>Retail is exhausted.</h1>
+
+  <div class="grid-3" style="margin-top: 36px;">
+    <div class="card">
+      <div class="hero-stat matrix">$40-80B</div>
+      <div class="caption" style="margin-top: 10px;">// annual memecoin volume<br>   2024-2025</div>
+    </div>
+    <div class="card">
+      <div class="hero-stat terminal">$15B+</div>
+      <div class="caption" style="margin-top: 10px;">// launchpad volume alone<br>   (same window)</div>
+    </div>
+    <div class="card">
+      <div class="hero-stat matrix">30-40%</div>
+      <div class="caption" style="margin-top: 10px;">// extractive load on<br>   every major launchpad</div>
+    </div>
+  </div>
+
+  <div class="kicker" style="margin-top: 28px;">// timing signals</div>
+  <ul class="arrow-list" style="font-size: 13px;">
+    <li style="font-size: 13px; color: var(--fg); font-family: 'Inter', sans-serif;">Regulators pivoting to memecoin market abuse (SEC, EU MiCA)</li>
+    <li style="font-size: 13px; color: var(--fg); font-family: 'Inter', sans-serif;">Retail exhausted by losing to bots — audience is receptive</li>
+    <li style="font-size: 13px; color: var(--fg); font-family: 'Inter', sans-serif;">LLM-written audits make 'verified launch contract' a real differentiator</li>
+  </ul>
+
+  <div style="text-align: center; margin-top: 18px; color: var(--terminal); font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-style: italic;">
+    The wedge only works if the mechanism is provably fair. Ours is.
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 07 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 8 — Traction ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 08 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; traction</div>
+  <h1 class="title">Shipped, tested, externally reviewed.<br>Not yet on mainnet.</h1>
+
+  <div class="grid-3" style="margin-top: 36px;">
+    <div class="card">
+      <div class="bracket-label">[ IN CODE ]</div>
+      <ul class="arrow-list" style="margin-top: 12px;">
+        <li>4 contracts shipped</li>
+        <li>18 unit tests green (0 failing)</li>
+        <li>forge test runs in 60ms</li>
+        <li>573-line launch UI shipped</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="bracket-label cyan">[ EXTERNAL REVIEW ]</div>
+      <ul class="arrow-list cyan" style="margin-top: 12px;">
+        <li>DeepSeek Round-2 audit relayed</li>
+        <li>Extractive Load branding (adopted)</li>
+        <li>Evidence-bundle hardening shipped</li>
+        <li>Round 3 queued</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="bracket-label">[ SECURITY POSTURE ]</div>
+      <ul class="arrow-list" style="margin-top: 12px;">
+        <li>Jarvis bot RSI: 75 findings</li>
+        <li>29 fixed (10 CRIT, 12 HIGH)</li>
+        <li>Self-theater audit gate (8-pass)</li>
+        <li>Bug bounty queued post-deploy</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="matrix" style="text-align: center; margin-top: 30px; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700;">
+    // not deployed to mainnet yet. that's what the raise funds.
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 08 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 9 — Roadmap ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 09 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; roadmap</div>
+  <h1 class="title">90 days to mainnet. 180 days to cross-chain.</h1>
+
+  <div class="grid-3" style="margin-top: 36px;">
+    <div class="card">
+      <div class="bracket-label">[ 90 DAYS ]</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; margin: 8px 0 16px 0;">Seed milestones</div>
+      <ul class="arrow-list">
+        <li>Mainnet deploy (Base/L2) + full audit</li>
+        <li>ProtocolLiquidityProvider.sol ship</li>
+        <li>Slash → VibeInsurancePool wiring</li>
+        <li>Treasury / POL / insurance dashboard</li>
+        <li>Bug bounty launch</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="bracket-label cyan">[ 180 DAYS ]</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; margin: 8px 0 16px 0;">Expansion</div>
+      <ul class="arrow-list cyan">
+        <li>Cross-chain (LayerZero — in place)</li>
+        <li>Canonicality futures (DeepSeek R2)</li>
+        <li>Opt-in creator services tier</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="bracket-label">[ BEYOND ]</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; margin: 8px 0 16px 0;">Composability</div>
+      <ul class="arrow-list">
+        <li>PsiNet — federated creator identity</li>
+        <li>Lineage — rationale-linked histories</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 09 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 10 — Team ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 10 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; team</div>
+  <h1 class="title">Solo-plus. AI-augmented.<br>Transparency is the wedge.</h1>
+
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card">
+      <div class="bracket-label">[ WILL GLYNN ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.2; margin: 10px 0 20px 0;">Founder. Lead engineer.<br>Protocol architect.</div>
+      <ul class="arrow-list">
+        <li>Author of the cooperative-capitalism + Extractive-Load framing</li>
+        <li>Ex-industry, transitioning to crypto full-time</li>
+        <li>Public: github.com/wglynn/vibeswap  +  vibeswap.org</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="bracket-label cyan">[ JARVIS // AI AUGMENTATION ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.2; margin: 10px 0 20px 0;">Human judgment layered<br>over accelerated output.</div>
+      <ul class="arrow-list cyan">
+        <li>Every contract, test, and paper reviewed by hand</li>
+        <li>Ships faster than teams 5x this size</li>
+        <li>The transparency about workflow is itself a trust signal</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 10 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 11 — Ask ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 11 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; ask</div>
+  <h1 class="title">Seed round.<br>In service of milestones, not optionality.</h1>
+
+  <div class="grid-2" style="margin-top: 30px; align-items: start; gap: 40px;">
+    <div>
+      <div class="bracket-label">[ RAISING ]</div>
+      <div style="font-size: 24px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; margin-top: 8px;">Use of funds</div>
+    </div>
+    <div style="text-align: right;">
+      <div class="matrix" style="font-size: 80px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; text-shadow: 0 0 30px rgba(0,255,65,0.25);">$2.0M</div>
+      <div class="caption" style="text-align: right; margin-top: 8px;">// seed  ·  12-month milestones</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 28px;">
+    <div class="ask-row">
+      <div class="amt">$400K</div>
+      <div class="use-name">Dual audit</div>
+      <div class="use-desc">OpenZeppelin + Certora formal verification.<br>Table stakes post-2024 for any launchpad touching meaningful TVL.</div>
+    </div>
+    <div class="ask-row">
+      <div class="amt">$800K</div>
+      <div class="use-name">POL seed capital</div>
+      <div class="use-desc">Treasury LP across 5-10 concurrent launches.<br>Returned capital compounds; revenue tracks volume.</div>
+    </div>
+    <div class="ask-row">
+      <div class="amt">$300K</div>
+      <div class="use-name">Bug bounty + SecOps</div>
+      <div class="use-desc">Immunefi-tier pool + on-call response + incident handling.<br>Post-deploy and ongoing.</div>
+    </div>
+    <div class="ask-row">
+      <div class="amt">$500K</div>
+      <div class="use-name">12-month runway</div>
+      <div class="use-desc">Founder + part-time contributor + growth ops + infra.<br>1.5 FTE through mainnet + expansion.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 11 / 12 ]</div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 12 — Why now ============ -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">VIBESWAP</span><span class="brand-sep">  ::  </span><span class="brand-accent">INTENT_MARKETS</span></div>
+    <span class="page">[ 12 / 12 ]</span>
+  </div>
+  <div class="kicker">&gt; why now</div>
+  <h1 class="title">Three things back a thesis this early.</h1>
+
+  <div style="margin-top: 28px;">
+    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--border);">
+      <div class="mono matrix" style="font-size: 30px; font-weight: 700;">01</div>
+      <div>
+        <div style="font-size: 18px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.015em;">The math is already true.</div>
+        <div class="mono muted" style="font-size: 12px; margin-top: 6px; line-height: 1.5;">Commit-reveal uniform clearing, Shapley consolidation, slash-bonded creators, 0% fee — not 'maybe they work.'<br>Paper, contracts, and tests read in an afternoon.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--border);">
+      <div class="mono terminal" style="font-size: 30px; font-weight: 700;">02</div>
+      <div>
+        <div style="font-size: 18px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.015em;">The moat is structural, not capital-intensive.</div>
+        <div class="mono muted" style="font-size: 12px; margin-top: 6px; line-height: 1.5;">The 0% claim cannot be copied by Pump.fun without burning their own revenue model.<br>Incumbents are locked out of following us.</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 80px 1fr; gap: 20px; padding: 14px 0;">
+      <div class="mono matrix" style="font-size: 30px; font-weight: 700;">03</div>
+      <div>
+        <div style="font-size: 18px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.015em;">The positioning compounds.</div>
+        <div class="mono muted" style="font-size: 12px; margin-top: 6px; line-height: 1.5;">Every successful launch grows treasury (POL LP fees) AND fairness reputation AND the Shapley consolidation cohort.<br>Three dimensions of network effect.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="brackets cyan" style="margin-top: 30px; padding: 18px 36px; text-align: center;">
+    <div class="bl"></div><div class="br"></div>
+    <div class="terminal" style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em;">A coordination primitive, not a casino.</div>
+  </div>
+
+  <div class="footer">
+    <div><span class="dot"></span>LIVE // 2026 seed round</div>
+    <div>[ 12 / 12 ]</div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

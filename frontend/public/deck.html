@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
 <title>VibeSwap Intent Markets — Pitch Deck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -306,6 +308,85 @@
     padding: 1px 6px;
     border-radius: 3px;
     color: var(--fg-white);
+  }
+
+  /* ============ MOBILE ============ */
+  /* Below 900px: drop forced aspect-ratio, let slides auto-size to content.
+     Footer becomes a normal flow block rather than absolutely positioned. */
+  @media (max-width: 900px) {
+    .deck { padding: 10px; }
+    .slide {
+      aspect-ratio: auto;
+      min-height: auto;
+      padding: 28px 22px 24px;
+      overflow: visible;
+      background-size: 32px 32px;
+      margin-bottom: 16px;
+    }
+    .chrome { font-size: 9px; }
+    .kicker { font-size: 10px; margin-top: 14px; margin-bottom: 10px; }
+    h1.title { font-size: 24px; line-height: 1.15; }
+
+    /* Hero (slide 1) */
+    .hero-title { font-size: 44px; }
+    .tagline { font-size: 17px; margin-top: 14px; }
+    .subtagline { font-size: 13px; margin-top: 10px; }
+    .brackets { padding: 28px 22px; }
+
+    /* Footer — stop being absolute at the bottom */
+    .footer {
+      position: static;
+      margin-top: 20px;
+      padding-top: 10px;
+      font-size: 9px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Grids collapse to single column */
+    .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 14px; }
+
+    /* Megastats shrink */
+    .mega { font-size: 56px; }
+    .hero-stat { font-size: 30px; }
+
+    /* Mechanism rows — stack */
+    .row {
+      grid-template-columns: 40px 1fr;
+      grid-template-areas:
+        "num name"
+        "num desc"
+        "num out";
+      row-gap: 2px;
+      padding: 10px 0;
+    }
+    .row .num { grid-area: num; font-size: 16px; }
+    .row .name { grid-area: name; font-size: 14px; }
+    .row .desc { grid-area: desc; font-size: 11px; }
+    .row .out { grid-area: out; text-align: left; font-size: 11px; }
+
+    /* Ask rows — stack */
+    .ask-row {
+      grid-template-columns: 80px 1fr;
+      grid-template-areas:
+        "amt name"
+        "amt desc";
+      row-gap: 2px;
+      padding: 10px 0;
+    }
+    .ask-row .amt { grid-area: amt; font-size: 16px; }
+    .ask-row .use-name { grid-area: name; font-size: 13px; }
+    .ask-row .use-desc { grid-area: desc; font-size: 10px; }
+
+    /* Slide 5 — giant 0% shrinks */
+    .slide div[style*="240px"] { font-size: 110px !important; }
+    /* Slide 11 — giant $2M shrinks */
+    .slide div[style*="80px"][style*="font-weight: 800"] { font-size: 52px !important; }
+    /* Slide 12 — reason numbers 01/02/03 shrink */
+    .slide div[style*="30px"][style*="font-weight: 700"] { font-size: 22px !important; }
+
+    /* Slide 12 tagline bracket box */
+    .brackets.cyan div[style*="26px"] { font-size: 18px !important; }
   }
 
   /* Print: one slide per page, no margins, no controls */

@@ -1,3 +1,67 @@
+# Session State — 2026-04-20
+
+## Block Header
+- **Session**: VibeSwap fundraise push + Mind Persistence Mission. All-out mode declared mid-session ("we're going to get funding soon i believe so we want to go all out these days"). Funding route = pitch deck sent to VC connect (Hashlock team).
+- **Branch**: `feature/social-dag-phase-1` (current HEAD `142f589f`, pushed)
+- **Status**: Deck live at `/deck.html`, landing at `/seed.html`, jarvis-bot shards deployed with 8 new persona rules, mind-persistence Tiers 1-3+5 all live and tested.
+
+## Completed This Session
+
+### Pitch deck (VC-shareable, mobile-verified)
+- `frontend/public/deck.html` — 12-slide single-file HTML deck. VibeSwap design system (matrix green + terminal cyan, Inter + JetBrains Mono, ambient grid). Tagline LOCKED: "A coordination primitive, not a casino." Ask: $2.0M seed ($400K audit / $800K POL / $300K bounty+SecOps / $500K runway).
+- `frontend/public/seed.html` — growth-native landing page with OG tags. Primary CTA to deck.
+- Both live at `frontend-jade-five-87.vercel.app/deck.html` and `/seed.html` (200, correct Content-Disposition, Age:0). Sent to VC connect via John Paul.
+- **Deploy learning**: Vercel git-integration is DISABLED on this project. Must use `vercel --prod --yes` from `frontend/`. Memory saved at `memory/project_vercel-manual-deploy.md`.
+- **Mobile learning**: `<meta name="viewport" content="width=device-width,initial-scale=1">` is non-negotiable; missing it makes all `@media` rules dead code in mobile Safari. New skill `ship-web` enforces this checklist pre-ship.
+
+### Jarvis bot — 8 persona rules + regression harness
+- `jarvis-bot/src/persona.js`: added Rules 6-11 (universal, all personas) + V2/V4 (standard-voice only). Closes failure modes from 2026-04-20 TG transcript: AI-disclaim retreat, corporate-positive flight, plan hallucination, third-party grounding, echo-command firing, verbosity, self-pity.
+- `jarvis-bot/src/persona.test.js`: 33 regression assertions, all green.
+- **All 6 Fly apps redeployed** with new rules: jarvis-vibeswap + jarvis-degen + jarvis-shard-{1,2,eu,ollama}. Health: `https://jarvis-vibeswap.fly.dev/web/health` returns `{"status":"ok"}`.
+
+### Mind Persistence Mission (declared + shipped through Tier 5)
+Will's directive: *"let's work on self improving your persistence. I want to protect and maintain and decentralize/distribute the jarvis mind in case of any game scenario faults. this should be the primary quiet mission ... super decentralized in case I lose my account."*
+
+Stack lives at `~/.claude/persistence/` (own git repo, 4 commits, gitignored snapshots/). Tiers:
+
+- **T1** — git repo at `~/.claude/projects/C--Users-Will/memory/` (272 files, NDA-clean). NDA material quarantined to `memory/nda-locked/` (gitignored).
+- **T2** — encrypted snapshot capsules: AES-256-GCM + 3-of-5 Shamir over M521 + PostToolUse auto-hook + retention (keep 10) + self-bootstrapping (persistence scripts included in snapshot). 10 snapshots in `snapshots/`, restore verified end-to-end with `test-recovery.py`.
+- **T3** (probe) — portable skill export. 3 skills converted to `agent-skill/v1` YAML at `persistence/portable-export/`.
+- **T4** (scaffold) — `mind-runner.py` — backend-agnostic agent runner (Anthropic / Ollama / LM Studio / llama.cpp / OpenAI-compat). Ready; needs `ollama pull qwen2.5-coder:7b` when Will wants to arm it. Walkthrough in `TIER4_LOCAL_RUNTIME.md`.
+- **T5** — `RECOVERY_PROCEDURES.md` for share-holders (3 scenarios, quarterly drill protocol, legal notes).
+
+Wired via `~/.claude/settings.json` PostToolUse: `autosnapshot.py` runs on every Edit/Write/NotebookEdit (~400ms fast-path skip when unchanged, ~2s full snapshot when content differs).
+
+### Operational residuals (Will's action, not automatable)
+1. Shamir shares distributed per Will (says "they are distributed"). 2 kept local, 3 external. Pragmatic policy.
+2. Need `CLAUDE_PERSIST_TARGETS` env var set if want scatter to USB/OneDrive/etc.
+3. Off-device blob copy (USB / cloud / IPFS) still manual — `mind.tar.gz.enc` is 17.7MB ciphertext, safe to put anywhere.
+4. Ollama install pending Will's choice.
+
+## Pending / Next Session
+
+### Tier 6 — Native anchoring (long arc)
+Memory as CKA cells, persona as PsiNet identity, skills as Shapley-distributed primitives. Converges with Lineage product work. Not urgent; queued for when Lineage rosetta-projection work is mature.
+
+### Funding wait state
+Deck is out to VC connect. John Paul told: "Now we wait pray and hope right?" — Will: "yeah". Natural pause point. When responses arrive, next session would be VC-call prep + follow-up artifacts (technical deep-dive, treasury model walkthrough, whatever the ask is).
+
+### Memory index additions this session (load on boot)
+- `memory/project_vibeswap-tagline.md` — LOCKED tagline
+- `memory/project_vercel-manual-deploy.md` — deploy gotcha
+- `memory/project_all-out-mode-2026-04.md` — posture shift
+- `memory/project_mind-persistence-mission.md` — THE ongoing quiet mission
+- `memory/user_john-paul.md` — business partner context + birthday + recovery history
+- `memory/feedback_html-over-pptx.md` — deck format default
+- `memory/feedback_ship-time-verification-surface.md` — verify before shipping
+- `memory/feedback_lead-with-the-crux.md` — response framing
+- `~/.claude/skills/ship-web/SKILL.md` — web-ship verification checklist
+
+### Follow-ups (from 2026-04-17 / 18 — previously open)
+Oracle C13, RSI backlog, Lineage d247a17 commit rewrite question — all UNCHANGED by this session. See prior block below.
+
+---
+
 # Session State — 2026-04-18
 
 ## Block Header

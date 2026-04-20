@@ -52,6 +52,12 @@ Memory as CKA cells, persona as PsiNet identity, skills as Shapley-distributed p
 ### Funding wait state
 Deck is out to VC connect. John Paul told: "Now we wait pray and hope right?" — Will: "yeah". Natural pause point. When responses arrive, next session would be VC-call prep + follow-up artifacts (technical deep-dive, treasury model walkthrough, whatever the ask is).
 
+### Full Stack RSI — next cycle candidates (menu for return)
+Session ran C28 (clean-pass CEI/reentrancy density scan, 0 real findings, 6/7 scanner FPs triaged) + C29 (backlog-unblock: C12-AUDIT-2 HIGH closed, commit `8f2fb9af`, pushed). Cursor-ready next loops:
+- **C30 Operator-Cell Assignment memo** (last design-gated HIGH in `project_rsi-backlog.md`): decide where `operatorAssignments[cellId] → operator` mapping lives (SOR vs. StateRentVault vs. separate registry) and who writes it (operator opt-in / cell owner assigns / onchain auction). Memo format like C29's — options table + recommendation + LOC estimate.
+- **Another density scan class**: signature-replay (timely post-C26 EIP-712 work), access-control on admin setters, or upgrade-storage-slot collision audit (post-C25 `__gap` shrink precedent).
+- **Pre-existing DonationAttack failures** in `test/TruePriceValidation.t.sol` (48 failing tests, AMM-side ordering — deferred in 2026-04-18 as "might be one-line helper fix, might be 48-test refactor"). Investigate if density-scan appetite is low.
+
 ### Memory index additions this session (load on boot)
 - `memory/project_vibeswap-tagline.md` — LOCKED tagline
 - `memory/project_vercel-manual-deploy.md` — deploy gotcha

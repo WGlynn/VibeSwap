@@ -1,12 +1,31 @@
-# Write-Ahead Log — REBOOT CHECKPOINT (session 2026-04-18 autopilot, near 50% context)
+# Write-Ahead Log — CLEAN (session 2026-04-20 AFK close)
 
-## Current Epoch
-- **Started**: 2026-04-18 (autopilot mode, full autonomy grant)
-- **Intent**: Big-small rotation + NDA-counterparty-sprint parallel track (Lineage repo).
-- **Branch**: feature/social-dag-phase-1 (vibeswap)
-- **Status**: VibeSwap work clean, pushed. Lineage repo has 6 local commits, no remote set.
+## Current Epoch — CLEAN
+- **Started**: 2026-04-20 (post-fundraise-push session continuation)
+- **Closed**: 2026-04-20 on Will going AFK
+- **Branch**: feature/social-dag-phase-1 (vibeswap) @ `8f2fb9af` pushed to origin
+- **Status**: CLEAN. All work committed and pushed. No pending writes, no orphan changes.
 
-**VibeSwap commits today (all pushed to origin)**:
+**VibeSwap commits this session (pushed to origin)**:
+`8f2fb9af` (C29: close slashed-stakes-orphaned HIGH, +8 tests 47/47 green).
+
+**Full Stack RSI state**:
+- Cycle 28: CEI/reentrancy density scan CLEAN PASS (0 real findings, 1 INFO deferred to backlog as C28-F1 VibeSocial hygiene note). No code change.
+- Cycle 29: Backlog-unblock, C12-AUDIT-2 HIGH closed. Commit `8f2fb9af` pushed.
+- Remaining open HIGH in backlog: Operator-Cell Assignment Layer (needs design memo on return).
+- Session continuation pointer: `.claude/SESSION_STATE.md` "Full Stack RSI — next cycle candidates" section lists concrete options.
+
+**Unrelated in-progress items (NOT this session's work, left untouched)**:
+- `.claude/PROPOSALS.md` modified (prior work)
+- `docs/papers/memecoin-intent-market-seed.md` modified (prior work)
+- `docs/justin-vibeswap-deck.md`, `docs/justin-vibeswap-deck-v2.md`, `docs/mit-lawson-pitch.md` untracked (prior work)
+- These predate this session; not mine to stage/commit without explicit ask.
+
+---
+
+## Prior Epoch (2026-04-18) — archived below
+
+**VibeSwap commits 2026-04-18 (all pushed)**:
 `5467576d` → `c4b91357` → `bc1bf2bf` → `125b01fb` (C12) → `6063dc74` → `8cb1d7c7` (C20 deltas) → `bb2d18d9` (R3 doc).
 
 **Lineage repo** (`C:/Users/Will/lineage/`, local only, no remote):

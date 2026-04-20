@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="VibeSwap Intent Markets — the first memecoin launchpad where extraction is the exception, not the business model. A coordination primitive, not a casino.">
+
+<!-- Open Graph (link unfurls) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="VibeSwap">
+<meta property="og:title" content="VibeSwap Intent Markets — Seed Round 2026">
+<meta property="og:description" content="A coordination primitive, not a casino. $2.0M seed to deploy the first memecoin launchpad with 0% protocol fee as a structural invariant.">
+<meta property="og:url" content="https://frontend-jade-five-87.vercel.app/seed">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VibeSwap Intent Markets — Seed 2026">
+<meta name="twitter:description" content="A coordination primitive, not a casino. 0% fee as structural invariant. $2.0M seed.">
+
+<link rel="icon" type="image/svg+xml" href="/vibe-icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<title>VibeSwap Intent Markets — Seed 2026</title>
+
+<style>
+  :root {
+    --bg: #000000;
+    --surface-1: #080808;
+    --surface-2: #0d0d0d;
+    --surface-3: #181818;
+    --border: #252525;
+    --border-hi: #424242;
+    --matrix: #00ff41;
+    --matrix-dim: #00cc34;
+    --terminal: #00d4ff;
+    --term-dim: #00a8cc;
+    --fg: #e0e0e0;
+    --fg-white: #ffffff;
+    --muted: #808080;
+    --muted-dim: #505050;
+    --danger: #ff3366;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+  body {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+  .matrix { color: var(--matrix); }
+  .terminal { color: var(--terminal); }
+  .muted { color: var(--muted); }
+  .white { color: var(--fg-white); }
+  a { color: var(--terminal); text-decoration: none; }
+  a:hover { color: var(--matrix); }
+
+  /* Chrome bar */
+  .chrome {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .chrome .brand { color: var(--fg); font-weight: 700; }
+  .chrome .brand-sep { color: var(--muted-dim); }
+  .chrome .brand-accent { color: var(--matrix); }
+  .chrome .seed-tag { color: var(--muted-dim); }
+  .chrome .seed-tag .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--matrix);
+    margin-right: 6px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px rgba(0,255,65,0.4);
+    animation: breathe 2s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+
+  /* Section shell */
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  section { padding: 64px 0; border-bottom: 1px solid var(--border); position: relative; }
+  section:last-of-type { border-bottom: none; }
+
+  .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--matrix);
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .kicker.cyan { color: var(--terminal); }
+
+  h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--fg-white);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 14px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 80px 0 96px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-title {
+    font-size: 56px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    color: var(--fg-white);
+    margin: 10px 0 20px;
+  }
+  .hero-title .accent { color: var(--matrix); }
+  .tagline {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--terminal);
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin-bottom: 18px;
+  }
+  .subline {
+    font-size: 15px;
+    color: var(--muted);
+    line-height: 1.55;
+    max-width: 640px;
+    margin-bottom: 32px;
+  }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 14px 22px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-primary {
+    background: var(--matrix);
+    color: #000;
+    border-color: var(--matrix);
+  }
+  .btn-primary:hover {
+    background: var(--matrix-dim);
+    box-shadow: 0 0 20px rgba(0,255,65,0.3);
+    color: #000;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--fg-white);
+    border-color: var(--border-hi);
+  }
+  .btn-secondary:hover {
+    border-color: var(--terminal);
+    color: var(--terminal);
+  }
+
+  /* Grids */
+  .grid-2 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .grid-5 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+
+  /* Cards */
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+  }
+  .card.matrix { border-color: rgba(0,255,65,0.25); box-shadow: 0 0 30px -12px rgba(0,255,65,0.2); }
+  .card.cyan { border-color: rgba(0,212,255,0.25); box-shadow: 0 0 30px -12px rgba(0,212,255,0.2); }
+
+  .bracket-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--matrix);
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+  }
+  .bracket-label.cyan { color: var(--terminal); }
+
+  /* Big stat */
+  .mega {
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.045em;
+    color: var(--matrix);
+    margin-bottom: 12px;
+  }
+  .mega-caption {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  /* Fixes list */
+  .fix-row {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    grid-template-areas:
+      "num name"
+      "num desc"
+      "num breaks";
+    row-gap: 4px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .fix-row:last-child { border-bottom: none; }
+  .fix-row .num {
+    grid-area: num;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--matrix);
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .fix-row .name {
+    grid-area: name;
+    color: var(--fg-white);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .fix-row .desc {
+    grid-area: desc;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .fix-row .breaks {
+    grid-area: breaks;
+    color: var(--terminal);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  /* Wedge — giant 0% */
+  .wedge-grid { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: center; }
+  .zero {
+    font-size: 140px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.07em;
+    color: var(--matrix);
+    text-align: center;
+    text-shadow: 0 0 40px rgba(0,255,65,0.3);
+  }
+  .zero-caption { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+  .code-block {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 16px 0;
+  }
+  .code-block .kw { color: var(--terminal); font-weight: 600; }
+  .code-block .val { color: var(--matrix); font-weight: 700; }
+
+  /* Numbers grid */
+  .num-card { text-align: left; padding: 18px; }
+  .num-card .n { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -0.025em; margin-bottom: 6px; }
+  .num-card .l { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  /* Ask rows */
+  .ask-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    grid-template-areas:
+      "amt name"
+      "amt desc";
+    row-gap: 3px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .ask-row:last-child { border-bottom: none; }
+  .ask-row .amt {
+    grid-area: amt;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--matrix);
+    font-weight: 700;
+    font-size: 17px;
+  }
+  .ask-row .name { grid-area: name; color: var(--fg-white); font-weight: 600; font-size: 14px; }
+  .ask-row .desc { grid-area: desc; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.4; }
+  .ask-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 14px 0 18px;
+    margin-bottom: 6px;
+    border-bottom: 2px solid var(--border);
+  }
+  .ask-total .label { font-family: 'JetBrains Mono', monospace; color: var(--terminal); font-size: 11px; font-weight: 700; }
+  .ask-total .amt {
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    color: var(--matrix);
+  }
+
+  /* Team */
+  .team-card h3 { font-size: 20px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.2; margin: 8px 0 14px; }
+  .team-card ul { list-style: none; }
+  .team-card li {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    padding-left: 16px;
+    position: relative;
+    line-height: 1.45;
+  }
+  .team-card li::before { content: '→'; position: absolute; left: 0; color: var(--matrix); font-weight: 700; }
+  .team-card.cyan li::before { color: var(--terminal); }
+
+  /* Closer */
+  .closer {
+    padding: 80px 0 96px;
+    text-align: center;
+  }
+  .closer .tagline-big {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--terminal);
+    letter-spacing: -0.02em;
+    margin-bottom: 26px;
+    line-height: 1.25;
+  }
+  .closer .cta-row { justify-content: center; }
+
+  footer.foot {
+    padding: 28px 0 40px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted-dim);
+    text-align: center;
+  }
+  footer.foot .sep { color: var(--muted-dim); margin: 0 10px; }
+  footer.foot a { color: var(--muted); }
+  footer.foot a:hover { color: var(--matrix); }
+
+  /* ============ DESKTOP (min-width: 900px) ============ */
+  /* Build up from mobile — only add richer layout at wider widths. */
+  @media (min-width: 900px) {
+    .wrap { padding: 0 40px; }
+    section { padding: 96px 0; }
+    h2 { font-size: 42px; }
+    .hero { padding: 120px 0 140px; }
+    .hero-title { font-size: 96px; }
+    .tagline { font-size: 30px; margin-bottom: 22px; }
+    .subline { font-size: 17px; margin-bottom: 40px; }
+
+    .grid-2 { grid-template-columns: 1fr 1fr; gap: 40px; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-5 { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+
+    .fix-row {
+      grid-template-columns: 56px 1fr 2fr 1fr;
+      grid-template-areas: "num name desc breaks";
+      align-items: center;
+      padding: 18px 0;
+    }
+    .fix-row .num { font-size: 22px; }
+    .fix-row .name { font-size: 17px; }
+    .fix-row .desc { font-size: 13px; }
+    .fix-row .breaks { text-align: right; font-size: 13px; }
+
+    .wedge-grid { grid-template-columns: 1fr 1fr; gap: 56px; }
+    .zero { font-size: 240px; text-align: left; }
+    .zero-caption { text-align: left; }
+
+    .num-card .n { font-size: 40px; }
+
+    .ask-row {
+      grid-template-columns: 110px 1fr 3fr;
+      grid-template-areas: "amt name desc";
+      align-items: center;
+      padding: 16px 0;
+    }
+    .ask-row .amt { font-size: 20px; }
+    .ask-row .name { font-size: 15px; }
+    .ask-row .desc { font-size: 12px; }
+    .ask-total .amt { font-size: 72px; }
+
+    .closer .tagline-big { font-size: 40px; }
+  }
+
+  @media (min-width: 1200px) {
+    .hero-title { font-size: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ Sticky chrome ============ -->
+<div class="chrome">
+  <div>
+    <span class="brand">VIBESWAP</span>
+    <span class="brand-sep">  ::  </span>
+    <span class="brand-accent">INTENT_MARKETS</span>
+  </div>
+  <div class="seed-tag">
+    <span class="dot"></span>SEED // 2026
+  </div>
+</div>
+
+<!-- ============ Hero ============ -->
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">&gt; the first memecoin launchpad</div>
+    <h1 class="hero-title">Intent <span class="accent">Markets.</span></h1>
+    <div class="tagline">A coordination primitive, not a casino.</div>
+    <p class="subline">The first memecoin launchpad where extraction is the exception, not the business model. 0% protocol fee as a structural invariant. Commit-reveal batch auctions. Slash-bonded creators. Shapley consolidation. All shipped, tested, and ready for mainnet.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/deck.html">View the Deck  →</a>
+      <a class="btn btn-secondary" href="https://github.com/wglynn/vibeswap" target="_blank" rel="noopener">GitHub  ↗</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Signal ============ -->
+<section>
+  <div class="wrap">
+    <div class="kicker">&gt; the problem</div>
+    <h2>A $60B signal, buried under<br>30–40% extractive load.</h2>
+    <div class="grid-2" style="margin-top: 40px;">
+      <div>
+        <div class="mega">$60B+</div>
+        <div class="mega-caption">// per-year memecoin volume<br>&nbsp;&nbsp; a pure signal of what people actually care about.</div>
+      </div>
+      <div class="card">
+        <div class="bracket-label">[ WHAT EATS THE SIGNAL ]</div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;"><span class="white">MEV sandwiches</span><span class="mono matrix">≈ 15-20%</span></div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;"><span class="white">Sniper bots</span><span class="mono matrix">≈ 5-10%</span></div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;"><span class="white">Rugs</span><span class="mono matrix">high-var</span></div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;"><span class="white">Wash trading</span><span class="mono matrix">≈ 3-8%</span></div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:14px;"><span class="white">Platform rents</span><span class="mono matrix">1-2% per trade</span></div>
+      </div>
+    </div>
+    <p style="margin-top: 32px; color: var(--fg); font-size: 15px; font-style: italic;">
+      <span class="mono muted">// </span>If you solved the extraction and kept the intent, you would own the largest onboarding funnel in crypto.
+    </p>
+  </div>
+</section>
+
+<!-- ============ Mechanism ============ -->
+<section>
+  <div class="wrap">
+    <div class="kicker">&gt; the mechanism</div>
+    <h2>Five structural fixes.<br>All in code.</h2>
+    <div style="margin-top: 36px;">
+      <div class="fix-row">
+        <div class="num">01</div>
+        <div class="name">Commit-reveal batch auction</div>
+        <div class="desc">Hashed orders; uniform clearing price after window.</div>
+        <div class="breaks">→ Breaks sniping</div>
+      </div>
+      <div class="fix-row">
+        <div class="num">02</div>
+        <div class="name">Shapley consolidation</div>
+        <div class="desc">One canonical token per meme intent; fair share.</div>
+        <div class="breaks">→ Breaks fragmentation</div>
+      </div>
+      <div class="fix-row">
+        <div class="num">03</div>
+        <div class="name">Creator liquidity lock</div>
+        <div class="desc">50% slash on early withdrawal; bond vests.</div>
+        <div class="breaks">→ Breaks rugs</div>
+      </div>
+      <div class="fix-row">
+        <div class="num">04</div>
+        <div class="name">Reputation + sybil guard</div>
+        <div class="desc">CogProof tiers gate participation.</div>
+        <div class="breaks">→ Breaks wash trading</div>
+      </div>
+      <div class="fix-row">
+        <div class="num">05</div>
+        <div class="name">0% protocol fee</div>
+        <div class="desc">100% of trading fees to LPs. Structural invariant.</div>
+        <div class="breaks">→ Breaks rent capture</div>
+      </div>
+    </div>
+    <p style="margin-top: 24px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-align: center;">
+      // ships in <span class="terminal">contracts/intent-markets/</span>  ·
+      <span class="matrix" style="font-weight: 700;">18 green tests</span>  ·
+      <span class="muted">forge test :: 60ms</span>
+    </p>
+  </div>
+</section>
+
+<!-- ============ Wedge ============ -->
+<section>
+  <div class="wrap">
+    <div class="kicker">&gt; the wedge</div>
+    <h2>The 0% claim is the moat.</h2>
+    <div class="wedge-grid" style="margin-top: 40px;">
+      <div>
+        <div class="zero">0%</div>
+        <div class="zero-caption">// protocol fee on launch</div>
+      </div>
+      <div>
+        <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.25;">
+          Not cheaper.<br>Structurally zero.
+        </div>
+        <div class="code-block">
+          uint256 public constant<br>
+          <span class="kw">PROTOCOL_FEE_BPS</span> = <span class="val">0</span>;
+        </div>
+        <p style="color: var(--muted); font-size: 14px; line-height: 1.55;">
+          A contract invariant — not a governance parameter a future vote can dial up.
+        </p>
+        <p style="color: var(--terminal); font-size: 14px; font-weight: 600; margin-top: 14px; line-height: 1.45;">
+          Incumbents can't follow without burning their own revenue model.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Traction numbers ============ -->
+<section>
+  <div class="wrap">
+    <div class="kicker cyan">&gt; the traction</div>
+    <h2>Shipped, tested, externally reviewed.</h2>
+    <div class="grid-5" style="margin-top: 32px;">
+      <div class="num-card card">
+        <div class="n matrix">18</div>
+        <div class="l">// unit tests green<br>&nbsp;&nbsp; 0 failing</div>
+      </div>
+      <div class="num-card card">
+        <div class="n terminal">75</div>
+        <div class="l">// RSI findings<br>&nbsp;&nbsp; surfaced</div>
+      </div>
+      <div class="num-card card">
+        <div class="n matrix">29</div>
+        <div class="l">// fixes shipped<br>&nbsp;&nbsp; (10 CRIT, 12 HIGH)</div>
+      </div>
+      <div class="num-card card">
+        <div class="n terminal">0%</div>
+        <div class="l">// protocol fee<br>&nbsp;&nbsp; structurally</div>
+      </div>
+      <div class="num-card card">
+        <div class="n matrix">60ms</div>
+        <div class="l">// forge test<br>&nbsp;&nbsp; full suite</div>
+      </div>
+    </div>
+    <p style="margin-top: 28px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); text-align: center;">
+      // DeepSeek Round-2 audit relayed, R3 queued  ·  self-theater audit gate (8-pass)  ·  bug bounty queued post-deploy
+    </p>
+  </div>
+</section>
+
+<!-- ============ Ask ============ -->
+<section>
+  <div class="wrap">
+    <div class="kicker">&gt; the ask</div>
+    <h2>Seed round.<br>In service of milestones, not optionality.</h2>
+
+    <div class="ask-total" style="margin-top: 36px;">
+      <span class="label">[ RAISING ]  seed  ·  12-month milestones</span>
+      <span class="amt">$2.0M</span>
+    </div>
+
+    <div>
+      <div class="ask-row">
+        <div class="amt">$400K</div>
+        <div class="name">Dual audit</div>
+        <div class="desc">OpenZeppelin + Certora formal verification. Table stakes post-2024.</div>
+      </div>
+      <div class="ask-row">
+        <div class="amt">$800K</div>
+        <div class="name">POL seed capital</div>
+        <div class="desc">Treasury LP across 5-10 concurrent launches. Returned capital compounds.</div>
+      </div>
+      <div class="ask-row">
+        <div class="amt">$300K</div>
+        <div class="name">Bug bounty + SecOps</div>
+        <div class="desc">Immunefi-tier pool + on-call response + incident handling.</div>
+      </div>
+      <div class="ask-row">
+        <div class="amt">$500K</div>
+        <div class="name">12-month runway</div>
+        <div class="desc">Founder + part-time contributor + growth ops + infra. 1.5 FTE.</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 36px; text-align: center;">
+      <a class="btn btn-primary" href="/deck.html">See the full breakdown in the deck  →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Team ============ -->
+<section>
+  <div class="wrap">
+    <div class="kicker">&gt; the team</div>
+    <h2>Solo-plus. AI-augmented.<br>Transparency is the wedge.</h2>
+
+    <div class="grid-2" style="margin-top: 32px;">
+      <div class="card team-card">
+        <div class="bracket-label">[ WILL GLYNN ]</div>
+        <h3>Founder. Lead engineer.<br>Protocol architect.</h3>
+        <ul>
+          <li>Author of the cooperative-capitalism + Extractive-Load framing</li>
+          <li>Ex-industry, transitioning to crypto full-time</li>
+          <li>Public: github.com/wglynn/vibeswap + vibeswap.org</li>
+        </ul>
+      </div>
+      <div class="card team-card cyan">
+        <div class="bracket-label cyan">[ JARVIS // AI AUGMENTATION ]</div>
+        <h3>Human judgment layered<br>over accelerated output.</h3>
+        <ul>
+          <li>Every contract, test, and paper reviewed by hand</li>
+          <li>Ships faster than teams 5× this size</li>
+          <li>The transparency about workflow is itself a trust signal</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Closer ============ -->
+<section class="closer">
+  <div class="wrap">
+    <div class="tagline-big">A coordination primitive, not a casino.</div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/deck.html">View the Deck  →</a>
+      <a class="btn btn-secondary" href="https://github.com/wglynn/vibeswap" target="_blank" rel="noopener">GitHub  ↗</a>
+    </div>
+    <p style="margin-top: 26px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);">
+      // ready for intro calls. specific numbers on a call.
+    </p>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap">
+    VibeSwap <span class="sep">·</span>
+    Seed 2026 <span class="sep">·</span>
+    <a href="/deck.html">Deck</a> <span class="sep">·</span>
+    <a href="https://github.com/wglynn/vibeswap" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

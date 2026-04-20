@@ -38,6 +38,12 @@ Wired via `~/.claude/settings.json` PostToolUse: `autosnapshot.py` runs on every
 3. Off-device blob copy (USB / cloud / IPFS) still manual — `mind.tar.gz.enc` is 17.7MB ciphertext, safe to put anywhere.
 4. Ollama install pending Will's choice.
 
+### Cycle 28 — CEI / reentrancy density scan (CLEAN PASS)
+Fresh bug class scanned post-funding-push. Scanner surfaced 7 candidates; after source-of-truth triage all but one were false positives (86% FP rate, 3 cases of hallucinated `nonReentrant`-absence). Net yield: **0 CRIT / 0 HIGH / 0 MED**, 1 INFO-grade hygiene note (VibeSocial.tipPost lacks `nonReentrant` but CEI is technically correct; fix deferred due to UUPS storage-slot churn cost). The CEI/reentrancy bug class is confirmed closed across the codebase — valuable pre-audit signal. Logged in NDA-locked Cycle 28 entry. No code changes, no commit needed this cycle.
+
+### Cycle 29 — Backlog-unblock: C12-AUDIT-2 slashed-stakes orphaned (HIGH closed)
+Design memo → "go" → ship. Fix: `_slashNonRevealers` in `VibeAgentConsensus.sol` now zeros `ac.stake`, accumulates slashed portion in new `slashPool`, credits remainder to the C14 pull queue. New `sweepSlashPoolToTreasury(address)` routes accumulated slash to a governance-chosen destination at sweep time (preferred over immutable treasury for upgrade-free flexibility). +50 LOC contract, +8 tests (47/47 green, 0 regressions). `__gap` shrunk 49→48. Backlog HIGH count: 2 → 1 (Operator-Cell Assignment still open).
+
 ## Pending / Next Session
 
 ### Tier 6 — Native anchoring (long arc)

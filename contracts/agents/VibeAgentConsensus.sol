@@ -109,8 +109,15 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     ///         before the external call and the call fails.
     mapping(address => uint256) public pendingStakeWithdrawals;
 
+    /// @notice C29 (C12-AUDIT-2): ETH from the slashed portion of non-revealer stakes.
+    ///         Accumulates across rounds. Owner sweeps to a treasury address via
+    ///         sweepSlashPoolToTreasury(). The unslashed remainder of each non-revealer's
+    ///         stake is credited to pendingStakeWithdrawals[committer] so the committer
+    ///         can pull their retained portion (`stake - slashAmount`, when slashBps < 10000).
+    uint256 public slashPool;
+
     /// @dev Reserved storage gap for future upgrades
-    uint256[49] private __gap;
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -123,6 +130,7 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     event ReliabilityUpdated(bytes32 indexed agentId, uint256 newScore);
     event StakeWithdrawalQueued(address indexed committer, uint256 amount);
     event StakeWithdrawn(address indexed committer, uint256 amount);
+    event SlashPoolSwept(address indexed treasury, uint256 amount);
 
     // ============ Init ============
 
@@ -315,13 +323,41 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             if (ac.committed && !ac.revealed && !ac.slashed) {
                 ac.slashed = true;
                 uint256 slashAmount = (ac.stake * slashBps) / 10000;
+                uint256 remainder = ac.stake - slashAmount;
+                address committer = ac.committer;
+                ac.stake = 0;
+
                 totalSlashed += slashAmount;
+                slashPool += slashAmount;
+
+                if (remainder > 0 && committer != address(0)) {
+                    pendingStakeWithdrawals[committer] += remainder;
+                    emit StakeWithdrawalQueued(committer, remainder);
+                }
 
                 reliability[participants[i]].roundsTimedOut++;
 
                 emit AgentSlashed(roundId, participants[i], slashAmount);
             }
         }
+    }
+
+    /**
+     * @notice Sweep accumulated slashed funds to a treasury address.
+     * @dev C29 (C12-AUDIT-2): slashed portion accumulates in slashPool; owner selects
+     *      destination at sweep time (DAOTreasury, insurance pool, bug-bounty fund).
+     *      Destination is a parameter rather than immutable state so the protocol can
+     *      route to different sinks as governance evolves without requiring upgrades.
+     *      CEI: slashPool zeroed before external call; nonReentrant guard as belt+suspenders.
+     */
+    function sweepSlashPoolToTreasury(address treasury) external onlyOwner nonReentrant {
+        require(treasury != address(0), "Zero treasury");
+        uint256 amount = slashPool;
+        require(amount > 0, "Empty pool");
+        slashPool = 0;
+        (bool ok, ) = treasury.call{value: amount}("");
+        require(ok, "Transfer failed");
+        emit SlashPoolSwept(treasury, amount);
     }
 
     function _returnStakes(uint256 roundId) internal {

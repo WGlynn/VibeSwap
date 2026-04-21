@@ -302,6 +302,53 @@ contract ShardOperatorRegistryTest is Test {
         registry.deactivateShard();
     }
 
+    // ============ C10-AUDIT-10: shardId-burn invariant ============
+
+    /// @notice After voluntary deactivation, the shardId is permanently burned:
+    ///         even the original operator cannot re-register under the same id.
+    ///         Audit-trail cleanliness — shardId → historical-operator is 1:1.
+    function test_C10AUDIT10_shardIdBurnedAfterVoluntaryDeactivate() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        vm.prank(op1);
+        registry.deactivateShard();
+
+        // Original operator re-attempts same shardId → ShardIdTaken
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.ShardIdTaken.selector);
+        registry.registerShard(shard1, STAKE);
+
+        // Different operator also blocked
+        vm.prank(op2);
+        vm.expectRevert(ShardOperatorRegistry.ShardIdTaken.selector);
+        registry.registerShard(shard1, STAKE);
+
+        // Escape hatch: original operator CAN register a new shardId
+        vm.prank(op1);
+        registry.registerShard(shard2, STAKE);
+        assertEq(registry.operatorShard(op1), shard2);
+    }
+
+    /// @notice Symmetric burn behavior on the stale-reap path.
+    function test_C10AUDIT10_shardIdBurnedAfterStaleReap() public {
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+
+        vm.warp(block.timestamp + 48 hours + 1);
+        vm.prank(op2);
+        registry.deactivateStaleShard(shard1);
+
+        // Reaped shardId permanently unavailable
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.ShardIdTaken.selector);
+        registry.registerShard(shard1, STAKE);
+
+        vm.prank(op3);
+        vm.expectRevert(ShardOperatorRegistry.ShardIdTaken.selector);
+        registry.registerShard(shard1, STAKE);
+    }
+
     // ============ Rewards (Masterchef) ============
 
     function test_distributeRewards() public {

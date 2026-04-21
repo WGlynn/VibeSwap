@@ -465,6 +465,18 @@ contract ShardOperatorRegistry is
 
     /**
      * @notice Deactivate a shard (voluntary exit)
+     *
+     * @dev C10-AUDIT-10 (shardId-burn invariant): `shards[shardId].operator` is
+     *      NOT cleared on deactivation. Combined with the `ShardIdTaken` gate in
+     *      `registerShard`, this burns the shardId permanently — no operator
+     *      (including the original) can re-register under the same shardId
+     *      post-deactivation. The operator CAN re-register under a new shardId
+     *      because `operatorShard[msg.sender]` is cleared below.
+     *
+     *      Rationale: audit-trail cleanliness. A burned shardId in `shardList`
+     *      always resolves to the same historical operator, eliminating
+     *      identity-rewriting. The `MIN_STAKE` gate (100 CKB) prices out
+     *      griefing-by-burn at ≥100 CKB per burned slot.
      */
     function deactivateShard() external nonReentrant {
         bytes32 shardId = operatorShard[msg.sender];
@@ -580,6 +592,10 @@ contract ShardOperatorRegistry is
      * @dev The operator forfeits their accumulated rewardDebt surplus (which would
      *      have been earnable via heartbeat + claim) as the stake-removal side-effect.
      *      If you don't want to lose it, heartbeat within the grace window.
+     *
+     *      C10-AUDIT-10 (shardId-burn invariant): symmetric with `deactivateShard`
+     *      — `shards[shardId].operator` is retained, burning the shardId. The
+     *      original operator can re-register under a new shardId only.
      */
     function deactivateStaleShard(bytes32 shardId) external nonReentrant {
         Shard storage shard = shards[shardId];

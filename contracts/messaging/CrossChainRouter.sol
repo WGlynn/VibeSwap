@@ -988,6 +988,12 @@ contract CrossChainRouter is
 
     event EmergencyWithdrawETH(address indexed to, uint256 amount);
     event EmergencyWithdrawERC20(address indexed token, address indexed to, uint256 amount);
+    event AuthorizedUpdated(address indexed caller, bool previous, bool current);
+    event MaxMessagesPerHourUpdated(uint256 previous, uint256 current);
+    event EndpointUpdated(address indexed previous, address indexed current);
+    event AuctionUpdated(address indexed previous, address indexed current);
+    event VibeSwapCoreUpdated(address indexed previous, address indexed current);
+    event BridgedDepositExpiryUpdated(uint256 previous, uint256 current);
 
     /**
      * @notice Emergency withdraw ETH not earmarked for bridged deposits
@@ -1036,7 +1042,9 @@ contract CrossChainRouter is
      * @notice Set authorized caller
      */
     function setAuthorized(address caller, bool status) external onlyOwner {
+        bool prev = authorized[caller];
         authorized[caller] = status;
+        emit AuthorizedUpdated(caller, prev, status);
     }
 
     /**
@@ -1045,7 +1053,9 @@ contract CrossChainRouter is
     /// @dev TRP-R21-M02: Added minimum 1 to prevent permanent DOS of all inbound messages.
     function setMaxMessagesPerHour(uint256 max) external onlyOwner {
         require(max >= 1, "Min 1 message per hour");
+        uint256 prev = maxMessagesPerHour;
         maxMessagesPerHour = max;
+        emit MaxMessagesPerHourUpdated(prev, max);
     }
 
     /**
@@ -1053,7 +1063,9 @@ contract CrossChainRouter is
      */
     function setEndpoint(address _endpoint) external onlyOwner {
         require(_endpoint != address(0), "Invalid endpoint");
+        address prev = lzEndpoint;
         lzEndpoint = _endpoint;
+        emit EndpointUpdated(prev, _endpoint);
     }
 
     /**
@@ -1061,13 +1073,17 @@ contract CrossChainRouter is
      */
     function setAuction(address _auction) external onlyOwner {
         require(_auction != address(0), "Invalid auction");
+        address prev = auction;
         auction = _auction;
+        emit AuctionUpdated(prev, _auction);
     }
 
     /// @notice XC-003: Set VibeSwapCore address for settlement confirmation callbacks
     function setVibeSwapCore(address _core) external onlyOwner {
         require(_core != address(0), "Invalid core");
+        address prev = vibeSwapCore;
         vibeSwapCore = _core;
+        emit VibeSwapCoreUpdated(prev, _core);
     }
 
     /**
@@ -1076,7 +1092,9 @@ contract CrossChainRouter is
      */
     function setBridgedDepositExpiry(uint256 _expiry) external onlyOwner {
         require(_expiry >= 1 hours, "Expiry too short");
+        uint256 prev = bridgedDepositExpiry;
         bridgedDepositExpiry = _expiry;
+        emit BridgedDepositExpiryUpdated(prev, _expiry);
     }
 
     /**

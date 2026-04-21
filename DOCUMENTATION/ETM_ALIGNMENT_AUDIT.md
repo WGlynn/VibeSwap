@@ -257,6 +257,24 @@ The combination of these three properties is **specifically what makes JUL not c
 - Mining difficulty curve — sets the rate of JUL issuance, which in turn sets the rate of monetary-supply growth. Tuning is monetary-policy work, not alignment.
 - JUL-VIBE-CKB exchange-rate dynamics — emergent from market activity. ETM-neutral on rates as long as the orthogonality of roles is preserved (which it is by construction).
 
+### 3.2 VIBE — governance share
+
+**What it is.** `contracts/monetary/VIBEToken.sol`. Capped supply (21M, Bitcoin-genesis homage). Distributed via Shapley to participants in proportion to their cognitive-economic contribution. Used for governance votes (DAO) and for staking that feeds the PoS pillar of NCI through `CKBNativeToken.sol` integration.
+
+**ETM analysis.** VIBE externalizes the **governance share** dimension — the right to participate in deciding what the substrate becomes. In cognition, this corresponds to the *agency-over-direction* a participant has within a knowledge community. Healthy cognitive economies distribute this agency in proportion to past contribution (those who built the substrate get to shape its future); unhealthy ones distribute it in proportion to present capital (whoever shows up with money decides). VIBE is built around the first model.
+
+Three structural properties keep VIBE ETM-aligned:
+
+- *Capped supply (21M).* Hard-cap means VIBE cannot inflate to dilute past contributors. The dilution that powers the rent dynamics in CKB-native (Section 3.3) does not apply to VIBE because VIBE is not the rent-source — it's the governance-share. ETM-aligned because cognitive governance authority should not dilute as new contributors arrive; new contributors get *their* share of VIBE through Shapley distribution, but existing holders retain their previously-earned share.
+- *Shapley-distributed.* Per `contracts/incentives/ShapleyDistributor.sol` and the FractalShapley refinement, VIBE allocations on each issuance event are proportional to participants' marginal contributions (Shapley values) over the contribution graph. This is the formal cognitive-economic model: governance authority is allocated by mechanism-derived contribution score, not by purchase. ETM-aligned because Shapley specifically captures the recursive-attribution property that PoM also depends on.
+- *Governance-only utility.* VIBE is not designed as a money asset (JUL fills that role) or a state-rent asset (CKB-native fills that). The role-discipline keeps the orthogonality intact. If governance-token holders had to also serve money or rent functions, the speculation pressure on the money axis would interfere with the governance-vote signal.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Vote-weight curves. Currently linear in VIBE held. Quadratic-voting variants might improve plurality-vs-plutocracy properties; ETM-neutral on the curve as long as governance authority remains earned-not-purchased.
+- VIBE staking yield. If staking VIBE produces JUL or CKB-native rewards, design with care — don't reintroduce a "hold VIBE → get money" loop that would re-couple governance to money. Current design is ETM-aligned; future yield-mechanism additions are the watch.
+
 <!-- SECTION-3-MARKER -->
 
 <!-- SECTION-4-MARKER -->

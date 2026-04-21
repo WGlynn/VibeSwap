@@ -1002,8 +1002,8 @@ contract TruePriceValidationTest is Test {
         // CASCADE + high manipulation: 200 + 400 + 400 = 1000 → capped at 500
         oracle.setTruePrice(highFeePool, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0.85e18);
 
+        // C33: no syncTrackedBalance — executeBatchSwap pre-credits internally
         capTokenA.mint(address(amm), SWAP_AMOUNT);
-        amm.syncTrackedBalance(address(capTokenA));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({

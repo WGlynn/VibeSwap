@@ -71,6 +71,16 @@ __pycache__/
 # Claude Code internal state (memory lives in ~/.claude/, not repo)
 .claude/projects/
 
+# SHIELD-PERSIST-LEAK (2026-04-21): PROPOSALS.md and TRUST_VIOLATIONS.md are
+# working-artifact files that accumulate conversation state via the proposal-
+# scraper hook and the API Death Shield auto-commit path. Conversation state
+# can include NDA-protected topics, making these files a tracked-repo leak
+# vector (verified by the 77fde23e near-miss on 2026-04-21). Files stay on
+# disk for the Propose→Persist primitive and audit-trail uses; do NOT version-
+# control their contents.
+.claude/PROPOSALS.md
+.claude/TRUST_VIOLATIONS.md
+
 # Runtime data / artifacts
 cogproof/data/*.db*
 data/

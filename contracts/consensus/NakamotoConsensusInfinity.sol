@@ -104,6 +104,21 @@ import "./INakamotoConsensusInfinity.sol";
  * requirements could pattern-match. The experience of shipping NCI this way
  * is an artifact worth publishing regardless of VibeSwap's eventual L1 path.
  *
+ * Prior art worth acknowledging: Chainlink pioneered the general shape of
+ * contract-layer staked operator networks — off-chain compute with on-chain
+ * collateral, economic penalties enforced by aggregator contracts, a service
+ * surface callable by other protocols. Their work demonstrated the paradigm
+ * is viable at production scale. NCI is adjacent-but-deeper: we use the same
+ * contract-layer staking+slashing primitive but run *consensus weighting*
+ * rather than *data-feed aggregation*, and we add Proof of Mind — a
+ * time-accumulated, unbuyable cognitive dimension with no analogue in the
+ * Chainlink operator-reputation model (theirs is a scoring heuristic over
+ * an honest-majority-of-operators trust assumption; PoM is a protocol
+ * invariant over a time-of-genuine-work trust assumption). Think of it as:
+ * Chainlink showed *that* you can run stake-backed services at the contract
+ * layer; NCI explores *how far the primitive stretches* when you push it
+ * into the consensus-weighting role and add a third security dimension.
+ *
  * It is not the permanent home. VibeSwap's security structure is
  * fundamentally different from any existing chain. Proof of Mind is a
  * time-accumulated, unbuyable weighting primitive; its dependencies

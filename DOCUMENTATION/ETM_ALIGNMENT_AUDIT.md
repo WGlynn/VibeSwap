@@ -187,7 +187,45 @@ The orthogonality property is critical for ETM-alignment. Cognition has the same
 - Pillar weights — 60/30/10 reflects current judgment on cognitive seniority. As the network matures and contribution attribution becomes more reliable, PoM weight could plausibly rise (70%+); if attribution proves gameable, weight would shift back. ETM-neutral on exact ratio so long as PoM remains senior.
 - Log-scale base for PoW — `log₂` is the current choice. `ln` or `log₁₀` would shift the diminishing-returns curve. Mechanism-economics, not alignment.
 
+### 2.2 Proof of Mind (PoM)
 
+**What it is.** PoM is the senior pillar of the NCI weight function (60%). Operationally, it is the scalar score of a participant's cognitive-economic contribution to the network, computed from several backing contracts: `contracts/identity/SoulboundIdentity.sol` (non-transferable identity), `contracts/identity/ContributionDAG.sol` (directed-acyclic graph of attested contributions), `contracts/identity/VibeCode.sol` + `contracts/identity/AgentRegistry.sol` (recognized contribution surfaces).
+
+**ETM analysis.** PoM is the highest-fidelity externalization of ETM's **common-knowledge anchoring** property available on any blockchain to date. The three properties that make it work:
+
+1. **Time-accumulated, not purchasable.** PoM score cannot be bought because soulbound identity prevents transfer of the underlying identity token. A wealthy actor cannot arrive and buy themselves a high PoM score; they must accumulate contributions over real time. This mirrors cognition: expertise cannot be purchased, only acquired through sustained engagement. A cognitive economy where reputation is for sale produces fake experts; ETM demands the opposite, and PoM enforces it structurally.
+
+2. **Attested by cross-referencing peers.** Contributions are scored via the Contribution DAG — each contribution is a node, references are edges, score accrues to nodes with many incoming edges (citations) from other high-PoM participants. Pure citation-count is gameable by Sybil mutual-citation rings; weighting citations by citer's PoM breaks the Sybil attack because high-PoM citers cannot themselves be Sybils (they too had to accumulate PoM over time). This is the PageRank-style recursive-authority property applied to contribution attribution, and it matches cognitive economies exactly: in academia, a citation from a Nobel laureate weighs more than a citation from an anonymous blog, and the Nobel laureate's weight came from her own citations-from-weighty-peers over decades.
+
+3. **Verifiable on-chain via the DAG.** Every claim of PoM reputation resolves to a concrete path through the DAG — which nodes cite me, which nodes cite them, all the way back to the genesis of the reputation substrate. The transparency is load-bearing because ETM's common-knowledge property requires *verifiable* status, not self-declared status. On-chain DAG gives the verifiability that cognitive economies accomplish via institutional memory (conferences, journals, citation graphs) but with lower overhead and cross-domain consistency.
+
+**Pattern-match drift warning.** PoM is explicitly called out in `primitive_pattern-match-drift-on-novelty.md` as a high-drift zone. Do **not** round PoM to "reputation score" or "trust score." Those framings miss the time-accumulated + soulbound + citation-weighted-by-cited-weight property set, which is the complete structural property that makes PoM work. It's closer to "on-chain academic reputation" than "DeFi trust score," but even that analogy falls short because academic reputation has no analog of the soulbound property — a dead academic's h-index doesn't transfer to their heirs.
+
+The 60% weight in NCI is the right weight *because* PoM is the senior common-knowledge signal. ETM would predict that any healthy cognitive economy puts common-knowledge at the top of its weight stack; NCI complies.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- DAG traversal cost for large participation sets. As PoM-node count grows, recursive-authority scoring becomes expensive. Future cycle may want cached sub-scores with periodic recomputation, or SNARK-backed authority proofs. ETM-neutral on implementation.
+- Score-decay calibration. PoM score should decay modestly for inactive participants (cognitive seniority decays too — a decade out of the field costs reputation), but the decay rate is sensitive. Too fast → penalizes sabbaticals; too slow → allows zombie-authority. Empirical tuning.
+
+### 2.3 Soulbound Identity and Heartbeat
+
+**What it is.** `contracts/identity/SoulboundIdentity.sol` issues non-transferable identity tokens — once bound to an address, they cannot move. `contracts/consensus/NakamotoConsensusInfinity.sol` enforces validator heartbeats — nodes must emit a liveness signal within `HEARTBEAT_WINDOW`; failure triggers downtime slashing (`SLASH_DOWNTIME = 5%` per NCI constant) and eventual deactivation. Together these ensure that participation is bound to a single time-continuous entity, not a transferable asset, and that entity must actively demonstrate presence.
+
+**ETM analysis.** The soulbound + heartbeat pair externalizes a property cognitive economies always have but blockchains historically don't: **continuity-of-identity over time is the unit that accumulates rent-paying power.** In cognition, your reputation accrues to *you* — not to a transferable token you could sell. In most PoS blockchains, stake is the unit; stake is transferable; reputation-weight moves with the coin. That structure fails ETM's seniority-of-common-knowledge property because it makes the senior signal a liquid asset.
+
+Soulbound fixes this by making the identity-unit non-transferable. Heartbeat fixes the adjacent failure: soulbound alone lets a long-inactive identity retain weight forever (dead-hand problem). Continuous heartbeat is the continuous-rent-payment in the identity dimension — presence must be demonstrated continuously, same as any other rent.
+
+The C24 primitive *Enforced Liveness Signal* (`primitive_enforced-liveness-signal.md`) made the load-bearing observation: a heartbeat CONSTANT without a corresponding gate or eviction is theater. The primitive flagged this as a failure mode and the implementation corrected: NCI's heartbeat is paired with `_checkHeartbeats` (called on epoch advance) that deactivates non-heartbeating validators. Without that teeth, the heartbeat constant would have been ETM-failing (rent-declared but not rent-enforced). With the teeth, it's ETM-aligned.
+
+The heartbeat + soulbound pair closes the continuity loop: (a) identity cannot be transferred, so weight always corresponds to the original-accruing participant; (b) identity must be continuously maintained by liveness, so dormant identities decay.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- `HEARTBEAT_WINDOW` — currently fixed. Cognitive economies don't have uniform attention demands across all participants; scholars can be heads-down for months without reputational decay, but active-duty professionals cannot be absent for days. A future refinement might make the window role-specific (e.g. tied to operational class), though the added complexity may not earn its rent.
+- `SLASH_DOWNTIME` = 5%. Probably appropriate for casual liveness failure; may need escalation for repeated failures. Parameter-space, not alignment.
 
 <!-- SECTION-3-MARKER -->
 

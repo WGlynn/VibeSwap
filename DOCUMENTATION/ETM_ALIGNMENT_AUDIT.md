@@ -390,6 +390,46 @@ What's NOT right:
 - *Active-vs-passive LP differentiation.* Concentrated-liquidity (Uniswap V3 style) is one path; on-chain rebalancing-attribution metrics (per-LP, per-block) is another. ETM-aligned mechanisms would reward active position management over passive holding.
 - *IL-protection vault re-evaluation.* The currently-deferred FAT-AUDIT-1 backlog item asks whether the IL-protection vault is insurance against a symptom rather than a fix for the cause. ETM frame says: yes, IL is the symptom of an unbounded-LP-state mechanism; fix the mechanism (rent on LP positions) and IL-protection becomes redundant.
 
+### 4.5 Lawson Floor
+
+**What it is.** A fairness lower bound that gates settlement: a settlement is valid only if the worst-off participant's utility meets the Lawson floor. Not a threshold of quality; a *minimum-outcome constraint* derived from Rawlsian-maximin fairness analysis. Backed by `docs/papers/contribution-dag-lawson-constant.md` (formal theory), `sims/lawson_floor_sim.py` (simulation), and `test/vectors/lawson_floor.json` (test vectors).
+
+**ETM analysis.** Lawson Floor externalizes the cognitive-economic property that **a cognitive economy maintains a lower bound on participant experience, below which the economy refuses to operate**. In cognition, this corresponds to: a healthy knowledge community does not accept collective decisions that crush the worst-off participant for aggregate gain. There is a fairness floor below which the community rejects the outcome, even if it would be aggregate-pareto-optimal above the floor.
+
+Applied to on-chain settlement, Lawson Floor is the mechanism that refuses to settle a trade batch, a governance decision, or an incentive distribution if the minimum participant-utility below a threshold. The floor is not a policy parameter ("we like to have at least 10% payout") — it's a mathematically-derived constant from the fairness-model's maximin optimization. That structural derivation is what makes it ETM-aligned rather than ETM-failing.
+
+Three properties that keep it aligned:
+
+- *Settlement-gating, not post-hoc compensation.* Lawson Floor refuses to finalize outcomes that fail the floor; it doesn't let them finalize and then try to compensate. ETM-aligned because post-hoc compensation admits the extractive dynamic first and attempts to un-extract — which is fundamentally weaker than preventing the extraction at settlement.
+- *Maximin-derived rather than threshold-derived.* The floor is computed from Rawlsian maximin over the participant set, giving a mathematically-unique value. Per the Augmented Mechanism Design paper's augmentation-not-policy principle: math-derived floors are structural; arbitrary thresholds are policy. ETM-aligned via the math-derivation.
+- *Works across mechanisms.* Lawson Floor isn't bound to one contract — the mathematical floor applies to any outcome-producing mechanism (batch auctions, Shapley distributions, governance allocations). This cross-cutting-ness is ETM-aligned because the cognitive-economic fairness-floor is itself cross-cutting: it applies to any collective-output mechanism, not just one specific domain.
+
+**Pattern-match drift warning.** Do NOT round Lawson Floor to "a minimum-guaranteed-price" or "a quality threshold." Both framings miss the maximin-derivation and the settlement-gating-not-compensation properties. The closest mainstream analog is "Rawlsian veil-of-ignorance applied to mechanism outcomes" — but even that requires the on-chain enforcement specificity to match VibeSwap's use.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- Floor level calibration. The maximin produces a value dependent on participant utility functions; those functions are mechanism-specific. Empirical work post-mainnet to confirm the floor matches real participant welfare.
+- Cross-mechanism Lawson-floor uniformity. Currently floor is computed per-mechanism; a unified cross-mechanism floor (if provable) would be stronger. Formal-theory work queued in `project_lawson-floor-research-agenda.md`.
+
+### 4.6 Contribution DAG
+
+**What it is.** `contracts/identity/ContributionDAG.sol`. Directed acyclic graph where nodes are contributions, edges are `contribution-A references/depends-on contribution-B`. Each node has authors (from SoulboundIdentity), timestamps, attestations. Contribution weight accrues along the DAG via recursive-authority scoring (PageRank-like, weighted by citer's PoM).
+
+**ETM analysis.** The Contribution DAG is the **on-chain substrate for the common-knowledge layer of the cognitive economy.** In cognition, common knowledge is the web of cross-referenced ideas that anchor the substrate — each idea's authority derives from which other ideas cite it, which in turn derive their authority from *their* citers, and so on recursively. The DAG is the literal data structure of this web. Externalizing it on-chain means: (a) contribution-authority is computable rather than declared, (b) the computation is transparent and verifiable, (c) new contributions can accrue authority over time by being cited by established nodes.
+
+ETM-aligned structural properties:
+
+- *Acyclic constraint.* Citations go backward in time; no self-citation loops; no mutual-citation rings that artificially inflate authority. The DAG's acyclicity is load-bearing — it prevents the Sybil-coalition mutual-citation attack. ETM demands this structure because cognitive-economic common-knowledge works the same way: ideas must build on prior ideas, not on themselves.
+- *PoM-weighted citation.* A citation from a high-PoM node weighs more than from a low-PoM or new node. This prevents Sybil inflation (Sybil nodes can cite, but they have low PoM weight) while rewarding legitimate contributions (a citation from a recognized expert is valuable). ETM-aligned: matches academic citation-authority weighting.
+- *Soulbound attribution.* Each DAG node's author is soulbound-identity-bound; contribution-weight is not transferable. ETM-aligned because cognitive contribution accrues to the contributor, not to an asset they could sell.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Traversal cost at scale. Already noted under Section 2.2 (PoM). Same issue; same mitigation paths.
+- Contribution-type specialization. Different contribution classes (code, docs, research, operational) might warrant different citation-weighting curves. ETM-neutral on specialization as long as within-class symmetry is preserved.
+
 <!-- SECTION-4-MARKER -->
 
 <!-- SECTION-5-MARKER -->

@@ -324,6 +324,28 @@ The 10-second batch length is the parameter that trades off (MEV-elimination str
 - Batch length adaptation. Could vary by liquidity / volume conditions — high-volume periods could shorten batches for throughput, low-volume could lengthen for better aggregation. ETM-neutral on adaptation as long as the uniform-clearing property is preserved.
 - Cross-batch coordination. Currently each batch is independent. For cross-chain order books or sequential dependencies, may need batch-of-batches structures. Future cycle.
 
+### 4.2 True Price Oracle (TPO)
+
+**What it is.** `contracts/oracle/TruePriceOracle.sol` plus the EvidenceBundle scheme + IssuerReputationRegistry shipped in C12. TPO converts off-chain price signals into on-chain truth via signed evidence bundles from registered issuers; issuer signatures are stake-bonded and slashable for misreporting; the registry tracks per-issuer reputation with time-mean-reversion; the oracle exposes a damped/validated price to consumer contracts.
+
+**ETM analysis.** TPO externalizes the cognitive-economic property that **truth-claims should be grounded in stake-bonded attestation that scales with reputation**. In cognition, the same property holds: a claim from a participant who has staked their reputation on its accuracy carries more weight than an anonymous assertion, and the participant who is wrong loses some reputation as a consequence. ETM predicts that any healthy oracle mechanism must externalize this structure; TPO does.
+
+The structural properties:
+
+- *Stake-bonded issuance.* Issuers must stake to register; misreporting (caught by downstream slashing or social-tier signals) costs the stake. ETM-aligned because reputation-without-skin-in-the-game is unenforced reputation, which doesn't survive ETM's continuous-rent test.
+- *Permissioned slashing with mean-reversion.* Reputation is penalty-only (negative-only adjustments), with a time-decay back toward neutral (MID=5000bps, half-life=30 days). This matches cognitive economies where past errors fade if not repeated, but recent errors weigh more. ETM-aligned because rent-paying-power should reflect *current* attentiveness, not eternal historical accumulation.
+- *EvidenceBundle as cryptographic substrate.* Every reported price must arrive in a signed bundle with version + context-hash + issuer-key fields. Fabrication invalidates the signature. ETM-aligned because verification cost should be cheap (signature check) but fabrication cost should be high (slash + reputation hit).
+- *Damped validated price.* The oracle does not surface the raw last-reported price; it applies TWAP + 5% deviation gate (per VibeAMM integration) before exposing it to consumer contracts. This is the cognitive-economic property of *shock-absorbing the substrate against single-point-of-error inputs* — when one issuer reports anomalously, the damping prevents that single signal from immediately destabilizing dependent mechanisms.
+
+**Partial-mirror caveat.** TPO has one ETM-axis where the alignment is incomplete: the **5% deviation gate** is a policy-level mitigation, not a structural one. A determined attacker who can move external markets by 4.9% repeatedly can attack the oracle by riding within the gate. The Augmented Mechanism Design paper's principle says "augment with math-enforced invariants, not policy," and a 5% gate is policy. The currently-deferred backlog item `FAT-AUDIT-2` (commit-reveal oracle aggregation for TWAP hardening) addresses exactly this gap — by making oracle aggregation itself a commit-reveal-batch primitive, the gate becomes structural rather than threshold-based.
+
+**Classification: ◐ PARTIALLY MIRRORS.**
+
+**Refinement targets** (FAT-AUDIT-2 is the canonical):
+- *Commit-reveal oracle aggregation.* Issuers commit prices, reveal together, median computed on the batch. Pattern identical to CRA commit-reveal — high code reuse. Eliminates the 5% gate as the load-bearing protection by making structural what was previously threshold-based.
+- *Sub-oracle reputation specialization.* Different issuers may be better at different asset classes (crypto vs fiat vs commodity). Reputation could be per-asset-class rather than monolithic. ETM-neutral, just better fidelity.
+- *Cross-oracle dispute primitive.* If two oracles report incompatible prices, a dispute window with cryptographic challenge-response would resolve the truth-claim more rigorously than current single-oracle reporting.
+
 <!-- SECTION-4-MARKER -->
 
 <!-- SECTION-5-MARKER -->

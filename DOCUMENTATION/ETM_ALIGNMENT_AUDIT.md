@@ -275,6 +275,27 @@ Three structural properties keep VIBE ETM-aligned:
 - Vote-weight curves. Currently linear in VIBE held. Quadratic-voting variants might improve plurality-vs-plutocracy properties; ETM-neutral on the curve as long as governance authority remains earned-not-purchased.
 - VIBE staking yield. If staking VIBE produces JUL or CKB-native rewards, design with care — don't reintroduce a "hold VIBE → get money" loop that would re-couple governance to money. Current design is ETM-aligned; future yield-mechanism additions are the watch.
 
+### 3.3 CKB-native — state-rent capital
+
+**What it is.** `contracts/monetary/CKBNativeToken.sol`. The state-rent asset of the substrate. Locked into cells via `StateRentVault.sol` (Section 1.1) to occupy bytes; diluted continuously via secondary issuance (Section 1.2). Backs the 30% PoS pillar of NCI.
+
+**ETM analysis.** CKB-native externalizes the **rent-paying capital** dimension. In cognition, this corresponds to *commitment of finite resource to a particular memory-cell* — when you choose to invest cognitive bandwidth in maintaining one piece of expertise, you're paying for it with a finite resource that could have gone to other expertise. CKB-native makes this trade-off legible on-chain: locking 100 CKB-native to keep a cell active is exactly the cognitive analog of dedicating ~100 units of mental bandwidth to maintaining a memory.
+
+The orthogonality with JUL (money) and VIBE (governance) is what keeps CKB-native ETM-aligned:
+
+- *Not money.* CKB-native is not designed for free-flowing exchange. Its primary use is to be *locked* (in cells, in PoS positions). If it were also money, the locking decision would be in tension with the speculation decision; users would underinvest in state-rent because the locked asset could be deployed for trading. ETM-aligned by being lockup-purposed, not exchange-purposed.
+- *Not governance.* CKB-native does not vote (VIBE does). If it did, then state-rent contribution would map directly to governance authority, which would re-couple the rent-payment role to the agency role. ETM warns against collapsing these dimensions.
+- *Elastic supply via secondary issuance.* The continuous dilution is the engine of the rent dynamic. ETM-aligned because rent that doesn't continuously erode is rent-as-one-time-fee, not rent-as-continuous-pressure. The elasticity is structurally load-bearing for the cell-rent mechanism to work.
+- *PoS pillar of NCI.* Beyond cell-rent, CKB-native is the consensus-stake asset (30% weight). This is consistent with the rent-paying-capital role: PoS stake is exactly "I am locking capital to commit to this network" — same primitive, applied to consensus participation rather than cell occupancy.
+
+**Three-token decomposition is structurally complete and minimal.** Every load-bearing axis (money, governance, rent-paying) has a dedicated token. No axis is doubled-up; no axis is missing. Per `feedback_jul-is-primary-liquidity.md`: *"Each role is orthogonal. Each token serves its own axis. Together they give the three-dimensional consensus weight function (NCI: 10% PoW + 30% PoS + 60% PoM). Collapsing any one of the three destroys the corresponding axis and the consensus property."*
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- Issuance schedule (covered in Section 1.2). Same tuning targets apply.
+- Lockup vs liquid balance for active mining/consensus participants. Operational hygiene, not alignment.
+
 <!-- SECTION-3-MARKER -->
 
 <!-- SECTION-4-MARKER -->

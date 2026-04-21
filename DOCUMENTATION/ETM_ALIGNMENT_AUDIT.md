@@ -432,6 +432,75 @@ ETM-aligned structural properties:
 
 <!-- SECTION-4-MARKER -->
 
+## Section 5 — Defense layer mechanisms
+
+The defense layer is where ETM alignment is most frequently violated in blockchain systems generally. Most defense mechanisms are policy-level overlays (blacklists, whitelists, timelocks, circuit breakers, pause switches) that impose discretionary authority on top of the substrate. ETM predicts that defense-via-policy is structurally weaker than defense-via-rent — because policy admits governance capture, enforcement drift, and attacker-learnable thresholds, while rent imposes continuous structural cost that cannot be threshold-gamed. VibeSwap's defense layer takes the harder path: rent on attacker cells (Siren), topological-taint propagation (Clawback), with circuit breakers and TWAP guards as the known policy-level exceptions.
+
+### 5.1 Siren Protocol
+
+**What it is.** `contracts/core/HoneypotDefense.sol` and `contracts/core/OmniscientAdversaryDefense.sol` together implement the Siren Protocol: instead of blocking attackers via blacklist, the protocol engages attackers in progressively-expensive shadow operations until the attacker's resource commitment exhausts itself against the defense. The attacker cannot tell initially whether a transaction is real or honey; the defense charges progressively more rent as engagement depth increases.
+
+**ETM analysis.** Siren externalizes the cognitive-economic defense pattern: **a healthy cognitive economy doesn't blacklist attackers; it exhausts them through rent.** An attacker who commits resources to attacking a memory substrate finds that each attack step costs more than the last, because the substrate's defenses scale their rent charge with the evidence of attack. Eventually the attacker's marginal cost exceeds their marginal expected benefit, and they exit voluntarily. This is the economic-rationality parallel of biological immune systems: they don't "ban" pathogens; they exhaust them by raising the cost of replication until replication becomes unprofitable.
+
+Three properties keep Siren ETM-aligned:
+
+- *Cost-scaling instead of blocklisting.* Siren doesn't reject attacker transactions outright; it accepts them but progressively increases their cost. ETM-aligned because blocklist-based defenses admit governance capture (who decides who goes on the list?) and structural holes (Sybil-rotation defeats blocklists); rent-based defenses don't have these failure modes.
+- *Asymmetric cost: high for attacker, low for honest user.* The rent is triggered by attack-signals, not by traffic volume. Honest users pay minimal or no Siren rent; attackers pay escalating rent. ETM-aligned because cognitive substrates similarly distinguish attention-worthy input from attention-consuming noise.
+- *Engagement-until-exhaustion rather than rejection.* By accepting the attacker into the honeypot space, Siren forces the attacker to expend resources for zero substrate-destabilizing effect. Rejection returns the attacker's unspent resources; engagement consumes them.
+
+**Pattern-match drift warning.** Do NOT round Siren to "blacklist plus timelock." That framing misses the engagement-until-exhaustion property. Siren is closer to "economic tar pit with progressively-sticky walls" — the attacker is welcomed in, and leaving becomes expensive.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Attack-signal calibration. False positives (honest users flagged as attackers, paying Siren rent) and false negatives (attackers not detected, paying no rent) are the two failure modes. Tuning is mechanism-economics; ETM-neutral.
+- Cross-contract Siren integration. Currently Siren primarily applies at specific contract entry points; a network-wide Siren layer could amortize cost across contracts. Future cycle.
+
+### 5.2 Clawback Cascade
+
+**What it is.** `contracts/compliance/ClawbackRegistry.sol` + `contracts/compliance/ClawbackVault.sol`. When a transaction is identified as tainted (malicious, stolen-funds-derived, sanctions-flagged), the clawback mechanism propagates the taint along the DAG of downstream transactions — anyone who received the funds from the tainted source is also tainted. Recovery happens topologically: all downstream holders are notified, have a window to contest, and on non-contest, the tainted portion is clawed back to the registry.
+
+**ETM analysis.** Clawback Cascade externalizes the cognitive-economic property that **provenance-based quality assessment propagates through the substrate.** In cognition, if you learn that a source you relied on was fraudulent, you don't just update that one claim — you re-evaluate everything you learned from that source, and everything you taught others based on it. The re-evaluation propagates topologically through your knowledge graph. Clawback Cascade is this dynamic, applied to value-flow rather than belief-propagation, but with the same structural geometry: topological-taint, contest windows, cascading update.
+
+ETM-aligned structural properties:
+
+- *Topological propagation.* Taint flows along the transaction graph, not by address-list membership. This is substrate-faithful: cognitive taint also follows the graph of information flow, not membership in a "bad" category.
+- *Contest windows preserve good-faith holders.* Anyone who received tainted funds legitimately (e.g., an AMM counterparty unaware of the source) can contest within the window; uncontested taint claws back, contested taint gets adjudicated. ETM-aligned because rigid propagation without contest would amount to strict liability, which no cognitive economy would tolerate.
+- *Registry-based centralization of the adjudication, not the detection.* The detection can be permissionless (anyone can flag a tainted source with evidence); the adjudication routes through the registry for consistency. ETM-aligned because consistent adjudication is a common-knowledge anchor that permissionless-detection + Sybil-prone-adjudication would not provide.
+
+**Pattern-match drift warning.** Do NOT round Clawback Cascade to "freeze funds" or "blacklist addresses." Both framings miss the topological-propagation-with-contest property that is the structural substance of the mechanism.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Contest-window duration. Too short → legitimate holders can't contest; too long → recovery is delayed past usefulness. Empirical tuning.
+- Cross-chain taint propagation. Currently contained to native-chain transactions. LayerZero integration + registry-replication across chains would extend the topological scope. Future cycle.
+
+### 5.3 Circuit Breakers / TWAP guards
+
+**What it is.** `contracts/core/CircuitBreaker.sol` + TWAP deviation checks in `contracts/amm/VibeAMM.sol` (max 5% deviation). Circuit breakers halt trading when volume/price/withdrawal thresholds are exceeded; TWAP guards reject individual trades whose price exceeds the time-weighted average by more than the deviation threshold.
+
+**ETM analysis.** Here ETM-alignment runs out. Circuit breakers and TWAP deviation gates are **policy-level defenses**: a threshold is set, an action fires when the threshold is crossed. They do not impose continuous rent, do not propagate topologically, and do not engage-until-exhaustion. They are classical pause-switches and bounded-rejection filters, imposed on top of the substrate rather than emerging from it.
+
+These mechanisms exist for pragmatic reasons: structural defenses against extreme oracle manipulation or flash-crash cascades require complex primitives (commit-reveal oracle aggregation, adaptive fee curves, Treasury Stabilizer expansion) that are not all shipped. Circuit breakers + TWAP guards are the bridge mechanisms that protect against worst cases while the structural refinements are queued.
+
+What's aligned:
+- *Transparent thresholds.* The firing conditions are on-chain and observable; no off-chain discretion in the firing decision itself.
+- *Last-resort disposition.* Per backlog entries FAT-AUDIT-2 (commit-reveal oracle) and FAT-AUDIT-3 (adaptive fees + Stabilizer expansion), the current design acknowledges these are last-resort policy mechanisms and that the goal is to reduce their firing domain over time by shipping structural alternatives.
+
+What's NOT aligned:
+- *Attacker-learnable thresholds.* An attacker studying on-chain history can stay-just-under the threshold, drive-to-halt-wait-resume, or front-run-the-halt. ETM predicts this — discretionary thresholds create exactly this class of exploit.
+- *Governance-set parameters.* Who decides the circuit-breaker thresholds? The DAO. What stops governance capture from setting thresholds that serve captors? Only the augmented-governance hierarchy (Physics > Constitution > Governance), which is strongest at the structural-invariant level and thinnest at the parameter-setting level. Circuit breakers live in the thin territory.
+- *No continuous rent.* A participant whose activity consistently runs near the threshold pays no continuous cost for that positioning. ETM-aligned defense would impose continuous rent proportional to proximity-to-threshold (e.g., steeper fee curves as volume or price-move approaches the circuit-breaker threshold).
+
+**Classification: ◐ PARTIALLY MIRRORS.** The transparency and last-resort disposition keep it from being a full FAIL; the policy-level nature and attacker-learnable thresholds keep it from being a full MIRROR.
+
+**Refinement targets** (these are the FAT-AUDIT-3 + FAT-AUDIT-2 canonicals):
+- *Adaptive fee curves.* Fee grows superlinearly with volume / price-move, so the cascade-profit motive drops organically before the breaker fires. Converts policy-threshold to structural-rent.
+- *Treasury Stabilizer expansion.* Auto-provides liquidity during stress rather than halting. Preserves trading during the exact moments breakers would otherwise fire.
+- *Commit-reveal oracle aggregation* (FAT-AUDIT-2). Removes the TWAP-deviation gate's load-bearing role by making oracle aggregation structural.
+- *Last-resort shrinkage.* Keep circuit breakers as true last-resort (unreachable in normal + near-normal operation), not as first-line defense. As structural mechanisms ship, relax breaker parameters so they only fire under catastrophic conditions.
+
 <!-- SECTION-5-MARKER -->
 
 <!-- SECTION-6-MARKER -->

@@ -6,6 +6,21 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
+/// @notice C32: minimal view over ContentMerkleRegistry for chunk-commitment
+///         lookups during V2b availability challenges. Avoids circular import.
+interface IContentMerkleRegistryForOCR {
+    struct ChunkCommitment {
+        bytes32 chunkRoot;
+        uint256 chunkCount;
+        uint256 chunkSize;
+        uint256 committedAt;
+        bool active;
+    }
+    function getCommitment(address operator, bytes32 cellId) external view returns (ChunkCommitment memory);
+    function hasCommitment(address operator, bytes32 cellId) external view returns (bool);
+}
 
 /// @notice Minimal view over StateRentVault for cell-existence checks.
 ///         Mirrors IStateRentVaultForRegistry in ShardOperatorRegistry.sol to
@@ -75,6 +90,23 @@ contract OperatorCellRegistry is
     uint256 public constant ASSIGNMENT_SLASH_BPS = 5000;       // 50% of assignment bond slashed
     uint256 public constant CHALLENGER_PAYOUT_BPS = 5000;      // 50% of slashed portion to challenger
 
+    // ============ C32 (V2b chunk-availability sampling) Constants ============
+    //
+    // Probabilistic Availability Sampling (PAS) — standard DAS family (Al-Bassam
+    // et al., 2018; Danksharding). K=16 all-must-pass threshold gives 0.999^16
+    // ≈ 98.4% pass rate for 99.9%-honest operators (1.6% FP) and ~0 pass rate
+    // for <90% availability. Bond/window/slash/split reuse V2a constants for
+    // protocol-wide consistency per augmented-mechanism-design.md.
+
+    /// @notice Chunks sampled per V2b challenge. Trade-off: gas vs security.
+    uint256 public constant K_SAMPLES = 16;
+
+    uint256 public constant CHUNK_CHALLENGE_BOND = ASSIGNMENT_CHALLENGE_BOND;
+    uint256 public constant CHUNK_CHALLENGE_RESPONSE_WINDOW = ASSIGNMENT_CHALLENGE_RESPONSE_WINDOW;
+    uint256 public constant CHUNK_CHALLENGE_COOLDOWN = PER_CELL_CHALLENGE_COOLDOWN;
+    uint256 public constant CHUNK_SLASH_BPS = ASSIGNMENT_SLASH_BPS;
+    uint256 public constant CHUNK_CHALLENGER_PAYOUT_BPS = CHALLENGER_PAYOUT_BPS;
+
     // ============ Types ============
 
     struct Assignment {
@@ -93,6 +125,17 @@ contract OperatorCellRegistry is
         uint256 bond;
         uint256 deadline;
         uint256 lastFailedAt;   // timestamp of most recent successful operator refute
+    }
+
+    /// @notice C32: state of a permissionless chunk-availability challenge.
+    /// @dev    Sampled indices are derived deterministically from (cellId, challenger, nonce)
+    ///         — not stored — keeping the struct shape parallel to V2a's AssignmentChallenge.
+    struct ChunkChallenge {
+        bytes32 nonce;
+        address challenger;
+        uint256 bond;
+        uint256 deadline;
+        uint256 lastFailedAt;
     }
 
     // ============ State ============
@@ -127,9 +170,20 @@ contract OperatorCellRegistry is
     ///         the C14-AUDIT-1 pull-queue pattern in VibeAgentConsensus.
     mapping(address => uint256) public pendingOperatorRefunds;
 
-    /// @dev Reserved storage gap for future upgrades. C31 added 2 mapping slots
-    ///      (assignmentChallenges, pendingOperatorRefunds) — shrunk from 46 → 44.
-    uint256[44] private __gap;
+    /// @notice C32: V2b chunk-commitment sidecar registry. When non-zero, V2b
+    ///         chunk-availability challenges are enabled. Paper §7.4
+    ///         composability: new primitive lives in a dedicated sidecar.
+    IContentMerkleRegistryForOCR public contentRegistry;
+
+    /// @notice C32: active chunk-availability challenges per cellId. Keyed on
+    ///         cellId (not (op, cellId)) because only the current assignee can
+    ///         be challenged; one active chunk challenge per cellId.
+    mapping(bytes32 => ChunkChallenge) public chunkChallenges;
+
+    /// @dev Reserved storage gap for future upgrades.
+    ///      C31 shrank 46 → 44 (assignmentChallenges + pendingOperatorRefunds).
+    ///      C32 shrank 44 → 42 (contentRegistry + chunkChallenges).
+    uint256[42] private __gap;
 
     // ============ Events ============
 
@@ -145,6 +199,11 @@ contract OperatorCellRegistry is
     event AssignmentSlashedByChallenge(bytes32 indexed cellId, address indexed operator, address indexed challenger, uint256 slashedAmount, uint256 challengerPayout, uint256 slashPoolAdd);
     event OperatorRefundQueued(address indexed operator, uint256 amount);
     event OperatorRefundWithdrawn(address indexed operator, uint256 amount);
+    // C32 (V2b chunk-availability)
+    event ContentRegistryUpdated(address indexed newRegistry);
+    event ChunkChallengeRaised(bytes32 indexed cellId, address indexed challenger, bytes32 nonce, uint256 deadline);
+    event ChunkChallengeRefuted(bytes32 indexed cellId, address indexed operator, address indexed challenger, uint256 bondPaidToOperator);
+    event ChunkChallengeSlashed(bytes32 indexed cellId, address indexed operator, address indexed challenger, uint256 slashedAmount, uint256 challengerPayout, uint256 slashPoolAdd);
 
     // ============ Errors ============
 
@@ -165,6 +224,13 @@ contract OperatorCellRegistry is
     error CooldownActive();
     error SelfChallenge();
     error NothingToWithdraw();
+    // C32 (V2b chunk-availability)
+    error ContentRegistryNotSet();
+    error NoChunkCommitment();
+    error InvalidResponseLength();
+    error InvalidMerkleProof();
+    error ChunkChallengeActive();
+    error ChunkChallengeCooldownActive();
 
     // ============ Init ============
 
@@ -236,9 +302,11 @@ contract OperatorCellRegistry is
         Assignment storage a = assignments[cellId];
         if (!a.active) revert NotAssigned();
         if (a.operator != msg.sender) revert NotOperator();
-        // C31: cannot relinquish out from under an active challenge — operator
-        // must respond or be slashed; otherwise this becomes a free escape hatch.
+        // C31/C32: cannot relinquish out from under an active challenge —
+        // operator must respond or be slashed; otherwise this becomes a free
+        // escape hatch. Both V2a (assignment) and V2b (chunk) challenges block.
         if (assignmentChallenges[cellId].challenger != address(0)) revert ChallengeActive();
+        if (chunkChallenges[cellId].challenger != address(0)) revert ChunkChallengeActive();
 
         uint256 bond = a.bond;
         address operator_ = a.operator;
@@ -250,8 +318,10 @@ contract OperatorCellRegistry is
 
         totalBondsLocked -= bond;
 
-        // C31: wipe challenge/cooldown state so a future claimant starts fresh
+        // C31/C32: wipe both challenge mappings so a future claimant starts fresh.
+        // No refund needed — we already reverted above if either challenge was active.
         delete assignmentChallenges[cellId];
+        delete chunkChallenges[cellId];
 
         if (bond > 0) {
             ckbToken.safeTransfer(operator_, bond);
@@ -377,9 +447,13 @@ contract OperatorCellRegistry is
         a.bond = 0;
         totalBondsLocked -= assignmentBond;
 
-        // Wipe all challenge state (lastFailedAt included — assignment is ending,
-        // future claimants of this cellId start with a fresh cooldown slate)
+        // Wipe all V2a challenge state (lastFailedAt included — assignment is
+        // ending, future claimants of this cellId start with a fresh cooldown).
+        // No V2a challenger to refund — they're the one invoking the slash.
         delete assignmentChallenges[cellId];
+
+        // Also wipe + refund any active V2b chunk challenge on this cellId
+        _refundAndClearChunkChallenge(cellId);
 
         // Accumulate to slashPool
         slashPool += slashPoolAdd;
@@ -411,6 +485,209 @@ contract OperatorCellRegistry is
         emit OperatorRefundWithdrawn(msg.sender, amount);
     }
 
+    // ============ C32: V2b Permissionless Chunk-Availability Challenge ============
+    //
+    // Probabilistic Availability Sampling (PAS). Challenger posts a nonce;
+    // K_SAMPLES indices are deterministically derived from (cellId, challenger,
+    // nonce). Operator must return each sampled chunk + Merkle proof against
+    // their committed chunkRoot in ContentMerkleRegistry. All-must-pass
+    // threshold. Enforcement is additive to V2a — both flows share bond/window
+    // primitives but run on separate state mappings.
+    //
+    // Opt-in: operators without a ContentMerkleRegistry commitment are immune
+    // to V2b. First-ship default; a future cycle may make commitment mandatory
+    // via claimCell signature change.
+
+    /**
+     * @notice Compute the k-th sampled chunk index for a given challenge.
+     * @dev Public so challengers and operators can derive the index set off-chain.
+     */
+    function deriveSampledIndex(
+        bytes32 cellId,
+        address challenger,
+        bytes32 nonce,
+        uint256 k,
+        uint256 chunkCount
+    ) public pure returns (uint256) {
+        return uint256(keccak256(abi.encode(cellId, challenger, nonce, k))) % chunkCount;
+    }
+
+    /**
+     * @notice Permissionlessly challenge an operator's chunk-availability.
+     * @dev Requires an active assignment AND a ContentMerkleRegistry commitment
+     *      from that operator. Operator has CHUNK_CHALLENGE_RESPONSE_WINDOW to
+     *      submit K_SAMPLES chunks + proofs; otherwise claimChunkAvailabilitySlash
+     *      can be invoked by anyone.
+     */
+    function challengeChunkAvailability(bytes32 cellId, bytes32 nonce) external nonReentrant {
+        if (address(contentRegistry) == address(0)) revert ContentRegistryNotSet();
+
+        Assignment storage a = assignments[cellId];
+        if (!a.active) revert NotAssigned();
+        if (msg.sender == a.operator) revert SelfChallenge();
+        if (!contentRegistry.hasCommitment(a.operator, cellId)) revert NoChunkCommitment();
+
+        ChunkChallenge storage c = chunkChallenges[cellId];
+        if (c.challenger != address(0)) revert ChunkChallengeActive();
+        if (
+            c.lastFailedAt != 0 &&
+            block.timestamp < c.lastFailedAt + CHUNK_CHALLENGE_COOLDOWN
+        ) revert ChunkChallengeCooldownActive();
+
+        ckbToken.safeTransferFrom(msg.sender, address(this), CHUNK_CHALLENGE_BOND);
+
+        c.nonce = nonce;
+        c.challenger = msg.sender;
+        c.bond = CHUNK_CHALLENGE_BOND;
+        c.deadline = block.timestamp + CHUNK_CHALLENGE_RESPONSE_WINDOW;
+
+        emit ChunkChallengeRaised(cellId, msg.sender, nonce, c.deadline);
+    }
+
+    /**
+     * @notice Operator refutes an active chunk challenge by supplying all K_SAMPLES
+     *         chunks + Merkle proofs against their committed chunkRoot.
+     * @param cellId     The challenged cellId.
+     * @param nonce      Must echo the stored challenge nonce.
+     * @param chunks     Length-K_SAMPLES array. chunks[k] is the chunk at
+     *                   deriveSampledIndex(cellId, challenger, nonce, k, chunkCount).
+     * @param proofs     Length-K_SAMPLES array of Merkle proofs. proofs[k] proves
+     *                   leaf_k = keccak256(abi.encode(sampledIdx_k, chunks[k]))
+     *                   against the operator's committed chunkRoot.
+     *
+     * @dev All K_SAMPLES proofs must verify. Any mismatch reverts the entire
+     *      response — operator either serves all sampled chunks or is slashable.
+     *      On success, challenger's bond flows to operator (attentiveness reward);
+     *      cooldown stamped to block regrief.
+     */
+    function respondWithChunks(
+        bytes32 cellId,
+        bytes32 nonce,
+        bytes[] calldata chunks,
+        bytes32[][] calldata proofs
+    ) external nonReentrant {
+        Assignment storage a = assignments[cellId];
+        if (!a.active) revert NotAssigned();
+        if (msg.sender != a.operator) revert NotOperator();
+
+        ChunkChallenge storage c = chunkChallenges[cellId];
+        if (c.challenger == address(0)) revert NoActiveChallenge();
+        if (block.timestamp > c.deadline) revert ChallengeExpired();
+        if (c.nonce != nonce) revert NonceMismatch();
+
+        if (chunks.length != K_SAMPLES || proofs.length != K_SAMPLES) revert InvalidResponseLength();
+
+        IContentMerkleRegistryForOCR.ChunkCommitment memory commitment =
+            contentRegistry.getCommitment(a.operator, cellId);
+        if (!commitment.active) revert NoChunkCommitment();
+
+        address challenger_ = c.challenger;
+        uint256 bond = c.bond;
+
+        // Verify each sampled chunk in the challenge set
+        for (uint256 k = 0; k < K_SAMPLES; k++) {
+            uint256 idx = deriveSampledIndex(cellId, challenger_, nonce, k, commitment.chunkCount);
+            bytes32 leaf = keccak256(abi.encode(idx, chunks[k]));
+            if (!MerkleProof.verify(proofs[k], commitment.chunkRoot, leaf)) {
+                revert InvalidMerkleProof();
+            }
+        }
+
+        // Clear active-challenge fields; stamp cooldown
+        c.nonce = bytes32(0);
+        c.challenger = address(0);
+        c.bond = 0;
+        c.deadline = 0;
+        c.lastFailedAt = block.timestamp;
+
+        // Challenger's bond flows to the operator (attentiveness reward)
+        if (bond > 0) {
+            ckbToken.safeTransfer(a.operator, bond);
+        }
+
+        emit ChunkChallengeRefuted(cellId, a.operator, challenger_, bond);
+    }
+
+    /**
+     * @notice Permissionlessly execute the chunk-availability slash after the
+     *         response window expires without a valid response.
+     * @dev Same split math as V2a: 50% assignment bond slashed (50% challenger,
+     *      50% slashPool); 50% remainder to operator pull queue. Also refunds
+     *      challenger's original CHUNK_CHALLENGE_BOND.
+     */
+    function claimChunkAvailabilitySlash(bytes32 cellId) external nonReentrant {
+        ChunkChallenge storage c = chunkChallenges[cellId];
+        if (c.challenger == address(0)) revert NoActiveChallenge();
+        if (block.timestamp <= c.deadline) revert ChallengeNotExpired();
+
+        Assignment storage a = assignments[cellId];
+        if (!a.active) revert NotAssigned();
+
+        uint256 assignmentBond = a.bond;
+        address operator_ = a.operator;
+        address challenger_ = c.challenger;
+        uint256 challengeBond = c.bond;
+
+        uint256 slashAmount = (assignmentBond * CHUNK_SLASH_BPS) / 10_000;
+        uint256 remainder = assignmentBond - slashAmount;
+        uint256 challengerPayout = (slashAmount * CHUNK_CHALLENGER_PAYOUT_BPS) / 10_000;
+        uint256 slashPoolAdd = slashAmount - challengerPayout;
+
+        _removeFromOperatorCells(operator_, cellId);
+        a.active = false;
+        a.bond = 0;
+        totalBondsLocked -= assignmentBond;
+
+        // Wipe both challenge records (V2a assignment challenge may also exist —
+        // refund its active challenger if so; V2b challenge ends here).
+        _refundAndClearAssignmentChallenge(cellId);
+        delete chunkChallenges[cellId];
+
+        slashPool += slashPoolAdd;
+
+        if (remainder > 0) {
+            pendingOperatorRefunds[operator_] += remainder;
+            emit OperatorRefundQueued(operator_, remainder);
+        }
+
+        uint256 challengerTotal = challengeBond + challengerPayout;
+        if (challengerTotal > 0) {
+            ckbToken.safeTransfer(challenger_, challengerTotal);
+        }
+
+        emit ChunkChallengeSlashed(cellId, operator_, challenger_, slashAmount, challengerPayout, slashPoolAdd);
+    }
+
+    /// @dev Internal helper — refund any active V2a challenger + wipe state.
+    ///      Used when a V2b slash (or admin slash) ends the assignment while a
+    ///      V2a challenge was also pending.
+    function _refundAndClearAssignmentChallenge(bytes32 cellId) internal {
+        AssignmentChallenge storage ac = assignmentChallenges[cellId];
+        if (ac.challenger != address(0) && ac.bond > 0) {
+            address c_ = ac.challenger;
+            uint256 b_ = ac.bond;
+            delete assignmentChallenges[cellId];
+            ckbToken.safeTransfer(c_, b_);
+        } else {
+            delete assignmentChallenges[cellId];
+        }
+    }
+
+    /// @dev Internal helper — refund any active V2b challenger + wipe state.
+    ///      Used when a V2a slash (or admin slash) ends the assignment while a
+    ///      V2b challenge was also pending.
+    function _refundAndClearChunkChallenge(bytes32 cellId) internal {
+        ChunkChallenge storage cc = chunkChallenges[cellId];
+        if (cc.challenger != address(0) && cc.bond > 0) {
+            address c_ = cc.challenger;
+            uint256 b_ = cc.bond;
+            delete chunkChallenges[cellId];
+            ckbToken.safeTransfer(c_, b_);
+        } else {
+            delete chunkChallenges[cellId];
+        }
+    }
+
     // ============ Admin ============
 
     /**
@@ -439,18 +716,11 @@ contract OperatorCellRegistry is
         totalBondsLocked -= bond;
         slashPool += bond;
 
-        // C31: wipe challenge/cooldown state so future claimants start fresh.
-        // Also refunds any active challenger's bond (admin slash pre-empts
-        // permissionless challenge — challenger was not wrong to try).
-        AssignmentChallenge storage c = assignmentChallenges[cellId];
-        if (c.challenger != address(0) && c.bond > 0) {
-            address challenger_ = c.challenger;
-            uint256 challengeBond = c.bond;
-            delete assignmentChallenges[cellId];
-            ckbToken.safeTransfer(challenger_, challengeBond);
-        } else {
-            delete assignmentChallenges[cellId];
-        }
+        // C31/C32: wipe both challenge records. Refund any active V2a or V2b
+        // challenger — admin slash pre-empts the permissionless game; neither
+        // challenger was wrong to try.
+        _refundAndClearAssignmentChallenge(cellId);
+        _refundAndClearChunkChallenge(cellId);
 
         emit CellAssignmentSlashed(cellId, operator_, bond);
     }
@@ -479,6 +749,15 @@ contract OperatorCellRegistry is
     function setStateRentVault(address newVault) external onlyOwner {
         stateRentVault = IStateRentVaultForCellRegistry(newVault);
         emit StateRentVaultUpdated(newVault);
+    }
+
+    /// @notice C32: wire the ContentMerkleRegistry for V2b chunk-availability
+    ///         challenges. When unset, V2b flow is disabled and operators face
+    ///         only V2a liveness challenges. Admin must call post-deploy to
+    ///         enable the stronger enforcement layer.
+    function setContentRegistry(address newRegistry) external onlyOwner {
+        contentRegistry = IContentMerkleRegistryForOCR(newRegistry);
+        emit ContentRegistryUpdated(newRegistry);
     }
 
     // ============ Views ============

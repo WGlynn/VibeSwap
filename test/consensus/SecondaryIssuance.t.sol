@@ -161,4 +161,27 @@ contract SecondaryIssuanceTest is Test {
 
         assertEq(issuance.totalDistributed(), pEmission);
     }
+
+    // ============ C36-F2: admin setter event observability ============
+
+    event MinDistributionUpdated(uint256 oldMin, uint256 newMin);
+    event InsurancePoolUpdated(address indexed oldPool, address indexed newPool);
+
+    function test_C36F2_setMinDistribution_emitsEvent() public {
+        uint256 oldM = issuance.minDistribution();
+        uint256 newM = 42e18;
+        vm.expectEmit(false, false, false, true);
+        emit MinDistributionUpdated(oldM, newM);
+        vm.prank(owner);
+        issuance.setMinDistribution(newM);
+    }
+
+    function test_C36F2_setInsurancePool_emitsEvent() public {
+        address oldP = issuance.insurancePool();
+        address newP = makeAddr("newInsurance");
+        vm.expectEmit(true, true, false, true);
+        emit InsurancePoolUpdated(oldP, newP);
+        vm.prank(owner);
+        issuance.setInsurancePool(newP);
+    }
 }

@@ -459,4 +459,55 @@ contract StablecoinFlowRegistryTest is Test {
         vm.expectRevert(StablecoinFlowRegistry.RatioOutOfBounds.selector);
         registry.updateFlowRatio(PRECISION * 100 + 1);
     }
+
+    // ============ C37-F1-TWIN: chain-fork replay defense ============
+
+    /// @notice Signatures valid on original chain must REJECT after a
+    ///         block.chainid change. Twin of TruePriceOracle C37-F1 coverage.
+    function test_C37F1TWIN_signatureRejectsAfterChainIdChange() public {
+        uint256 nonce = registry.updaterNonces(updater);
+        bytes memory sig = _createFlowSignature(25e17, nonce, block.timestamp + 1 hours);
+
+        // Fork simulation: same signature should now fail
+        vm.chainId(block.chainid + 424242);
+
+        vm.expectRevert(StablecoinFlowRegistry.Unauthorized.selector);
+        registry.updateFlowRatioSigned(25e17, sig);
+    }
+
+    /// @notice Fresh signature against the NEW chain's domain separator
+    ///         passes — end-to-end lazy-recompute path verified.
+    function test_C37F1TWIN_signatureAcceptedOnNewChainWithFreshSig() public {
+        // Move to new chain first
+        uint256 newChainId = block.chainid + 424242;
+        vm.chainId(newChainId);
+
+        // Build domain separator against NEW chainid
+        bytes32 newDomainSeparator = keccak256(abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256("StablecoinFlowRegistry"),
+            keccak256("1"),
+            newChainId,
+            address(registry)
+        ));
+
+        // On-chain view should match
+        assertEq(registry.domainSeparator(), newDomainSeparator);
+
+        uint256 nonce = registry.updaterNonces(updater);
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes32 structHash = keccak256(abi.encode(
+            FLOW_UPDATE_TYPEHASH,
+            uint256(25e17),
+            nonce,
+            deadline
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", newDomainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(updaterPrivateKey, digest);
+        bytes memory sig = abi.encodePacked(r, s, v, nonce, deadline);
+
+        registry.updateFlowRatioSigned(25e17, sig);
+        assertEq(registry.currentFlowRatio(), 25e17);
+    }
 }

@@ -922,4 +922,244 @@ contract CrossChainRouterTest is Test {
         assertEq(uint8(revealed.status), uint8(ICommitRevealAuction.CommitStatus.REVEALED),
             "Order should be successfully revealed");
     }
+
+    // ============ C15-AUDIT-1: Settlement failure tracking + retry ============
+
+    /// @notice Before the fix, a reverting settleCrossChainOrder silently swallowed the
+    ///         error — deposits[trader][token] was never decremented on source, letting
+    ///         the trader withdrawDeposit() to double-spend against the already-filled
+    ///         destination output. Fix: track failure, expose permissionless retry.
+    function test_C15_BatchResult_SettlementFailure_RecordsRetryState() public {
+        MockSettlementCore core = new MockSettlementCore();
+        core.setReverting(true);
+        router.setVibeSwapCore(address(core));
+
+        bytes32 commitHash = keccak256("c15-commit");
+        bytes32 poolId = keccak256("c15-pool");
+        _deliverBatchResult(commitHash, poolId, 0, 42 ether);
+
+        assertTrue(router.settlementFailed(commitHash), "settlementFailed set on catch");
+        assertEq(router.failedSettlementEstimatedOut(commitHash), 42 ether, "estimatedOut cached");
+        assertEq(router.failedSettlementPoolId(commitHash), poolId, "poolId cached");
+    }
+
+    function test_C15_RetrySettlementOrder_ClosesWindow() public {
+        MockSettlementCore core = new MockSettlementCore();
+        core.setReverting(true);
+        router.setVibeSwapCore(address(core));
+
+        bytes32 commitHash = keccak256("c15-commit-2");
+        bytes32 poolId = keccak256("c15-pool-2");
+        _deliverBatchResult(commitHash, poolId, 1, 100 ether);
+        assertTrue(router.settlementFailed(commitHash));
+
+        // Flip core to success; anyone calls retry.
+        core.setReverting(false);
+        address randomCaller = makeAddr("randomCaller");
+        vm.prank(randomCaller);
+        router.retrySettlementOrder(commitHash);
+
+        assertFalse(router.settlementFailed(commitHash), "flag cleared on successful retry");
+        assertEq(router.failedSettlementEstimatedOut(commitHash), 0, "estimatedOut cleared");
+        assertEq(router.failedSettlementPoolId(commitHash), bytes32(0), "poolId cleared");
+        (bytes32 lastHash, bytes32 lastPool, uint256 lastOut) = core.lastSettle();
+        assertEq(lastHash, commitHash);
+        assertEq(lastPool, poolId);
+        assertEq(lastOut, 100 ether);
+    }
+
+    function test_C15_RetrySettlementOrder_RevertsWhenNotPending() public {
+        MockSettlementCore core = new MockSettlementCore();
+        router.setVibeSwapCore(address(core));
+        vm.expectRevert("Not pending");
+        router.retrySettlementOrder(keccak256("never-failed"));
+    }
+
+    function test_C15_SettlementConfirm_LightweightPath() public {
+        MockSettlementCore core = new MockSettlementCore();
+        core.setReverting(true);
+        router.setVibeSwapCore(address(core));
+
+        bytes32 commitHash = keccak256("c15-confirm");
+        _deliverSettlementConfirm(commitHash, 2);
+
+        assertTrue(router.settlementFailed(commitHash), "flag set on mark catch");
+
+        core.setReverting(false);
+        router.retrySettlementMark(commitHash);
+        assertFalse(router.settlementFailed(commitHash), "flag cleared on mark retry");
+    }
+
+    function test_C15_SuccessfulBatchResult_ClearsPriorFailure() public {
+        MockSettlementCore core = new MockSettlementCore();
+        core.setReverting(true);
+        router.setVibeSwapCore(address(core));
+
+        bytes32 commitHash = keccak256("c15-replay");
+        bytes32 poolId = keccak256("c15-pool-replay");
+        _deliverBatchResult(commitHash, poolId, 3, 50 ether);
+        assertTrue(router.settlementFailed(commitHash));
+
+        // Next BatchResult arrives (LZ retry), core is now healthy — flag should clear.
+        core.setReverting(false);
+        _deliverBatchResult(commitHash, poolId, 4, 50 ether);
+        assertFalse(router.settlementFailed(commitHash), "natural retry clears flag");
+    }
+
+    function _deliverBatchResult(
+        bytes32 commitHash,
+        bytes32 poolId,
+        uint64 batchId,
+        uint256 estimatedOut
+    ) internal {
+        bytes32[] memory commits = new bytes32[](1);
+        commits[0] = commitHash;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = estimatedOut;
+        address[] memory traders = new address[](1);
+        traders[0] = authorized;
+
+        CrossChainRouter.BatchResult memory result = CrossChainRouter.BatchResult({
+            batchId: batchId,
+            poolId: poolId,
+            clearingPrice: 1e18,
+            filledTraders: traders,
+            filledAmounts: amounts,
+            filledCommitHashes: commits
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.BATCH_RESULT, abi.encode(result));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: uint64(batchId + 1)
+        });
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256(abi.encode("guid", batchId, commitHash)), message, address(0), "");
+    }
+
+    function _deliverSettlementConfirm(bytes32 commitHash, uint64 batchId) internal {
+        bytes32[] memory commits = new bytes32[](1);
+        commits[0] = commitHash;
+        CrossChainRouter.SettlementConfirm memory confirm = CrossChainRouter.SettlementConfirm({
+            commitHashes: commits,
+            batchId: batchId,
+            settledOnChain: CHAIN_B
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.SETTLEMENT_CONFIRM, abi.encode(confirm));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: uint64(batchId + 10)
+        });
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256(abi.encode("confirm-guid", batchId, commitHash)), message, address(0), "");
+    }
+
+    // ============ C24-F2: MAX_SETTLEMENT_BATCH Cap Tests ============
+
+    function test_C24F2_BatchResult_RejectsOversizedPayload() public {
+        uint256 cap = router.MAX_SETTLEMENT_BATCH();
+        uint256 over = cap + 1;
+
+        bytes32[] memory commits = new bytes32[](over);
+        uint256[] memory amounts = new uint256[](over);
+        address[] memory traders = new address[](over);
+        for (uint256 i = 0; i < over; i++) {
+            commits[i] = keccak256(abi.encodePacked("c", i));
+        }
+
+        CrossChainRouter.BatchResult memory result = CrossChainRouter.BatchResult({
+            batchId: 1,
+            poolId: keccak256("p"),
+            clearingPrice: 1e18,
+            filledTraders: traders,
+            filledAmounts: amounts,
+            filledCommitHashes: commits
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.BATCH_RESULT, abi.encode(result));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: 42
+        });
+        vm.prank(address(endpoint));
+        vm.expectRevert(CrossChainRouter.BatchTooLarge.selector);
+        router.lzReceive(origin, keccak256("oversized"), message, address(0), "");
+    }
+
+    function test_C24F2_SettlementConfirm_RejectsOversizedPayload() public {
+        uint256 cap = router.MAX_SETTLEMENT_BATCH();
+        uint256 over = cap + 1;
+
+        bytes32[] memory commits = new bytes32[](over);
+        for (uint256 i = 0; i < over; i++) {
+            commits[i] = keccak256(abi.encodePacked("s", i));
+        }
+
+        CrossChainRouter.SettlementConfirm memory confirm = CrossChainRouter.SettlementConfirm({
+            commitHashes: commits,
+            batchId: 2,
+            settledOnChain: CHAIN_B
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.SETTLEMENT_CONFIRM, abi.encode(confirm));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: 43
+        });
+        vm.prank(address(endpoint));
+        vm.expectRevert(CrossChainRouter.BatchTooLarge.selector);
+        router.lzReceive(origin, keccak256("oversized-confirm"), message, address(0), "");
+    }
+
+    function test_C24F2_BatchResult_AtCap_Accepted() public {
+        uint256 cap = router.MAX_SETTLEMENT_BATCH();
+
+        bytes32[] memory commits = new bytes32[](cap);
+        uint256[] memory amounts = new uint256[](cap);
+        address[] memory traders = new address[](cap);
+        for (uint256 i = 0; i < cap; i++) {
+            commits[i] = keccak256(abi.encodePacked("ok", i));
+            traders[i] = authorized;
+        }
+
+        CrossChainRouter.BatchResult memory result = CrossChainRouter.BatchResult({
+            batchId: 99,
+            poolId: keccak256("p99"),
+            clearingPrice: 1e18,
+            filledTraders: traders,
+            filledAmounts: amounts,
+            filledCommitHashes: commits
+        });
+        bytes memory message = abi.encode(CrossChainRouter.MessageType.BATCH_RESULT, abi.encode(result));
+        CrossChainRouter.Origin memory origin = CrossChainRouter.Origin({
+            srcEid: CHAIN_B, sender: PEER_B, nonce: 99
+        });
+        // Should NOT revert at the cap — core is address(0) in default setup so the
+        // inner settleCrossChainOrder call is skipped, but the gate itself must allow
+        // length == cap.
+        vm.prank(address(endpoint));
+        router.lzReceive(origin, keccak256("at-cap"), message, address(0), "");
+        // Processed flag = gate passed
+        assertTrue(router.isProcessed(keccak256("at-cap")));
+    }
+}
+
+/// @dev Mock VibeSwapCore settlement surface. Toggle reverting to simulate a paused /
+///      buggy / OOG-starved core whose failures previously went unnoticed.
+contract MockSettlementCore {
+    bool public reverting;
+    bytes32 public lastCommitHash;
+    bytes32 public lastPoolId;
+    uint256 public lastEstimatedOut;
+
+    function setReverting(bool b) external { reverting = b; }
+
+    function lastSettle() external view returns (bytes32, bytes32, uint256) {
+        return (lastCommitHash, lastPoolId, lastEstimatedOut);
+    }
+
+    function settleCrossChainOrder(bytes32 commitHash, bytes32 poolId, uint256 estimatedOut) external {
+        require(!reverting, "core reverting");
+        lastCommitHash = commitHash;
+        lastPoolId = poolId;
+        lastEstimatedOut = estimatedOut;
+    }
+
+    function markCrossChainSettled(bytes32 commitHash) external {
+        require(!reverting, "core reverting");
+        lastCommitHash = commitHash;
+    }
 }

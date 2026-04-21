@@ -55,6 +55,41 @@ contract MockStrategy is IStrategy {
     }
 }
 
+/// @notice Mock ShapleyDistributor that mirrors the real contract's balance-based
+///         pre-funding check. C17-AUDIT-1 exposed that the aggregator was approving
+///         instead of transferring, which would fail this balance check.
+contract MockShapleyDistributorForC17 {
+    uint256 public lastTotalValue;
+    address public lastToken;
+    bytes32 public lastGameId;
+    uint256 public createGameCalls;
+
+    function createGame(
+        bytes32 gameId,
+        uint256 totalValue,
+        address token,
+        IShapleyDistributor.Participant[] calldata
+    ) external {
+        // Mirror ShapleyDistributor._createGameInternal line 523 balance check.
+        require(
+            IERC20(token).balanceOf(address(this)) >= totalValue,
+            "Insufficient tokens for game"
+        );
+        lastTotalValue = totalValue;
+        lastToken = token;
+        lastGameId = gameId;
+        createGameCalls++;
+    }
+
+    // Implement the remaining interface methods as no-ops for compilation.
+    function createGameTyped(
+        bytes32, uint256, address, IShapleyDistributor.GameType, IShapleyDistributor.Participant[] calldata
+    ) external {}
+    function createGameFull(
+        bytes32, uint256, address, IShapleyDistributor.GameType, bytes32, IShapleyDistributor.Participant[] calldata
+    ) external {}
+}
+
 // ============ Tests ============
 
 contract VibeYieldAggregatorTest is Test {
@@ -611,6 +646,73 @@ contract VibeYieldAggregatorTest is Test {
         vm.prank(bob);
         agg.emergencyWithdraw(vaultId);
         assertEq(agg.balanceOf(vaultId, bob), 0);
+    }
+
+    // ============ C17-AUDIT-1: Fees must be TRANSFERRED to Shapley, not approved ============
+
+    /// @notice Before the fix, distributeFees did `approve(shapley, fees); createGame(...)`
+    ///         but ShapleyDistributor.createGame checks `balanceOf(address(this))`, not
+    ///         pull-on-transferFrom. The call would always revert at the balance gate —
+    ///         a latent, never-tested bug that fully broke the Shapley fee path.
+    ///         After the fix: aggregator pushes via safeTransfer before createGame.
+    function test_C17_DistributeFees_PushesToShapleyBeforeCreateGame() public {
+        MockShapleyDistributorForC17 shapley = new MockShapleyDistributorForC17();
+        agg.setShapleyDistributor(address(shapley));
+
+        // Accumulate fees via harvest. Note: harvest() increments v.accumulatedFees
+        // as an ACCOUNTING counter; it does NOT physically move fee tokens from the
+        // strategy to the aggregator (C17-AUDIT-2, deferred architectural follow-up).
+        // For this regression we simulate the post-harvest end-state by also
+        // minting fee tokens directly into the aggregator so safeTransfer has
+        // something to move. The AUDIT-1 fix (approve→transfer) is orthogonal
+        // to AUDIT-2 (accumulator/balance divorce).
+        agg.addStrategy(vaultId, address(strategy1), 10000);
+
+        vm.prank(alice);
+        agg.deposit(vaultId, 100_000e18);
+
+        strategy1.setPendingProfit(10_000e18);
+        token.mint(address(strategy1), 10_000e18);
+        vm.prank(keeperAddr);
+        agg.harvest(vaultId, address(strategy1));
+
+        uint256 fees = agg.getVault(vaultId).accumulatedFees;
+        assertGt(fees, 0, "fees accumulated from harvest");
+
+        // Simulate the token-transfer side of harvest (AUDIT-2 deferred): mint the
+        // equivalent fees onto the aggregator so the C17-AUDIT-1 fix has balance
+        // to move. Without AUDIT-2's closure, real-world distributeFees requires
+        // an operator to manually move fees from strategy to aggregator first.
+        token.mint(address(agg), fees);
+
+        // Now distributeFees. Before C17 fix: this would revert at shapley's balance
+        // gate because the aggregator approved but did NOT transfer.
+        IShapleyDistributor.Participant[] memory participants = new IShapleyDistributor.Participant[](2);
+        participants[0] = IShapleyDistributor.Participant({
+            participant: alice, directContribution: 1, timeInPool: 1,
+            scarcityScore: 5000, stabilityScore: 5000
+        });
+        participants[1] = IShapleyDistributor.Participant({
+            participant: bob, directContribution: 1, timeInPool: 1,
+            scarcityScore: 5000, stabilityScore: 5000
+        });
+
+        bytes32 gameId = keccak256("c17-game");
+        uint256 shapleyBalBefore = token.balanceOf(address(shapley));
+        uint256 aggBalBefore = token.balanceOf(address(agg));
+
+        agg.distributeFees(vaultId, gameId, participants);
+
+        // Invariants:
+        // 1. shapley received exactly `fees` tokens (no approve-without-pull).
+        // 2. aggregator decreased by exactly `fees`.
+        // 3. createGame was called once with matching args.
+        assertEq(token.balanceOf(address(shapley)) - shapleyBalBefore, fees, "shapley received fees");
+        assertEq(aggBalBefore - token.balanceOf(address(agg)), fees, "aggregator paid out");
+        assertEq(shapley.createGameCalls(), 1, "createGame fired exactly once");
+        assertEq(shapley.lastGameId(), gameId, "gameId matches");
+        assertEq(shapley.lastTotalValue(), fees, "totalValue matches");
+        assertEq(shapley.lastToken(), address(token), "token matches");
     }
 
     function test_multiVaultLifecycle() public {

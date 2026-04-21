@@ -90,6 +90,13 @@ interface INakamotoConsensusInfinity {
     event EquivocationDetected(address indexed validator, uint256 indexed epochNumber, bytes32 hash1, bytes32 hash2);
     event TrinityNodeAdded(address indexed node);
     event TrinityNodeRemoved(address indexed node);
+    // C36-F2: admin observability — external-contract reference setters
+    event SoulboundIdentityUpdated(address indexed oldAddr, address indexed newAddr);
+    event ContributionDAGUpdated(address indexed oldAddr, address indexed newAddr);
+    event VibeCodeUpdated(address indexed oldAddr, address indexed newAddr);
+    event AgentReputationUpdated(address indexed oldAddr, address indexed newAddr);
+    event CKBNativeTokenUpdated(address indexed oldAddr, address indexed newAddr);
+    event JouleTokenUpdated(address indexed oldAddr, address indexed newAddr);
 
     // ============ Errors ============
 
@@ -107,6 +114,7 @@ interface INakamotoConsensusInfinity {
     error ZeroAmount();
     error ValidatorSlashedErr();
     error Unauthorized();
+    error MaxValidatorsReached();
 
     // ============ Validator Functions ============
 

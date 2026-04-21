@@ -16,6 +16,11 @@ contract VibeCheckpointRegistry is OwnableUpgradeable, UUPSUpgradeable {
 
     event CheckpointSubmitted(uint256 indexed id, uint256 blockNumber, bytes32 stateRoot);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() external initializer { __Ownable_init(msg.sender); __UUPSUpgradeable_init(); }
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         require(newImplementation.code.length > 0, "Not a contract");

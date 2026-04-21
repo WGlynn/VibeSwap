@@ -528,6 +528,145 @@ contract VibeAgentConsensusTest is Test {
         assertEq(rel.reliabilityScore, 0);
     }
 
+    // ============ Stake Return — Regression tests for C12-AUDIT-1 (CRIT) ============
+    //
+    // Previously _returnStakes sent ALL revealed-agent stakes to msg.sender of finalize()
+    // instead of to the committer. Any finalizer could drain the full batch.
+
+    function test_StakeReturn_GoesToCommitter_NotFinalizer() public {
+        uint256 roundId = _createRound();
+        uint256 value = 50000e18;
+        bytes32 salt = keccak256("salt-1");
+
+        uint256 committerStart = agent1Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, value, salt);
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, value, salt);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        // Some unrelated EOA finalizes. Prior to fix, this address would have received the stake.
+        address finalizer = makeAddr("opportunistic-finalizer");
+        vm.deal(finalizer, 0);
+
+        vm.prank(finalizer);
+        consensus.finalize(roundId);
+
+        assertEq(finalizer.balance, 0, "finalizer must NOT receive stake");
+        assertEq(agent1Addr.balance, committerStart, "committer must be made whole");
+    }
+
+    function test_StakeReturn_MultipleCommitters_EachGetsOwnStake() public {
+        uint256 roundId = _createRound();
+        bytes32 salt1 = keccak256("s1");
+        bytes32 salt2 = keccak256("s2");
+
+        uint256 start1 = agent1Addr.balance;
+        uint256 start2 = agent2Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, salt2);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        _revealAgent(roundId, agent2Addr, AGENT2, 51000e18, salt2);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        address finalizer = makeAddr("finalizer");
+        vm.prank(finalizer);
+        consensus.finalize(roundId);
+
+        assertEq(agent1Addr.balance, start1, "agent1 whole");
+        assertEq(agent2Addr.balance, start2, "agent2 whole");
+        assertEq(finalizer.balance, 0, "finalizer gets nothing");
+    }
+
+    function test_StakeReturn_SlashedAgent_NotRefunded() public {
+        uint256 roundId = _createRound();
+        bytes32 salt1 = keccak256("s1");
+        bytes32 salt2 = keccak256("s2");
+
+        uint256 start2 = agent2Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, salt2);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, salt1);
+        // agent2 does NOT reveal
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        // agent2 stake is locked by the slash — stays in contract, does not flow back
+        assertEq(agent2Addr.balance, start2 - MIN_STAKE, "non-revealer stays short");
+    }
+
+    // ============ C14-AUDIT-1: Pull pattern for failed stake returns ============
+
+    function test_C14_FailedPush_CreditsPendingQueue() public {
+        EthRejector rej = new EthRejector();
+        rej.setRejecting(true);
+        // Fund the rejector so it can pay the commit stake under vm.prank. vm.deal bypasses
+        // the receive() rejection (it's a cheatcode, not a transfer).
+        vm.deal(address(rej), MIN_STAKE);
+
+        uint256 roundId = _createRound();
+        bytes32 salt = keccak256("c14-salt");
+        uint256 value = 50000e18;
+
+        // Committer is the rejecting contract
+        bytes32 ch = _commitHash(value, salt);
+        vm.prank(address(rej));
+        consensus.commit{value: MIN_STAKE}(roundId, AGENT1, ch, 5000);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        vm.prank(address(rej));
+        consensus.reveal(roundId, AGENT1, value, salt, 0);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        // Auto-push failed, pending must equal stake. Pre-fix: stake trapped in ac.stake
+        // with no external withdrawal path.
+        assertEq(consensus.pendingStakeWithdrawals(address(rej)), MIN_STAKE, "pending queued");
+        assertEq(address(rej).balance, 0, "rejector did not auto-receive");
+    }
+
+    function test_C14_PendingWithdrawal_Pullable_AfterRejectorDisables() public {
+        EthRejector rej = new EthRejector();
+        rej.setRejecting(true);
+        vm.deal(address(rej), MIN_STAKE);
+
+        uint256 roundId = _createRound();
+        bytes32 salt = keccak256("c14-salt-2");
+        uint256 value = 50000e18;
+
+        bytes32 ch = _commitHash(value, salt);
+        vm.prank(address(rej));
+        consensus.commit{value: MIN_STAKE}(roundId, AGENT1, ch, 5000);
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        vm.prank(address(rej));
+        consensus.reveal(roundId, AGENT1, value, salt, 0);
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+        assertEq(consensus.pendingStakeWithdrawals(address(rej)), MIN_STAKE);
+
+        // Rejector flips to accept ETH, then pulls
+        rej.setRejecting(false);
+        rej.pull(address(consensus));
+
+        assertEq(consensus.pendingStakeWithdrawals(address(rej)), 0, "pending cleared");
+        assertEq(address(rej).balance, MIN_STAKE, "rejector got stake");
+    }
+
+    function test_C14_WithdrawPendingStake_RevertsWhenZero() public {
+        vm.expectRevert("Nothing to withdraw");
+        consensus.withdrawPendingStake();
+    }
+
     // ============ Fuzz ============
 
     function testFuzz_Commit_StakeRange(uint256 stake) public {
@@ -558,5 +697,174 @@ contract VibeAgentConsensusTest is Test {
 
         // Single agent: consensus == their value
         assertEq(consensus.getRound(roundId).consensusValue, value);
+    }
+
+    // ============ C29 (C12-AUDIT-2): Slashed stakes no longer orphaned ============
+    //
+    // Before C29: _slashNonRevealers incremented totalSlashed counter but never zeroed
+    // ac.stake or moved funds. Full stake (including the unslashed portion when
+    // slashBps < 10000) was trapped in contract balance with no withdraw path.
+    //
+    // After C29: slashed portion accumulates in slashPool (owner-sweepable to treasury);
+    // unslashed remainder is credited to pendingStakeWithdrawals[committer] so the
+    // committer can reclaim their kept stake via withdrawPendingStake().
+
+    function test_C29_Slash_AccumulatesToSlashPool() public {
+        uint256 roundId = _createRound();
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, keccak256("s2"));
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        // agent2 does NOT reveal
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        assertEq(consensus.slashPool(), 0, "pool starts empty");
+        consensus.finalize(roundId);
+
+        // slashBps = 1000 (10% default) → slashAmount = MIN_STAKE * 0.1
+        uint256 expected = (MIN_STAKE * 1000) / 10000;
+        assertEq(consensus.slashPool(), expected, "pool holds slashed portion");
+        assertEq(consensus.totalSlashed(), expected, "counter matches pool");
+    }
+
+    function test_C29_Slash_RemainderCreditedToPendingQueue() public {
+        uint256 roundId = _createRound();
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, keccak256("s2"));
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        uint256 slashAmount = (MIN_STAKE * 1000) / 10000;
+        uint256 remainder = MIN_STAKE - slashAmount;
+        assertEq(consensus.pendingStakeWithdrawals(agent2Addr), remainder, "remainder queued for committer");
+    }
+
+    function test_C29_NonRevealer_AcStakeZeroedAfterSlash() public {
+        uint256 roundId = _createRound();
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, keccak256("s2"));
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        // Destructure: (commitHash, revealedValue, stake, mindScore, powNonce, committer, committed, revealed, slashed)
+        (, , uint256 stakeAfter, , , , , , bool slashed) = consensus.commits(roundId, AGENT2);
+        assertTrue(slashed, "AGENT2 marked slashed");
+        assertEq(stakeAfter, 0, "ac.stake zeroed - no fund-trap");
+    }
+
+    function test_C29_NonRevealer_CanWithdrawRemainder() public {
+        uint256 roundId = _createRound();
+        uint256 preBalance = agent2Addr.balance;
+
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, keccak256("s2"));
+
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+
+        consensus.finalize(roundId);
+
+        uint256 slashAmount = (MIN_STAKE * 1000) / 10000;
+
+        vm.prank(agent2Addr);
+        consensus.withdrawPendingStake();
+
+        // Non-revealer reclaims the unslashed portion. Net loss == slashAmount only.
+        assertEq(agent2Addr.balance, preBalance - slashAmount, "only slashed portion lost");
+        assertEq(consensus.pendingStakeWithdrawals(agent2Addr), 0, "pending cleared");
+    }
+
+    function test_C29_SweepSlashPool_ToTreasury() public {
+        uint256 roundId = _createRound();
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, keccak256("s2"));
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+        consensus.finalize(roundId);
+
+        uint256 slashAmount = (MIN_STAKE * 1000) / 10000;
+        address treasury = makeAddr("dao-treasury");
+
+        consensus.sweepSlashPoolToTreasury(treasury);
+
+        assertEq(treasury.balance, slashAmount, "treasury received slash");
+        assertEq(consensus.slashPool(), 0, "pool drained");
+    }
+
+    function test_C29_Sweep_RejectsZeroTreasury() public {
+        // Need pool non-zero so "Empty pool" doesn't fire first
+        uint256 roundId = _createRound();
+        _commitAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        _commitAgent(roundId, agent2Addr, AGENT2, 51000e18, keccak256("s2"));
+        vm.warp(block.timestamp + COMMIT_DURATION + 1);
+        _revealAgent(roundId, agent1Addr, AGENT1, 50000e18, keccak256("s1"));
+        vm.warp(block.timestamp + REVEAL_DURATION + 1);
+        consensus.finalize(roundId);
+
+        vm.expectRevert("Zero treasury");
+        consensus.sweepSlashPoolToTreasury(address(0));
+    }
+
+    function test_C29_Sweep_RejectsEmptyPool() public {
+        vm.expectRevert("Empty pool");
+        consensus.sweepSlashPoolToTreasury(makeAddr("treasury"));
+    }
+
+    function test_C29_Sweep_OnlyOwner() public {
+        vm.prank(agent1Addr);
+        vm.expectRevert();
+        consensus.sweepSlashPoolToTreasury(makeAddr("treasury"));
+    }
+
+    function test_C29_Sweep_AccumulatesAcrossRounds() public {
+        // Two timeout rounds back-to-back, then single sweep collects both slashes.
+        for (uint256 r = 0; r < 2; r++) {
+            uint256 roundId = consensus.createRound(keccak256(abi.encodePacked("topic-", r)));
+            bytes32 agentId = keccak256(abi.encodePacked("agent-x-", r));
+            bytes32 ch = _commitHash(50000e18, keccak256("salt-x"));
+
+            vm.deal(agent2Addr, 1 ether);
+            vm.prank(agent2Addr);
+            consensus.commit{value: MIN_STAKE}(roundId, agentId, ch, 5000);
+
+            vm.warp(block.timestamp + COMMIT_DURATION + REVEAL_DURATION + 1);
+            consensus.finalize(roundId);
+        }
+
+        uint256 slashPerRound = (MIN_STAKE * 1000) / 10000;
+        assertEq(consensus.slashPool(), slashPerRound * 2, "two rounds accumulated");
+
+        address treasury = makeAddr("treasury");
+        consensus.sweepSlashPoolToTreasury(treasury);
+        assertEq(treasury.balance, slashPerRound * 2, "sweep gets both rounds");
+    }
+}
+
+// ============ C14 test helpers ============
+
+/// @dev Contract that can toggle ETH acceptance, used to simulate a committer whose
+///      fallback rejects ETH during _returnStakes auto-push.
+contract EthRejector {
+    bool public rejecting;
+
+    function setRejecting(bool b) external { rejecting = b; }
+
+    receive() external payable {
+        require(!rejecting, "rejecting");
+    }
+
+    function pull(address c) external {
+        VibeAgentConsensus(payable(c)).withdrawPendingStake();
     }
 }

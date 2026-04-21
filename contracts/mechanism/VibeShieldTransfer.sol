@@ -65,6 +65,11 @@ contract VibeShieldTransfer is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     // ============ Init ============
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

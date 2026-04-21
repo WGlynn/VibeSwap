@@ -104,6 +104,7 @@ contract MockTruePriceOracle is ITruePriceOracle {
 
     function updateTruePrice(bytes32, uint256, uint256, int256, RegimeType, uint256, bytes32, bytes calldata) external {}
     function updateStablecoinContext(uint256, bool, bool, uint256, bytes calldata) external {}
+    function updateTruePriceBundle(EvidenceBundle calldata, bytes calldata) external {}
     function setAuthorizedSigner(address, bool) external {}
 }
 
@@ -846,8 +847,13 @@ contract TruePriceValidationTest is Test {
     // ============ Helpers ============
 
     function _mintAndSync(uint256 amount) internal {
+        // Simulates VibeSwapCore's `safeTransfer(amm, amountIn)` step in
+        // `_buildPoolSwapOrders`. Production flow does NOT sync trackedBalances
+        // after the transfer — executeBatchSwap pre-credits `trackedBalances +=
+        // amountIn` internally (see VibeAMM.sol TRP-R16-F03). Syncing here
+        // double-counts and reverts with DonationAttackSuspected.
+        // (Name kept for test-site stability; behavior now matches production.)
         tokenA.mint(address(amm), amount);
-        amm.syncTrackedBalance(address(tokenA));
     }
 
     function _makeSingleOrder(uint256 amount) internal view returns (IVibeAMM.SwapOrder[] memory) {
@@ -996,8 +1002,8 @@ contract TruePriceValidationTest is Test {
         // CASCADE + high manipulation: 200 + 400 + 400 = 1000 → capped at 500
         oracle.setTruePrice(highFeePool, 1e18, 0.01e18, 0, ITruePriceOracle.RegimeType.CASCADE, 0.85e18);
 
+        // C33: no syncTrackedBalance — executeBatchSwap pre-credits internally
         capTokenA.mint(address(amm), SWAP_AMOUNT);
-        amm.syncTrackedBalance(address(capTokenA));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({

@@ -1488,15 +1488,35 @@ contract VibeAMM is
         // routing through batch vs single swap produced different effective fee rates.
         // Standardized to input-fee: fee stays as tokenIn in the pool (LP benefit),
         // and output is computed on the post-fee input amount at clearing price.
+        //
+        // C34: cap amountOut by the constant-product curve. The uniform clearing price
+        // becomes an UPPER BOUND on trader payout rather than the exact execution rate.
+        // When TruePrice damping pulls clearingPrice away from AMM's natural marginal
+        // price, the linear formula can pay out more than x*y=k allows, violating the
+        // k-invariant check below. Clipping to the curve preserves k unconditionally:
+        // if damping is more generous than the curve, traders get the curve amount
+        // (LP-favorable, k grows); if damping is more restrictive, traders get the
+        // damped amount (trader penalty, k grows further). Paper §2.1 Def 4
+        // core-preservation mandate: augmentations must preserve π(AMM) = x*y=k.
         // Stack note: inline calculations to avoid extra local variables (function near stack limit).
         {
             // effectiveAmountIn = amountIn * (10000 - feeRate) / 10000
             uint256 effIn = amountIn * (10000 - feeRate) / 10000;
+            uint256 linearAmountOut;
             if (isToken0) {
-                amountOut = (effIn * clearingPrice) / 1e18;
+                linearAmountOut = (effIn * clearingPrice) / 1e18;
             } else {
-                amountOut = clearingPrice > 0 ? (effIn * 1e18) / clearingPrice : 0;
+                linearAmountOut = clearingPrice > 0 ? (effIn * 1e18) / clearingPrice : 0;
             }
+            // Constant-product cap using per-order reserves. getAmountOut applies the
+            // fee internally on amountIn, matching the single-swap path exactly.
+            uint256 curveAmountOut = BatchMath.getAmountOut(
+                amountIn,
+                isToken0 ? pool.reserve0 : pool.reserve1,
+                isToken0 ? pool.reserve1 : pool.reserve0,
+                feeRate
+            );
+            amountOut = linearAmountOut < curveAmountOut ? linearAmountOut : curveAmountOut;
             // protocolFee = feeAmount * protocolFeeShare / 10000
             //             = (amountIn - effIn) * protocolFeeShare / 10000
             protocolFee = (amountIn - effIn) * protocolFeeShare / 10000;

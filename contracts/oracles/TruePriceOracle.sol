@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/ITruePriceOracle.sol";
 import "./interfaces/IStablecoinFlowRegistry.sol";
+import "./interfaces/IIssuerReputationRegistry.sol";
 import "../libraries/SecurityLib.sol";
 
 /**
@@ -83,9 +84,35 @@ contract TruePriceOracle is
         "StablecoinUpdate(uint256 usdtUsdcRatio,bool usdtDominant,bool usdcDominant,uint256 volatilityMultiplier,uint256 nonce,uint256 deadline)"
     );
 
+    // C12: EvidenceBundle typed data
+    bytes32 public constant EVIDENCE_BUNDLE_TYPEHASH = keccak256(
+        "EvidenceBundle(uint8 version,bytes32 poolId,uint256 price,uint256 confidence,int256 deviationZScore,uint8 regime,uint256 manipulationProb,bytes32 dataHash,bytes32 stablecoinContextHash,bytes32 issuerKey,uint256 nonce,uint256 deadline)"
+    );
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint8 public constant BUNDLE_VERSION = 1;
+
+    /// @notice C12 — Issuer reputation registry for stake-bonded oracle identity.
+    IIssuerReputationRegistry public issuerRegistry;
+
+    /// @notice C37-F1 — chain ID captured at init, used to detect fork scenarios.
+    ///         When `block.chainid != _cachedChainId`, `_domainSeparator()`
+    ///         recomputes the domain separator against the live chain, making
+    ///         cached-at-init signatures invalid on forked chains. Prevents
+    ///         the cross-chain replay class documented in EIP-712 §Rationale.
+    uint256 private _cachedChainId;
+
+    /// @notice C37-F1 — compile-time name/version hashes used by
+    ///         `_buildDomainSeparator` so recomputation is chain-aware
+    ///         without re-hashing string literals at runtime.
+    bytes32 private constant _HASHED_NAME = keccak256("TruePriceOracle");
+    bytes32 private constant _HASHED_VERSION = keccak256("1");
+    bytes32 private constant _TYPE_HASH_EIP712_DOMAIN = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
+    /// @dev Reserved storage gap for future upgrades.
+    ///      C12: 50 → 49 (issuerRegistry). C37-F1: 49 → 48 (_cachedChainId).
+    uint256[48] private __gap;
 
     // ============ Errors ============
 
@@ -97,6 +124,11 @@ contract TruePriceOracle is
     error InvalidNonce();
     error ZeroAddress();
     error NoPriceData();
+    // C12
+    error UnsupportedBundleVersion(uint8 version);
+    error IssuerRegistryNotSet();
+    error IssuerNotActive(bytes32 issuerKey);
+    error StablecoinContextMismatch();
 
     // ============ Modifiers ============
 
@@ -119,15 +151,13 @@ contract TruePriceOracle is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("TruePriceOracle"),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
+        // C37-F1: cache both the chain id and a domain separator computed
+        // against it. `_domainSeparator()` returns this cached value when
+        // block.chainid still matches, and recomputes on the fly if the chain
+        // ever diverges (fork / migration). DOMAIN_SEPARATOR remains in
+        // storage as the public fast-path value for the common case.
+        _cachedChainId = block.chainid;
+        DOMAIN_SEPARATOR = _buildDomainSeparator();
 
         // Initialize default stablecoin context
         stablecoinContext = StablecoinContext({
@@ -136,6 +166,35 @@ contract TruePriceOracle is
             usdcDominant: false,
             volatilityMultiplier: PRECISION // 1.0x
         });
+    }
+
+    /// @notice C37-F1 — current-chain-aware domain separator. Use in place
+    ///         of the cached public `DOMAIN_SEPARATOR` anywhere signatures
+    ///         are verified. Cached fast path on the original chain; fresh
+    ///         compute on forked chains.
+    function _domainSeparator() internal view returns (bytes32) {
+        if (block.chainid == _cachedChainId) {
+            return DOMAIN_SEPARATOR;
+        }
+        return _buildDomainSeparator();
+    }
+
+    /// @notice C37-F1 — compute a domain separator against the live chain.
+    function _buildDomainSeparator() internal view returns (bytes32) {
+        return keccak256(abi.encode(
+            _TYPE_HASH_EIP712_DOMAIN,
+            _HASHED_NAME,
+            _HASHED_VERSION,
+            block.chainid,
+            address(this)
+        ));
+    }
+
+    /// @notice C37-F1 — external getter returning the fork-aware domain
+    ///         separator. Off-chain keepers should prefer this over reading
+    ///         the public `DOMAIN_SEPARATOR` storage slot directly.
+    function domainSeparator() external view returns (bytes32) {
+        return _domainSeparator();
     }
 
     // ============ External View Functions ============
@@ -343,6 +402,131 @@ contract TruePriceOracle is
     }
 
     /**
+     * @notice C12 — Set the IssuerReputationRegistry used by updateTruePriceBundle.
+     * @param registry Registry contract address (zero to disable bundle path).
+     */
+    function setIssuerRegistry(address registry) external onlyOwner {
+        issuerRegistry = IIssuerReputationRegistry(registry);
+    }
+
+    // ============ C12: EvidenceBundle Update Path ============
+
+    /// @inheritdoc ITruePriceOracle
+    function updateTruePriceBundle(
+        EvidenceBundle calldata bundle,
+        bytes calldata signature
+    ) external override nonReentrant {
+        if (bundle.version != BUNDLE_VERSION) revert UnsupportedBundleVersion(bundle.version);
+        if (address(issuerRegistry) == address(0)) revert IssuerRegistryNotSet();
+
+        // Check stablecoin context snapshot matches current live context.
+        if (bundle.stablecoinContextHash != _currentStablecoinContextHash()) {
+            revert StablecoinContextMismatch();
+        }
+
+        (address signer, uint256 nonce, uint256 deadline) = _verifyBundleSignature(bundle, signature);
+
+        // Issuer binding — the signer recovered from the signature must match the
+        // signer registered under bundle.issuerKey, and the issuer must be ACTIVE
+        // with reputation >= minReputation. This is the stake-bonded identity check.
+        if (!issuerRegistry.verifyIssuer(bundle.issuerKey, signer)) {
+            revert IssuerNotActive(bundle.issuerKey);
+        }
+
+        if (nonce != signerNonces[signer]) revert InvalidNonce();
+        signerNonces[signer]++;
+        if (block.timestamp > deadline) revert ExpiredSignature();
+
+        // Price jump validation (if existing data).
+        if (truePrices[bundle.poolId].timestamp > 0 && truePrices[bundle.poolId].price > 0) {
+            _validatePriceJump(truePrices[bundle.poolId].price, bundle.price);
+        }
+
+        // Store new data.
+        TruePriceData memory newData;
+        newData.price = bundle.price;
+        newData.confidence = bundle.confidence;
+        newData.deviationZScore = bundle.deviationZScore;
+        newData.regime = bundle.regime;
+        newData.manipulationProb = bundle.manipulationProb;
+        newData.timestamp = uint64(block.timestamp);
+        newData.dataHash = bundle.dataHash;
+
+        truePrices[bundle.poolId] = newData;
+        _addToHistory(bundle.poolId, newData);
+
+        emit TruePriceUpdated(bundle.poolId, bundle.price, bundle.deviationZScore, bundle.regime, bundle.manipulationProb, uint64(block.timestamp));
+    }
+
+    /// @dev Extracted to avoid stack-too-deep in _verifyBundleSignature.
+    function _bundleStructHash(EvidenceBundle calldata bundle, uint256 nonce, uint256 deadline)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(
+            EVIDENCE_BUNDLE_TYPEHASH,
+            bundle.version,
+            bundle.poolId,
+            bundle.price,
+            bundle.confidence,
+            bundle.deviationZScore,
+            uint8(bundle.regime),
+            bundle.manipulationProb,
+            bundle.dataHash,
+            bundle.stablecoinContextHash,
+            bundle.issuerKey,
+            nonce,
+            deadline
+        ));
+    }
+
+    function _verifyBundleSignature(EvidenceBundle calldata bundle, bytes calldata signature)
+        internal
+        view
+        returns (address signer, uint256 nonce, uint256 deadline)
+    {
+        require(signature.length >= 129, "Invalid signature length");
+
+        nonce = abi.decode(signature[65:97], (uint256));
+        deadline = abi.decode(signature[97:129], (uint256));
+
+        // C37-F1: fork-aware domain separator
+        bytes32 digest = SecurityLib.toTypedDataHash(
+            _domainSeparator(),
+            _bundleStructHash(bundle, nonce, deadline)
+        );
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly {
+            r := calldataload(signature.offset)
+            s := calldataload(add(signature.offset, 32))
+            v := byte(0, calldataload(add(signature.offset, 64)))
+        }
+
+        signer = SecurityLib.recoverSigner(digest, v, r, s);
+    }
+
+    /// @notice Snapshot hash of the live stablecoin context. Off-chain issuer
+    ///         must bind to this at attestation time for bundle replay to hold.
+    function _currentStablecoinContextHash() internal view returns (bytes32) {
+        StablecoinContext memory ctx = _getStablecoinContext();
+        return keccak256(abi.encode(
+            ctx.usdtUsdcRatio,
+            ctx.usdtDominant,
+            ctx.usdcDominant,
+            ctx.volatilityMultiplier
+        ));
+    }
+
+    /// @notice External helper so off-chain keepers can query the current hash.
+    function currentStablecoinContextHash() external view returns (bytes32) {
+        return _currentStablecoinContextHash();
+    }
+
+    /**
      * @notice Get signer's current nonce
      * @param signer Signer address
      * @return Current nonce
@@ -411,7 +595,8 @@ contract TruePriceOracle is
             deadline
         ));
 
-        bytes32 digest = SecurityLib.toTypedDataHash(DOMAIN_SEPARATOR, structHash);
+        // C37-F1: fork-aware domain separator
+        bytes32 digest = SecurityLib.toTypedDataHash(_domainSeparator(), structHash);
 
         // Extract r, s, v
         bytes32 r;
@@ -448,7 +633,8 @@ contract TruePriceOracle is
             deadline
         ));
 
-        bytes32 digest = SecurityLib.toTypedDataHash(DOMAIN_SEPARATOR, structHash);
+        // C37-F1: fork-aware domain separator
+        bytes32 digest = SecurityLib.toTypedDataHash(_domainSeparator(), structHash);
 
         bytes32 r;
         bytes32 s;

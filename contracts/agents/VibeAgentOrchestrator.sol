@@ -23,6 +23,11 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
     enum StepStatus { PENDING, READY, EXECUTING, COMPLETED, FAILED }
     enum ConsensusType { MAJORITY, UNANIMOUS, WEIGHTED }
 
+    // ============ Constants ============
+
+    /// @notice C25-F4: DoS cap on _activeWorkflowIds (iteration bound). Phantom Array class.
+    uint256 public constant MAX_ACTIVE_WORKFLOWS = 10_000;
+
     struct Step {
         uint256 stepId;
         bytes32 agentId;
@@ -77,9 +82,11 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
     /// @dev agentId => authorized operator address
     mapping(bytes32 => address) public agentOperators;
 
+    /// @dev workflowId => index+1 in _activeWorkflowIds (0 = not present). C25-F4 swap-and-pop.
+    mapping(uint256 => uint256) private _activeWorkflowIndex;
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -109,8 +116,14 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
     error AlreadySubmitted();
     error NoSubmissions();
     error InvalidDependency();
+    error MaxActiveWorkflowsReached();
 
     // ============ Initializer ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize() external initializer {
         __Ownable_init(msg.sender);
@@ -182,9 +195,12 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
         if (wf.status != WorkflowStatus.DRAFT) revert WorkflowNotDraft();
         if (wf.creator != msg.sender) revert WorkflowNotDraft();
 
+        if (_activeWorkflowIds.length >= MAX_ACTIVE_WORKFLOWS) revert MaxActiveWorkflowsReached();
+
         wf.status = WorkflowStatus.ACTIVE;
         _isActive[workflowId] = true;
         _activeWorkflowIds.push(workflowId);
+        _activeWorkflowIndex[workflowId] = _activeWorkflowIds.length; // 1-indexed
 
         // Mark root steps (no dependencies) as READY
         for (uint256 i; i < wf.stepCount; i++) {
@@ -219,6 +235,7 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
         if (_allStepsCompleted(workflowId, wf.stepCount)) {
             wf.status = WorkflowStatus.COMPLETED;
             _isActive[workflowId] = false;
+            _removeFromActiveWorkflowIds(workflowId);
             emit WorkflowCompleted(workflowId, wf.spent);
         }
     }
@@ -235,6 +252,7 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
         s.status = StepStatus.FAILED;
         wf.status = WorkflowStatus.FAILED;
         _isActive[workflowId] = false;
+        _removeFromActiveWorkflowIds(workflowId);
 
         emit StepFailed(workflowId, stepId);
         emit WorkflowFailed(workflowId, stepId);
@@ -404,6 +422,21 @@ contract VibeAgentOrchestrator is OwnableUpgradeable, UUPSUpgradeable, Reentranc
             }
         }
         return bestOutput;
+    }
+
+    /// @dev C25-F4: swap-and-pop removal. No-op if id absent. Phantom Array class defense.
+    function _removeFromActiveWorkflowIds(uint256 workflowId) internal {
+        uint256 indexPlusOne = _activeWorkflowIndex[workflowId];
+        if (indexPlusOne == 0) return;
+        uint256 idx = indexPlusOne - 1;
+        uint256 lastIdx = _activeWorkflowIds.length - 1;
+        if (idx != lastIdx) {
+            uint256 lastId = _activeWorkflowIds[lastIdx];
+            _activeWorkflowIds[idx] = lastId;
+            _activeWorkflowIndex[lastId] = idx + 1;
+        }
+        _activeWorkflowIds.pop();
+        _activeWorkflowIndex[workflowId] = 0;
     }
 
     function _resolveUnanimous(SwarmTask storage task, AgentSwarm storage swarm) internal view returns (bytes32) {

@@ -1,4 +1,36 @@
-# Write-Ahead Log — CLEAN (session 2026-04-20 AFK close)
+# Write-Ahead Log — CLEAN (session 2026-04-21 reboot close)
+
+## Epoch — CLEAN at 2026-04-21 reboot
+- **Closed**: 2026-04-21, Will requested session reboot with next-session plan persisted in SESSION_STATE.md.
+- **Branch**: `feature/social-dag-phase-1` @ `08a2301c` pushed to origin (plus session-state commit incoming).
+- **Status**: CLEAN. 8 vibeswap commits pushed across session + memory-repo commits throughout. Tree clean.
+
+**Key vibeswap commits 2026-04-21**:
+- `8219d77b` C35 shardId-burn invariant (AUDIT-10 INFO)
+- `af036e19` C36-F1 bondPerCell MIN floor (MED)
+- `22b6f53f` C36-F2 admin-setter event observability (LOW×6 + primitive extracted)
+- `e4929da6` SHIELD-PERSIST-LEAK Layer 1 (untrack conversation-state files)
+- `e71e0ea9` C37-F1 fork-aware domain separator (TruePriceOracle)
+- `93f58de4` C37-F1-TWIN fork-aware domain separator (StablecoinFlowRegistry)
+- `08a2301c` MASTER_INDEX.md + PRIMITIVE_EXTRACTION_PROTOCOL.md
+
+**Key memory primitives extracted 2026-04-21** (in `~/.claude/projects/C--Users-Will/memory/`):
+- `primitive_economic-theory-of-mind.md` (META-PRINCIPLE Axis 0)
+- `primitive_token-mindfulness.md`
+- `primitive_pattern-match-drift-on-novelty.md`
+- `feedback_jul-is-primary-liquidity.md`
+- `primitive_admin-event-observability.md`
+
+**NDA incident resolved**: contaminated prior-session commit `77fde23e` dropped via surgical rebase. Root-cause fix (SHIELD-PERSIST-LEAK) shipped as two-layer defense. Backup branch `backup-pre-77fde23e-drop` preserves pre-rebase chain locally.
+
+## Next-session directive
+**Load `.claude/SESSION_STATE.md` first, then `memory/primitive_economic-theory-of-mind.md` before doing anything else.** Top priority: ETM Alignment Audit → Build Roadmap → Positioning rewrite → C38 first concrete alignment fix. Full four-step plan in SESSION_STATE "Pending / Next Session" section.
+
+Will directive at session close: *"we want to build toward this as a reality. asap."* Execute, don't re-theorize.
+
+---
+
+# Prior Epoch (2026-04-20) — archived below
 
 ## Current Epoch — CLEAN
 - **Started**: 2026-04-20 (post-fundraise-push session continuation)

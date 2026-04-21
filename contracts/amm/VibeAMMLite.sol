@@ -69,6 +69,11 @@ contract VibeAMMLite is
 
     event FeesCollected(address indexed token, uint256 amount);
     event BreakerTripped(bytes32 indexed breakerType, uint256 value);
+    event AuthorizedExecutorUpdated(address indexed executor, bool previous, bool current);
+    event TreasuryUpdated(address indexed previous, address indexed current);
+    event GlobalPauseUpdated(bool previous, bool current);
+    event FlashLoanProtectionUpdated(bool previous, bool current);
+    event TWAPValidationUpdated(bool previous, bool current);
 
     // ============ Errors ============
 
@@ -317,15 +322,36 @@ contract VibeAMMLite is
     // ============ Admin ============
 
     /// DISINTERMEDIATION: Grade C -> Target Grade B. Governance (TimelockController).
-    function setAuthorizedExecutor(address e, bool a) external onlyOwner { authorizedExecutors[e] = a; }
+    function setAuthorizedExecutor(address e, bool a) external onlyOwner {
+        bool prev = authorizedExecutors[e];
+        authorizedExecutors[e] = a;
+        emit AuthorizedExecutorUpdated(e, prev, a);
+    }
     /// DISINTERMEDIATION: Grade C -> Target Grade B. Governance (TimelockController).
-    function setTreasury(address t) external onlyOwner { if (t == address(0)) revert InvalidTreasury(); treasury = t; }
+    function setTreasury(address t) external onlyOwner {
+        if (t == address(0)) revert InvalidTreasury();
+        address prev = treasury;
+        treasury = t;
+        emit TreasuryUpdated(prev, t);
+    }
     /// DISINTERMEDIATION: KEEP — emergency pause. Target Grade B: governance + guardian.
-    function setGlobalPause(bool p) external onlyOwner { globalPaused = p; }
+    function setGlobalPause(bool p) external onlyOwner {
+        bool prev = globalPaused;
+        globalPaused = p;
+        emit GlobalPauseUpdated(prev, p);
+    }
     /// DISINTERMEDIATION: KEEP — security toggle. Target Grade B: governance + guardian.
-    function setFlashLoanProtection(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_FLASH_LOAN; else protectionFlags &= ~FLAG_FLASH_LOAN; }
+    function setFlashLoanProtection(bool e) external onlyOwner {
+        bool prev = (protectionFlags & FLAG_FLASH_LOAN) != 0;
+        if (e) protectionFlags |= FLAG_FLASH_LOAN; else protectionFlags &= ~FLAG_FLASH_LOAN;
+        emit FlashLoanProtectionUpdated(prev, e);
+    }
     /// DISINTERMEDIATION: KEEP — security toggle. Target Grade B: governance + guardian.
-    function setTWAPValidation(bool e) external onlyOwner { if (e) protectionFlags |= FLAG_TWAP; else protectionFlags &= ~FLAG_TWAP; }
+    function setTWAPValidation(bool e) external onlyOwner {
+        bool prev = (protectionFlags & FLAG_TWAP) != 0;
+        if (e) protectionFlags |= FLAG_TWAP; else protectionFlags &= ~FLAG_TWAP;
+        emit TWAPValidationUpdated(prev, e);
+    }
 
     /// DISINTERMEDIATION: DISSOLVED (Phase 2). Fee collection sends to treasury
     /// (hardcoded destination). Permissionless — caller pays gas, protocol benefits.

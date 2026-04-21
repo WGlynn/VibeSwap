@@ -503,6 +503,34 @@ What's NOT aligned:
 
 <!-- SECTION-5-MARKER -->
 
+## Section 6 — Summary table
+
+| # | Mechanism | Class | Notes |
+|---|---|---|---|
+| 1.1 | CKB State-Rent | ✅ MIRRORS | Canonical instantiation; cell + rent + citation-density + reaping. |
+| 1.2 | Secondary Issuance | ✅ MIRRORS | Continuous dilution is the rent engine. Split ratios ETM-neutral. |
+| 1.3 | Operator-Cell Assignment (OCR V1+V2a) | ✅ MIRRORS | Per-cell bond = attention rent; V2a permissionless challenge converts governance-slashing to math-enforced game. |
+| 1.4 | Content Merkle Registry / PAS (V2b) | ✅ MIRRORS | Extends rent from liveness to content-delivery. K-sampling structural. |
+| 2.1 | NCI 3D Consensus weight (PoW 10% / PoS 30% / PoM 60%) | ✅ MIRRORS | Three orthogonal cognitive resources; PoM seniority correct. |
+| 2.2 | Proof of Mind (PoM) | ✅ MIRRORS | Highest-fidelity common-knowledge externalization on any chain. |
+| 2.3 | Soulbound Identity + Heartbeat | ✅ MIRRORS | Continuity-of-identity as rent-unit; eviction-with-teeth (Enforced Liveness Signal primitive). |
+| 3.1 | JUL — primary liquidity | ✅ MIRRORS | Money + PoW pillar. Do NOT round to "bootstrap." |
+| 3.2 | VIBE — governance share | ✅ MIRRORS | Capped 21M, Shapley-distributed, governance-only utility. |
+| 3.3 | CKB-native — state-rent capital | ✅ MIRRORS | Locked-not-exchanged; elastic via issuance. Three-token orthogonality complete + minimal. |
+| 4.1 | Commit-Reveal Batch Auction (CRA) | ✅ MIRRORS | Walrasian batch at mechanism layer; eliminates ordering-extraction. |
+| 4.2 | True Price Oracle (TPO) | ◐ PARTIALLY | Stake-bonded + reputation + EvidenceBundle align; 5% deviation gate is policy, not structural. Refinement: FAT-AUDIT-2. |
+| 4.3 | Shapley + FractalShapley Distribution | ✅ MIRRORS | Mathematically-unique fair attribution function; recursive credit flow matches citation graph. |
+| 4.4 | VibeAMM constant-product | ◐ PARTIALLY | Operational layer aligned; LP positions sit rent-free + time-locked-not-attention-rewarded. Refinement: rent on LP positions + active-LP differentiation. |
+| 4.5 | Lawson Floor | ✅ MIRRORS | Maximin-derived settlement gate; structural not threshold. |
+| 4.6 | Contribution DAG | ✅ MIRRORS | Acyclic + PoM-weighted + soulbound-attributed. Substrate for common-knowledge layer. |
+| 5.1 | Siren Protocol | ✅ MIRRORS | Rent-until-exhaustion, not blacklist. High-drift zone handled correctly. |
+| 5.2 | Clawback Cascade | ✅ MIRRORS | Topological taint + contest windows. Not "freeze funds." |
+| 5.3 | Circuit Breakers + TWAP guards | ◐ PARTIALLY | Transparent last-resort, but attacker-learnable thresholds, no continuous rent. Refinement: FAT-AUDIT-2 + FAT-AUDIT-3. |
+
+**Totals**: 16 MIRRORS / 3 PARTIALLY MIRRORS / 0 FAILS TO MIRROR across 19 major mechanisms audited.
+
+**The 0 FAILS TO MIRROR result is itself noteworthy.** VibeSwap was designed against the cognitive-economic spec before the spec was articulated as ETM. The absence of full-fail mechanisms says: the underlying design intuition has been consistently ETM-aligned across the mechanism space. The 3 PARTIAL cases are known backlog items (FAT-AUDIT-1, FAT-AUDIT-2, FAT-AUDIT-3) already queued for refinement.
+
 <!-- SECTION-6-MARKER -->
 
 <!-- SECTION-7-MARKER -->

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/consensus/ShardOperatorRegistry.sol";
+import "../../contracts/consensus/OperatorCellRegistry.sol";
 import "../../contracts/monetary/CKBNativeToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -1029,5 +1030,131 @@ contract ShardOperatorRegistryTest is Test {
         registry.deactivateShard();
         assertEq(registry.totalCellsServed(), 0);
         assertFalse(registry.getShard(shard1).active);
+    }
+
+    // ============ C30: OperatorCellRegistry integration ============
+    //
+    // Closes the "cells-I-don't-serve" refute class. When cellRegistry is wired,
+    // respondToChallenge requires the refuting operator to hold an active
+    // assignment on the challenged cellId. Without cellRegistry wired (default
+    // in this test file's setUp), the behaviour falls back to the C11-AUDIT-14
+    // existence check alone.
+
+    /// @dev Deploy an OperatorCellRegistry, wire it into both the SOR and CKB,
+    ///      fund operators for bond payment. Returns the deployed registry.
+    function _deployCellRegistry(uint256 bondPerCell) internal returns (OperatorCellRegistry cellReg) {
+        OperatorCellRegistry impl = new OperatorCellRegistry();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                OperatorCellRegistry.initialize.selector,
+                address(ckb),
+                address(vault),  // mock implements compatible getCell struct
+                bondPerCell,
+                owner
+            )
+        );
+        cellReg = OperatorCellRegistry(payable(address(proxy)));
+
+        vm.prank(owner);
+        registry.setCellRegistry(address(cellReg));
+
+        // Fund operators with extra CKB for per-cell bonds, approve the registry
+        vm.prank(minter);
+        ckb.mint(op1, 10_000e18);
+        vm.prank(op1);
+        ckb.approve(address(cellReg), type(uint256).max);
+    }
+
+    function test_C30_respondToChallenge_revertsIfNotAssigned() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+        vault.setActive(cellA, true);
+
+        OperatorCellRegistry cellReg = _deployCellRegistry(10e18);
+        // op1 does NOT claim cellA
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        vm.prank(op1);
+        vm.expectRevert(ShardOperatorRegistry.NotAssignedToCell.selector);
+        registry.respondToChallenge(shard1, cellA, proof0);
+
+        // silence unused-var warning
+        cellReg;
+    }
+
+    function test_C30_respondToChallenge_succeedsIfAssigned() public {
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+        vault.setActive(cellA, true);
+
+        OperatorCellRegistry cellReg = _deployCellRegistry(10e18);
+
+        // op1 claims cellA — pays the per-cell bond
+        vm.prank(op1);
+        cellReg.claimCell(cellA);
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        uint256 op1Before = ckb.balanceOf(op1);
+
+        // Now op1 can successfully refute — assigned to cellA
+        vm.prank(op1);
+        registry.respondToChallenge(shard1, cellA, proof0);
+
+        // Challenge bond flows to op1 as before
+        assertEq(ckb.balanceOf(op1), op1Before + registry.CHALLENGE_BOND());
+    }
+
+    function test_C30_respondToChallenge_skipsCheckWhenRegistryUnset() public {
+        // Default setUp leaves cellRegistry unset (address(0)).
+        // Existing C11-AUDIT-14 path must still work — graceful fallback for
+        // pre-wiring window.
+        bytes32 cellA = keccak256("cellA");
+        bytes32 cellB = keccak256("cellB");
+        (bytes32 root, bytes32[] memory proof0, ) = _build2LeafTree(cellA, cellB);
+        vault.setActive(cellA, true);
+
+        assertEq(address(registry.cellRegistry()), address(0), "registry starts unset");
+
+        vm.prank(op1);
+        registry.registerShard(shard1, STAKE);
+        vm.prank(op1);
+        registry.commitCellsReport(2, root);
+
+        vm.prank(op2);
+        registry.challengeCellsReport(shard1, 0);
+
+        // No cellRegistry → no assignment check → refute succeeds on vault alone.
+        vm.prank(op1);
+        registry.respondToChallenge(shard1, cellA, proof0);
+    }
+
+    function test_C30_setCellRegistry_OnlyOwner() public {
+        vm.prank(op1);
+        vm.expectRevert();
+        registry.setCellRegistry(address(0xdead));
+    }
+
+    function test_C30_setCellRegistry_WritesSlot() public {
+        address fake = makeAddr("fake-registry");
+        vm.prank(owner);
+        registry.setCellRegistry(fake);
+        assertEq(address(registry.cellRegistry()), fake);
     }
 }

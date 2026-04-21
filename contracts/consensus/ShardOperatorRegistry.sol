@@ -23,6 +23,12 @@ interface IStateRentVaultForRegistry {
     function getCell(bytes32 cellId) external view returns (Cell memory);
 }
 
+/// @notice C30: minimal view over OperatorCellRegistry for assignment checks
+///         during challenge-response. Avoids circular import.
+interface IOperatorCellRegistryForSOR {
+    function isAssigned(bytes32 cellId, address operator) external view returns (bool);
+}
+
 /**
  * @title ShardOperatorRegistry — CKA Shard Node Management
  * @notice Registers shard nodes, tracks cells served, distributes secondary issuance.
@@ -133,8 +139,16 @@ contract ShardOperatorRegistry is
     ///         with VaultNotSet until then (upgrade-path security enforced).
     IStateRentVaultForRegistry public stateRentVault;
 
-    /// @dev Reserved storage gap (reduced 48 → 47 for stateRentVault slot).
-    uint256[47] private __gap;
+    /// @notice C30: operator↔cell assignment registry. When non-zero,
+    ///         respondToChallenge requires the refuting operator to hold an
+    ///         active assignment on the challenged cellId. Closes the
+    ///         "cells-I-don't-serve" refute class (C11-AUDIT-14 follow-up).
+    ///         Must be set post-upgrade via setCellRegistry; when unset the
+    ///         refute falls back to the C11-AUDIT-14 existence check only.
+    IOperatorCellRegistryForSOR public cellRegistry;
+
+    /// @dev Reserved storage gap (reduced 47 → 46 for cellRegistry slot).
+    uint256[46] private __gap;
 
     // ============ Events ============
 
@@ -179,6 +193,7 @@ contract ShardOperatorRegistry is
     // C11-AUDIT-14: cell-existence cross-ref
     error VaultNotSet();
     error InactiveCell();
+    error NotAssignedToCell();
 
     // ============ Initializer ============
 
@@ -370,6 +385,15 @@ contract ShardOperatorRegistry is
         if (address(stateRentVault) == address(0)) revert VaultNotSet();
         if (!stateRentVault.getCell(cellId).active) revert InactiveCell();
 
+        // C30: prove the refuting operator is actually assigned to this cellId.
+        // Closes the "cells-I-don't-serve" refute class (C11-AUDIT-14 follow-up).
+        // When cellRegistry is unset, this check is skipped and the older vault-
+        // existence check alone gates the refute — admin MUST call setCellRegistry()
+        // post-deploy to fully close the gap.
+        if (address(cellRegistry) != address(0)) {
+            if (!cellRegistry.isAssigned(cellId, shards[shardId].operator)) revert NotAssignedToCell();
+        }
+
         // Challenger loses bond to the operator
         uint256 bond = p.challengerBond;
         address challenger = p.challenger;
@@ -516,6 +540,15 @@ contract ShardOperatorRegistry is
     ///         revert VaultNotSet when the address is zero.
     function setStateRentVault(address vault) external onlyOwner {
         stateRentVault = IStateRentVaultForRegistry(vault);
+    }
+
+    /// @notice C30: wire the OperatorCellRegistry for assignment checks in
+    ///         respondToChallenge. When unset, refutes fall back to the
+    ///         C11-AUDIT-14 cell-existence check only (assignment enforcement
+    ///         bypassed). Admin MUST call this post-deploy to fully close the
+    ///         "cells-I-don't-serve" refute class.
+    function setCellRegistry(address registry) external onlyOwner {
+        cellRegistry = IOperatorCellRegistryForSOR(registry);
     }
 
     /**

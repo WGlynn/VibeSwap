@@ -44,6 +44,9 @@ Fresh bug class scanned post-funding-push. Scanner surfaced 7 candidates; after 
 ### Cycle 29 — Backlog-unblock: C12-AUDIT-2 slashed-stakes orphaned (HIGH closed)
 Design memo → "go" → ship. Fix: `_slashNonRevealers` in `VibeAgentConsensus.sol` now zeros `ac.stake`, accumulates slashed portion in new `slashPool`, credits remainder to the C14 pull queue. New `sweepSlashPoolToTreasury(address)` routes accumulated slash to a governance-chosen destination at sweep time (preferred over immutable treasury for upgrade-free flexibility). +50 LOC contract, +8 tests (47/47 green, 0 regressions). `__gap` shrunk 49→48. Backlog HIGH count: 2 → 1 (Operator-Cell Assignment still open).
 
+### Cycle 30 — Backlog-unblock: Operator-Cell Assignment Layer (C11-AUDIT-14 follow-up HIGH closed)
+Memo → "go" → ship. New standalone `OperatorCellRegistry.sol` (287 LOC, UUPS-upgradeable) implements operator-opt-in-with-bond: operators call `claimCell(cellId)` posting a per-cell CKB bond (default 10e18, governance-tunable); `respondToChallenge` in SOR now requires `cellRegistry.isAssigned(cellId, operator)` before accepting refutes. Sybil cost for inflating cellsServed by N = N × bondPerCell. V1 slashing is `onlyOwner` (admin uses off-chain availability evidence); V2 permissionless availability-proof slashing deferred. SOR wire-in: +15 LOC (interface + slot + setter + one require), `__gap` 47 → 46. Phantom Array primitive (C24/C25) and slash-pool primitive (C29) reused verbatim — template library compounds. +30 tests (25 registry + 5 SOR integration, 89 total green, 0 regressions). **Backlog HIGH count: 1 → 0. No design-gated HIGHs remain in backlog.**
+
 ## Pending / Next Session
 
 ### Tier 6 — Native anchoring (long arc)

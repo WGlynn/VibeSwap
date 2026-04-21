@@ -298,6 +298,32 @@ The orthogonality with JUL (money) and VIBE (governance) is what keeps CKB-nativ
 
 <!-- SECTION-3-MARKER -->
 
+## Section 4 — Mechanism layer
+
+The mechanism layer covers the on-chain primitives that perform discrete operations: how trades clear, how prices form, how rewards distribute, how AMM pools price assets, how fairness floors gate settlement, how contribution graphs accrue weight. ETM's audit of this layer asks: do the mechanisms themselves preserve the cognitive-economic structure the substrate-and-token layers establish? A perfectly ETM-aligned substrate can be undermined by mechanism-layer choices that re-introduce extractive dynamics (MEV, rent-free state, Sybil-vulnerable scoring) above the substrate.
+
+### 4.1 Commit-Reveal Batch Auction (CRA)
+
+**What it is.** `contracts/core/CommitRevealAuction.sol`. 10-second batches: 8s commit phase (users submit `hash(order || secret)` with deposit), 2s reveal phase (orders + optional priority bids revealed), settlement via Fisher-Yates shuffle using XORed secrets, uniform clearing price. MEV elimination at the mechanism layer; same-batch trades clear at the same price regardless of submission order within the batch.
+
+**ETM analysis.** CRA externalizes a property cognitive economies have at the social-coordination layer but blockchains historically don't: **batch resolution at uniform clearing price prevents extraction by ordering.** In cognition, healthy decision-making batches alternatives, evaluates them on shared criteria, and resolves at one decision applied to all — not a sequential resolution where the early-arriving alternative gets a structural advantage over the later-arriving one. The CRA externalization on-chain prevents the analogous failure on the trading layer (front-running, sandwich attacks, ordering exploitation), which would be an extractive dynamic that ETM warns against.
+
+Three structural properties keep CRA ETM-aligned:
+
+- *Commit-reveal opacity during commit phase.* Bidders cannot observe each other's intentions before committing, so order-flow information cannot be used to extract value. This is the cognitive-economic principle of *blind allocation* — when allocations are made under blind conditions, no participant can exploit knowledge of others' positions to extract from them.
+- *Uniform clearing price.* All trades within a batch clear at the same price, derived from the aggregate supply-demand intersection. No participant gets a worse price for being later in the batch. ETM-aligned because cognitive economies don't structurally privilege the early-arriving idea over the later-arriving one within a single decision cycle (innovation timing matters across cycles, but not within a single batch).
+- *Fisher-Yates shuffle using XORed secrets.* Even within the batch, the order in which orders are processed for ledger-update purposes is randomized via a verifiable shuffle. No participant can position themselves to be processed first or last in ways that would matter. ETM-aligned: the substrate gives no spatial-positioning advantage either.
+
+The 10-second batch length is the parameter that trades off (MEV-elimination strength, throughput latency). Shorter batches → less MEV-elimination opportunity (the attacker has less time to enter the batch); longer batches → more user-felt latency. Current 10s is mechanism-tuning; ETM-neutral on exact value.
+
+**Pattern-match drift warning.** Do *not* round CRA to "Uniswap with a delay." That framing misses the uniform-clearing-price + shuffle properties, which are structural not cosmetic. CRA is closer to "Walrasian batch auction at the mechanism layer" than to any AMM pattern. The novelty is the batch-uniform-clearing combined with on-chain commit-reveal opacity.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Batch length adaptation. Could vary by liquidity / volume conditions — high-volume periods could shorten batches for throughput, low-volume could lengthen for better aggregation. ETM-neutral on adaptation as long as the uniform-clearing property is preserved.
+- Cross-batch coordination. Currently each batch is independent. For cross-chain order books or sequential dependencies, may need batch-of-batches structures. Future cycle.
+
 <!-- SECTION-4-MARKER -->
 
 <!-- SECTION-5-MARKER -->

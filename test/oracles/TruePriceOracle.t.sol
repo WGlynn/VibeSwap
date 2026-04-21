@@ -718,4 +718,100 @@ contract TruePriceOracleTest is Test {
         uint256 prob4 = TruePriceLib.zScoreToReversionProbability(2 * int256(PRECISION), false);
         assertGt(prob3, prob4);
     }
+
+    // ============ C37-F1: chain-fork replay defense ============
+
+    /// @notice Signatures valid on the original chain must REJECT after a
+    ///         block.chainid change. Defends against cross-chain replay via
+    ///         cached domain separator (EIP-712 §Rationale).
+    function test_C37F1_signatureRejectsAfterChainIdChange() public {
+        // Sign a valid price update on the original chain
+        uint256 price = 2000 * PRECISION;
+        uint256 nonce = oracle.getNonce(signer);
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes memory sig = _createPriceSignature(
+            poolId,
+            price,
+            PRECISION / 100,
+            0,
+            ITruePriceOracle.RegimeType.NORMAL,
+            0,
+            keccak256("data"),
+            nonce,
+            deadline
+        );
+
+        // Simulate a chain fork — same signature should now fail to verify
+        vm.chainId(block.chainid + 424242);
+
+        vm.expectRevert(TruePriceOracle.UnauthorizedSigner.selector);
+        oracle.updateTruePrice(
+            poolId,
+            price,
+            PRECISION / 100,
+            0,
+            ITruePriceOracle.RegimeType.NORMAL,
+            0,
+            keccak256("data"),
+            sig
+        );
+    }
+
+    /// @notice On the NEW chain, a freshly-signed signature (against the
+    ///         new chain's domain separator) is accepted. Confirms the
+    ///         lazy-recompute path works end-to-end, not just the rejection.
+    function test_C37F1_signatureAcceptedOnNewChainWithFreshSig() public {
+        uint256 price = 2000 * PRECISION;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // Move to a different chainid first
+        uint256 newChainId = block.chainid + 424242;
+        vm.chainId(newChainId);
+
+        // Build domain separator against the NEW chainid (what off-chain
+        // keeper would do after detecting the fork)
+        bytes32 newDomainSeparator = keccak256(abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256("TruePriceOracle"),
+            keccak256("1"),
+            newChainId,
+            address(oracle)
+        ));
+
+        // Confirm the on-chain view agrees
+        assertEq(oracle.domainSeparator(), newDomainSeparator);
+
+        uint256 nonce = oracle.getNonce(signer);
+
+        bytes32 structHash = keccak256(abi.encode(
+            PRICE_UPDATE_TYPEHASH,
+            poolId,
+            price,
+            PRECISION / 100,
+            int256(0),
+            uint8(ITruePriceOracle.RegimeType.NORMAL),
+            uint256(0),
+            keccak256("data"),
+            nonce,
+            deadline
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", newDomainSeparator, structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+        bytes memory sig = abi.encodePacked(r, s, v, nonce, deadline);
+
+        // Fresh signature on new chain passes
+        oracle.updateTruePrice(
+            poolId,
+            price,
+            PRECISION / 100,
+            0,
+            ITruePriceOracle.RegimeType.NORMAL,
+            0,
+            keccak256("data"),
+            sig
+        );
+
+        assertEq(oracle.getTruePrice(poolId).price, price);
+    }
 }

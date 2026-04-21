@@ -92,6 +92,30 @@ import "./INakamotoConsensusInfinity.sol";
  * validator behavior under real adversarial pressure with real money at
  * stake — is only extractable from a live deployment. The contract gets us
  * there in weeks, not years.
+ *
+ * ----------------------------------------------------------------------------
+ * Two things the contract form is NOT
+ * ----------------------------------------------------------------------------
+ *
+ * It is not just a prototype. Contract-based abstraction consensus — running
+ * a novel consensus weighting layer inside smart contracts on top of an
+ * existing chain's ordering substrate — may prove to be a durable paradigm
+ * in its own right. Other protocols with economic-security-at-a-layer-above
+ * requirements could pattern-match. The experience of shipping NCI this way
+ * is an artifact worth publishing regardless of VibeSwap's eventual L1 path.
+ *
+ * It is not the permanent home. VibeSwap's security structure is
+ * fundamentally different from any existing chain. Proof of Mind is a
+ * time-accumulated, unbuyable weighting primitive; its dependencies
+ * (SoulboundIdentity, ContributionDAG, VibeCode, AgentReputation) are
+ * first-class protocol state, not contract reads from oracles. At native
+ * scale these become chain-level primitives — the block header commits to
+ * the identity/reputation/contribution ledger, consensus reads them
+ * directly, and the PoM weighting becomes a protocol invariant rather than
+ * a contract invariant. No EVM chain can host this natively because EVM
+ * chains don't track PoM state at the base layer. The move to our own
+ * network is a when, not an if — driven by substrate necessity, not by
+ * "graduation" from the contract form.
  */
 contract NakamotoConsensusInfinity is
     INakamotoConsensusInfinity,

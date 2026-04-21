@@ -476,4 +476,68 @@ contract VibeSocialTest is Test {
 
         assertTrue(social.isFollowing(alice, bob));
     }
+
+    // ============ C38-F1: tipPost reentrancy guard regression ============
+
+    function test_C38F1_tipPost_blocksReentrancy() public {
+        ReentrantTipReceiver attacker = new ReentrantTipReceiver(social);
+        vm.deal(address(attacker), 10 ether);
+
+        // Attacker registers and posts
+        vm.prank(address(attacker));
+        social.createProfile("attacker", "bio", "avatar");
+        vm.prank(address(attacker));
+        social.createPost("malicious post");
+        uint256 postId = 1;
+        attacker.arm(postId);
+
+        // Alice tips → attacker.receive() tries to reenter tipPost → guard reverts
+        // The outer tipPost call propagates the inner failure via the require(ok) check
+        vm.prank(alice);
+        vm.expectRevert(bytes("Tip failed"));
+        social.tipPost{value: 1 ether}(postId);
+
+        // Confirm guard prevented the second tip from accumulating
+        assertEq(social.totalTipsReceived(address(attacker)), 0);
+    }
+
+    function test_C38F1_tipPost_normalFlowStillWorks() public {
+        _createProfile(bob, "bobtipper");
+        vm.prank(bob);
+        social.createPost("normal post");
+        uint256 postId = 1;
+
+        uint256 bobBefore = bob.balance;
+        vm.prank(alice);
+        social.tipPost{value: 1 ether}(postId);
+
+        assertEq(bob.balance, bobBefore + 1 ether, "tip received normally");
+        assertEq(social.totalTipsReceived(bob), 1 ether, "tip accounted");
+    }
+}
+
+contract ReentrantTipReceiver {
+    VibeSocial public social;
+    uint256 public targetPostId;
+    bool public armed;
+    bool public reenterAttempted;
+
+    constructor(VibeSocial _social) {
+        social = _social;
+    }
+
+    function arm(uint256 postId) external {
+        targetPostId = postId;
+        armed = true;
+    }
+
+    receive() external payable {
+        if (armed && !reenterAttempted) {
+            reenterAttempted = true;
+            // Try to reenter — ReentrancyGuard should revert this inner call,
+            // which propagates as a failed external .call back in tipPost,
+            // which then triggers the require(ok) "Tip failed" revert.
+            social.tipPost{value: 0.1 ether}(targetPostId);
+        }
+    }
 }

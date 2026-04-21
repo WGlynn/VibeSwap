@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 /**
  * @title VibeSocial — On-Chain Social Graph
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  *         Follow/unfollow, posts, comments, tips, and social recovery.
  *         Lens Protocol alternative — fully on-chain, no off-chain indexer required.
  */
-contract VibeSocial is OwnableUpgradeable, UUPSUpgradeable {
+contract VibeSocial is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     // ============ Types ============
 
     struct Profile {
@@ -83,6 +84,7 @@ contract VibeSocial is OwnableUpgradeable, UUPSUpgradeable {
     function initialize() external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
@@ -199,7 +201,7 @@ contract VibeSocial is OwnableUpgradeable, UUPSUpgradeable {
         emit CommentCreated(postId, idx, msg.sender);
     }
 
-    function tipPost(uint256 postId) external payable {
+    function tipPost(uint256 postId) external payable nonReentrant {
         require(posts[postId].active, "Post not active");
         require(msg.value > 0, "Zero tip");
 

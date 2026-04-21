@@ -115,8 +115,14 @@ contract IncentiveController is
     /// @notice Reward debt per LP (Masterchef pattern — set on every position change)
     mapping(bytes32 => mapping(address => uint256)) public rewardDebt;
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 2 for accRewardPerShare + rewardDebt)
-    uint256[48] private __gap;
+    /// @notice C14-AUDIT-2: Pull-queue for auction proceeds whose auto-push at
+    ///         onLiquidityRemoved() failed (contract LP rejects ETH, multisig, OOG in
+    ///         fallback). Replaces silent forfeit — LP can later call
+    ///         claimForfeitedAuctionProceeds() even after their LP balance is zero.
+    mapping(address => uint256) public pendingForfeitedProceeds;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 1 for pendingForfeitedProceeds)
+    uint256[47] private __gap;
 
     // ============ Errors ============
 
@@ -348,8 +354,11 @@ contract IncentiveController is
             // called from AMM's nonReentrant context, and the LP initiated the removal)
             (bool success, ) = lp.call{value: pending}("");
             if (!success) {
-                // If transfer fails (contract LP that rejects ETH), don't block removal.
-                // Proceeds are forfeited. Emit event for off-chain tracking.
+                // C14-AUDIT-2: route failed auto-push to pull-queue instead of silent
+                // forfeit. After full removal, lpBalance == 0 locks the LP out of
+                // claimAuctionProceeds(), so the previous "forfeit" was permanent loss.
+                // claimForfeitedAuctionProceeds() below does not gate on lpBalance.
+                pendingForfeitedProceeds[lp] += pending;
                 emit AuctionProceedsForfeited(poolId, lp, pending);
             }
         }
@@ -464,6 +473,20 @@ contract IncentiveController is
         (bool success, ) = msg.sender.call{value: amount}("");
         require(success, "Transfer failed");
 
+        return amount;
+    }
+
+    /**
+     * @notice C14-AUDIT-2: Pull-path for auction proceeds that failed to auto-deliver
+     *         during onLiquidityRemoved(). Ungated by lpBalance — caller can claim after
+     *         full removal.
+     */
+    function claimForfeitedAuctionProceeds() external nonReentrant returns (uint256 amount) {
+        amount = pendingForfeitedProceeds[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        pendingForfeitedProceeds[msg.sender] = 0;
+        (bool success, ) = msg.sender.call{value: amount}("");
+        require(success, "Transfer failed");
         return amount;
     }
 

@@ -110,6 +110,15 @@ contract SecondaryIssuanceController is
         uint256 totalEmitted
     );
     event ParametersUpdated(uint256 annualEmission, uint256 epochDuration);
+    // C36-F2: admin observability
+    event MinDistributionUpdated(uint256 oldMin, uint256 newMin);
+    event InsurancePoolUpdated(address indexed oldPool, address indexed newPool);
+
+    /// @notice C14-AUDIT-4: emitted when a try/catch branch reroutes shardShare or
+    ///         daoShare to the insurance pool (catch path). Observability for the
+    ///         rerouted portion that does NOT appear in EpochDistributed.shardShare
+    ///         or .daoShare (those report the ORIGINAL split, not post-catch flows).
+    event ShareRerouted(uint256 indexed epoch, string reason, uint256 amount);
 
     // ============ Errors ============
 
@@ -225,9 +234,13 @@ contract SecondaryIssuanceController is
             try shardRegistry.distributeRewards(shardShare) {
                 // success
             } catch {
-                // No active shards — clear approval, redirect to insurance
+                // No active shards — clear approval, redirect to insurance.
+                // C14-AUDIT-4: emit observability event (parity with dao-shelter catch).
+                // No insuranceShare mutation — this path is already supply-neutral because
+                // the minted shardShare is transferred (not re-minted).
                 IERC20(address(ckbToken)).forceApprove(address(shardRegistry), 0);
                 IERC20(address(ckbToken)).safeTransfer(insurancePool, shardShare);
+                emit ShareRerouted(totalDistributed, "shard-registry-catch", shardShare);
             }
         }
 
@@ -241,6 +254,7 @@ contract SecondaryIssuanceController is
         // ERC20 (transferFrom reverts or transfers full amount), so the only
         // way to hit this revert is through a hostile shelter upgrade that
         // short-transfers. Reverting forces operator intervention.
+        uint256 daoShareRerouted;
         if (daoShare > 0) {
             ckbToken.mint(address(this), daoShare);
             IERC20(address(ckbToken)).forceApprove(address(daoShelter), daoShare);
@@ -252,9 +266,17 @@ contract SecondaryIssuanceController is
                 uint256 actuallyPulled = balBefore - balAfter;
                 if (actuallyPulled < daoShare) revert ShelterShortPull();
             } catch {
+                // C10-AUDIT-4 + C14-AUDIT-3: reroute daoShare to insurance when shelter
+                // cannot accept yield (e.g. totalDeposited == 0 → NoDepositors revert).
+                // C14-AUDIT-4: the already-minted daoShare is transferred (no new supply).
+                //              Previously this was ALSO added to insuranceShare and minted
+                //              fresh at line below → over-emission by daoShare per catch.
+                //              Now tracked separately via daoShareRerouted + ShareRerouted
+                //              event for observability, but NOT minted twice.
                 IERC20(address(ckbToken)).forceApprove(address(daoShelter), 0);
                 IERC20(address(ckbToken)).safeTransfer(insurancePool, daoShare);
-                insuranceShare += daoShare;
+                daoShareRerouted = daoShare;
+                emit ShareRerouted(totalDistributed, "dao-shelter-catch", daoShare);
                 daoShare = 0;
             }
         }
@@ -283,12 +305,18 @@ contract SecondaryIssuanceController is
         emit ParametersUpdated(_annualEmission, _epochDuration);
     }
 
+    /// @dev C36-F2: emits MinDistributionUpdated for admin-action observability.
     function setMinDistribution(uint256 _min) external onlyOwner {
+        uint256 old = minDistribution;
         minDistribution = _min;
+        emit MinDistributionUpdated(old, _min);
     }
 
+    /// @dev C36-F2: emits InsurancePoolUpdated for admin-action observability.
     function setInsurancePool(address _pool) external onlyOwner {
+        address old = insurancePool;
         insurancePool = _pool;
+        emit InsurancePoolUpdated(old, _pool);
     }
 
     // ============ View Functions ============

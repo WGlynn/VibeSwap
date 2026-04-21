@@ -58,6 +58,7 @@ contract InvMockTruePriceOracle is ITruePriceOracle {
     }
     function updateTruePrice(bytes32, uint256, uint256, int256, RegimeType, uint256, bytes32, bytes calldata) external {}
     function updateStablecoinContext(uint256, bool, bool, uint256, bytes calldata) external {}
+    function updateTruePriceBundle(EvidenceBundle calldata, bytes calldata) external {}
     function setAuthorizedSigner(address, bool) external {}
 }
 
@@ -102,10 +103,11 @@ contract TruePriceHandler is Test {
         address tokenIn = direction ? address(token0) : address(token1);
         address tokenOut = direction ? address(token1) : address(token0);
 
+        // C33: no pre-swap syncTrackedBalance — executeBatchSwap pre-credits
+        // trackedBalances internally (VibeAMM TRP-R16-F03). Post-swap sync
+        // below is kept as belt-and-suspenders (AMM already re-syncs at end
+        // of executeBatchSwap, so this is redundant but harmless).
         InvMockToken(tokenIn).mint(address(amm), amount);
-
-        vm.prank(owner);
-        amm.syncTrackedBalance(tokenIn);
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({

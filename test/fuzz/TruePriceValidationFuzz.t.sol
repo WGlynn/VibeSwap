@@ -62,6 +62,7 @@ contract FuzzMockTruePriceOracle is ITruePriceOracle {
     }
     function updateTruePrice(bytes32, uint256, uint256, int256, RegimeType, uint256, bytes32, bytes calldata) external {}
     function updateStablecoinContext(uint256, bool, bool, uint256, bytes calldata) external {}
+    function updateTruePriceBundle(EvidenceBundle calldata, bytes calldata) external {}
     function setAuthorizedSigner(address, bool) external {}
 }
 
@@ -137,8 +138,10 @@ contract TruePriceValidationFuzzTest is Test {
             ITruePriceOracle.RegimeType(regime), 0
         );
 
+        // C33: no syncTrackedBalance after mint — executeBatchSwap pre-credits
+        // trackedBalances internally (see VibeAMM TRP-R16-F03). Syncing here
+        // double-counts and trips DonationAttackSuspected.
         token0.mint(address(amm), swapAmount);
-        amm.syncTrackedBalance(address(token0));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({
@@ -175,8 +178,10 @@ contract TruePriceValidationFuzzTest is Test {
             ITruePriceOracle.RegimeType.NORMAL, 0
         );
 
+        // C33: no syncTrackedBalance after mint — executeBatchSwap pre-credits
+        // trackedBalances internally (see VibeAMM TRP-R16-F03). Syncing here
+        // double-counts and trips DonationAttackSuspected.
         token0.mint(address(amm), swapAmount);
-        amm.syncTrackedBalance(address(token0));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({
@@ -335,8 +340,10 @@ contract TruePriceValidationFuzzTest is Test {
             manipProb
         );
 
+        // C33: no syncTrackedBalance after mint — executeBatchSwap pre-credits
+        // trackedBalances internally (see VibeAMM TRP-R16-F03). Syncing here
+        // double-counts and trips DonationAttackSuspected.
         token0.mint(address(amm), swapAmount);
-        amm.syncTrackedBalance(address(token0));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({

@@ -23,6 +23,12 @@ interface IStateRentVaultForRegistry {
     function getCell(bytes32 cellId) external view returns (Cell memory);
 }
 
+/// @notice C30: minimal view over OperatorCellRegistry for assignment checks
+///         during challenge-response. Avoids circular import.
+interface IOperatorCellRegistryForSOR {
+    function isAssigned(bytes32 cellId, address operator) external view returns (bool);
+}
+
 /**
  * @title ShardOperatorRegistry — CKA Shard Node Management
  * @notice Registers shard nodes, tracks cells served, distributes secondary issuance.
@@ -133,8 +139,16 @@ contract ShardOperatorRegistry is
     ///         with VaultNotSet until then (upgrade-path security enforced).
     IStateRentVaultForRegistry public stateRentVault;
 
-    /// @dev Reserved storage gap (reduced 48 → 47 for stateRentVault slot).
-    uint256[47] private __gap;
+    /// @notice C30: operator↔cell assignment registry. When non-zero,
+    ///         respondToChallenge requires the refuting operator to hold an
+    ///         active assignment on the challenged cellId. Closes the
+    ///         "cells-I-don't-serve" refute class (C11-AUDIT-14 follow-up).
+    ///         Must be set post-upgrade via setCellRegistry; when unset the
+    ///         refute falls back to the C11-AUDIT-14 existence check only.
+    IOperatorCellRegistryForSOR public cellRegistry;
+
+    /// @dev Reserved storage gap (reduced 47 → 46 for cellRegistry slot).
+    uint256[46] private __gap;
 
     // ============ Events ============
 
@@ -152,6 +166,10 @@ contract ShardOperatorRegistry is
     event ChallengeRaised(bytes32 indexed shardId, address indexed challenger, uint256 cellIndex, uint256 deadline);
     event ChallengeRefuted(bytes32 indexed shardId, address indexed challenger, uint256 cellIndex);
     event ChallengeSucceeded(bytes32 indexed shardId, address indexed challenger, uint256 operatorSlashed);
+    // C36-F2: admin observability
+    event IssuanceControllerUpdated(address indexed oldController, address indexed newController);
+    event StateRentVaultUpdated(address indexed oldVault, address indexed newVault);
+    event CellRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
 
     // ============ Errors ============
 
@@ -179,6 +197,7 @@ contract ShardOperatorRegistry is
     // C11-AUDIT-14: cell-existence cross-ref
     error VaultNotSet();
     error InactiveCell();
+    error NotAssignedToCell();
 
     // ============ Initializer ============
 
@@ -370,6 +389,15 @@ contract ShardOperatorRegistry is
         if (address(stateRentVault) == address(0)) revert VaultNotSet();
         if (!stateRentVault.getCell(cellId).active) revert InactiveCell();
 
+        // C30: prove the refuting operator is actually assigned to this cellId.
+        // Closes the "cells-I-don't-serve" refute class (C11-AUDIT-14 follow-up).
+        // When cellRegistry is unset, this check is skipped and the older vault-
+        // existence check alone gates the refute — admin MUST call setCellRegistry()
+        // post-deploy to fully close the gap.
+        if (address(cellRegistry) != address(0)) {
+            if (!cellRegistry.isAssigned(cellId, shards[shardId].operator)) revert NotAssignedToCell();
+        }
+
         // Challenger loses bond to the operator
         uint256 bond = p.challengerBond;
         address challenger = p.challenger;
@@ -441,6 +469,18 @@ contract ShardOperatorRegistry is
 
     /**
      * @notice Deactivate a shard (voluntary exit)
+     *
+     * @dev C10-AUDIT-10 (shardId-burn invariant): `shards[shardId].operator` is
+     *      NOT cleared on deactivation. Combined with the `ShardIdTaken` gate in
+     *      `registerShard`, this burns the shardId permanently — no operator
+     *      (including the original) can re-register under the same shardId
+     *      post-deactivation. The operator CAN re-register under a new shardId
+     *      because `operatorShard[msg.sender]` is cleared below.
+     *
+     *      Rationale: audit-trail cleanliness. A burned shardId in `shardList`
+     *      always resolves to the same historical operator, eliminating
+     *      identity-rewriting. The `MIN_STAKE` gate (100 CKB) prices out
+     *      griefing-by-burn at ≥100 CKB per burned slot.
      */
     function deactivateShard() external nonReentrant {
         bytes32 shardId = operatorShard[msg.sender];
@@ -506,16 +546,34 @@ contract ShardOperatorRegistry is
     }
 
     /// @notice Set the issuance controller address
+    /// @dev C36-F2: emits IssuanceControllerUpdated for admin-action observability.
     function setIssuanceController(address controller) external onlyOwner {
+        address old = issuanceController;
         issuanceController = controller;
+        emit IssuanceControllerUpdated(old, controller);
     }
 
     /// @notice C11-AUDIT-14: wire the canonical StateRentVault for
     ///         cell-existence checks in respondToChallenge. MUST be called
     ///         post-upgrade before any challenge can be refuted — refutes
     ///         revert VaultNotSet when the address is zero.
+    /// @dev C36-F2: emits StateRentVaultUpdated for admin-action observability.
     function setStateRentVault(address vault) external onlyOwner {
+        address old = address(stateRentVault);
         stateRentVault = IStateRentVaultForRegistry(vault);
+        emit StateRentVaultUpdated(old, vault);
+    }
+
+    /// @notice C30: wire the OperatorCellRegistry for assignment checks in
+    ///         respondToChallenge. When unset, refutes fall back to the
+    ///         C11-AUDIT-14 cell-existence check only (assignment enforcement
+    ///         bypassed). Admin MUST call this post-deploy to fully close the
+    ///         "cells-I-don't-serve" refute class.
+    /// @dev C36-F2: emits CellRegistryUpdated for admin-action observability.
+    function setCellRegistry(address registry) external onlyOwner {
+        address old = address(cellRegistry);
+        cellRegistry = IOperatorCellRegistryForSOR(registry);
+        emit CellRegistryUpdated(old, registry);
     }
 
     /**
@@ -547,6 +605,10 @@ contract ShardOperatorRegistry is
      * @dev The operator forfeits their accumulated rewardDebt surplus (which would
      *      have been earnable via heartbeat + claim) as the stake-removal side-effect.
      *      If you don't want to lose it, heartbeat within the grace window.
+     *
+     *      C10-AUDIT-10 (shardId-burn invariant): symmetric with `deactivateShard`
+     *      — `shards[shardId].operator` is retained, burning the shardId. The
+     *      original operator can re-register under a new shardId only.
      */
     function deactivateStaleShard(bytes32 shardId) external nonReentrant {
         Shard storage shard = shards[shardId];

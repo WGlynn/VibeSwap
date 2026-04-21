@@ -25,6 +25,11 @@ contract VibeMultiSend is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUp
     event MultiSendETH(address indexed sender, uint256 recipientCount, uint256 totalAmount);
     event MultiSendToken(address indexed sender, address token, uint256 recipientCount, uint256 totalAmount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

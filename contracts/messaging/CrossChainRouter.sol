@@ -131,6 +131,13 @@ contract CrossChainRouter is
     mapping(uint32 => uint256) public lastResetTime;
     uint256 public maxMessagesPerHour;
 
+    /// @notice C24-F2: Per-message cap on settlement array length. Bounds the
+    ///         inbound loop inside _handleBatchResult / _handleSettlementConfirm.
+    ///         A peer (malicious or compromised) sending oversized payloads would
+    ///         otherwise burn the LZ gas budget iterating, potentially bricking
+    ///         the channel for that srcEid.
+    uint256 public constant MAX_SETTLEMENT_BATCH = 256;
+
     /// @notice Pending cross-chain commits
     mapping(bytes32 => CrossChainCommit) public pendingCommits;
 
@@ -184,8 +191,30 @@ contract CrossChainRouter is
     /// @notice XC-003: VibeSwapCore address for settlement confirmation callbacks
     address public vibeSwapCore;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[46] private __gap;
+    /// @notice C15-AUDIT-1: Commits whose source-chain settlement callback reverted.
+    ///         Tracks BatchResult.filledCommitHashes entries that failed on
+    ///         `settleCrossChainOrder` or `markCrossChainSettled`. Because the outer
+    ///         catch swallowed the revert for LZ-channel safety, the source chain's
+    ///         `deposits[trader][token]` never decremented — letting the trader call
+    ///         `VibeSwapCore.withdrawDeposit(token)` to reclaim the input while
+    ///         having already received output on destination (double-spend).
+    ///         Setter path: `_handleBatchResult` / `_handleSettlementConfirm` catch.
+    ///         Resolver path: permissionless `retrySettlement*`.
+    ///
+    ///         Remaining surface (deferred): VibeSwapCore.withdrawDeposit does not
+    ///         currently block on this flag. Until that layer is added, the
+    ///         double-spend window is [BatchResult-received -> next retry]. Making
+    ///         retry permissionless keeps that window tight.
+    mapping(bytes32 => bool) public settlementFailed;
+
+    /// @notice C15-AUDIT-1: Cached estimatedOut from the original BatchResult so
+    ///         `retrySettlement` can re-invoke settleCrossChainOrder with the same
+    ///         accounting data. poolId is paired via `failedSettlementPoolId`.
+    mapping(bytes32 => uint256) public failedSettlementEstimatedOut;
+    mapping(bytes32 => bytes32) public failedSettlementPoolId;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 3 for settlementFailed maps)
+    uint256[43] private __gap;
 
     // ============ Events ============
 
@@ -222,6 +251,10 @@ contract CrossChainRouter is
     /// @notice XC-003: Emitted when markCrossChainSettled fails (observability for silent try-catch)
     event SettlementMarkFailed(bytes32 indexed commitHash, bytes reason);
 
+    /// @notice C15-AUDIT-1: Emitted when a previously-failed settlement is successfully retried.
+    ///         Off-chain monitors can use this to close their alert on SettlementMarkFailed.
+    event SettlementRetrySucceeded(bytes32 indexed commitHash);
+
     /// @dev TRP-R48-NEW05: Emitted when a liquidity sync is rejected for exceeding rate-of-change limits
     event LiquiditySyncRejected(bytes32 indexed poolId, uint32 indexed srcEid, uint256 maxDelta);
 
@@ -236,6 +269,7 @@ contract CrossChainRouter is
     error DepositNotExpired();
     error NoDepositToRecover();
     error NoClaimableDeposit();
+    error BatchTooLarge();
 
     // ============ Modifiers ============
 
@@ -721,19 +755,37 @@ contract CrossChainRouter is
     ///      bridge operator after verifying the batch result. This function handles state only.
     function _handleBatchResult(bytes memory payload, uint32 srcEid) internal {
         BatchResult memory result = abi.decode(payload, (BatchResult));
+        // C24-F2: cap attacker-supplied array length to bound iteration gas
+        if (result.filledCommitHashes.length > MAX_SETTLEMENT_BATCH) revert BatchTooLarge();
 
         if (vibeSwapCore != address(0) && result.filledCommitHashes.length > 0) {
             for (uint256 i = 0; i < result.filledCommitHashes.length;) {
                 // XC-004: Full settlement with execution recording.
                 // filledAmounts[i] = estimated output for this order from the destination chain.
                 uint256 estimatedOut = i < result.filledAmounts.length ? result.filledAmounts[i] : 0;
+                bytes32 commitHash = result.filledCommitHashes[i];
 
                 try IVibeSwapCoreSettlement(vibeSwapCore).settleCrossChainOrder(
-                    result.filledCommitHashes[i],
+                    commitHash,
                     result.poolId,
                     estimatedOut
-                ) {} catch (bytes memory reason) {
-                    emit SettlementMarkFailed(result.filledCommitHashes[i], reason);
+                ) {
+                    // Success — if a prior retry had been queued, clear it.
+                    if (settlementFailed[commitHash]) {
+                        settlementFailed[commitHash] = false;
+                        delete failedSettlementEstimatedOut[commitHash];
+                        delete failedSettlementPoolId[commitHash];
+                    }
+                } catch (bytes memory reason) {
+                    // C15-AUDIT-1: record failure + cache retry args. Without this, a
+                    // transient revert (paused core, OOG within the lz gas budget,
+                    // CrossChainOrderAlreadySettled replay) silently left the source-side
+                    // deposit un-decremented. Trader could then withdrawDeposit(token)
+                    // on source while already holding output on destination.
+                    settlementFailed[commitHash] = true;
+                    failedSettlementEstimatedOut[commitHash] = estimatedOut;
+                    failedSettlementPoolId[commitHash] = result.poolId;
+                    emit SettlementMarkFailed(commitHash, reason);
                 }
                 unchecked { ++i; }
             }
@@ -747,19 +799,76 @@ contract CrossChainRouter is
     /// @dev Used when hub sends a lightweight confirmation without full batch results
     function _handleSettlementConfirm(bytes memory payload, uint32 srcEid) internal {
         SettlementConfirm memory confirm = abi.decode(payload, (SettlementConfirm));
+        // C24-F2: cap attacker-supplied array length to bound iteration gas
+        if (confirm.commitHashes.length > MAX_SETTLEMENT_BATCH) revert BatchTooLarge();
 
         if (vibeSwapCore != address(0)) {
             for (uint256 i = 0; i < confirm.commitHashes.length;) {
+                bytes32 commitHash = confirm.commitHashes[i];
                 try IVibeSwapCoreSettlement(vibeSwapCore).markCrossChainSettled(
-                    confirm.commitHashes[i]
-                ) {} catch (bytes memory reason) {
-                    emit SettlementMarkFailed(confirm.commitHashes[i], reason);
+                    commitHash
+                ) {
+                    if (settlementFailed[commitHash]) {
+                        settlementFailed[commitHash] = false;
+                        delete failedSettlementEstimatedOut[commitHash];
+                        delete failedSettlementPoolId[commitHash];
+                    }
+                } catch (bytes memory reason) {
+                    // C15-AUDIT-1: record failure for retry. Unlike the BatchResult path,
+                    // the lightweight confirmation does NOT carry poolId/estimatedOut — the
+                    // retry routes through markCrossChainSettled (no execution recording).
+                    // estimatedOut stays 0 to signal the lightweight-retry path.
+                    settlementFailed[commitHash] = true;
+                    emit SettlementMarkFailed(commitHash, reason);
                 }
                 unchecked { ++i; }
             }
         }
 
         emit SettlementConfirmReceived(confirm.batchId, srcEid, confirm.commitHashes.length);
+    }
+
+    /// @notice C15-AUDIT-1: Permissionless retry for a settlement that caught during
+    ///         BatchResult processing. Uses the cached poolId + estimatedOut recorded
+    ///         when the original call reverted. Anyone observing SettlementMarkFailed
+    ///         can trigger this to close the double-spend window.
+    /// @dev    Emits SettlementRetrySucceeded on success. On revert, propagates so the
+    ///         caller sees the underlying cause (pause, replay, etc.). The
+    ///         `settlementFailed` flag stays set until a successful retry or
+    ///         subsequent BatchResult/Confirm receipt clears it.
+    function retrySettlementOrder(bytes32 commitHash) external nonReentrant {
+        require(vibeSwapCore != address(0), "No core");
+        require(settlementFailed[commitHash], "Not pending");
+        bytes32 poolId = failedSettlementPoolId[commitHash];
+        uint256 estimatedOut = failedSettlementEstimatedOut[commitHash];
+        // Clear BEFORE the external call (CEI) — on success we stay cleared;
+        // on revert the tx rolls back and the flag reappears naturally.
+        settlementFailed[commitHash] = false;
+        delete failedSettlementEstimatedOut[commitHash];
+        delete failedSettlementPoolId[commitHash];
+        IVibeSwapCoreSettlement(vibeSwapCore).settleCrossChainOrder(
+            commitHash,
+            poolId,
+            estimatedOut
+        );
+        emit SettlementRetrySucceeded(commitHash);
+    }
+
+    /// @notice C15-AUDIT-1: Permissionless retry for the lightweight SettlementConfirm
+    ///         path (markCrossChainSettled only, no execution recording).
+    function retrySettlementMark(bytes32 commitHash) external nonReentrant {
+        require(vibeSwapCore != address(0), "No core");
+        require(settlementFailed[commitHash], "Not pending");
+        // Only the lightweight path caches estimatedOut == 0; the full-settle path
+        // caches the real value. If the retry caller intends the lightweight path
+        // they should use this function; if the BatchResult path, they should use
+        // retrySettlementOrder. Choosing the wrong path is harmless — wrong retry
+        // reverts or no-ops.
+        settlementFailed[commitHash] = false;
+        delete failedSettlementEstimatedOut[commitHash];
+        delete failedSettlementPoolId[commitHash];
+        IVibeSwapCoreSettlement(vibeSwapCore).markCrossChainSettled(commitHash);
+        emit SettlementRetrySucceeded(commitHash);
     }
 
     /// @dev TRP-R48-NEW05: Rate-of-change validation prevents spoofed liquidity from a compromised peer.

@@ -35,6 +35,102 @@ import "./INakamotoConsensusInfinity.sol";
  *      diminishing marginal utility in the combined weight.
  *
  * See: docs/papers/nakamoto-consensus-infinite.md (Knowledge Primitive P-027)
+ *
+ * ============================================================================
+ * Design rationale — why NCI lives in a smart contract, not a new L1
+ * ============================================================================
+ *
+ * NCI is a novel consensus protocol. The canonical move would be to launch a
+ * greenfield L1 chain that runs it natively. We explicitly chose the opposite:
+ * implement NCI as an upgradeable smart contract on an existing EVM chain
+ * (with LayerZero omnichain messaging for cross-chain liveness). The reasons:
+ *
+ * 1. Augmentation over replacement (Augmented Mechanism Design).
+ *    The VibeSwap thesis is to augment existing markets/chains with
+ *    math-enforced invariants, not to replace them. A smart-contract
+ *    consensus primitive augments the EVM ecosystem with a new accountability
+ *    layer; a greenfield L1 would fragment it.
+ *
+ * 2. Game-theory validation before network investment.
+ *    Standing up an L1 (p2p networking, state sync, block gossip, client
+ *    diversity, node operator acquisition) is years of infrastructure. The
+ *    game theory of PoW+PoS+PoM weighting can be stress-tested on-contract
+ *    in weeks. If the three-dimensional security model doesn't hold up to
+ *    real adversarial conditions, we learn that before committing to a
+ *    full-stack chain build. If it does, the contract becomes a reference
+ *    implementation for a future L1 or rollup port.
+ *
+ * 3. Inherited economic security.
+ *    A greenfield L1 starts with zero economic security and a cold-start
+ *    validator bootstrap problem — the #1 killer of novel consensus projects.
+ *    Running inside an existing chain inherits that chain's security budget
+ *    for the data-availability and ordering substrate. NCI only needs to
+ *    secure its own weighting logic, not block production from scratch.
+ *
+ * 4. Upgradeable iteration.
+ *    Consensus rules evolve with observed attack patterns. On an L1, changing
+ *    the rules requires a coordinated hard fork — a political event. Here,
+ *    a UUPS proxy upgrade is a governance transaction. Fast iteration at
+ *    the mechanism layer is existential while the design is young.
+ *
+ * 5. Composability with VibeSwap primitives.
+ *    NCI validators earn Shapley-distributed rewards from the same treasury
+ *    that pays LPs and operators. Slashing routes through the same slash-pool
+ *    sweep pattern as C29/C30. Cross-chain would force bridges between NCI
+ *    and its own incentive layer, defeating the economic coupling that gives
+ *    the math its teeth.
+ *
+ * 6. Observation cost.
+ *    Smart-contract execution is fully introspectable — every validator
+ *    weight recompute, every slash, every Trinity node change emits an event
+ *    indexable from a standard subgraph. An L1's consensus state lives in
+ *    untrusted node logs. The contract form lets us prove the mechanism
+ *    works in public before asking anyone to run a client.
+ *
+ * The tradeoff: gas cost per operation is higher than native consensus. We
+ * accept that because the information we need to ship NCI credibly — real
+ * validator behavior under real adversarial pressure with real money at
+ * stake — is only extractable from a live deployment. The contract gets us
+ * there in weeks, not years.
+ *
+ * ----------------------------------------------------------------------------
+ * Two things the contract form is NOT
+ * ----------------------------------------------------------------------------
+ *
+ * It is not just a prototype. Contract-based abstraction consensus — running
+ * a novel consensus weighting layer inside smart contracts on top of an
+ * existing chain's ordering substrate — may prove to be a durable paradigm
+ * in its own right. Other protocols with economic-security-at-a-layer-above
+ * requirements could pattern-match. The experience of shipping NCI this way
+ * is an artifact worth publishing regardless of VibeSwap's eventual L1 path.
+ *
+ * Prior art worth acknowledging: Chainlink pioneered the general shape of
+ * contract-layer staked operator networks — off-chain compute with on-chain
+ * collateral, economic penalties enforced by aggregator contracts, a service
+ * surface callable by other protocols. Their work demonstrated the paradigm
+ * is viable at production scale. NCI is adjacent-but-deeper: we use the same
+ * contract-layer staking+slashing primitive but run *consensus weighting*
+ * rather than *data-feed aggregation*, and we add Proof of Mind — a
+ * time-accumulated, unbuyable cognitive dimension with no analogue in the
+ * Chainlink operator-reputation model (theirs is a scoring heuristic over
+ * an honest-majority-of-operators trust assumption; PoM is a protocol
+ * invariant over a time-of-genuine-work trust assumption). Think of it as:
+ * Chainlink showed *that* you can run stake-backed services at the contract
+ * layer; NCI explores *how far the primitive stretches* when you push it
+ * into the consensus-weighting role and add a third security dimension.
+ *
+ * It is not the permanent home. VibeSwap's security structure is
+ * fundamentally different from any existing chain. Proof of Mind is a
+ * time-accumulated, unbuyable weighting primitive; its dependencies
+ * (SoulboundIdentity, ContributionDAG, VibeCode, AgentReputation) are
+ * first-class protocol state, not contract reads from oracles. At native
+ * scale these become chain-level primitives — the block header commits to
+ * the identity/reputation/contribution ledger, consensus reads them
+ * directly, and the PoM weighting becomes a protocol invariant rather than
+ * a contract invariant. No EVM chain can host this natively because EVM
+ * chains don't track PoM state at the base layer. The move to our own
+ * network is a when, not an if — driven by substrate necessity, not by
+ * "graduation" from the contract form.
  */
 contract NakamotoConsensusInfinity is
     INakamotoConsensusInfinity,
@@ -88,6 +184,7 @@ contract NakamotoConsensusInfinity is
 
     uint256 public constant MIN_STAKE = 100e18;  // NCI-002: Minimum stake to register
     uint256 public constant UNBONDING_PERIOD = 7 days;  // NCI-009: Unbonding delay
+    uint256 public constant MAX_VALIDATORS = 10_000;  // C24-F1: DoS cap on validatorList (iteration bound)
 
     // ============ PoW Difficulty ============
 
@@ -210,6 +307,8 @@ contract NakamotoConsensusInfinity is
         if (_validators[msg.sender].registeredAt != 0) revert AlreadyRegistered();
         // NCI-002: Require minimum stake to prevent Sybil + gas DoS
         if (stakeAmount < MIN_STAKE) revert InsufficientStake();
+        // C24-F1: Hard cap on active validator list to bound _checkHeartbeats iteration
+        if (validatorList.length >= MAX_VALIDATORS) revert MaxValidatorsReached();
 
         // Authority nodes require Trinity approval (must already be a trinity node)
         if (nodeType == NodeType.AUTHORITY) {
@@ -482,6 +581,8 @@ contract NakamotoConsensusInfinity is
         totalActiveWeight -= v.totalWeight;
         v.active = false;
         activeValidatorCount--;
+        // C24-F1: Remove from iteration list to keep _checkHeartbeats bounded
+        _removeFromValidatorList(msg.sender);
 
         emit ValidatorDeactivated(msg.sender);
     }
@@ -645,30 +746,48 @@ contract NakamotoConsensusInfinity is
 
     // ============ Admin: Update External Contracts ============
 
+    /// @dev C36-F2: emits old→new for admin-action observability.
     function setSoulboundIdentity(address addr) external onlyOwner {
+        address old = soulboundIdentity;
         soulboundIdentity = addr;
+        emit SoulboundIdentityUpdated(old, addr);
     }
 
+    /// @dev C36-F2.
     function setContributionDAG(address addr) external onlyOwner {
+        address old = contributionDAG;
         contributionDAG = addr;
+        emit ContributionDAGUpdated(old, addr);
     }
 
+    /// @dev C36-F2.
     function setVibeCode(address addr) external onlyOwner {
+        address old = vibeCode;
         vibeCode = addr;
+        emit VibeCodeUpdated(old, addr);
     }
 
+    /// @dev C36-F2.
     function setAgentReputation(address addr) external onlyOwner {
+        address old = agentReputation;
         agentReputation = addr;
+        emit AgentReputationUpdated(old, addr);
     }
 
     /// @notice Set the CKB-native token for PoS staking
+    /// @dev C36-F2.
     function setCKBNativeToken(address addr) external onlyOwner {
+        address old = address(ckbNativeToken);
         ckbNativeToken = IERC20(addr);
+        emit CKBNativeTokenUpdated(old, addr);
     }
 
     /// @notice Set the Joule token address for PoW weight lookups
+    /// @dev C36-F2.
     function setJouleToken(address addr) external onlyOwner {
+        address old = jouleToken;
         jouleToken = addr;
+        emit JouleTokenUpdated(old, addr);
     }
 
     // ============ View Functions ============
@@ -801,6 +920,8 @@ contract NakamotoConsensusInfinity is
         v.slashed = true;
         v.active = false;
         activeValidatorCount--;
+        // C24-F1: Remove from iteration list to keep _checkHeartbeats bounded
+        _removeFromValidatorList(validator);
 
         _recalculateWeights(validator);
         // Weight is now 0 (slashed + inactive) — no need to re-add to totalActiveWeight
@@ -811,20 +932,43 @@ contract NakamotoConsensusInfinity is
 
     // ============ Internal: Heartbeat Checks ============
 
-    /// @dev NCI-008: Still iterates for heartbeat checks, but O(1) weight update.
-    ///      Full decoupling (lazy deactivation) deferred to Phase 2.
+    /// @dev NCI-008 + C24-F1: Iterates validatorList; on deactivation, swap-and-pop
+    ///      to keep the list bounded. With MAX_VALIDATORS cap on registration and
+    ///      active-only membership, this loop is bounded by MAX_VALIDATORS at worst
+    ///      and by activeValidatorCount in practice.
     function _checkHeartbeats() internal {
-        for (uint256 i = 0; i < validatorList.length; i++) {
-            Validator storage v = _validators[validatorList[i]];
-            if (v.active && !v.slashed) {
-                if (block.timestamp > v.lastHeartbeat + HEARTBEAT_GRACE) {
-                    totalActiveWeight -= v.totalWeight;
-                    v.active = false;
-                    activeValidatorCount--;
-                    emit ValidatorDeactivated(validatorList[i]);
-                }
+        uint256 i = 0;
+        while (i < validatorList.length) {
+            address addr = validatorList[i];
+            Validator storage v = _validators[addr];
+            if (v.active && !v.slashed && block.timestamp > v.lastHeartbeat + HEARTBEAT_GRACE) {
+                totalActiveWeight -= v.totalWeight;
+                v.active = false;
+                activeValidatorCount--;
+                _removeFromValidatorList(addr);
+                emit ValidatorDeactivated(addr);
+                // Do not increment i — the slot now holds a different validator (or shrank).
+                continue;
             }
+            unchecked { ++i; }
         }
+    }
+
+    /// @dev C24-F1: Swap-and-pop removal from validatorList + clear index.
+    ///      Caller is responsible for all other state updates (active flag, counters).
+    ///      No-op if addr is not in the list (defensive).
+    function _removeFromValidatorList(address addr) internal {
+        uint256 indexPlusOne = _validatorIndex[addr];
+        if (indexPlusOne == 0) return;
+        uint256 idx = indexPlusOne - 1;
+        uint256 lastIdx = validatorList.length - 1;
+        if (idx != lastIdx) {
+            address lastAddr = validatorList[lastIdx];
+            validatorList[idx] = lastAddr;
+            _validatorIndex[lastAddr] = idx + 1;
+        }
+        validatorList.pop();
+        _validatorIndex[addr] = 0;
     }
 
     // ============ Internal: Math ============

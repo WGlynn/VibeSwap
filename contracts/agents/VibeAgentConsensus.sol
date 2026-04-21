@@ -60,6 +60,7 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         uint256 stake;
         uint256 mindScore;
         uint256 powNonce;            // Proof of work
+        address committer;           // msg.sender at commit time — stake return target
         bool committed;
         bool revealed;
         bool slashed;
@@ -102,9 +103,21 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     uint256 public totalRoundsTimedOut;
     uint256 public totalSlashed;
 
+    /// @notice C14-AUDIT-1: Pull-pattern queue for stake returns that the auto-push could
+    ///         not deliver (contract committer rejects ETH, self-destructed wallet, OOG in
+    ///         recipient fallback). Prevents permanent fund-trap when ac.stake is zeroed
+    ///         before the external call and the call fails.
+    mapping(address => uint256) public pendingStakeWithdrawals;
+
+    /// @notice C29 (C12-AUDIT-2): ETH from the slashed portion of non-revealer stakes.
+    ///         Accumulates across rounds. Owner sweeps to a treasury address via
+    ///         sweepSlashPoolToTreasury(). The unslashed remainder of each non-revealer's
+    ///         stake is credited to pendingStakeWithdrawals[committer] so the committer
+    ///         can pull their retained portion (`stake - slashAmount`, when slashBps < 10000).
+    uint256 public slashPool;
 
     /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     // ============ Events ============
 
@@ -115,8 +128,16 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     event RoundTimedOut(uint256 indexed roundId);
     event AgentSlashed(uint256 indexed roundId, bytes32 indexed agentId, uint256 amount);
     event ReliabilityUpdated(bytes32 indexed agentId, uint256 newScore);
+    event StakeWithdrawalQueued(address indexed committer, uint256 amount);
+    event StakeWithdrawn(address indexed committer, uint256 amount);
+    event SlashPoolSwept(address indexed treasury, uint256 amount);
 
     // ============ Init ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(uint256 _minStake, uint256 _powDifficulty) external initializer {
         __Ownable_init(msg.sender);
@@ -182,6 +203,7 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             stake: msg.value,
             mindScore: mindScore,
             powNonce: 0,
+            committer: msg.sender,
             committed: true,
             revealed: false,
             slashed: false
@@ -301,7 +323,17 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
             if (ac.committed && !ac.revealed && !ac.slashed) {
                 ac.slashed = true;
                 uint256 slashAmount = (ac.stake * slashBps) / 10000;
+                uint256 remainder = ac.stake - slashAmount;
+                address committer = ac.committer;
+                ac.stake = 0;
+
                 totalSlashed += slashAmount;
+                slashPool += slashAmount;
+
+                if (remainder > 0 && committer != address(0)) {
+                    pendingStakeWithdrawals[committer] += remainder;
+                    emit StakeWithdrawalQueued(committer, remainder);
+                }
 
                 reliability[participants[i]].roundsTimedOut++;
 
@@ -310,18 +342,57 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
         }
     }
 
+    /**
+     * @notice Sweep accumulated slashed funds to a treasury address.
+     * @dev C29 (C12-AUDIT-2): slashed portion accumulates in slashPool; owner selects
+     *      destination at sweep time (DAOTreasury, insurance pool, bug-bounty fund).
+     *      Destination is a parameter rather than immutable state so the protocol can
+     *      route to different sinks as governance evolves without requiring upgrades.
+     *      CEI: slashPool zeroed before external call; nonReentrant guard as belt+suspenders.
+     */
+    function sweepSlashPoolToTreasury(address treasury) external onlyOwner nonReentrant {
+        require(treasury != address(0), "Zero treasury");
+        uint256 amount = slashPool;
+        require(amount > 0, "Empty pool");
+        slashPool = 0;
+        (bool ok, ) = treasury.call{value: amount}("");
+        require(ok, "Transfer failed");
+        emit SlashPoolSwept(treasury, amount);
+    }
+
     function _returnStakes(uint256 roundId) internal {
         bytes32[] storage participants = roundParticipants[roundId];
         for (uint256 i = 0; i < participants.length; i++) {
             AgentCommit storage ac = commits[roundId][participants[i]];
-            if (ac.revealed && ac.stake > 0) {
+            if (ac.revealed && ac.stake > 0 && ac.committer != address(0)) {
                 uint256 returnAmount = ac.stake;
+                address committer = ac.committer;
                 ac.stake = 0;
-                (bool ok, ) = msg.sender.call{value: returnAmount}("");
-                // Best effort return — don't revert on failure
-                if (!ok) { ac.stake = returnAmount; }
+                (bool ok, ) = committer.call{value: returnAmount}("");
+                if (!ok) {
+                    // C14-AUDIT-1: route failed auto-push to pull-queue instead of
+                    // restoring ac.stake. Restoring created a permanent trap — no
+                    // external function read ac.stake to allow later withdrawal.
+                    pendingStakeWithdrawals[committer] += returnAmount;
+                    emit StakeWithdrawalQueued(committer, returnAmount);
+                }
             }
         }
+    }
+
+    /**
+     * @notice Withdraw stake that the auto-push at finalize() failed to deliver.
+     * @dev C14-AUDIT-1: escape valve for contract committers that reject ETH
+     *      (e.g. multisig, DAO, or a committer-wallet that later self-destructs).
+     *      CEI pattern — map zeroed before external call.
+     */
+    function withdrawPendingStake() external nonReentrant {
+        uint256 amount = pendingStakeWithdrawals[msg.sender];
+        require(amount > 0, "Nothing to withdraw");
+        pendingStakeWithdrawals[msg.sender] = 0;
+        (bool ok, ) = msg.sender.call{value: amount}("");
+        require(ok, "Transfer failed");
+        emit StakeWithdrawn(msg.sender, amount);
     }
 
     function _updateReliability(uint256 roundId) internal {

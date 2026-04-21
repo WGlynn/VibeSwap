@@ -104,6 +104,11 @@ contract VibeAgentMarketplace is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     error TransferFailed();
 
     // ============ Initializer ============
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address _arbitrator) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();

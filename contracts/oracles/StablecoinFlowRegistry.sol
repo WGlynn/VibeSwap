@@ -72,8 +72,20 @@ contract StablecoinFlowRegistry is
     /// @notice Nonces for signed updates
     mapping(address => uint256) public updaterNonces;
 
-    /// @notice Domain separator for EIP-712
+    /// @notice Domain separator for EIP-712 (cached fast-path; see _domainSeparator)
     bytes32 public DOMAIN_SEPARATOR;
+
+    /// @notice C37-F1-TWIN — chain ID at init; `_domainSeparator()` lazy-recomputes
+    ///         when block.chainid diverges from this (chain fork / migration defense).
+    uint256 private _cachedChainId;
+
+    /// @notice C37-F1-TWIN — compile-time hashes for chain-aware domain separator
+    ///         recomputation without string re-hashing at runtime.
+    bytes32 private constant _HASHED_NAME = keccak256("StablecoinFlowRegistry");
+    bytes32 private constant _HASHED_VERSION = keccak256("1");
+    bytes32 private constant _TYPE_HASH_EIP712_DOMAIN = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
 
     // ============ EIP-712 Type Hash ============
 
@@ -82,8 +94,8 @@ contract StablecoinFlowRegistry is
     );
 
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @dev Reserved storage gap. C37-F1-TWIN: 50 → 49 (_cachedChainId slot).
+    uint256[49] private __gap;
 
     // ============ Errors ============
 
@@ -111,15 +123,38 @@ contract StablecoinFlowRegistry is
         currentFlowRatio = PRECISION; // 1.0
         avgFlowRatio7d = PRECISION;
 
-        DOMAIN_SEPARATOR = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("StablecoinFlowRegistry"),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
+        // C37-F1-TWIN: cache chainid + domain separator computed against it.
+        // `_domainSeparator()` serves the cached value on the original chain
+        // and recomputes on forked chains — defeats EIP-712 cross-chain replay.
+        _cachedChainId = block.chainid;
+        DOMAIN_SEPARATOR = _buildDomainSeparator();
+    }
+
+    /// @notice C37-F1-TWIN — current-chain-aware domain separator. Cached
+    ///         fast-path on original chain, fresh compute on fork.
+    function _domainSeparator() internal view returns (bytes32) {
+        if (block.chainid == _cachedChainId) {
+            return DOMAIN_SEPARATOR;
+        }
+        return _buildDomainSeparator();
+    }
+
+    /// @notice C37-F1-TWIN — compute a domain separator against the live chain.
+    function _buildDomainSeparator() internal view returns (bytes32) {
+        return keccak256(abi.encode(
+            _TYPE_HASH_EIP712_DOMAIN,
+            _HASHED_NAME,
+            _HASHED_VERSION,
+            block.chainid,
+            address(this)
+        ));
+    }
+
+    /// @notice C37-F1-TWIN — external getter returning the fork-aware domain
+    ///         separator. Off-chain keepers should prefer this over the
+    ///         public `DOMAIN_SEPARATOR` storage slot.
+    function domainSeparator() external view returns (bytes32) {
+        return _domainSeparator();
     }
 
     // ============ External View Functions ============
@@ -365,7 +400,8 @@ contract StablecoinFlowRegistry is
             deadline
         ));
 
-        bytes32 digest = SecurityLib.toTypedDataHash(DOMAIN_SEPARATOR, structHash);
+        // C37-F1-TWIN: fork-aware domain separator
+        bytes32 digest = SecurityLib.toTypedDataHash(_domainSeparator(), structHash);
 
         bytes32 r;
         bytes32 s;

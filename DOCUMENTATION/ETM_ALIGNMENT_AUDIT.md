@@ -227,6 +227,36 @@ The heartbeat + soulbound pair closes the continuity loop: (a) identity cannot b
 - `HEARTBEAT_WINDOW` — currently fixed. Cognitive economies don't have uniform attention demands across all participants; scholars can be heads-down for months without reputational decay, but active-duty professionals cannot be absent for days. A future refinement might make the window role-specific (e.g. tied to operational class), though the added complexity may not earn its rent.
 - `SLASH_DOWNTIME` = 5%. Probably appropriate for casual liveness failure; may need escalation for repeated failures. Parameter-space, not alignment.
 
+## Section 3 — Three-token monetary system
+
+The three-token system (JUL / VIBE / CKB-native) externalizes the cognitive-economic insight that **money, governance authority, and rent-paying capital are three orthogonal dimensions** that should not be collapsed into a single asset. ETM predicts collapse-failure modes in single-token economies: when one token must serve all three roles, the value-extracting actor on one axis (speculator on price) interferes with load-bearing-of-value on the other axes (governance vote, state-rent payment). Three orthogonal tokens prevent this by structural separation. Each subsection below evaluates whether the actual token's design preserves the orthogonality ETM demands.
+
+> **Pattern-match-drift gate.** JUL is the historical highest-drift entity in this codebase per `feedback_jul-is-primary-liquidity.md`. Per the memo: "the JUL serves its own purpose as primary liquidity in the network because it has POW objectivity and fiat-like stability ... dont forget that EVER." If anywhere below you find yourself describing JUL as a "bootstrap" or "precursor" token, that is the drift firing — re-read the memo and Section 3.1 before continuing.
+
+### 3.1 JUL — primary liquidity (money + PoW pillar)
+
+**What it is.** `contracts/monetary/Joule.sol` (often referenced as JUL). Two standalone load-bearing roles plus a downstream nicety:
+
+1. **Economy**: primary liquidity. PoW-objective + fiat-stable = the network's medium of exchange.
+2. **Consensus**: PoW pillar of NCI. Backs the 10% PoW component of `W(node)`.
+3. **Downstream nicety**: JUL burn bootstraps CKB-native circulation. A welcome side effect, *not* the reason JUL exists.
+
+**ETM analysis.** JUL externalizes the **money** dimension of the cognitive economy. In cognition, money corresponds to the *exchange medium of attention* — the ambient resource that flows freely between activities, can be used to acquire any cognitive resource, and is itself produced by sustained engagement (real work). JUL satisfies all three properties:
+
+- *Free-flowing exchange.* JUL trades against any other token; it is not domain-locked. Fiat-like stability comes from supply responsiveness to mining demand rather than to speculation, giving it the unit-of-account property without centralized issuance. ETM-aligned because attention-as-currency in cognition is similarly fiat-like — fungible across applications, neutral, not an asset class to hold.
+- *Real-work-backed.* Every JUL is backed by SHA-256 PoW. No shortcut, no shortcut-via-capital. ETM-aligned because attention in cognition cannot be faked by spending money — only by spending real cognitive effort. The PoW objectivity transfers this property on-chain.
+- *PoW pillar of consensus.* Through the NCI weight function, holding JUL via mining contributes to consensus weight. This makes JUL not just "the money" but also "the energy-spent signal." ETM-aligned because in cognitive economies, energy-spent-on-real-engagement is itself a load-bearing signal of seriousness, separate from reputation (PoM) and capital lockup (PoS).
+
+The combination of these three properties is **specifically what makes JUL not collapsible into VIBE or CKB-native.** Removing JUL would simultaneously destroy the money layer (no fiat-stable medium), the PoW objectivity (no real-work-backed asset), and the time-of-genuine-work consensus dimension. Three load-bearing failures, one collapse.
+
+**Pattern-match drift correction.** If you describe JUL as "the token used to bootstrap CKB-native minting" — drift. The bootstrap is a side effect of the burn pathway, not the role JUL plays. The role is *money + PoW pillar.* If you describe JUL as "a complexity that could be removed for simplicity" — drift. The complexity is justified by three orthogonal load-bearing roles. If you describe JUL as "the legacy mining token" — drift. JUL is current and senior; mining produces JUL, JUL backs PoW consensus, JUL trades as money.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets** (no redesign):
+- Mining difficulty curve — sets the rate of JUL issuance, which in turn sets the rate of monetary-supply growth. Tuning is monetary-policy work, not alignment.
+- JUL-VIBE-CKB exchange-rate dynamics — emergent from market activity. ETM-neutral on rates as long as the orthogonality of roles is preserved (which it is by construction).
+
 <!-- SECTION-3-MARKER -->
 
 <!-- SECTION-4-MARKER -->

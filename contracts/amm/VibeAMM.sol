@@ -278,6 +278,7 @@ contract VibeAMM is
     event LargeTradeLimited(bytes32 indexed poolId, uint256 requested, uint256 allowed);
     event FeesCollected(address indexed token, uint256 amount);
     event TruePriceOracleUpdated(address indexed oracle);
+    event TruePriceMaxStalenessUpdated(uint256 previous, uint256 current);
     event TruePriceValidationToggled(bool enabled);
     event TruePriceValidationResult(bytes32 indexed poolId, uint256 spotPrice, uint256 truePrice, bool passed);
     event LiquidityProtectionConfigured(bytes32 indexed poolId, uint256 amplification, uint256 maxImpactBps);
@@ -2185,7 +2186,9 @@ contract VibeAMM is
      */
     function setTruePriceMaxStaleness(uint256 maxStaleness) external onlyOwner {
         require(maxStaleness >= 30 && maxStaleness <= 30 minutes, "Staleness out of range");
+        uint256 prev = truePriceMaxStaleness;
         truePriceMaxStaleness = maxStaleness;
+        emit TruePriceMaxStalenessUpdated(prev, maxStaleness);
     }
 
     // ============ True Price Internal Functions ============

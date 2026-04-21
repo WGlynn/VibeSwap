@@ -346,6 +346,26 @@ The structural properties:
 - *Sub-oracle reputation specialization.* Different issuers may be better at different asset classes (crypto vs fiat vs commodity). Reputation could be per-asset-class rather than monolithic. ETM-neutral, just better fidelity.
 - *Cross-oracle dispute primitive.* If two oracles report incompatible prices, a dispute window with cryptographic challenge-response would resolve the truth-claim more rigorously than current single-oracle reporting.
 
+### 4.3 Shapley Distribution / FractalShapley
+
+**What it is.** `contracts/incentives/ShapleyDistributor.sol` and the FractalShapley refinement in adjacent contracts. Shapley value computation distributes rewards from a contribution pool to participants in proportion to their *marginal* contribution — the average increment they bring to all possible coalitions of contributors. FractalShapley extends this recursively: each contribution is itself decomposable into sub-contributions that get their own sub-Shapley distribution.
+
+**ETM analysis.** Shapley distribution externalizes the **fair-attribution-of-collective-output** property. In cognition, when many participants jointly produce something, the cognitive economy needs a way to allocate credit that is (a) fair to the marginal contributor (their share reflects what they actually added, not just headcount), (b) not gameable by ordering or coalition formation, and (c) consistent (the same contribution structure always produces the same allocation). Shapley value uniquely satisfies all three properties (Shapley's axioms: efficiency, symmetry, dummy, additivity). It is *the* mathematically-correct attribution function for cognitive-collective-output.
+
+ETM-aligned because:
+
+- *Marginal contribution captures real cognitive economics.* The participant who, when added to a coalition, increases output the most, is doing the most cognitive-economic work. Pay them in proportion to that marginal increment, not in proportion to their seniority or headcount or order-of-arrival.
+- *Symmetry: identical contributors get identical rewards.* No structural advantage from being early, late, named, or anonymous. ETM demands structural neutrality, and Shapley enforces it.
+- *Coalition-resistance.* Two contributors cannot collude to extract more than their joint marginal contribution would justify; the math doesn't allow it. ETM-aligned because cognitive-economic primitives must resist Sybil-coalition extraction.
+
+The FractalShapley refinement extends ETM-fidelity further: most blockchain reward systems treat "a contribution" as a leaf node, but real cognitive contributions decompose recursively (a contribution to VibeSwap might itself be backed by a contribution from Uniswap V4's design, which itself comes from constant-product AMM theory, etc.). FractalShapley's recursive sub-distribution lets credit flow upstream through the contribution lineage, which matches how cognitive economies actually work — credit flows backward through the ideas that made the current contribution possible.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- Computation cost. Exact Shapley is exponential in coalition size; approximations (Monte Carlo sampling, structural decomposition) keep it tractable. Per-participant gas budget is the limiting parameter; ETM-neutral on the choice of approximation.
+- Recursion depth for FractalShapley. How far back through the contribution graph does credit flow? Cognitive analog: how many citation-hops back does academic credit propagate? Empirically tunable; ETM-neutral.
+
 <!-- SECTION-4-MARKER -->
 
 <!-- SECTION-5-MARKER -->

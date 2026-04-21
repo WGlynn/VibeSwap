@@ -847,8 +847,13 @@ contract TruePriceValidationTest is Test {
     // ============ Helpers ============
 
     function _mintAndSync(uint256 amount) internal {
+        // Simulates VibeSwapCore's `safeTransfer(amm, amountIn)` step in
+        // `_buildPoolSwapOrders`. Production flow does NOT sync trackedBalances
+        // after the transfer — executeBatchSwap pre-credits `trackedBalances +=
+        // amountIn` internally (see VibeAMM.sol TRP-R16-F03). Syncing here
+        // double-counts and reverts with DonationAttackSuspected.
+        // (Name kept for test-site stability; behavior now matches production.)
         tokenA.mint(address(amm), amount);
-        amm.syncTrackedBalance(address(tokenA));
     }
 
     function _makeSingleOrder(uint256 amount) internal view returns (IVibeAMM.SwapOrder[] memory) {

@@ -138,8 +138,10 @@ contract TruePriceValidationFuzzTest is Test {
             ITruePriceOracle.RegimeType(regime), 0
         );
 
+        // C33: no syncTrackedBalance after mint — executeBatchSwap pre-credits
+        // trackedBalances internally (see VibeAMM TRP-R16-F03). Syncing here
+        // double-counts and trips DonationAttackSuspected.
         token0.mint(address(amm), swapAmount);
-        amm.syncTrackedBalance(address(token0));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({
@@ -176,8 +178,10 @@ contract TruePriceValidationFuzzTest is Test {
             ITruePriceOracle.RegimeType.NORMAL, 0
         );
 
+        // C33: no syncTrackedBalance after mint — executeBatchSwap pre-credits
+        // trackedBalances internally (see VibeAMM TRP-R16-F03). Syncing here
+        // double-counts and trips DonationAttackSuspected.
         token0.mint(address(amm), swapAmount);
-        amm.syncTrackedBalance(address(token0));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({
@@ -336,8 +340,10 @@ contract TruePriceValidationFuzzTest is Test {
             manipProb
         );
 
+        // C33: no syncTrackedBalance after mint — executeBatchSwap pre-credits
+        // trackedBalances internally (see VibeAMM TRP-R16-F03). Syncing here
+        // double-counts and trips DonationAttackSuspected.
         token0.mint(address(amm), swapAmount);
-        amm.syncTrackedBalance(address(token0));
 
         IVibeAMM.SwapOrder[] memory orders = new IVibeAMM.SwapOrder[](1);
         orders[0] = IVibeAMM.SwapOrder({

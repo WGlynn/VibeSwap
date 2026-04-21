@@ -1095,4 +1095,47 @@ contract NakamotoConsensusInfinityTest is Test {
         }
         return false;
     }
+
+    // ============ C36-F2: admin setter event observability ============
+
+    event SoulboundIdentityUpdated(address indexed oldAddr, address indexed newAddr);
+    event ContributionDAGUpdated(address indexed oldAddr, address indexed newAddr);
+    event VibeCodeUpdated(address indexed oldAddr, address indexed newAddr);
+    event AgentReputationUpdated(address indexed oldAddr, address indexed newAddr);
+    event CKBNativeTokenUpdated(address indexed oldAddr, address indexed newAddr);
+    event JouleTokenUpdated(address indexed oldAddr, address indexed newAddr);
+
+    function test_C36F2_adminSettersEmitEvents() public {
+        address newAddr = makeAddr("newExternal");
+
+        address oldSB = nci.soulboundIdentity();
+        vm.expectEmit(true, true, false, true);
+        emit SoulboundIdentityUpdated(oldSB, newAddr);
+        nci.setSoulboundIdentity(newAddr);
+
+        address oldDAG = nci.contributionDAG();
+        vm.expectEmit(true, true, false, true);
+        emit ContributionDAGUpdated(oldDAG, newAddr);
+        nci.setContributionDAG(newAddr);
+
+        address oldVC = nci.vibeCode();
+        vm.expectEmit(true, true, false, true);
+        emit VibeCodeUpdated(oldVC, newAddr);
+        nci.setVibeCode(newAddr);
+
+        address oldAR = nci.agentReputation();
+        vm.expectEmit(true, true, false, true);
+        emit AgentReputationUpdated(oldAR, newAddr);
+        nci.setAgentReputation(newAddr);
+
+        address oldCKB = address(nci.ckbNativeToken());
+        vm.expectEmit(true, true, false, true);
+        emit CKBNativeTokenUpdated(oldCKB, newAddr);
+        nci.setCKBNativeToken(newAddr);
+
+        address oldJ = nci.jouleToken();
+        vm.expectEmit(true, true, false, true);
+        emit JouleTokenUpdated(oldJ, newAddr);
+        nci.setJouleToken(newAddr);
+    }
 }

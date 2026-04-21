@@ -166,6 +166,10 @@ contract ShardOperatorRegistry is
     event ChallengeRaised(bytes32 indexed shardId, address indexed challenger, uint256 cellIndex, uint256 deadline);
     event ChallengeRefuted(bytes32 indexed shardId, address indexed challenger, uint256 cellIndex);
     event ChallengeSucceeded(bytes32 indexed shardId, address indexed challenger, uint256 operatorSlashed);
+    // C36-F2: admin observability
+    event IssuanceControllerUpdated(address indexed oldController, address indexed newController);
+    event StateRentVaultUpdated(address indexed oldVault, address indexed newVault);
+    event CellRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
 
     // ============ Errors ============
 
@@ -542,16 +546,22 @@ contract ShardOperatorRegistry is
     }
 
     /// @notice Set the issuance controller address
+    /// @dev C36-F2: emits IssuanceControllerUpdated for admin-action observability.
     function setIssuanceController(address controller) external onlyOwner {
+        address old = issuanceController;
         issuanceController = controller;
+        emit IssuanceControllerUpdated(old, controller);
     }
 
     /// @notice C11-AUDIT-14: wire the canonical StateRentVault for
     ///         cell-existence checks in respondToChallenge. MUST be called
     ///         post-upgrade before any challenge can be refuted — refutes
     ///         revert VaultNotSet when the address is zero.
+    /// @dev C36-F2: emits StateRentVaultUpdated for admin-action observability.
     function setStateRentVault(address vault) external onlyOwner {
+        address old = address(stateRentVault);
         stateRentVault = IStateRentVaultForRegistry(vault);
+        emit StateRentVaultUpdated(old, vault);
     }
 
     /// @notice C30: wire the OperatorCellRegistry for assignment checks in
@@ -559,8 +569,11 @@ contract ShardOperatorRegistry is
     ///         C11-AUDIT-14 cell-existence check only (assignment enforcement
     ///         bypassed). Admin MUST call this post-deploy to fully close the
     ///         "cells-I-don't-serve" refute class.
+    /// @dev C36-F2: emits CellRegistryUpdated for admin-action observability.
     function setCellRegistry(address registry) external onlyOwner {
+        address old = address(cellRegistry);
         cellRegistry = IOperatorCellRegistryForSOR(registry);
+        emit CellRegistryUpdated(old, registry);
     }
 
     /**

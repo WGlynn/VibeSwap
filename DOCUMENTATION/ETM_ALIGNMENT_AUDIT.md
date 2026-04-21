@@ -533,4 +533,70 @@ What's NOT aligned:
 
 <!-- SECTION-6-MARKER -->
 
+## Section 7 — Prioritized gap list (feeds Step 2 Build Roadmap)
+
+The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order is by leverage — the gap whose closure most strengthens the overall ETM-fidelity of the system, not necessarily by implementation cost.
+
+### Gap 1 — VibeAMM LP positions are rent-free (HIGH leverage)
+
+**From Section 4.4.** LP positions occupy state, accrue fees in proportion to time-locked-liquidity, and never face dilution pressure. ETM predicts: dormant positions should pay rent the same way other cells do; active position management should be rewarded over passive holding.
+
+**Why HIGH leverage**: this is the most-frequent participant interface in the system. Every LP touches this; every fee distribution is shaped by it. Closing the gap here propagates ETM-alignment into the daily-experience surface of the protocol.
+
+**Refinement direction**:
+- Apply CKB-native lockup proportional to LP-position byte-occupancy. LP positions then participate in the same rent dynamics as cells in `StateRentVault`.
+- Differentiate active-rebalancing LPs from passive-holding LPs in fee distribution (concentrated-liquidity-position-style metrics, or per-block rebalancing attribution).
+- Reframe IL-protection vault as conditional-on-residual-IL after rent + active-LP differentiation reduce the underlying problem.
+
+**Rough scope**: 2-3 cycles. New `LPRentRegistry` sidecar + VibeAMM wire-in + fee-distribution recomputation.
+
+### Gap 2 — TPO uses 5% deviation gate as primary defense (MED-HIGH leverage)
+
+**From Section 4.2.** Deviation-threshold protection is policy-level. Determined attacker can ride within the gate.
+
+**Why MED-HIGH leverage**: oracle correctness is upstream of every pricing-dependent mechanism (CRA settlement, AMM trades, liquidations). A failure here cascades. Not the highest-frequency participant interface but the highest-criticality one.
+
+**Refinement direction (canonical: FAT-AUDIT-2)**:
+- Commit-reveal oracle aggregation. Issuers commit prices, reveal together, median computed. Pattern identical to CRA — high code reuse.
+- Replaces the deviation-gate's load-bearing role with structural commit-reveal opacity.
+- Hardens VibeStable liquidation path (closes C7-GOV-008 dependency).
+
+**Rough scope**: 1-2 cycles. New aggregation contract + TPO wire-in + VibeStable liquidation path update.
+
+### Gap 3 — Circuit breakers / TWAP deviation are policy thresholds (MED leverage)
+
+**From Section 5.3.** Last-resort policy mechanisms; attacker-learnable; no continuous rent.
+
+**Why MED leverage**: secondary defense layer, fires only under stress. ETM-alignment matters but the failure mode (a stress event survives the last-resort defense and propagates) is rare.
+
+**Refinement direction (canonical: FAT-AUDIT-3)**:
+- Adaptive fee curves: fees scale superlinearly with volume / price-move. Cascade profit motive drops organically before breaker fires.
+- Treasury Stabilizer expansion: auto-provides liquidity during stress, preserving trading rather than halting.
+- Goal: shrink breaker firing domain over time. Keep breakers as true last-resort, not first-line.
+
+**Rough scope**: 2-3 cycles. New fee-curve contract + Treasury Stabilizer extension + breaker parameter rebalance.
+
+### Gap 4 — IL Protection Vault may be insurance against a symptom (LOW-MED leverage, post-mainnet decision)
+
+**From Section 4.4 + backlog FAT-AUDIT-1.** ETM predicts: if rent-on-LP-positions (Gap 1) closes the IL exposure at the source, the IL-protection vault becomes redundant. But this is empirical — needs mainnet IL-claim-frequency data before the call can be made.
+
+**Why LOW-MED leverage**: depends on Gap 1 closure first; depends on real volume data. Decoupling delays this.
+
+**Refinement direction**:
+- Ship Gap 1 first.
+- Instrument IL-claim frequency on mainnet launch.
+- Re-audit post-volume. If claim data supports low-incidence, route Vault revenue streams (priority bid % + early-exit penalty %) directly to LPs — simpler, cheaper, same user outcome.
+
+**Rough scope**: depends on Gap 1 + mainnet runtime data.
+
+---
+
+## Step 2 entry point
+
+`DOCUMENTATION/ETM_BUILD_ROADMAP.md` will translate these 4 gaps into concrete engineering tasks: per-gap acceptance criteria, contracts to modify, primitives to draft, tests to write. Each gap becomes ~1-3 RSI cycles in the build queue.
+
+## Step 4 candidate
+
+C39 (next concrete alignment fix) should be **Gap 2 — TPO commit-reveal oracle aggregation**. Reasons: smaller scope than Gap 1 (1-2 cycles vs 2-3), high code reuse from existing CRA primitive (4th invocation of commit-reveal pattern, see Cycle 36 memory), unblocks downstream VibeStable refresh. Gap 1 should be C40+ after Gap 2 ships, with the LPRentRegistry pattern informed by what we learn from oracle aggregation.
+
 <!-- SECTION-7-MARKER -->

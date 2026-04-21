@@ -1,3 +1,100 @@
+# Session State — 2026-04-21
+
+## Block Header
+- **Session**: All-Out Mode autopilot. Closed the entire C35→C37 RSI cycle (4 security-class fixes shipped + pushed), extracted 5 durable primitives to memory, authored the repo MASTER_INDEX.md (176 KB Wikipedia of VibeSwap) and PRIMITIVE_EXTRACTION_PROTOCOL.md (37 KB meta-paper on JARVIS's primitive-extraction skill), then — big finish — Will articulated the **Economic Theory of Mind** as a META-PRINCIPLE (Axis 0): mind is primary, blockchain economics is the *reflection*. Will directive at session end: **"we want to build toward this as a reality. asap."** Then requested session reboot.
+- **Branch**: `feature/social-dag-phase-1` (HEAD `08a2301c` after all pushes)
+- **Status**: 8 commits pushed to `origin/feature/social-dag-phase-1` across the session. Backlog HIGH=0, MED=0. NDA gate cleared early-session via surgical rebase (dropped contaminated `77fde23e`). SHIELD root-cause fix (`SHIELD-PERSIST-LEAK`) shipped — `.claude/PROPOSALS.md` + `TRUST_VIOLATIONS.md` untracked + SHIELD now NDA-scans staged diffs pre-commit.
+
+## ⚠ LOAD-BEARING CONTEXT FOR NEXT SESSION
+
+**Read `memory/primitive_economic-theory-of-mind.md` FIRST.** It was coined, refined, and directionality-corrected in the final turns of this session. Two critical aspects:
+1. **Mind is primary, blockchain is the reflection** (NOT the other way around). Cognition has always worked economically; blockchain externalizes the pattern into a decentralized substrate where it's legible, composable, multi-participant.
+2. **High-drift concept.** Do NOT round ETM to LRU, Shannon, attention, working-set, or "analogy." The "What this is NOT" section in the primitive exists specifically to pre-empt rounding. If you find yourself explaining ETM in terms of any of those, [Pattern-Match Drift on Novelty](P·pattern-match-drift-on-novelty) is firing — stop and re-read ETM directly.
+
+**Also load early**: `memory/primitive_token-mindfulness.md`, `memory/primitive_pattern-match-drift-on-novelty.md`, `memory/feedback_jul-is-primary-liquidity.md`. All were extracted or refined this session and carry the theory that informs next-session work.
+
+## Pending / Next Session — THE TOP PRIORITY
+
+**ETM Build Roadmap — "make blockchain-as-reflection-of-mind a reality."** Will directive: ASAP. Not more theory; concrete build work.
+
+Four parallel workstreams. Execute in order; step 1 before the others:
+
+### Step 1 — ETM ALIGNMENT AUDIT (first thing, new session)
+
+Produce `DOCUMENTATION/ETM_ALIGNMENT_AUDIT.md`. Scope:
+
+1. Walk each major VibeSwap mechanism (CKB state-rent, Secondary Issuance, Shapley Distribution, Commit-Reveal Batch Auction, True Price Oracle, Clawback Cascade, Siren Protocol, Lawson Floor, NCI weight function, Contribution DAG, Soulbound Identity, etc.).
+2. For each: classify as **MIRRORS** (directly reflects cognitive-economic structure), **PARTIALLY MIRRORS** (reflects with distortion — candidate for refinement), **FAILS TO MIRROR** (imposes non-cognitive structure — candidate for redesign).
+3. Per classification: one-paragraph justification against ETM. Cite `primitive_economic-theory-of-mind.md` sections.
+4. Summary table at the end. Prioritized list of the gaps.
+
+Output size target: ~40-70 KB. Heavily hyperlinked to MASTER_INDEX.md entries. Direct-write (no agent delegation — per Token Mindfulness primitive the scope doesn't fit a single-agent output-window).
+
+### Step 2 — ROADMAP DOC
+
+`DOCUMENTATION/ETM_BUILD_ROADMAP.md`. Translates the audit's prioritized gap list into concrete engineering tasks. Cross-links to specific contracts to modify, new primitives to draft, tests to write. Becomes the backlog for the next N RSI cycles.
+
+### Step 3 — POSITIONING REWRITE
+
+Update the 2-3 primary outreach docs (whitepaper, investor summary, Medium rollout top-of-funnel) to reframe from "DEX + AI" to "**cognitive economy externalized**." The tagline stays ("coordination primitive, not casino") — it already aligns. The supporting narrative needs ETM-primacy framing baked in.
+
+Specific docs to touch: `DOCUMENTATION/VIBESWAP_WHITEPAPER.md`, `DOCUMENTATION/INVESTOR_SUMMARY.md`, `DOCUMENTATION/SEC_WHITEPAPER_VIBESWAP.md`, `docs/medium-pipeline/*` top-of-funnel posts.
+
+### Step 4 — FIRST CONCRETE ALIGNMENT FIX
+
+From the audit, pick the ONE highest-leverage mis-alignment and fix it as an RSI cycle (C38). Ship contract diff + regression tests + memory update. Proves the roadmap is executable, not aspirational.
+
+## ⛔ Anti-drift warnings for next session
+- The ETM directionality is mind→blockchain, NOT blockchain→mind. Verify yourself on this before writing anything downstream.
+- JUL is money + PoW pillar (two standalone load-bearing roles). NOT a bootstrap token. Never suggest collapsing it.
+- Master-index task taught us: large synthesis deliverables (>50 KB) belong to direct-write-with-Edit-append. NOT to single-agent delegation. Agents drift on scope.
+- Token Mindfulness primitive covers the above + cost-awareness (money / environment / scaling). Read it before any tool-spend decision.
+
+## Completed This Session
+
+### Security-class ship work (4 fixes across C35→C37, all pushed)
+1. **C35 — ShardOperatorRegistry shardId-burn invariant** (AUDIT-10 INFO closed) — NatSpec + 2 regression tests locking the "shardId cannot be re-registered after deactivation" property. Commit landed pre-NDA-rebase; rebased as `8219d77b`.
+2. **C36-F1 — OperatorCellRegistry bondPerCell MIN floor** (MED closed) — `MIN_BOND_PER_CELL = 1e18` + `BondBelowMin` error enforced at `initialize` and `setBondPerCell`. Closes a real Sybil-resistance foot-gun. +4 regression tests. Commit `af036e19`.
+3. **C36-F2 — Admin Event Observability across 11 setters** (LOW×6 closed + primitive extracted) — `ShardOperatorRegistry`, `NakamotoConsensusInfinity`, `SecondaryIssuanceController` all now emit `XUpdated(old, new)` events on every admin setter. +6 regression tests, 133/133 green. Commit `22b6f53f`.
+4. **C37-F1 + C37-F1-TWIN — Fork-aware EIP-712 domain separator** (MED×2 closed) — `TruePriceOracle` + `StablecoinFlowRegistry` both swapped to OZ cached-plus-lazy-recompute pattern. Defeats cross-chain replay via cached-at-init DOMAIN_SEPARATOR. +4 regression tests covering reject-on-fork + fresh-sig-accepted-on-new-chain. Commits `e71e0ea9` + `93f58de4`.
+
+### NDA incident (caught by gate, resolved cleanly)
+- Prior-session SHIELD commit `77fde23e` had dumped conversation state with protected-counterparty keywords into tracked `.claude/PROPOSALS.md`. NDA gate caught the push early in today's session.
+- **Resolution (chosen option 1)**: non-interactive rebase dropped `77fde23e` cleanly. Backup branch `backup-pre-77fde23e-drop` preserves old chain locally.
+- **Root cause fix (SHIELD-PERSIST-LEAK closed)**: two-layer defense. Layer 1: `.claude/PROPOSALS.md` + `.claude/TRUST_VIOLATIONS.md` untracked + `.gitignore` entry. Layer 2: `api-death-shield.py` now NDA-scans staged diffs before calling git commit — hits trigger `git reset` + NDA-ABORT log entry. Commit `e4929da6`.
+
+### Docs shipped
+- `DOCUMENTATION/MASTER_INDEX.md` (176 KB, 1734 lines) — repo-wide Wikipedia. Four parts: Index, Glossary, 181 citations, encyclopedia proper across 18 domain sections. Commit `08a2301c`.
+- `DOCUMENTATION/PRIMITIVE_EXTRACTION_PROTOCOL.md` (37 KB, 475 lines) — meta-paper framing JARVIS's primitive-extraction skill as the "what makes Jarvis different" positioning doc. Same commit.
+- Extended NCI contract NatSpec (~60 lines) — design rationale (contract-form-as-paradigm, native-chain as substrate necessity, Chainlink positioning).
+
+### Primitives extracted to memory (5 durable, committed)
+1. `feedback_jul-is-primary-liquidity.md` — JUL is money (PoW-objective + fiat-stable primary liquidity) AND PoW pillar of NCI. Never frame as bootstrap. Never suggest collapsing.
+2. `primitive_pattern-match-drift-on-novelty.md` — the general failure mode. Covers Variant A (concept-drift) + Variant B (delivery-scope-drift).
+3. `primitive_admin-event-observability.md` — every privileged setter emits `XUpdated(old, new)`. Extracted from C36-F2.
+4. `primitive_token-mindfulness.md` — character trait, proactive counter to drift. Includes costs context (money / environment / scaling) + generative framing (constraint as forcing function for cleverness).
+5. `primitive_economic-theory-of-mind.md` — **THE META-PRINCIPLE** at Axis 0. Mind primary, blockchain is reflection. Load-bearing across the stack.
+
+Plus phone-ping hook (`~/.claude/hooks/phone-ping.py`) and SETUP.md installed; Stop hook wired in `~/.claude/settings.json`. Currently no-ops without Gmail app-password creds (user declined to set up; Calendar MCP pings work fine).
+
+### Memory repo commits
+- `bc86b75` — phone-ping always-on rule + SHIELD-PERSIST-LEAK backlog entry.
+- `6b36a6c` — AUDIT-10 closure + link-rot fix + rsi-backlog indexing.
+- `a60ff99` — Admin Event Observability primitive extraction.
+- `e5a4c15`, `45ec63e`, `3caf89a`, `5bd497d`, `d8f86b6`, `8fcf9da`, `4a1173f`, `75f55c7`, `e358559`, `d84ab1f` — incremental primitive extractions + backlog updates.
+
+## RSI Backlog state (end of session)
+- **Open HIGH**: 0
+- **Open MED**: 0
+- **Open LOW/INFO**: FAT-AUDIT-1/2/3 (First-Available Trap audit findings — blocked on mainnet data or queued for future cycles), C7-GOV-008 (stale-oracle VibeStable liquidation — blocked on oracle arch refresh), C22-D1 (NCI reinitializer(2) pre-deploy gate), C28-F1 (VibeSocial `tipPost` nonReentrant hygiene), PING-HOOK (hook-level phone-ping — currently memory-enforced instead), VibeAgentOrchestrator architectural scaling question.
+- See `project_rsi-backlog.md` in memory repo for detail.
+
+## Git remotes state
+- `origin/feature/social-dag-phase-1` — up to date at `08a2301c`.
+- Session working tree clean. `backup-pre-77fde23e-drop` preserves pre-rebase chain locally as safety.
+
+---
+
 # Session State — 2026-04-20
 
 ## Block Header

@@ -35,6 +35,63 @@ import "./INakamotoConsensusInfinity.sol";
  *      diminishing marginal utility in the combined weight.
  *
  * See: docs/papers/nakamoto-consensus-infinite.md (Knowledge Primitive P-027)
+ *
+ * ============================================================================
+ * Design rationale — why NCI lives in a smart contract, not a new L1
+ * ============================================================================
+ *
+ * NCI is a novel consensus protocol. The canonical move would be to launch a
+ * greenfield L1 chain that runs it natively. We explicitly chose the opposite:
+ * implement NCI as an upgradeable smart contract on an existing EVM chain
+ * (with LayerZero omnichain messaging for cross-chain liveness). The reasons:
+ *
+ * 1. Augmentation over replacement (Augmented Mechanism Design).
+ *    The VibeSwap thesis is to augment existing markets/chains with
+ *    math-enforced invariants, not to replace them. A smart-contract
+ *    consensus primitive augments the EVM ecosystem with a new accountability
+ *    layer; a greenfield L1 would fragment it.
+ *
+ * 2. Game-theory validation before network investment.
+ *    Standing up an L1 (p2p networking, state sync, block gossip, client
+ *    diversity, node operator acquisition) is years of infrastructure. The
+ *    game theory of PoW+PoS+PoM weighting can be stress-tested on-contract
+ *    in weeks. If the three-dimensional security model doesn't hold up to
+ *    real adversarial conditions, we learn that before committing to a
+ *    full-stack chain build. If it does, the contract becomes a reference
+ *    implementation for a future L1 or rollup port.
+ *
+ * 3. Inherited economic security.
+ *    A greenfield L1 starts with zero economic security and a cold-start
+ *    validator bootstrap problem — the #1 killer of novel consensus projects.
+ *    Running inside an existing chain inherits that chain's security budget
+ *    for the data-availability and ordering substrate. NCI only needs to
+ *    secure its own weighting logic, not block production from scratch.
+ *
+ * 4. Upgradeable iteration.
+ *    Consensus rules evolve with observed attack patterns. On an L1, changing
+ *    the rules requires a coordinated hard fork — a political event. Here,
+ *    a UUPS proxy upgrade is a governance transaction. Fast iteration at
+ *    the mechanism layer is existential while the design is young.
+ *
+ * 5. Composability with VibeSwap primitives.
+ *    NCI validators earn Shapley-distributed rewards from the same treasury
+ *    that pays LPs and operators. Slashing routes through the same slash-pool
+ *    sweep pattern as C29/C30. Cross-chain would force bridges between NCI
+ *    and its own incentive layer, defeating the economic coupling that gives
+ *    the math its teeth.
+ *
+ * 6. Observation cost.
+ *    Smart-contract execution is fully introspectable — every validator
+ *    weight recompute, every slash, every Trinity node change emits an event
+ *    indexable from a standard subgraph. An L1's consensus state lives in
+ *    untrusted node logs. The contract form lets us prove the mechanism
+ *    works in public before asking anyone to run a client.
+ *
+ * The tradeoff: gas cost per operation is higher than native consensus. We
+ * accept that because the information we need to ship NCI credibly — real
+ * validator behavior under real adversarial pressure with real money at
+ * stake — is only extractable from a live deployment. The contract gets us
+ * there in weeks, not years.
  */
 contract NakamotoConsensusInfinity is
     INakamotoConsensusInfinity,
@@ -650,30 +707,48 @@ contract NakamotoConsensusInfinity is
 
     // ============ Admin: Update External Contracts ============
 
+    /// @dev C36-F2: emits old→new for admin-action observability.
     function setSoulboundIdentity(address addr) external onlyOwner {
+        address old = soulboundIdentity;
         soulboundIdentity = addr;
+        emit SoulboundIdentityUpdated(old, addr);
     }
 
+    /// @dev C36-F2.
     function setContributionDAG(address addr) external onlyOwner {
+        address old = contributionDAG;
         contributionDAG = addr;
+        emit ContributionDAGUpdated(old, addr);
     }
 
+    /// @dev C36-F2.
     function setVibeCode(address addr) external onlyOwner {
+        address old = vibeCode;
         vibeCode = addr;
+        emit VibeCodeUpdated(old, addr);
     }
 
+    /// @dev C36-F2.
     function setAgentReputation(address addr) external onlyOwner {
+        address old = agentReputation;
         agentReputation = addr;
+        emit AgentReputationUpdated(old, addr);
     }
 
     /// @notice Set the CKB-native token for PoS staking
+    /// @dev C36-F2.
     function setCKBNativeToken(address addr) external onlyOwner {
+        address old = address(ckbNativeToken);
         ckbNativeToken = IERC20(addr);
+        emit CKBNativeTokenUpdated(old, addr);
     }
 
     /// @notice Set the Joule token address for PoW weight lookups
+    /// @dev C36-F2.
     function setJouleToken(address addr) external onlyOwner {
+        address old = jouleToken;
         jouleToken = addr;
+        emit JouleTokenUpdated(old, addr);
     }
 
     // ============ View Functions ============

@@ -110,6 +110,9 @@ contract SecondaryIssuanceController is
         uint256 totalEmitted
     );
     event ParametersUpdated(uint256 annualEmission, uint256 epochDuration);
+    // C36-F2: admin observability
+    event MinDistributionUpdated(uint256 oldMin, uint256 newMin);
+    event InsurancePoolUpdated(address indexed oldPool, address indexed newPool);
 
     /// @notice C14-AUDIT-4: emitted when a try/catch branch reroutes shardShare or
     ///         daoShare to the insurance pool (catch path). Observability for the
@@ -302,12 +305,18 @@ contract SecondaryIssuanceController is
         emit ParametersUpdated(_annualEmission, _epochDuration);
     }
 
+    /// @dev C36-F2: emits MinDistributionUpdated for admin-action observability.
     function setMinDistribution(uint256 _min) external onlyOwner {
+        uint256 old = minDistribution;
         minDistribution = _min;
+        emit MinDistributionUpdated(old, _min);
     }
 
+    /// @dev C36-F2: emits InsurancePoolUpdated for admin-action observability.
     function setInsurancePool(address _pool) external onlyOwner {
+        address old = insurancePool;
         insurancePool = _pool;
+        emit InsurancePoolUpdated(old, _pool);
     }
 
     // ============ View Functions ============

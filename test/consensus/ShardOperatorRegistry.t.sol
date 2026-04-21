@@ -1204,4 +1204,37 @@ contract ShardOperatorRegistryTest is Test {
         registry.setCellRegistry(fake);
         assertEq(address(registry.cellRegistry()), fake);
     }
+
+    // ============ C36-F2: admin setter event observability ============
+
+    event IssuanceControllerUpdated(address indexed oldController, address indexed newController);
+    event StateRentVaultUpdated(address indexed oldVault, address indexed newVault);
+    event CellRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+
+    function test_C36F2_setIssuanceController_emitsEvent() public {
+        address oldC = registry.issuanceController();
+        address newC = makeAddr("newController");
+        vm.expectEmit(true, true, false, true);
+        emit IssuanceControllerUpdated(oldC, newC);
+        vm.prank(owner);
+        registry.setIssuanceController(newC);
+    }
+
+    function test_C36F2_setStateRentVault_emitsEvent() public {
+        address oldV = address(registry.stateRentVault());
+        address newV = makeAddr("newVault");
+        vm.expectEmit(true, true, false, true);
+        emit StateRentVaultUpdated(oldV, newV);
+        vm.prank(owner);
+        registry.setStateRentVault(newV);
+    }
+
+    function test_C36F2_setCellRegistry_emitsEvent() public {
+        address oldR = address(registry.cellRegistry());
+        address newR = makeAddr("newCellRegistry");
+        vm.expectEmit(true, true, false, true);
+        emit CellRegistryUpdated(oldR, newR);
+        vm.prank(owner);
+        registry.setCellRegistry(newR);
+    }
 }

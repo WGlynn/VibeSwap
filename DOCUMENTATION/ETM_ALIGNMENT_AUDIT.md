@@ -366,6 +366,30 @@ The FractalShapley refinement extends ETM-fidelity further: most blockchain rewa
 - Computation cost. Exact Shapley is exponential in coalition size; approximations (Monte Carlo sampling, structural decomposition) keep it tractable. Per-participant gas budget is the limiting parameter; ETM-neutral on the choice of approximation.
 - Recursion depth for FractalShapley. How far back through the contribution graph does credit flow? Cognitive analog: how many citation-hops back does academic credit propagate? Empirically tunable; ETM-neutral.
 
+### 4.4 VibeAMM constant-product
+
+**What it is.** `contracts/amm/VibeAMM.sol`. Constant-product AMM (`x * y = k`) for liquidity pools. Trades execute via batch settlement (post-CRA), with the cap that trader payout cannot exceed the natural curve amount even if the externally-derived clearing price would have given more (the C34 fix). LPs deposit pairs; receive LP tokens; earn fees from trades.
+
+**ETM analysis.** This is the audit's most interesting case. Constant-product AMM is the canonical *neutral pricing primitive* — it has no notion of memory rent, no notion of contribution graph, no notion of soulbound identity. It's pure market mechanism: liquidity in, liquidity out, price discovered from the curve. So is it ETM-aligned?
+
+The answer is **partial**: VibeAMM mirrors ETM at the operational layer (the batch-settlement integration with CRA preserves the uniform-clearing property; the C34 curve-cap preserves the k-invariant under price damping) but does NOT mirror ETM at the LP-position layer (LP positions don't pay state-rent, they sit unbounded, and they accrue fees in proportion to time-locked liquidity rather than in proportion to attentive maintenance).
+
+What's right:
+- *Curve-bounded payout.* The C34 fix (`amountOut = min(linear, curve)`) means the AMM's structural invariant is preserved against externally-imposed pricing pressure. ETM-aligned: the substrate (k-invariant) is honored even when other mechanisms (TPO damping) push against it.
+- *Batch settlement integration with CRA.* All pool trades land via uniform-clearing batches, so MEV doesn't attack the AMM-side of trades. ETM-aligned via inheritance from CRA's MIRROR.
+- *LP fee distribution proportional to liquidity contribution.* Standard AMM math; matches contribution-proportional reward (Shapley-adjacent for the simple two-asset case).
+
+What's NOT right:
+- *No state-rent on LP positions.* An LP position occupies state forever (until withdrawn) without paying continuous rent. This is a violation of the substrate-layer rent property — the pool data takes up cells in state, but the LP doesn't pay dilution-based rent on those cells. ETM would predict: dormant LP positions (low fee earnings, low utilization) should face increasing rent pressure to either re-deploy or exit, freeing capacity for higher-utility positions.
+- *Time-locked rather than attention-rewarded.* LP rewards accrue in proportion to time-in-pool, not in proportion to active rebalancing or thoughtful position management. A passive LP and an active LP earn the same fee share for the same time-weighted liquidity. ETM-aligned mechanism would distinguish these — active LPs (who reposition as conditions warrant, who provide where it's most needed) should earn more than passive LPs, even at the same time-weighted notional.
+
+**Classification: ◐ PARTIALLY MIRRORS.**
+
+**Refinement targets**:
+- *State-rent on LP positions.* Apply CKB-native lockup proportional to position byte-occupancy. LP positions then pay rent the same way cells do; dormant positions face dilution pressure; the pool gets self-cleaning of stale liquidity.
+- *Active-vs-passive LP differentiation.* Concentrated-liquidity (Uniswap V3 style) is one path; on-chain rebalancing-attribution metrics (per-LP, per-block) is another. ETM-aligned mechanisms would reward active position management over passive holding.
+- *IL-protection vault re-evaluation.* The currently-deferred FAT-AUDIT-1 backlog item asks whether the IL-protection vault is insurance against a symptom rather than a fix for the cause. ETM frame says: yes, IL is the symptom of an unbounded-LP-state mechanism; fix the mechanism (rent on LP positions) and IL-protection becomes redundant.
+
 <!-- SECTION-4-MARKER -->
 
 <!-- SECTION-5-MARKER -->

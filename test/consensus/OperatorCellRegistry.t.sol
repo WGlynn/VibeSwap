@@ -352,19 +352,47 @@ contract OperatorCellRegistryTest is Test {
         registry.setBondPerCell(20e18);
     }
 
-    function test_C30_ZeroBond_StillRegisters() public {
+    // ============ C36-F1: bondPerCell floor (Sybil-resistance invariant) ============
+
+    /// @notice C36-F1: zero bond would disable Sybil resistance. Setter rejects.
+    ///         Supersedes the prior test_C30_ZeroBond_StillRegisters which
+    ///         documented the vulnerable behavior.
+    function test_C36F1_setBondPerCell_revertsAtZero() public {
         vm.prank(owner);
+        vm.expectRevert(OperatorCellRegistry.BondBelowMin.selector);
         registry.setBondPerCell(0);
+    }
 
-        vault.setActive(cell1, true);
-        uint256 bal0 = ckb.balanceOf(op1);
+    /// @notice C36-F1: anything below MIN_BOND_PER_CELL is rejected.
+    function test_C36F1_setBondPerCell_revertsBelowMin() public {
+        uint256 min = registry.MIN_BOND_PER_CELL();
+        vm.prank(owner);
+        vm.expectRevert(OperatorCellRegistry.BondBelowMin.selector);
+        registry.setBondPerCell(min - 1);
+    }
 
-        vm.prank(op1);
-        registry.claimCell(cell1);
+    /// @notice C36-F1: exactly MIN is accepted (boundary).
+    function test_C36F1_setBondPerCell_acceptsAtMin() public {
+        uint256 min = registry.MIN_BOND_PER_CELL();
+        vm.prank(owner);
+        registry.setBondPerCell(min);
+        assertEq(registry.bondPerCell(), min);
+    }
 
-        assertTrue(registry.isAssigned(cell1, op1));
-        assertEq(registry.totalBondsLocked(), 0);
-        assertEq(ckb.balanceOf(op1), bal0, "no bond pulled at zero");
+    /// @notice C36-F1: initialize enforces the same floor.
+    function test_C36F1_initialize_revertsBelowMin() public {
+        OperatorCellRegistry impl2 = new OperatorCellRegistry();
+        vm.expectRevert(OperatorCellRegistry.BondBelowMin.selector);
+        new ERC1967Proxy(
+            address(impl2),
+            abi.encodeWithSelector(
+                OperatorCellRegistry.initialize.selector,
+                address(ckb),
+                address(vault),
+                uint256(0), // zero bond at genesis
+                owner
+            )
+        );
     }
 
     function test_C30_SetStateRentVault_OnlyOwner() public {

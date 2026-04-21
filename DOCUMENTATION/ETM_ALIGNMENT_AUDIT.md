@@ -157,7 +157,37 @@ The cross-challenge coexistence — V2a and V2b run on separate state, slash pat
 
 
 
-<!-- SECTION-2-MARKER -->
+## Section 2 — Consensus and identity mechanisms
+
+The substrate-layer mechanisms (Section 1) externalize the *what* — what state is, what rent is, who pays. The consensus / identity layer externalizes the *who* — which participants count, with what weight, on what evidence. ETM demands that the *who* layer also reflect cognitive-economic structure: weight should accrue to participants whose contributions would survive rent-pressure in a healthy cognitive economy, and the weight signal should be hard to fake along orthogonal dimensions (no single resource — money, energy, time — should be able to monopolize "who counts").
+
+### 2.1 NCI 3D Consensus weight function
+
+**What it is.** `contracts/consensus/NakamotoConsensusInfinity.sol` defines node weight as `W(node) = 0.10 × PoW + 0.30 × PoS + 0.60 × PoM`, where:
+
+- *PoW* is log₂-scaled cumulative mining solutions (backed by `Joule.sol` / JUL).
+- *PoS* is CKB-native stake locked for consensus (1 stake = 1e18 weight units).
+- *PoM* is mind-score from `SoulboundIdentity + ContributionDAG + VibeCode + AgentReputation`, multiplied by `POM_SCALE`.
+
+The weights sum to 1.00; the dimensions are orthogonal (each resource attacks a different axis); attacking the consensus requires coordinated compromise across all three.
+
+**ETM analysis.** The 3D weight function is one of the highest-fidelity ETM externalizations in the codebase. Each pillar maps to an orthogonal cognitive-economic resource:
+
+- *PoW (10%) — ambient-work signal.* Cognition has an analogous dimension: the energy continuously spent demonstrating real engagement (problem-solving cycles, attention sustained over time, deep-work bouts). PoW makes this dimension on-chain: every JUL minted is verifiable SHA-256 work, no shortcut, no shortcut-via-capital. The log₂ scaling is critical — linear PoW would let compute-rich actors dominate; log₂ flattens the curve so a doubling of effort yields only one more weight unit. ETM-aligned because cognitive contribution doesn't scale linearly with hours either; the 100th hour of work on the same problem is worth far less than the first hour, and the cognitive economy reflects this in its diminishing-returns reward shape.
+- *PoS (30%) — rent-paying capacity.* Stake locked = capacity to pay rent on consensus participation, the same way locking CKB-native to occupy a cell is rent-paying-power for substrate-cells (Section 1.1). Linear-in-stake (1:1 weight) is correct here because PoS is denominated in the same unit as the rent itself; log-scaling stake would be a category error.
+- *PoM (60% — the dominant pillar) — common-knowledge anchoring.* Time-accumulated, soulbound, contribution-weighted, citation-cross-referenced. PoM is the on-chain externalization of the cognitive-economic property that *common-knowledge cells anchor the substrate*. The 60% weight is load-bearing: it sets common-knowledge as the senior signal, which is exactly the seniority ETM demands (density alone without recognition is isolated; rent-paying alone without contribution is plutocracy; common-knowledge anchoring is what keeps the substrate coherent).
+
+The orthogonality property is critical for ETM-alignment. Cognition has the same orthogonality: you cannot fake contribution by spending energy (PoW does not buy PoM), you cannot fake reputation by holding capital (PoS does not buy PoM), you cannot fake recognition by mining hashes. Each axis defends a distinct attack surface. The 3D consensus inherits this property structurally, not by policy.
+
+**Pattern-match drift warning.** The 3D consensus is a high-drift zone (per `primitive_pattern-match-drift-on-novelty.md`). Do **not** round NCI to "weighted average of PoW and PoS with reputation bonus." That framing collapses the orthogonality and treats PoM as a policy add-on rather than a structural senior pillar. The correct framing is *three orthogonal pillars, weighted to reflect cognitive seniority of common-knowledge*.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets** (no redesign):
+- Pillar weights — 60/30/10 reflects current judgment on cognitive seniority. As the network matures and contribution attribution becomes more reliable, PoM weight could plausibly rise (70%+); if attribution proves gameable, weight would shift back. ETM-neutral on exact ratio so long as PoM remains senior.
+- Log-scale base for PoW — `log₂` is the current choice. `ln` or `log₁₀` would shift the diminishing-returns curve. Mechanism-economics, not alignment.
+
+
 
 <!-- SECTION-3-MARKER -->
 

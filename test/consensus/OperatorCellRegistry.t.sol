@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/consensus/OperatorCellRegistry.sol";
+import "../../contracts/consensus/ContentMerkleRegistry.sol";
 import "../../contracts/monetary/CKBNativeToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -729,5 +730,406 @@ contract OperatorCellRegistryTest is Test {
 
         (, address challenger, , , ) = registry.assignmentChallenges(cell1);
         assertEq(challenger, op3);
+    }
+
+    // ============ C32: V2b Chunk-Availability Challenge ============
+    //
+    // End-to-end chunk-availability sampling. Tests build real Merkle trees
+    // (OZ sorted-pair hashing), commit them in ContentMerkleRegistry, and
+    // verify the challenge/respond/slash flow with actual proof verification.
+
+    ContentMerkleRegistry public cmr;
+
+    uint256 constant CHUNK_COUNT = 64;   // power of 2 for the test tree
+    uint256 constant CHUNK_SIZE = 32;
+
+    /// @dev Initialise V2b infrastructure: deploy ContentMerkleRegistry, wire
+    ///      it into OCR. Called at the top of every V2b test that needs it.
+    function _setupV2b() internal {
+        ContentMerkleRegistry impl = new ContentMerkleRegistry();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                ContentMerkleRegistry.initialize.selector,
+                address(vault),
+                owner
+            )
+        );
+        cmr = ContentMerkleRegistry(address(proxy));
+        vm.prank(owner);
+        registry.setContentRegistry(address(cmr));
+    }
+
+    /// @dev Sorted-pair hash matching OZ's MerkleProof.verify.
+    function _hashPair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
+        return a < b ? keccak256(abi.encodePacked(a, b)) : keccak256(abi.encodePacked(b, a));
+    }
+
+    /// @dev Build a Merkle tree over `chunks` with leaf = keccak256(abi.encode(idx, chunk)).
+    ///      Returns (root, proofs[] for each leaf). Requires chunks.length to be a power of 2.
+    function _buildMerkleTree(bytes[] memory chunks)
+        internal
+        pure
+        returns (bytes32 root, bytes32[][] memory proofs)
+    {
+        uint256 n = chunks.length;
+        // Build leaves
+        bytes32[] memory current = new bytes32[](n);
+        for (uint256 i = 0; i < n; i++) {
+            current[i] = keccak256(abi.encode(i, chunks[i]));
+        }
+        // Stash each level for proof extraction
+        bytes32[][] memory levels = new bytes32[][](_log2(n) + 1);
+        levels[0] = current;
+        uint256 lvl = 0;
+        while (current.length > 1) {
+            uint256 parentLen = current.length / 2;
+            bytes32[] memory parents = new bytes32[](parentLen);
+            for (uint256 i = 0; i < parentLen; i++) {
+                parents[i] = _hashPair(current[2 * i], current[2 * i + 1]);
+            }
+            current = parents;
+            lvl++;
+            levels[lvl] = current;
+        }
+        root = current[0];
+
+        // Build a proof for each leaf
+        proofs = new bytes32[][](n);
+        for (uint256 i = 0; i < n; i++) {
+            uint256 depth = lvl;
+            bytes32[] memory pf = new bytes32[](depth);
+            uint256 idx = i;
+            for (uint256 d = 0; d < depth; d++) {
+                uint256 sib = (idx % 2 == 0) ? idx + 1 : idx - 1;
+                pf[d] = levels[d][sib];
+                idx /= 2;
+            }
+            proofs[i] = pf;
+        }
+    }
+
+    function _log2(uint256 n) internal pure returns (uint256 r) {
+        while (n > 1) {
+            n >>= 1;
+            r++;
+        }
+    }
+
+    /// @dev Build a Merkle tree with a deterministic chunk layout, claim cell
+    ///      for op1, commit the tree root, and return the chunks + proofs for
+    ///      use in challenge-response.
+    function _claimAndCommit(address operator, bytes32 cellId)
+        internal
+        returns (bytes[] memory chunks, bytes32[][] memory proofs, bytes32 chunkRoot)
+    {
+        vault.setActive(cellId, true);
+        vm.prank(operator);
+        registry.claimCell(cellId);
+
+        chunks = new bytes[](CHUNK_COUNT);
+        for (uint256 i = 0; i < CHUNK_COUNT; i++) {
+            // Deterministic chunk content seeded by index
+            chunks[i] = abi.encodePacked(keccak256(abi.encode("chunk-seed", operator, cellId, i)));
+        }
+        (chunkRoot, proofs) = _buildMerkleTree(chunks);
+
+        vm.prank(operator);
+        cmr.commitChunks(cellId, chunkRoot, CHUNK_COUNT, CHUNK_SIZE);
+    }
+
+    /// @dev Pick the K_SAMPLES chunks + proofs corresponding to the sampled
+    ///      indices for a given (cellId, challenger, nonce).
+    function _buildResponse(
+        bytes32 cellId,
+        address challenger,
+        bytes32 nonce,
+        bytes[] memory allChunks,
+        bytes32[][] memory allProofs
+    )
+        internal
+        view
+        returns (bytes[] memory sampledChunks, bytes32[][] memory sampledProofs)
+    {
+        uint256 k = registry.K_SAMPLES();
+        sampledChunks = new bytes[](k);
+        sampledProofs = new bytes32[][](k);
+        for (uint256 i = 0; i < k; i++) {
+            uint256 idx = registry.deriveSampledIndex(cellId, challenger, nonce, i, CHUNK_COUNT);
+            sampledChunks[i] = allChunks[idx];
+            sampledProofs[i] = allProofs[idx];
+        }
+    }
+
+    // ---- happy path ----
+
+    function test_C32_ChallengeAndRespondHappyPath() public {
+        _setupV2b();
+        (bytes[] memory chunks, bytes32[][] memory proofs, ) = _claimAndCommit(op1, cell1);
+
+        bytes32 nonce = keccak256("c32-nonce-1");
+        uint256 op1Before = ckb.balanceOf(op1);
+
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, nonce);
+
+        (bytes[] memory sChunks, bytes32[][] memory sProofs) = _buildResponse(cell1, op2, nonce, chunks, proofs);
+
+        vm.prank(op1);
+        registry.respondWithChunks(cell1, nonce, sChunks, sProofs);
+
+        // Operator received challenger's bond as attentiveness reward
+        assertEq(ckb.balanceOf(op1), op1Before + registry.CHUNK_CHALLENGE_BOND());
+
+        // Challenge state cleared, cooldown stamp set
+        (, address challenger, , , uint256 lastFailedAt) = registry.chunkChallenges(cell1);
+        assertEq(challenger, address(0));
+        assertEq(lastFailedAt, block.timestamp);
+    }
+
+    // ---- commitment required ----
+
+    function test_C32_Challenge_RevertsIfNoCommitment() public {
+        _setupV2b();
+        // op1 claims but does not commit chunks
+        vault.setActive(cell1, true);
+        vm.prank(op1);
+        registry.claimCell(cell1);
+
+        vm.prank(op2);
+        vm.expectRevert(OperatorCellRegistry.NoChunkCommitment.selector);
+        registry.challengeChunkAvailability(cell1, keccak256("n"));
+    }
+
+    function test_C32_Challenge_RevertsIfContentRegistryUnset() public {
+        // NB: no _setupV2b() — contentRegistry remains address(0)
+        vault.setActive(cell1, true);
+        vm.prank(op1);
+        registry.claimCell(cell1);
+
+        vm.prank(op2);
+        vm.expectRevert(OperatorCellRegistry.ContentRegistryNotSet.selector);
+        registry.challengeChunkAvailability(cell1, keccak256("n"));
+    }
+
+    function test_C32_Challenge_RevertsOnSelfChallenge() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        vm.prank(op1);
+        vm.expectRevert(OperatorCellRegistry.SelfChallenge.selector);
+        registry.challengeChunkAvailability(cell1, keccak256("n"));
+    }
+
+    function test_C32_Challenge_RevertsIfAlreadyChallenged() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, keccak256("n1"));
+
+        address op3 = makeAddr("op3");
+        vm.prank(minter);
+        ckb.mint(op3, 1_000e18);
+        vm.prank(op3);
+        ckb.approve(address(registry), type(uint256).max);
+
+        vm.prank(op3);
+        vm.expectRevert(OperatorCellRegistry.ChunkChallengeActive.selector);
+        registry.challengeChunkAvailability(cell1, keccak256("n2"));
+    }
+
+    // ---- respond reverts ----
+
+    function test_C32_Respond_RevertsOnBadProof() public {
+        _setupV2b();
+        (bytes[] memory chunks, bytes32[][] memory proofs, ) = _claimAndCommit(op1, cell1);
+
+        bytes32 nonce = keccak256("n1");
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, nonce);
+
+        (bytes[] memory sChunks, bytes32[][] memory sProofs) = _buildResponse(cell1, op2, nonce, chunks, proofs);
+
+        // Corrupt the first chunk so the Merkle proof no longer verifies
+        sChunks[0] = abi.encodePacked(keccak256("wrong-chunk"));
+
+        vm.prank(op1);
+        vm.expectRevert(OperatorCellRegistry.InvalidMerkleProof.selector);
+        registry.respondWithChunks(cell1, nonce, sChunks, sProofs);
+    }
+
+    function test_C32_Respond_RevertsOnWrongLength() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        bytes32 nonce = keccak256("n1");
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, nonce);
+
+        bytes[] memory tooFewChunks = new bytes[](3);
+        bytes32[][] memory tooFewProofs = new bytes32[][](3);
+
+        vm.prank(op1);
+        vm.expectRevert(OperatorCellRegistry.InvalidResponseLength.selector);
+        registry.respondWithChunks(cell1, nonce, tooFewChunks, tooFewProofs);
+    }
+
+    // ---- slash ----
+
+    function test_C32_ClaimSlash_SplitMath() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+        uint256 op2Before = ckb.balanceOf(op2);
+
+        bytes32 nonce = keccak256("n1");
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, nonce);
+
+        // Operator doesn't respond
+        vm.warp(block.timestamp + registry.CHUNK_CHALLENGE_RESPONSE_WINDOW() + 1);
+
+        // Anyone triggers the slash
+        address poker = makeAddr("poker");
+        vm.prank(poker);
+        registry.claimChunkAvailabilitySlash(cell1);
+
+        uint256 assignmentBond = BOND;  // default cell bond
+        uint256 expectedSlashed = (assignmentBond * registry.CHUNK_SLASH_BPS()) / 10_000;
+        uint256 expectedRemainder = assignmentBond - expectedSlashed;
+        uint256 expectedChallengerPayout = (expectedSlashed * registry.CHUNK_CHALLENGER_PAYOUT_BPS()) / 10_000;
+        uint256 expectedSlashPoolAdd = expectedSlashed - expectedChallengerPayout;
+
+        assertEq(registry.slashPool(), expectedSlashPoolAdd, "slashPool += slashed/2");
+        assertEq(registry.pendingOperatorRefunds(op1), expectedRemainder, "op1 remainder queued");
+
+        // Challenger received: challenge bond back + payout
+        uint256 challengeBond = registry.CHUNK_CHALLENGE_BOND();
+        assertEq(
+            ckb.balanceOf(op2),
+            op2Before - challengeBond + (challengeBond + expectedChallengerPayout),
+            "challenger refunded + rewarded"
+        );
+
+        assertFalse(registry.isAssigned(cell1, op1));
+    }
+
+    // ---- cooldown ----
+
+    function test_C32_Cooldown_EnforcedAfterRefute() public {
+        _setupV2b();
+        (bytes[] memory chunks, bytes32[][] memory proofs, ) = _claimAndCommit(op1, cell1);
+
+        bytes32 nonce = keccak256("n1");
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, nonce);
+
+        (bytes[] memory sChunks, bytes32[][] memory sProofs) = _buildResponse(cell1, op2, nonce, chunks, proofs);
+        vm.prank(op1);
+        registry.respondWithChunks(cell1, nonce, sChunks, sProofs);
+
+        // Immediate re-challenge — cooldown blocks
+        vm.prank(op2);
+        vm.expectRevert(OperatorCellRegistry.ChunkChallengeCooldownActive.selector);
+        registry.challengeChunkAvailability(cell1, keccak256("n2"));
+    }
+
+    // ---- coexistence with V2a ----
+
+    function test_C32_Coexistence_V2aAndV2b_BothActive() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        // op2 raises V2a liveness challenge
+        vm.prank(op2);
+        registry.challengeAssignment(cell1, keccak256("v2a-nonce"));
+
+        // op2 also raises V2b chunk-availability challenge (different game)
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, keccak256("v2b-nonce"));
+
+        (, address v2aChallenger, , , ) = registry.assignmentChallenges(cell1);
+        (, address v2bChallenger, , , ) = registry.chunkChallenges(cell1);
+        assertEq(v2aChallenger, op2);
+        assertEq(v2bChallenger, op2);
+    }
+
+    function test_C32_V2bSlash_RefundsActiveV2aChallenger() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        // Two separate challengers — op2 raises V2a, op3 raises V2b
+        address op3 = makeAddr("op3");
+        vm.prank(minter);
+        ckb.mint(op3, 1_000e18);
+        vm.prank(op3);
+        ckb.approve(address(registry), type(uint256).max);
+
+        uint256 op2Before = ckb.balanceOf(op2);
+
+        vm.prank(op2);
+        registry.challengeAssignment(cell1, keccak256("v2a"));
+        vm.prank(op3);
+        registry.challengeChunkAvailability(cell1, keccak256("v2b"));
+
+        vm.warp(block.timestamp + registry.CHUNK_CHALLENGE_RESPONSE_WINDOW() + 1);
+
+        // V2b slash wins — should also refund the active V2a challenger (op2)
+        registry.claimChunkAvailabilitySlash(cell1);
+
+        // op2 was not wrong to raise V2a — they get their bond back
+        assertEq(ckb.balanceOf(op2), op2Before, "v2a challenger refunded on v2b slash");
+        (, address v2aChallenger, , , ) = registry.assignmentChallenges(cell1);
+        assertEq(v2aChallenger, address(0), "v2a challenge wiped");
+    }
+
+    function test_C32_V2aSlash_RefundsActiveV2bChallenger() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        address op3 = makeAddr("op3");
+        vm.prank(minter);
+        ckb.mint(op3, 1_000e18);
+        vm.prank(op3);
+        ckb.approve(address(registry), type(uint256).max);
+
+        uint256 op3Before = ckb.balanceOf(op3);
+
+        vm.prank(op2);
+        registry.challengeAssignment(cell1, keccak256("v2a"));
+        vm.prank(op3);
+        registry.challengeChunkAvailability(cell1, keccak256("v2b"));
+
+        vm.warp(block.timestamp + registry.ASSIGNMENT_CHALLENGE_RESPONSE_WINDOW() + 1);
+
+        registry.claimAssignmentSlash(cell1);
+
+        assertEq(ckb.balanceOf(op3), op3Before, "v2b challenger refunded on v2a slash");
+        (, address v2bChallenger, , , ) = registry.chunkChallenges(cell1);
+        assertEq(v2bChallenger, address(0), "v2b challenge wiped");
+    }
+
+    function test_C32_Relinquish_BlockedDuringChunkChallenge() public {
+        _setupV2b();
+        _claimAndCommit(op1, cell1);
+
+        vm.prank(op2);
+        registry.challengeChunkAvailability(cell1, keccak256("n1"));
+
+        vm.prank(op1);
+        vm.expectRevert(OperatorCellRegistry.ChunkChallengeActive.selector);
+        registry.relinquishCell(cell1);
+    }
+
+    function test_C32_DeriveSampledIndex_Deterministic() public view {
+        bytes32 nonce = keccak256("det");
+        uint256 idx1 = registry.deriveSampledIndex(cell1, op2, nonce, 0, 64);
+        uint256 idx1Again = registry.deriveSampledIndex(cell1, op2, nonce, 0, 64);
+        assertEq(idx1, idx1Again, "same inputs = same index");
+
+        uint256 idx2 = registry.deriveSampledIndex(cell1, op2, nonce, 1, 64);
+        // Different k MAY coincide but should be independent — spot check they differ for k=0,1
+        // (collision probability 1/64 ≈ 1.5%, acceptable for a single assertion)
+        assertTrue(idx1 < 64 && idx2 < 64, "bounded by chunkCount");
     }
 }

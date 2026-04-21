@@ -50,6 +50,15 @@ Memo → "go" → ship. New standalone `OperatorCellRegistry.sol` (287 LOC, UUPS
 ### Cycle 31 — V2 Permissionless Availability Challenge for OperatorCellRegistry
 Memo v1 asked for open parameters; Will corrected: "refer to the augmented mechanism design paper rather than asking me." Saved `feedback_augmented-mechanism-design-paper.md`, re-drafted memo v2 with all constants cited to paper sections (Temporal §6.1, Compensatory §6.5 — Challenge Bond 10e18 CKB, Response Window 30min, Cooldown 24hr, Slash 50%, Challenger Payout 50% of slashed). "Go" on v2 shipped directly. New challenge/refute/slash flow: `challengeAssignment`, `respondToAssignmentChallenge`, `claimAssignmentSlash`, `withdrawPendingRefund`. 50/50 slash-split with remainder to operator via pull queue (C14-AUDIT-1 primitive, 3rd invocation). `slashAssignment` kept `@deprecated` as paper §8.2 transition affordance. `__gap` 46 → 44. +20 tests (45 total registry, 64/64 SOR unchanged — 0 regressions). V2b (Merkle-chunk PAS, needs StateRentVault migration) and V2c (threshold attestors) deferred to future cycles.
 
+### Cycle 32 — V2b Content-Availability Sampling (Merkle-chunk PAS) — autonomous ship
+Will said "i need to take care of myself so work on your own" mid-cycle — executed full cycle autonomously. Chose **Option D — sidecar `ContentMerkleRegistry`** over three StateRentVault-modifying alternatives (paper §7.4 composability: new primitives get new contracts, not new security-critical vault fields). Shipped:
+- New `ContentMerkleRegistry.sol` (~200 LOC, UUPS): operators commit chunk Merkle roots per cellId; `MIN_CHUNK_SIZE=32`, `MAX_CHUNK_SIZE=4096`, `MAX_CHUNK_COUNT=1M` (caps proof depth at ~20 levels); `commitChunks` / `revokeCommitment` / `updateCommitment`
+- OCR V2b extensions (+~280 LOC): `challengeChunkAvailability` → `respondWithChunks` (K=16 Merkle proofs, all-must-pass) → `claimChunkAvailabilitySlash`. Split math mirrors V2a (50% slash / 50/50 challenger-vs-slashPool). `deriveSampledIndex` pure helper.
+- Cross-challenge coexistence: V2a (liveness) and V2b (content) run on separate state mappings; any slash path refunds active challenger on the non-winning side via `_refundAndClearAssignmentChallenge` + `_refundAndClearChunkChallenge` helpers. `relinquishCell` blocks on either active challenge.
+- `__gap` 44 → 42. `@deprecated slashAssignment` still refunds both challenge types.
+- +32 tests (18 new `ContentMerkleRegistry.t.sol` + 14 V2b integration on OCR). Real Merkle-tree construction in Solidity test helper (OZ-compatible sorted-pair hashing). **141/141 across OCR + CMR + SOR, 0 regressions.** V2b response gas: ~2.3M observed at K=16/chunkCount=64; scales to ~10M at chunkCount=1M (within block limit).
+- V2c (threshold attestors) deferred to future cycle. Backlog open HIGH: **0**.
+
 ## Pending / Next Session
 
 ### Tier 6 — Native anchoring (long arc)

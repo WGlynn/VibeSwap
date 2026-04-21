@@ -67,6 +67,14 @@ contract OperatorCellRegistry is
     /// @notice C24/C25 primitive — cap operatorCells to prevent unbounded iteration.
     uint256 public constant MAX_CELLS_PER_OPERATOR = 10_000;
 
+    /// @notice C36-F1: lower bound on bondPerCell. Zero bond disables Sybil
+    ///         resistance (operators claim cells for free); this floor keeps
+    ///         the invariant "each claim costs a non-trivial bond" intact
+    ///         across all governance tunings. 1e18 (1 CKB) is well below the
+    ///         10e18 default, preserving governance's right to lower the
+    ///         bond by an order of magnitude without disabling protection.
+    uint256 public constant MIN_BOND_PER_CELL = 1e18;
+
     // ============ C31 (V2 availability challenge) Constants ============
     //
     // Parameters drawn from augmented-mechanism-design.md:
@@ -231,6 +239,8 @@ contract OperatorCellRegistry is
     error InvalidMerkleProof();
     error ChunkChallengeActive();
     error ChunkChallengeCooldownActive();
+    // C36-F1 access-control bound
+    error BondBelowMin();
 
     // ============ Init ============
 
@@ -246,6 +256,8 @@ contract OperatorCellRegistry is
         address _owner
     ) external initializer {
         if (_ckbToken == address(0) || _owner == address(0)) revert ZeroAddress();
+        // C36-F1: enforce the Sybil-resistance floor at genesis too.
+        if (_bondPerCell < MIN_BOND_PER_CELL) revert BondBelowMin();
 
         __Ownable_init(_owner);
         __UUPSUpgradeable_init();
@@ -740,7 +752,10 @@ contract OperatorCellRegistry is
         emit SlashPoolSwept(destination, amount);
     }
 
+    /// @notice Governance-tunable cell-claim bond. Floored at MIN_BOND_PER_CELL
+    ///         to preserve Sybil resistance across all governance states (C36-F1).
     function setBondPerCell(uint256 newBond) external onlyOwner {
+        if (newBond < MIN_BOND_PER_CELL) revert BondBelowMin();
         uint256 old = bondPerCell;
         bondPerCell = newBond;
         emit BondPerCellUpdated(old, newBond);

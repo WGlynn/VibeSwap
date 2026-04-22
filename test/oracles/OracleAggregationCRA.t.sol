@@ -5,6 +5,8 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../../contracts/oracles/OracleAggregationCRA.sol";
 import "../../contracts/oracles/interfaces/IOracleAggregationCRA.sol";
+import "../../contracts/oracles/TruePriceOracle.sol";
+import "../../contracts/oracles/interfaces/ITruePriceOracle.sol";
 
 /**
  * @title OracleAggregationCRA tests — C39 FAT-AUDIT-2
@@ -314,5 +316,60 @@ contract OracleAggregationCRATest is Test {
         // Don't advance past reveal deadline
         vm.expectRevert(bytes("Reveal not yet ended"));
         agg.slashNonRevealer(1, issuer1);
+    }
+
+    // ============ TPO Wire-In (C39) ============
+
+    function test_tpoWireIn_pullFromAggregator() public {
+        // Stand up a real TPO and wire it to the aggregator
+        TruePriceOracle tpoImpl = new TruePriceOracle();
+        ERC1967Proxy tpoProxy = new ERC1967Proxy(
+            address(tpoImpl),
+            abi.encodeWithSelector(TruePriceOracle.initialize.selector)
+        );
+        TruePriceOracle tpo = TruePriceOracle(address(tpoProxy));
+        tpo.setOracleAggregator(address(agg));
+
+        // Run a full batch on the aggregator: median should be 1500e18
+        _threeCommitsAndReveals([uint256(1400e18), uint256(1500e18), uint256(1600e18)]);
+        uint256 median = agg.settleBatch(1);
+        assertEq(median, 1500e18, "aggregator median sanity");
+
+        // Pull median into TPO for some poolId
+        bytes32 poolId = keccak256("ETH/USD");
+        tpo.pullFromAggregator(poolId, 1);
+
+        // TPO now reflects the aggregated median
+        ITruePriceOracle.TruePriceData memory data = tpo.getTruePrice(poolId);
+        assertEq(data.price, 1500e18);
+        assertEq(uint256(data.regime), uint256(ITruePriceOracle.RegimeType.STABLE));
+        assertEq(data.manipulationProb, 0);
+        assertGt(data.confidence, 0);
+    }
+
+    function test_tpoWireIn_revertOnAggregatorUnset() public {
+        TruePriceOracle tpoImpl = new TruePriceOracle();
+        ERC1967Proxy tpoProxy = new ERC1967Proxy(
+            address(tpoImpl),
+            abi.encodeWithSelector(TruePriceOracle.initialize.selector)
+        );
+        TruePriceOracle tpo = TruePriceOracle(address(tpoProxy));
+        // Don't call setOracleAggregator — should revert
+        vm.expectRevert(bytes("Aggregator unset"));
+        tpo.pullFromAggregator(keccak256("ETH/USD"), 1);
+    }
+
+    function test_tpoWireIn_revertOnUnsettledBatch() public {
+        TruePriceOracle tpoImpl = new TruePriceOracle();
+        ERC1967Proxy tpoProxy = new ERC1967Proxy(
+            address(tpoImpl),
+            abi.encodeWithSelector(TruePriceOracle.initialize.selector)
+        );
+        TruePriceOracle tpo = TruePriceOracle(address(tpoProxy));
+        tpo.setOracleAggregator(address(agg));
+
+        // Aggregator's batch 1 is open / not settled
+        vm.expectRevert(bytes("Batch not settled"));
+        tpo.pullFromAggregator(keccak256("ETH/USD"), 1);
     }
 }

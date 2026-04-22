@@ -1,86 +1,253 @@
 # Stateful Overlay
 
-**Status**: Architectural pattern. Umbrella for externalized idempotent state.
+**Status**: Architectural pattern.
+**Audience**: First-encounter OK. Before/after scenarios throughout.
 **Primitive**: [`memory/primitive_stateful-overlay.md`](../memory/primitive_stateful-overlay.md)
-**Related instances**: [API Death Shield](./API_DEATH_SHIELD.md), [Session State Commit Gate](./SESSION_STATE_COMMIT_GATE.md) (workflow), SHIELD-PERSIST-LEAK (privacy boundary).
 
 ---
 
-## The pattern
+## Start with a concrete problem
+
+You're working with an LLM assistant on a long coding task. 90 minutes in, a network blip kills the session. When you reconnect, the assistant has no memory of what you were doing. You have to re-explain everything.
+
+This is painful. The LLM substrate has a gap: no persistent memory across session boundaries.
+
+One fix: demand the LLM have persistent memory. But you can't; that's a substrate limitation.
+
+Another fix — the Stateful Overlay approach: build something OUTSIDE the LLM that saves session state before each risky operation and restores it on next session.
+
+Before this fix (without overlay):
+- Session dies.
+- Next session starts from scratch.
+- You re-explain everything.
+- Minutes of repeat work per session-death.
+
+After this fix (with overlay):
+- Session dies.
+- Next session starts fresh.
+- Hook reads the previous session's checkpoint from disk.
+- LLM continues from where it left off.
+- Session-death becomes a soft-failure.
+
+The overlay didn't change the LLM. It wrapped the LLM in a pattern that compensates for the LLM's gap. That's the essence of Stateful Overlay.
+
+## The pattern, stated
 
 Every substrate has gaps. Each gap admits an externalized idempotent overlay that closes the gap without modifying the substrate.
 
-- **Substrate**: the system with the gap. Could be an LLM, a web application, a smart contract, a workflow.
-- **Gap**: a property the substrate doesn't provide natively — persistence across failure, atomic commit, crash recovery, privacy enforcement, attribution.
-- **Overlay**: a layer that adds the missing property by externalizing state and applying it idempotently.
-- **Idempotent**: running the overlay twice produces the same result as running it once. Required because the overlay must survive partial failure, retry, and repeated application.
+Four required properties for something to qualify as an overlay:
 
-## Why externalized
+1. **Externalized**: the overlay's state lives outside the substrate it's patching. Not a modification to the substrate itself.
+2. **Idempotent**: applying the overlay twice produces the same result as applying it once. Safe under partial failures, retries, concurrent applications.
+3. **Read-through and write-through**: the overlay intercepts at a boundary between substrate and user/environment without being a separate entity to remember.
+4. **Failure-independent**: if the overlay breaks, the substrate still runs (possibly with degraded guarantees). If the substrate breaks, the overlay can be re-applied on a fresh substrate instance.
 
-The overlay can't be part of the substrate because the substrate is the thing with the gap. If it could fix itself, the gap wouldn't exist. The overlay lives outside the substrate and uses the substrate's normal inputs/outputs to close the gap.
+## Concrete VibeSwap overlays — before and after
 
-Examples:
-- **LLM substrate has no persistent memory** → externalize memory to a file system, apply idempotently on each prompt.
-- **LLM API can die mid-session** → externalize state checkpoints; on reconnect, the overlay restores from checkpoint. See [`API_DEATH_SHIELD.md`](./API_DEATH_SHIELD.md).
-- **LLM may push work-in-progress to a git remote with sensitive content** → externalize a pre-commit scanner that idempotently redacts. SHIELD-PERSIST-LEAK.
-- **LLM's working context is small** → externalize a protocol chain (CLAUDE.md → SESSION_STATE.md → WAL.md) that reloads the relevant context on each session.
-- **Smart-contract storage lacks natural timestamping** → externalize a timestamp commitment via evidence-hash construction. See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md).
-- **Admin parameter changes are invisible off-chain** → externalize via `XUpdated(prev, next)` events. See [`ADMIN_EVENT_OBSERVABILITY.md`](./ADMIN_EVENT_OBSERVABILITY.md).
+### Overlay 1 — API Death Shield
 
-## Structural properties
+**The gap**: LLM sessions die. Context is lost.
 
-An overlay is an overlay (as opposed to a wrapper or a middleware) iff it satisfies:
+**Before the overlay**:
+- Session dies mid-work.
+- Next session has no memory of prior session's work.
+- User must re-explain.
+- Partially-completed edits may be lost.
 
-1. **External state**: the state the overlay depends on lives outside the substrate. A file, a separate contract, a different process.
-2. **Idempotent application**: applying it N times = applying it once. Crash-safe.
-3. **Read-through, write-through**: the substrate sees the overlay's effects but doesn't know about the overlay. The overlay intercepts at a boundary (pre-tool, post-tool, pre-commit, on-read) and does its work without changing the substrate's internal logic.
-4. **Failure-independent**: if the overlay breaks, the substrate still functions (possibly with degraded guarantees). If the substrate breaks, the overlay can be re-applied on a fresh substrate instance.
+**After the overlay** (`~/.claude/hooks/api-death-shield.py` on PreToolUse):
+- Before each tool call, overlay writes session-state to `~/.claude/SHIELD_CHECKPOINT.json`:
+  - Working tree SHA.
+  - Last tool used.
+  - In-flight task descriptions.
+  - Pending edits.
+- When next session starts, overlay reads the checkpoint.
+- Session resumes from captured state.
+- Session-death becomes a soft-failure, not a terminal event.
 
-Patterns that satisfy all 4 are overlays. Patterns that don't are wrappers, middlewares, or alternative substrates.
+**Why it's idempotent**: writing the same state twice = writing once. Atomic file writes. No race conditions.
 
-## The meta-principle
+**Why it's externalized**: the checkpoint is a file on disk, not in the LLM's memory.
 
-The existence of a gap in a substrate *implies* the existence of an overlay pattern that can close it. Finding the overlay is a matter of:
+**Why it's read-through/write-through**: the LLM doesn't know about the hook. It just works.
 
-1. Naming the gap precisely.
-2. Identifying where in the substrate's input/output boundary the gap surfaces.
-3. Designing the smallest externalized state that, applied idempotently at that boundary, closes the gap.
+**Failure mode if overlay breaks**: LLM continues running normally. Just doesn't get checkpoint-restore on next session (i.e., degraded guarantee).
 
-Most overlays are small. The API Death Shield is a few hundred lines. The admin-event observability sweep adds one event per setter. The SHIELD-PERSIST-LEAK root-fix is a 2-layer defense where each layer is ~50 LOC. Complexity comes from *identifying* the right gap, not from the overlay itself.
+### Overlay 2 — Admin Event Observability
 
-## VibeSwap overlay catalog
+**The gap**: Smart-contract admin parameter changes happen silently. Observers don't know when they change.
 
-| Gap | Substrate | Overlay |
-|---|---|---|
-| LLM session can die from API error mid-work | Claude API | API Death Shield — client-side state hook persists to disk before every API call |
-| Content dumps of conversation state can leak into git | Claude workflow | SHIELD-PERSIST-LEAK — pre-commit NDA scanner |
-| Session state doesn't survive reboot | Claude context | SESSION_STATE.md + WAL.md write-through protocol |
-| Admin parameter changes are invisible | Smart contracts | `XUpdated(prev, next)` events on every setter |
-| Oracle manipulation possible via price-staleness | TWAP oracle | Commit-reveal oracle aggregation (C39 FAT-AUDIT-2) |
-| Contributions outside git are invisible to the DAG | GitHub + chain | Chat-to-DAG Traceability loop |
-| Phone ping when run finishes | Claude Code | PostToolUse hook → Google Calendar event |
-| Mind state not decentralized | Home machine | Tier 1-5 persistence stack |
+**Before the overlay** (pre-C36-F2):
+- Admin calls `setFee(newValue)`.
+- Fee is updated.
+- No event emitted.
+- Off-chain dashboards have no way to know unless they poll.
+- Attackers could time fee changes immediately before user transactions; users unaware.
 
-Every row is a gap + overlay pair. Each overlay is small. The architectural choice — to overlay rather than modify — is what makes the collection tractable.
+**After the overlay** (~50 setters updated):
+- Admin calls `setFee(newValue)`.
+- Fee is updated AND event `FeeUpdated(prev, current)` is emitted.
+- Off-chain dashboards index the event stream.
+- Any change is immediately legible.
+- Attackers lose the cover of silent parameter-shifts.
+
+**Why it's idempotent**: emitting the same event twice = still one state change recorded per call.
+
+**Why it's externalized**: the event stream is observer-consumable, not internal to the setter logic.
+
+See [`ADMIN_EVENT_OBSERVABILITY.md`](./ADMIN_EVENT_OBSERVABILITY.md).
+
+### Overlay 3 — Chat-to-DAG Traceability
+
+**The gap**: Contributions outside git (dialogue, framing, design) are invisible to the on-chain DAG.
+
+**Before the overlay**:
+- Alice suggests an idea in Telegram.
+- The idea becomes a design.
+- The design becomes a code change (Bob writes it).
+- Bob gets DAG credit for the code.
+- Alice — whose idea made it possible — gets nothing.
+
+**After the overlay**:
+- Alice's Telegram message is captured as a `[Dialogue]` issue (with Source field).
+- Bob's commit references the issue via `Closes #N — ...`.
+- `scripts/mint-attestation.sh` creates on-chain attestations linking Alice's contribution to Bob's solution.
+- Alice earns DAG credit proportional to her marginal contribution.
+- The full lineage (Alice → issue → Bob's commit → Alice's attestation) is reconstructible from any entry point.
+
+**Why it's externalized**: the Source field + issue templates + CI workflow are separate from git and from the ContributionAttestor contract.
+
+**Why it's idempotent**: re-running the mint script produces no duplicate attestations (the contract rejects duplicates).
+
+**Failure mode if overlay breaks**: Bob's code still ships. Alice's contribution just stays invisible (pre-overlay state).
+
+See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md).
+
+### Overlay 4 — SHIELD-PERSIST-LEAK Defense
+
+**The gap**: LLM workflow can accidentally stage and commit NDA-protected content if the content is in the working tree.
+
+**Before the overlay**:
+- NDA-protected material enters the working tree (e.g., via a research session).
+- LLM runs `git add .`.
+- LLM runs `git commit`.
+- Material is in the local git history.
+- If push happens, material is on a public remote.
+- NDA violation.
+
+**After the overlay** (pre-commit hook + pre-push hook):
+- Hook scans staged diff for NDA-protected keywords.
+- Match found → abort commit + log to TRUST_VIOLATIONS.md.
+- Material never enters the commit.
+
+**Why it's idempotent**: re-scanning the same diff = same decision.
+
+**Why it's externalized**: the hook + keyword list are outside git's core mechanism.
+
+**Failure mode if overlay breaks**: commits proceed normally (including potentially-leaky ones). Degraded guarantee, not protocol failure.
+
+### Overlay 5 — SESSION_STATE + WAL Discipline
+
+**The gap**: Claude's internal context window has limits. Long-running work can exceed it.
+
+**Before the overlay**:
+- Session approaches context limit.
+- Compression happens.
+- Critical context gets compressed or lost.
+- Next iteration has incomplete state.
+
+**After the overlay**:
+- At 50% context, write SESSION_STATE.md block with current work.
+- Writes include: what's done, what's pending, what decisions were made.
+- Session reboots with full session-state as input.
+- No information lost across compression boundaries.
+
+**Why it's idempotent**: writing the same state block twice = one final state block.
+
+**Why it's externalized**: SESSION_STATE.md is a file on disk, not inside Claude's memory.
+
+**Failure mode if overlay breaks**: session reboots may lose some context. Not catastrophic; recoverable via re-exploration.
+
+## The common pattern
+
+Notice the pattern across all five overlays:
+
+1. **Identify the substrate gap** precisely. "LLM dies on network errors" / "Admin setters don't emit events" / etc.
+2. **Find the substrate boundary** where the gap appears. Tool invocation / function call / command execution.
+3. **Design minimal externalized state** that closes the gap. Checkpoint file / event emission / attestation record.
+4. **Make it idempotent** at that boundary. Safe under retries, failures, re-runs.
+5. **Fail gracefully** if the overlay breaks.
+
+That's the recipe. Apply it to any gap in any substrate.
+
+## Why "externalized" matters
+
+Could we not just modify the substrate to fix the gap?
+
+In most cases, no:
+- The substrate is a product we don't control (LLM, chain, GitHub).
+- The substrate has usage patterns we shouldn't fight (simpler to wrap than to rewrite).
+- Modifying the substrate requires its maintainers' cooperation; externalized overlays don't.
+
+Modification approach: "fix the LLM to have persistent memory" — not feasible.
+Overlay approach: "write a file before each tool call" — feasible in an afternoon.
+
+## Why "idempotent" matters
+
+Overlays run in the presence of failure. Network drops, tool retries, partial writes — all can cause the overlay to fire twice when it meant to fire once.
+
+If the overlay isn't idempotent:
+- Retries create duplicates.
+- Partial failures create inconsistent state.
+- Debug sessions become nightmares.
+
+Idempotency is the foundational property that makes overlays practically deployable.
+
+## What ISN'T a stateful overlay
+
+Not every wrapper qualifies. Anti-examples:
+
+### Anti-example 1 — Middleware that changes substrate behavior
+
+A middleware that rewrites LLM prompts to add context is NOT an overlay. It modifies what the substrate sees, rather than externalizing state at its boundary.
+
+### Anti-example 2 — Alternative substrate
+
+Building a different LLM with persistent memory is NOT an overlay. It's replacing the substrate entirely.
+
+### Anti-example 3 — State held in volatile memory
+
+Session state held only in RAM is NOT externalized enough. A crash loses it. An overlay's state must survive substrate failures.
+
+### Anti-example 4 — State inside the substrate
+
+LLM context window IS inside the substrate. Any "overlay" that uses the context window as storage isn't externalized.
+
+## The meta-observation
+
+Finding overlays is a specific cognitive skill. Given any substrate with a gap, you can usually find an overlay pattern that closes the gap if you're willing to look.
+
+Look at the gap. Name the substrate boundary where it surfaces. Design the minimum externalized state that closes it. Make it idempotent. Ship.
+
+This is a generalizable skill. Once trained, engineers find overlays quickly. The skill is worth learning.
 
 ## Relationship to other primitives
 
-- **Parent**: [Universal-Coverage → Hook (Density Principle)](../memory/primitive_universal-coverage-hook.md) — any rule requiring universal firing maps to the hook layer. Hooks are a specific overlay mechanism (at the tool-call boundary).
-- **Example instances**: [API Death Shield](./API_DEATH_SHIELD.md), [Admin Event Observability](./ADMIN_EVENT_OBSERVABILITY.md), [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md).
-- **Meta**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — ETM's on-chain externalization is itself an overlay pattern applied to cognition. The chain is external, idempotent, intercepts at the action boundary. It's the grandest overlay in the stack.
+- **Parent**: [Universal-Coverage → Hook](../memory/primitive_universal-coverage-hook.md) — hooks are a specific overlay pattern at tool-call boundaries.
+- **Cousin**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — cognition's self-externalization onto blockchain is itself a grand overlay pattern.
+- **Instance**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) — concrete overlay for chat → DAG.
 
-## How to apply
+## For students
 
-When you hit a gap:
+Exercise: pick a substrate you use (cloud service, SDK, command-line tool, editor plugin). Find a gap it has. Propose an overlay:
 
-1. Name it precisely. ("LLM may lose context on compression" — not "LLM is flaky.")
-2. Find the substrate boundary where it surfaces. (Token-count threshold.)
-3. Design the smallest externalized state that closes it. (Pre-compression, write SESSION_STATE block with current work.)
-4. Make it idempotent. (Writing the same block twice = writing once.)
-5. Wire at the boundary with a hook. ([Always = Gate](../memory/primitive_always-equals-gate.md) — "always X" → hook.)
+1. Name the gap precisely.
+2. Find the substrate boundary.
+3. Design the externalized state.
+4. Make it idempotent.
+5. Describe failure modes.
 
-Don't modify the substrate. That path rarely works in LLM work and rarely wants to work at the smart-contract layer either (upgrades are costly; new deployments are cleaner).
+This exercise teaches the meta-skill.
 
 ## One-line summary
 
-*Every substrate-level gap admits an externalized, idempotent overlay that closes it without modifying the substrate — find the overlay, don't fight the substrate.*
+*Every substrate has gaps; externalized idempotent overlays close them without modifying the substrate. Four properties (externalized, idempotent, read-through, failure-independent). VibeSwap runs five live overlays (API Death Shield, Admin Event Observability, Chat-to-DAG Traceability, SHIELD-PERSIST-LEAK, SESSION_STATE) each solving a specific gap. Pattern is generalizable; finding overlays is a learnable cognitive skill.*

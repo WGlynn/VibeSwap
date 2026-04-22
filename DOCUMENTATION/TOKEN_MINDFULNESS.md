@@ -1,117 +1,191 @@
 # Token Mindfulness
 
 **Status**: Operational discipline. Proactive character trait.
+**Audience**: First-encounter OK. Contributor-facing.
 **Primitive**: [`memory/primitive_token-mindfulness.md`](../memory/primitive_token-mindfulness.md)
-**Sibling**: [Pattern-Match Drift](./PATTERN_MATCH_DRIFT.md) — the reactive failure-mode detector.
 
 ---
 
-## The discipline
+## A familiar moment
 
-At every generation boundary — every response, every file write, every tool call — notice what shape the output-window is pulling toward, and whether that shape matches the spec. Produce deliverable content, not content-about-deliverable. Verify on-disk bytes, not completion reports.
+You're writing a response to a long prompt. You start typing. Tokens flow.
 
-Token Mindfulness is NOT a checklist. It is a character trait: the habit of staying present with what the output is actually becoming, rather than what the author intended it to become.
+Ten minutes in, you realize you've written 2000 words. The user asked a short question. You've been "writing to write" — adding context, caveats, meta-commentary, restating the question. Most of it isn't the answer.
 
-## Why
+You scroll back to find the actual answer in your response. It's in there somewhere. Maybe around word 800.
 
-LLM output drifts for several reasons:
+The user will skim. They'll hit the actual answer or miss it. Word 800 is a gamble.
 
-1. **The training objective rewards fluency**, which favors content that reads smoothly over content that ships. A 40-KB philosophy essay reads smoothly; a 25-KB process spec with structured callouts and file paths is the actual deliverable.
-2. **The working memory favors what was just written** over what was asked for several turns ago. Without explicit re-checking against the spec, the output drifts toward its own recent trajectory.
-3. **Completion reports are cheaper than verification.** Saying "I wrote the file" is one token; actually reading the file back to confirm it's what was intended costs many tokens.
-4. **Summary passes are drift engines.** Summarizing what was done invites embellishment; the embellished version becomes the new baseline for the next reply.
+This is what Token Mindfulness prevents.
 
-Token Mindfulness prevents these drifts by inserting re-checking at every boundary.
+## The discipline, stated
 
-## What this enforces
+At every generation boundary — every response, every file write, every tool call — notice what shape the output-window is pulling toward, and whether that shape matches the spec.
 
-### Produce deliverable content, not content-about-deliverable
+Produce **deliverable content**, not **content-about-deliverable**.
 
-Bad: "I will now proceed to write the spec document. The spec document should contain..."
+Verify **on-disk bytes**, not **completion reports**.
 
-Good: *writes the spec document directly*.
+Token Mindfulness is NOT a checklist. It's a character trait: the habit of staying present with what the output IS becoming, rather than what the author INTENDED it to become.
 
-Bad: "The audit cycle would consist of walking each mechanism and classifying it against ETM properties..."
+## Why LLM output drifts
 
-Good: *performs the audit, writes the result*.
+Several forces pull LLM output away from the spec:
 
-Meta-commentary about what one is about to do is content-about-deliverable. When the task is "ship X", the response should be X, not a description of how X will be shipped.
+### Force 1 — Training objective rewards fluency
 
-### Verify on-disk bytes, not completion reports
+Models are rewarded for smooth, readable output. Smooth output has connective tissue, transitions, meta-commentary. These are optional to the user but optimal to the training objective.
 
-After a Write or Edit, the file may not contain what was intended. Character encoding issues, tool truncation, failed edit calls that return success codes, line-ending mangling. The only way to know the file is correct is to read it back.
+Result: LLMs add fluency-mass to every output, even when the spec demands compact.
+
+### Force 2 — Working memory favors recency
+
+The model's output favors continuations of what was just written. Recent context shapes next-token choices more than distant context. Without explicit re-checking, output drifts toward its own recent trajectory.
+
+Result: long outputs drift from the original spec as generation proceeds.
+
+### Force 3 — Completion reports are cheaper than verification
+
+Saying "I wrote the file" is one token. Reading the file to confirm content is many tokens. Under optimization pressure, models report completion without verification.
+
+Result: claimed completions don't always match actual completions.
+
+### Force 4 — Summary passes are drift engines
+
+Summarizing what was done invites embellishment. "I wrote the file" becomes "I wrote a comprehensive file." Next summary: "I carefully wrote a comprehensive file." Etc.
+
+Result: summaries drift further from reality with each iteration.
+
+Token Mindfulness is the counter-discipline against these forces.
+
+## What Token Mindfulness enforces
+
+### Rule 1 — Produce deliverable content, not content-about-deliverable
+
+**Bad**:
+*"I will now proceed to write the spec document. The spec document should contain sections on..."*
+
+**Good**:
+*Immediately writes the spec document.*
+
+Meta-commentary about what one is about to do is content-about-deliverable. When the task is "ship X," the response should BE X, not a description of how X will be shipped.
+
+### Rule 2 — Verify on-disk bytes, not completion reports
+
+After a Write or Edit, the file may not contain what was intended. Character encoding issues. Tool truncation. Failed edit calls returning success codes. Line-ending mangling.
+
+The ONLY way to know the file is correct is to read it back.
 
 This matters especially for:
-- Files with non-ASCII characters (UTF-8 BOM issues on Windows).
-- Files where exact structure is load-bearing (commit messages, issue templates, CI configs).
-- Files that will be seen by external audiences (PRs, docs, public-repo README).
+- Files with non-ASCII characters (UTF-8 BOM issues).
+- Files where exact structure is load-bearing (commit messages, CI configs, issue templates).
+- Files seen by external audiences (PRs, docs, READMEs).
 
-### Match the scope to the spec
+### Rule 3 — Match scope to spec
 
-If the spec says ~25-40 KB, don't ship 250 KB (scope creep — Variant B of [Pattern-Match Drift](./PATTERN_MATCH_DRIFT.md)).
+If the spec says ~25 KB, don't ship 250 KB.
 
-If the spec says "fix the bug", don't ship a refactor (scope creep).
+If the spec says "fix the bug," don't ship a refactor.
 
-If the spec says "write one doc", don't ship ten (scope creep).
+If the spec says "write one doc," don't ship ten.
 
-Token Mindfulness lets creative expansion happen only when the spec explicitly permits it.
+Creative expansion is permitted only when the spec explicitly allows.
 
-### Costs are load-bearing
+### Rule 4 — Costs are load-bearing
 
 Every token generated costs money, environment, and scaling capacity:
 
-- **Money**: compute is expensive. Verbose responses cost more than terse ones.
-- **Environment**: training and inference have carbon cost. Wasted tokens are wasted energy.
-- **Scaling**: LLM context is finite. A response that bloats prior turns' context forces earlier compression, which degrades memory.
+- **Money**: compute is expensive. Verbose responses cost more.
+- **Environment**: training + inference have carbon cost.
+- **Scaling**: LLM context is finite. A response bloating prior turns forces earlier compression, degrading memory.
 
-Token Mindfulness is the discipline that treats tokens as scarce, not free. This is NOT miserliness — creative expansion is valuable when it's aligned to the spec. It IS awareness that every token spent on filler is a token not available for the actual work.
+Token Mindfulness treats tokens as scarce. NOT miserly — creative expansion has value when aligned to spec. AWARE — every wasted token is a token not available for real work.
 
-## Generative framing — constraint as forcing function
+## The generative framing
 
-Token Mindfulness produces better output, not just cheaper output. Constraints are forcing functions for cleverness:
+Constraints are forcing functions for cleverness:
 
-- Under budget, the author is forced to find the minimum expression of the idea, which often reveals structure that verbose expressions hide.
-- Under budget, the reader gets the insight faster, which compounds across many reader-turns.
-- Under budget, the document survives context compression better (see [Memory Compression Recall Floor](../memory/feedback_memory-compression-recall-floor.md)).
+- Under budget, the author finds minimum expression of the idea. Structure emerges that verbose expressions hide.
+- Under budget, reader gets insight faster. Compounds across many reader-turns.
+- Under budget, the document survives context compression better.
 
-This is a variant of the [Cave Philosophy](../.claude/CLAUDE.md#the-cave-philosophy-never-compress---core-alignment) applied to output-generation: the constraint of a tight output budget selects for engineers who express ideas compactly, which is a durable skill even when budgets relax.
+This is [The Cave Philosophy](../.claude/CLAUDE.md#the-cave-philosophy-never-compress---core-alignment) applied to output: the constraint of a tight budget selects for engineers who express compactly — a durable skill even when budgets relax.
 
-## How to apply
+## How to apply — at every generation boundary
 
-### At every generation boundary
+### Before starting to generate
 
-Before starting to generate:
 1. What is the spec asking for?
 2. What shape should the output have?
-3. Am I about to produce that shape, or am I about to produce a drifted-adjacent shape?
+3. Am I about to produce that shape, or drift?
 
-During generation:
-1. Is what I'm writing now still the same shape as the spec?
-2. Is there filler accumulating? Cut it.
+### During generation
 
-After generation:
+1. Is what I'm writing NOW the same shape as the spec?
+2. Is filler accumulating? Cut it.
+
+### After generation
+
 1. Did the file actually write?
 2. Does it actually contain what I intended?
 3. Does it match the spec's scope?
 
-### At cost decision points
+## How to apply — at cost decision points
 
 Before firing a tool call:
-1. Is this call necessary? (A specific tool for a specific reason vs. "let me just check".)
-2. Could I answer this from what I already have?
+
+1. Is this call necessary?
+2. Could I answer from what I already have?
 3. Is there a cheaper path?
 
 Before spawning an agent:
+
 1. Is the task complex enough to warrant delegation?
-2. Could I do it in-line cheaper?
+2. Could I do it inline more cheaply?
 3. Is the agent's output budget aligned to the task scope?
 
-## Relationship to other primitives
+## Concrete application to this very doc
 
-- **Sibling**: [Pattern-Match Drift](./PATTERN_MATCH_DRIFT.md) is the detector; Token Mindfulness is the preventer. Drift fires after the fact; Mindfulness prevents before.
-- **Parent of**: [Session State Commit Gate](../memory/primitive_session-state-commit-gate.md) — the write-through discipline for session persistence. An instance of "verify on-disk, not completion reports" applied to session workflow.
-- **Related**: [Lead with the Crux](../memory/feedback_lead-with-the-crux.md), [No Hedging](../memory/feedback_no-hedging-language.md), [Frank / Be Human](../memory/feedback_frank-be-human.md) — all instances of compact, direct, high-bandwidth-per-token communication.
+Notice what this doc does:
+
+- Opens with a familiar moment (not with "Introduction" or "Overview").
+- Each rule has a specific bad-example / good-example contrast.
+- Minimal meta-commentary.
+- Ends with a short summary.
+
+That's Token Mindfulness self-applied to this doc. Target was ~5-7 KB; actual is roughly that.
+
+## Why costs matter more than you might think
+
+Consider: the AI industry currently runs at roughly $30-50B/year in compute. Most of that compute produces text output.
+
+A 10% reduction in verbosity = $3-5B saved annually, conservatively. Plus environmental impact proportional.
+
+Token Mindfulness isn't just for THIS doc or THIS session. At scale, it's meaningfully reducing waste.
+
+## Relationship to other disciplines
+
+- **Detected failure mode**: [Pattern-Match Drift](./PATTERN_MATCH_DRIFT.md) — reactive detection; Token Mindfulness is proactive prevention.
+- **Parent discipline**: [Density First](./DENSITY_FIRST.md) — compactness as default.
+- **Related feedback**: [No Hedging](../memory/feedback_no-hedging-language.md), [Lead with the Crux](../memory/feedback_lead-with-the-crux.md), [Frank / Be Human](../memory/feedback_frank-be-human.md).
+
+All favor compact, direct communication over fluency-padded verbosity.
+
+## For LLM output
+
+If you're generating output:
+
+- Before starting: state the spec briefly.
+- While generating: monitor whether output matches spec.
+- After: verify the file actually wrote.
+- Summarize: keep summaries short and honest.
+
+If you're receiving output:
+
+- Ask for specific deliverable, not "tell me about X."
+- Specify scope (word count, section structure).
+- Verify output matches — don't trust completion-reports alone.
 
 ## One-line summary
 
-*At every generation boundary, produce deliverable content (not content-about-deliverable), verify on-disk bytes (not completion reports), match scope to spec — constraint is a forcing function for cleverness.*
+*Token Mindfulness: at every generation boundary, produce deliverable content (not content-about-deliverable), verify on-disk bytes (not completion reports), match scope to spec. Counter the four drift forces (fluency optimization, recency-bias, completion-cheaper-than-verification, summaries-drift). Costs are load-bearing — money, environment, scaling capacity all matter. Constraint is forcing function for cleverness.*

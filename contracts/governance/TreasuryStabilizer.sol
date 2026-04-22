@@ -27,6 +27,13 @@ contract TreasuryStabilizer is
 {
     using SafeERC20 for IERC20;
 
+    // ============ Admin Observability Events ============
+    event MainPoolUpdated(address indexed token, bytes32 previous, bytes32 current);
+    event TWAPPeriodsUpdated(uint32 prevShort, uint32 prevLong, uint32 currentShort, uint32 currentLong);
+    event VibeAMMUpdated(address indexed previous, address indexed current);
+    event DAOTreasuryUpdated(address indexed previous, address indexed current);
+    event VolatilityOracleUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant BPS_PRECISION = 10000;
@@ -428,7 +435,9 @@ contract TreasuryStabilizer is
      * @param poolId VibeAMM pool identifier
      */
     function setMainPool(address token, bytes32 poolId) external onlyOwner {
+        bytes32 prev = tokenMainPool[token];
         tokenMainPool[token] = poolId;
+        emit MainPoolUpdated(token, prev, poolId);
     }
 
     /**
@@ -452,8 +461,11 @@ contract TreasuryStabilizer is
      * @param _longTerm Long term period
      */
     function setTWAPPeriods(uint32 _shortTerm, uint32 _longTerm) external onlyOwner {
+        uint32 prevShort = shortTermPeriod;
+        uint32 prevLong = longTermPeriod;
         shortTermPeriod = _shortTerm;
         longTermPeriod = _longTerm;
+        emit TWAPPeriodsUpdated(prevShort, prevLong, _shortTerm, _longTerm);
     }
 
     /**
@@ -461,17 +473,23 @@ contract TreasuryStabilizer is
      */
     function setVibeAMM(address _vibeAMM) external onlyOwner {
         if (_vibeAMM == address(0)) revert ZeroAddress();
+        address prev = address(vibeAMM);
         vibeAMM = IVibeAMM(_vibeAMM);
+        emit VibeAMMUpdated(prev, _vibeAMM);
     }
 
     function setDAOTreasury(address _daoTreasury) external onlyOwner {
         if (_daoTreasury == address(0)) revert ZeroAddress();
+        address prev = address(daoTreasury);
         daoTreasury = IDAOTreasury(_daoTreasury);
+        emit DAOTreasuryUpdated(prev, _daoTreasury);
     }
 
     function setVolatilityOracle(address _volatilityOracle) external onlyOwner {
         if (_volatilityOracle == address(0)) revert ZeroAddress();
+        address prev = address(volatilityOracle);
         volatilityOracle = IVolatilityOracle(_volatilityOracle);
+        emit VolatilityOracleUpdated(prev, _volatilityOracle);
     }
 
     /**

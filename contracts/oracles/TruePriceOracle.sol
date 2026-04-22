@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "./interfaces/ITruePriceOracle.sol";
 import "./interfaces/IStablecoinFlowRegistry.sol";
 import "./interfaces/IIssuerReputationRegistry.sol";
+import "./interfaces/IOracleAggregationCRA.sol";
 import "../libraries/SecurityLib.sol";
 
 /**
@@ -433,6 +434,52 @@ contract TruePriceOracle is
         address prev = oracleAggregator;
         oracleAggregator = aggregator;
         emit OracleAggregatorUpdated(prev, aggregator);
+    }
+
+    /**
+     * @notice C39 FAT-AUDIT-2 — Permissionless pull of a settled batch's median into TruePrice.
+     *
+     * The aggregator's commit-reveal opacity replaces TPO's policy-level
+     * 5% deviation gate. Anyone can trigger this pull; the aggregator's
+     * own validation (committed before reveal, hash-matched, MIN_REVEALS≥3)
+     * is the structural defense.
+     *
+     * Confidence is derived from revealCount — more honest reveals = higher
+     * confidence. Caller specifies poolId since V1 aggregator is a single
+     * price stream; V2 will host per-pool aggregator instances.
+     *
+     * @param poolId Pool identifier this median represents.
+     * @param batchId Batch on the aggregator to pull from.
+     */
+    function pullFromAggregator(bytes32 poolId, uint256 batchId) external nonReentrant {
+        require(oracleAggregator != address(0), "Aggregator unset");
+
+        IOracleAggregationCRA.BatchInfo memory batch = IOracleAggregationCRA(oracleAggregator).getBatch(batchId);
+        require(batch.phase == IOracleAggregationCRA.BatchPhase.SETTLED, "Batch not settled");
+        require(batch.medianPrice > 0, "Zero median");
+
+        // Confidence proportional to reveal count (capped at PRECISION).
+        // 3 reveals -> ~30% confidence, 10+ reveals -> 100%.
+        uint256 confidence = batch.revealCount * PRECISION / 10;
+        if (confidence > PRECISION) confidence = PRECISION;
+
+        TruePriceData memory newData;
+        newData.price = batch.medianPrice;
+        newData.confidence = confidence;
+        newData.deviationZScore = 0;          // not applicable for aggregated path
+        newData.regime = RegimeType.STABLE;   // aggregator handles outlier defense structurally
+        newData.manipulationProb = 0;         // commit-reveal opacity = anti-manipulation
+        newData.timestamp = uint64(block.timestamp);
+        newData.dataHash = keccak256(abi.encodePacked(poolId, batchId, batch.medianPrice));
+
+        // Anti-replay: only accept if newer than last
+        require(newData.timestamp > truePrices[poolId].timestamp, "Stale or replay");
+
+        truePrices[poolId] = newData;
+        _addToHistory(poolId, newData);
+
+        emit TruePriceFromAggregator(poolId, batchId, batch.medianPrice, batch.revealCount);
+        emit TruePriceUpdated(poolId, batch.medianPrice, 0, RegimeType.STABLE, 0, uint64(block.timestamp));
     }
 
     // ============ C12: EvidenceBundle Update Path ============

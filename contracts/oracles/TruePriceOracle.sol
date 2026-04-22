@@ -467,7 +467,7 @@ contract TruePriceOracle is
         newData.price = batch.medianPrice;
         newData.confidence = confidence;
         newData.deviationZScore = 0;          // not applicable for aggregated path
-        newData.regime = RegimeType.STABLE;   // aggregator handles outlier defense structurally
+        newData.regime = RegimeType.NORMAL;   // aggregator handles outlier defense structurally
         newData.manipulationProb = 0;         // commit-reveal opacity = anti-manipulation
         newData.timestamp = uint64(block.timestamp);
         newData.dataHash = keccak256(abi.encodePacked(poolId, batchId, batch.medianPrice));
@@ -479,7 +479,7 @@ contract TruePriceOracle is
         _addToHistory(poolId, newData);
 
         emit TruePriceFromAggregator(poolId, batchId, batch.medianPrice, batch.revealCount);
-        emit TruePriceUpdated(poolId, batch.medianPrice, 0, RegimeType.STABLE, 0, uint64(block.timestamp));
+        emit TruePriceUpdated(poolId, batch.medianPrice, 0, RegimeType.NORMAL, 0, uint64(block.timestamp));
     }
 
     // ============ C12: EvidenceBundle Update Path ============

@@ -218,7 +218,7 @@ contract OracleAggregationCRA is
         require(b.commitDeadline != 0, "Unknown batch");
         require(block.timestamp > b.revealDeadline, "Reveal not yet ended");
         require(_commits[batchId][issuer] != bytes32(0), "Issuer did not commit");
-        require(_reveals[batchId][issuer] == 0, "Issuer revealed — not slashable");
+        require(_reveals[batchId][issuer] == 0, "Issuer revealed - not slashable");
 
         // V1: clear commit (prevents double-slash), record violation, emit.
         // V1.5 will route to IssuerReputationRegistry.slash(issuer, NON_REVEAL_SLASH_BPS)

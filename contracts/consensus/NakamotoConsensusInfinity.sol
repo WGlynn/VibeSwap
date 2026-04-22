@@ -852,6 +852,73 @@ contract NakamotoConsensusInfinity is
         return _log2(1 + mindScore);
     }
 
+    // ============ Cognitive Retention (α = 1.6 convex decay) ============
+
+    /// @notice Retention horizon constants. RETENTION_HORIZON_DEFAULT is the
+    ///         full-decay time T used when calling `calculateRetentionWeight`
+    ///         without an explicit horizon. α = 1.6 per paper §6.4 (Ebbinghaus).
+    uint256 public constant RETENTION_HORIZON_DEFAULT = 365 days;
+    uint256 public constant RETENTION_ALPHA_BPS = 16000; // α = 1.6 (documentary; value is hardcoded in polynomial)
+
+    /// @notice Compute cognitive-retention weight `1 − (t/T)^1.6` in basis points.
+    /// @dev Convex decay matching cognitive substrate (Ebbinghaus retention + §6.4).
+    ///      α = 1.6 is encoded into the cubic polynomial `0.1744·x + 1.116·x² − 0.2904·x³`
+    ///      fitted to `x^1.6` on [0,1]. Max error ~3%, sufficient for consensus weighting.
+    ///
+    ///      Retention applies to PoW and PoM pillars only (work + mind — both historical
+    ///      records whose relevance fades). PoS is present-tense locked capital and is
+    ///      NOT subject to retention decay.
+    ///
+    ///      This is a CORRECTNESS-PROOF primitive. Integration into _recalculateWeights
+    ///      is gated on six design decisions — see NCI_WEIGHT_FUNCTION.md (C40b).
+    /// @param elapsedSec Seconds since the reference timestamp (contribution / PoW submission / attestation).
+    /// @param horizonSec Full-decay horizon T, in seconds. Pass 0 to use RETENTION_HORIZON_DEFAULT.
+    /// @return weightBps Retention weight in basis points: BPS = fresh, 0 = fully decayed.
+    function calculateRetentionWeight(uint256 elapsedSec, uint256 horizonSec)
+        public
+        pure
+        returns (uint256 weightBps)
+    {
+        uint256 horizon = horizonSec == 0 ? RETENTION_HORIZON_DEFAULT : horizonSec;
+        if (elapsedSec >= horizon) return 0;
+
+        // ratio = (t / T) expressed in BPS (0 … BPS). Always < BPS here.
+        uint256 ratioBps = (elapsedSec * BPS) / horizon;
+
+        // decay = (t/T)^1.6 in BPS, via the cubic approximation.
+        uint256 decayBps = _pow16Bps(ratioBps);
+
+        // weight = 1 - decay. Clamp: polynomial error can push decay slightly above BPS
+        // near x=1; treat as fully decayed in that pathological case.
+        return decayBps >= BPS ? 0 : BPS - decayBps;
+    }
+
+    /// @dev Approximates `x^1.6` for x in [0, BPS] using the cubic
+    ///      p(x) = 0.1744·x + 1.116·x² − 0.2904·x³ (least-squares fit through
+    ///      (0,0), (0.25, 0.1088), (0.5, 0.3299), (0.75, 0.6339), (1,1)).
+    ///      Coefficients scaled by 10 for integer arithmetic: 1744, 11160, 2904 → /10000.
+    ///      Input and output both in BPS. `x >= BPS` clamps to BPS (i.e. x^1.6 for x≥1 saturates).
+    function _pow16Bps(uint256 xBps) internal pure returns (uint256) {
+        if (xBps == 0) return 0;
+        if (xBps >= BPS) return BPS;
+
+        uint256 x2 = (xBps * xBps) / BPS;       // x² in BPS
+        uint256 x3 = (x2 * xBps) / BPS;         // x³ in BPS
+
+        // positive terms: 0.1744·x + 1.116·x²
+        uint256 pos = (1744 * xBps) + (11160 * x2);
+        // negative term: 0.2904·x³
+        uint256 neg = 2904 * x3;
+
+        // Guard: the polynomial can produce `pos < neg` only when coefficients
+        // or inputs are out of expected range. For valid x ∈ [0, BPS] this never
+        // fires, but defensive bound keeps the view function total.
+        if (neg > pos) return 0;
+
+        // Scale back down by 10000 (coefficients were ×10000 for integer arithmetic).
+        return (pos - neg) / BPS;
+    }
+
     // ============ Internal: Weight Calculation ============
 
     function _recalculateWeights(address addr) internal {

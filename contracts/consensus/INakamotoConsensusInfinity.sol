@@ -207,4 +207,11 @@ interface INakamotoConsensusInfinity {
 
     /// @notice Calculate PoM weight from mind score (pure math)
     function calculatePoMWeight(uint256 mindScore) external pure returns (uint256);
+
+    /// @notice Convex retention weight `1 − (t/T)^1.6` in basis points.
+    /// @dev Not yet wired into per-pillar weight recompute — see NCI_WEIGHT_FUNCTION.md (C40b).
+    function calculateRetentionWeight(uint256 elapsedSec, uint256 horizonSec)
+        external
+        pure
+        returns (uint256 weightBps);
 }

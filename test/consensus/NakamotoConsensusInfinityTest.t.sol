@@ -1138,4 +1138,79 @@ contract NakamotoConsensusInfinityTest is Test {
         emit JouleTokenUpdated(oldJ, newAddr);
         nci.setJouleToken(newAddr);
     }
+
+    // ============ C40a: Cognitive Retention (α = 1.6) ============
+    //
+    // Correctness proof for `calculateRetentionWeight(elapsed, horizon)`.
+    // The function implements `1 − (t/T)^1.6` via cubic polynomial approx.
+    // Reference numbers below are from DOCUMENTATION/COGNITIVE_RENT_ECONOMICS.md
+    // (base=1000 scaled down to BPS; doc quotes retained mass, we compare weight).
+
+    uint256 constant YEAR = 365 days;
+
+    function test_Retention_FreshFullWeight() public view {
+        // t = 0 → full weight (fresh contribution).
+        assertEq(nci.calculateRetentionWeight(0, YEAR), 10000);
+    }
+
+    function test_Retention_FullDecayAtHorizon() public view {
+        // t = T → fully decayed.
+        assertEq(nci.calculateRetentionWeight(YEAR, YEAR), 0);
+    }
+
+    function test_Retention_DecayedBeyondHorizon() public view {
+        // t > T → stays at 0 (no negative weight).
+        assertEq(nci.calculateRetentionWeight(YEAR + 1 days, YEAR), 0);
+        assertEq(nci.calculateRetentionWeight(10 * YEAR, YEAR), 0);
+    }
+
+    function test_Retention_DefaultHorizon() public view {
+        // horizon = 0 → uses RETENTION_HORIZON_DEFAULT (365 days).
+        uint256 w = nci.calculateRetentionWeight(30 days, 0);
+        uint256 wExplicit = nci.calculateRetentionWeight(30 days, YEAR);
+        assertEq(w, wExplicit);
+    }
+
+    function test_Retention_MatchesDocDay30() public view {
+        // Doc: at day 30 of T=365, convex retains 986/1000 ≈ 9860 bps.
+        // Allow ±300 bps tolerance for polynomial approximation error.
+        uint256 w = nci.calculateRetentionWeight(30 days, YEAR);
+        assertApproxEqAbs(w, 9860, 300);
+    }
+
+    function test_Retention_MatchesDocDay180() public view {
+        // Doc: at day 180 of T=365, convex retains 662/1000 ≈ 6620 bps.
+        uint256 w = nci.calculateRetentionWeight(180 days, YEAR);
+        assertApproxEqAbs(w, 6620, 300);
+    }
+
+    function test_Retention_MonotonicallyDecreasing() public view {
+        // Weight must be non-increasing in elapsed time across a representative sweep.
+        uint256 prev = 10001; // strictly greater than BPS max
+        uint256[9] memory samples = [
+            uint256(0),
+            1 days,
+            30 days,
+            90 days,
+            180 days,
+            270 days,
+            330 days,
+            360 days,
+            365 days
+        ];
+        for (uint256 i = 0; i < samples.length; i++) {
+            uint256 w = nci.calculateRetentionWeight(samples[i], YEAR);
+            assertLe(w, prev, "retention weight must be non-increasing");
+            prev = w;
+        }
+    }
+
+    function test_Retention_ConvexKinderThanLinearAtMidTerm() public view {
+        // Core ETM claim: convex α=1.6 retention is kinder to recent contributions
+        // than linear decay would be. Linear at day 180 retains ~507 / 1000 (5070 bps);
+        // convex retains ~662 / 1000 (6620 bps). Assert convex > linear-equivalent.
+        uint256 wConvex = nci.calculateRetentionWeight(180 days, YEAR);
+        uint256 wLinearBps = 10000 - (10000 * 180 days) / YEAR; // 5069 bps
+        assertGt(wConvex, wLinearBps, "convex retention must exceed linear at mid-term");
+    }
 }

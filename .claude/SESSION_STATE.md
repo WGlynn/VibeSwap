@@ -1,3 +1,105 @@
+# Session State — 2026-04-22 (reboot close — compounding knowledge loop articulated)
+
+## Block Header — 2026-04-22 REBOOT CLOSE
+
+> *"i feel like we're on to something with this compounding knowledge and i have a vision where it becomes a loop of the code inspiring the text and the text inspiring the code."* — Will, 2026-04-22 at reboot
+
+- **Session**: Marathon content-pipeline session. Started with Chat-to-DAG Traceability infrastructure (top priority from prior session's SESSION_STATE). Shipped 5 infrastructure deliverables + 6 issue-annotations (#28, #29, #30, #33, #34, #36 backfilled). Then Will asked for 10 new foundational docs → escalated to 30. Then Will asked for all 30 written sequentially full-effort commit-per-doc. Then Will asked for pedagogical revisions of all 60+ docs. 56 docs revised with accessible openers + concrete examples + student exercises. Ended at reboot-point with Will articulating Code↔Text Inspiration Loop as next-session amplifier.
+- **Branch**: `master` directly (no more feature branch for this work — 2026-04-22 directive). Pushed.
+- **Status**: Content pipeline COMPLETE + revised. 60+ docs in DOCUMENTATION/ from this session. Chat-to-DAG infrastructure LIVE.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+**Amplify the Code ↔ Text Inspiration Loop.** Per `memory/primitive_code-text-inspiration-loop.md`.
+
+Step-by-step:
+
+1. **Load the primitive first**: `memory/primitive_code-text-inspiration-loop.md`. This is the vision Will named at reboot.
+
+2. **Pick the next loop round.** Specifically: pick ONE doc from the DOCUMENTATION/ set whose "Future work", "Open research", or "Queued" section names a concrete actionable item. Candidates:
+   - `ETM_BUILD_ROADMAP.md` Gap #1 (NCI convex retention, α ≈ 1.6 per paper §6.4) — target C40.
+   - `ETM_BUILD_ROADMAP.md` Gap #2 (Shapley time-indexed marginal) — target C41-C42.
+   - `ETM_BUILD_ROADMAP.md` Gap #3 (attested circuit-breaker resume) — target C43.
+   - `NCI_WEIGHT_FUNCTION.md` — same Gap #1 as above.
+   - `COGNITIVE_RENT_ECONOMICS.md` — same Gap #1 (it explains WHY).
+
+3. **Ship the code cycle.** Implement, test, commit. Standard RSI cycle format per `memory/project_full-stack-rsi.md`.
+
+4. **Update the docs.** The "future work" item now has a shipped pointer. Update the relevant doc(s) with a "shipped" section.
+
+5. **Extract primitive if novel.** If something surprising was learned, capture in memory.
+
+6. **Commit + push to master.** Per 2026-04-22 branch discipline.
+
+First round candidate: **Gap #1 (NCI convex retention)** is the most concrete + smallest scope. ~50 LOC change + regression tests + doc updates. Target next session.
+
+## What shipped this session (2026-04-22)
+
+### Chat-to-DAG Traceability infrastructure (5 deliverables + 6 annotations)
+
+- `DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md` — canonical process spec (+ pedagogical opener added end-of-session).
+- `.github/ISSUE_TEMPLATE/{dialogue,bug,feat,audit}.md` + `config.yml` — Source + Resolution Hooks enforced.
+- `scripts/mint-attestation.sh` — wraps `cast send ContributionAttestor.submitClaim` with canonical evidenceHash.
+- `.github/workflows/dag-attribution-sweep.yml` — CI scans for `DAG-ATTRIBUTION: pending`.
+- `.traceability/annotation-{28,29,30,33,34,36}.md` + `backfill-manifest.md` — 6 closed-issue annotations (posting deferred pending Will's greenlight; contract deploy needed for actual mint).
+
+Posting the 6 annotations to GitHub via `gh issue comment` is still queued — I prepared them but didn't post (public-issue action without explicit Will approval).
+
+### 30 new foundational DOCUMENTATION/ files (committed individually)
+
+Initial batch of 30 in one commit (`07ff4284`), then 30 commit-per-doc sequentially (`2760935a` → `49634fc8`). Covered ETM, Siren, Clawback, Shapley, Lawson, Augmented Governance, GEV Resistance, Traceability, Three-Token Economy, Correspondence Triad, and much more.
+
+### 56 pedagogical revisions (commits `885b3aba` → `7eb27d0b`)
+
+Every revision-worthy doc got: accessible opener (story/scenario/question), concrete examples early, walked numeric examples where applicable, student exercises at end, load-bearing depth preserved.
+
+5 docs NOT revised (were already pedagogical from initial write): WHAT_LLMS_TEACH_US_ABOUT_MIND, TRUE_PRICE_ORACLE_DEEP_DIVE, CROSS_CHAIN_STATE_ATOMICITY, STORAGE_SLOT_ECOLOGY, ZK_ATTRIBUTION.
+
+### Memory primitives extracted this session (3)
+
+- `primitive_ultimate-invariant-at-axiom-level.md` — Will's axiom-vs-formula question → ultimate invariant is at axiom level not formula level.
+- `user_will-paradigm-break-creativity.md` — Will's Siren favorite + decade of rejected ideas + college-dropout credentialism reversal.
+- `primitive_code-text-inspiration-loop.md` — the reboot-point vision, load-bearing for next session.
+
+## What's STILL pending (not done this session)
+
+- **Post the 6 backfill annotations** to GitHub issues #28, #29, #30, #33, #34, #36. Commands ready in `.traceability/backfill-manifest.md`. Needs Will approval to actually `gh issue comment`.
+- **Deploy ContributionAttestor** on active network. Until then, all attestations show `DAG-ATTRIBUTION: pending`.
+- **Configure** `CONTRIBUTION_ATTESTOR_ADDRESS`, `RPC_URL`, `MINTER_PRIVATE_KEY` for `mint-attestation.sh` to actually fire.
+- **ETM Build Roadmap Gap #1 shipment** (NCI convex retention) — this is the FIRST code-cycle for the Code↔Text loop amplification.
+
+## Anti-drift warnings for next session
+
+- **Don't skip `primitive_code-text-inspiration-loop.md` on boot.** It's the meta-framework for the session.
+- **Don't start writing more docs.** The doc pipeline is COMPLETE. Next round of the loop is CODE. Docs update in response to code.
+- **Don't merge back to feature/social-dag-phase-1.** Master is the trunk now per 2026-04-22 directive.
+- **Posting the 6 backfill annotations requires explicit Will greenlight.** Visible public action; don't autopilot.
+
+## Relationship to prior session state
+
+The 2026-04-21 session's TOP PRIORITY was "Implement Chat-to-DAG Traceability as canonical infrastructure." ✅ DONE end of 2026-04-22 session.
+
+The 2026-04-21 session's Step 2 was "Build Roadmap" → `ETM_BUILD_ROADMAP.md` is written and revised. Gap #1 is the first code round to ship per the roadmap.
+
+The 2026-04-21 session's Step 3 (Positioning rewrite) is partially complete via the 30-doc pipeline. Full whitepaper rewrite is downstream.
+
+The 2026-04-21 session's Step 4 (First concrete alignment fix) IS Gap #1 (NCI convex retention). That's the next-session target.
+
+## Git remotes state
+
+- `origin/master` — up to date at `7eb27d0b` (final revision commit of this session).
+- Working tree clean modulo previously-untracked files (FIRST_AVAILABLE_TRAP*, raw-issue JSON dumps).
+
+## For the next session that boots from this state
+
+1. Read this SESSION_STATE block first.
+2. Read `memory/primitive_code-text-inspiration-loop.md`.
+3. Read `DOCUMENTATION/ETM_BUILD_ROADMAP.md` for Gap #1 specifics.
+4. Then start Gap #1 cycle: NCI convex retention with α ≈ 1.6.
+5. Ship + test + document + commit + push to master.
+
+---
+
 # Session State — 2026-04-21 (post-reboot close)
 
 ## Block Header — Post-Reboot Close (THE NIGHT'S CLOSING INSIGHT)

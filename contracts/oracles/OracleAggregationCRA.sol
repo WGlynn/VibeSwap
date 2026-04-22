@@ -176,8 +176,41 @@ contract OracleAggregationCRA is
         emit PriceRevealed(batchId, msg.sender, price);
     }
 
-    function settleBatch(uint256) external pure returns (uint256) {
-        revert("not implemented");
+    function settleBatch(uint256 batchId) external nonReentrant returns (uint256 medianPrice) {
+        BatchData storage b = _batches[batchId];
+        require(b.commitDeadline != 0, "Unknown batch");
+        require(block.timestamp > b.revealDeadline, "Reveal not yet ended");
+        require(b.phase != BatchPhase.SETTLED, "Already settled");
+
+        uint256 n = _revealedPrices[batchId].length;
+        require(n >= MIN_REVEALS_FOR_SETTLEMENT, "Insufficient reveals");
+
+        // Copy to memory and sort (insertion sort — N is small, typically <20)
+        uint256[] memory prices = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
+            prices[i] = _revealedPrices[batchId][i];
+        }
+        for (uint256 i = 1; i < n; i++) {
+            uint256 key = prices[i];
+            uint256 j = i;
+            while (j > 0 && prices[j - 1] > key) {
+                prices[j] = prices[j - 1];
+                j--;
+            }
+            prices[j] = key;
+        }
+
+        // Median: middle for odd N, average of two middles for even N
+        if (n % 2 == 1) {
+            medianPrice = prices[n / 2];
+        } else {
+            medianPrice = (prices[n / 2 - 1] + prices[n / 2]) / 2;
+        }
+
+        b.medianPrice = medianPrice;
+        b.phase = BatchPhase.SETTLED;
+
+        emit BatchSettled(batchId, medianPrice, n);
     }
 
     function slashNonRevealer(uint256, address) external pure {

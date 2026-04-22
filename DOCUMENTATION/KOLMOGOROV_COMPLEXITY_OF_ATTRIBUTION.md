@@ -1,184 +1,224 @@
 # Kolmogorov Complexity of Attribution
 
-**Status**: Information-theoretic analysis. What's the minimum description length for a reconstructable attribution chain?
-**Depth**: Formal lower bounds with practical storage/retrieval implications.
-**Related**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md), [The Long Now of Contribution](./THE_LONG_NOW_OF_CONTRIBUTION.md), [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md).
+**Status**: Information-theoretic analysis with concrete compression examples.
+**Audience**: First-encounter OK. Kolmogorov complexity introduced from scratch.
 
 ---
 
-## The question
+## An intuition from file storage
 
-Attribution chains ([Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md)) accumulate over time. Alice's 2026 insight → Bob's 2028 design → Carla's 2030 implementation → ... Each link requires some amount of information to encode the causal dependency.
+You have a 100 MB photo. You email it to a friend. The email takes 10 seconds.
 
-What's the minimum information needed to reconstruct an N-link attribution chain? Can we encode it compactly enough that a 50-year chain remains navigable? What are the information-theoretic storage costs and retrieval costs?
+You have a 100 MB video of a quiet wall. Same color throughout. You email it. The email takes 0.1 seconds because compression reduces it to a few KB.
 
-These aren't merely academic. Chain length × cost-per-link determines whether VibeSwap's attribution infrastructure is sustainable at decade-plus timescales.
+Why the difference? The photo contains rich detail — each pixel is different. High "information content". The wall-video contains almost no detail — every frame is nearly identical. Low information content.
 
-## Kolmogorov complexity refresher
+Information content is formal. It's called **Kolmogorov complexity**.
 
-The Kolmogorov complexity K(x) of a string x is the length of the shortest program that outputs x. It's the formal lower bound on lossless compression.
+## Kolmogorov complexity, stated plainly
 
-For attribution chains, K tells us: given all the metadata, what's the minimum information needed to reconstruct the causal-dependency graph exactly? Anything less loses information; anything more is redundant.
+The Kolmogorov complexity `K(x)` of a string `x` is the length of the shortest program that outputs `x`.
 
-Practical consequence: we can't compress attribution below K(chain). We CAN design the attribution format to have low K(chain) by choosing what to include and what to reference-only.
+Not the length of `x` itself — the length of the shortest description of `x`.
 
-## The structure of an attribution link
+For the wall-video: K is tiny because "output 100MB of color C for each frame, for N frames" is a very short program.
 
-A single attribution link (one claim) contains:
+For the photo: K is close to its length — there's no shorter description than the photo itself.
 
-- Contributor address (20 bytes)
-- ContributionType enum (1 byte — but really ~3-4 bits needed for 9 values)
-- evidenceHash (32 bytes — a commitment to off-chain content)
-- description string (variable — typically 50-200 bytes)
-- value (32 bytes)
-- timestamp (8 bytes)
-- parentAttestations[] (variable — 0 or more 32-byte hashes)
-- claimId (32 bytes — derived; could be recomputed)
+Kolmogorov complexity tells us: how much can this data be compressed, losslessly?
 
-Naive storage per link: ~200-500 bytes. N-link chain at average 300 bytes: 300 × N bytes.
+## Why this applies to attribution
 
-For N = 10,000 (decade of modest contribution): 3 MB. Easily affordable.
+Attribution chains are data. They live on-chain (expensive) or off-chain (cheaper). Either way, they have some information content. We want to know: can we store attribution chains efficiently?
 
-For N = 1,000,000 (multi-decade high-volume): 300 MB. Still tractable but starting to matter for full-node storage.
+If K(attribution) is small, we can compress. If K is large, we can't.
 
-For N = 1,000,000,000 (long-arc global scale, multiple successor projects): 300 GB. Tractable for archives, prohibitive for on-chain storage.
+Let's figure out what K(attribution) looks like.
 
-Storage-per-link is critical at large N. The format must be minimal.
+## The structure of one attribution
 
-## What's compressible
+Per [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md), each claim has:
 
-Several parts of the attribution format have structure we can exploit:
+- Contributor address: 20 bytes.
+- ContributionType enum: 1 byte (but really 3-4 bits needed for 9 values).
+- evidenceHash: 32 bytes (cryptographic commitment).
+- Description string: variable — typically 50-200 bytes.
+- Value: 32 bytes.
+- Timestamp: 8 bytes (unix epoch).
+- Parent attestations: variable; 0 or more 32-byte hashes each.
+- ClaimId: 32 bytes (derived, can be recomputed).
 
-### Structure 1 — Repeated contributors
+Naive storage per attestation: ~200-500 bytes.
 
-The same contributor address appears across many claims. A 20-byte address repeated 10,000 times is 200 KB; a 4-byte address-table-index repeated 10,000 times plus a 20-byte table entry per unique contributor is 40 KB + 200 × unique-count bytes. For ~1000 unique contributors: 60 KB. ~3x savings.
+For a 10,000-attestation chain: 2-5 MB.
+For a 1M-attestation chain: 200-500 MB.
+For a 10^9 chain (long-arc global): 200-500 GB.
 
-### Structure 2 — Time ordering
+The big question: how much can we compress?
 
-Claim timestamps are monotonic by block ordering. Storing deltas from previous timestamp instead of absolute timestamps: 4 bytes (per-claim delta) vs 8 bytes (absolute). 2x savings.
+## What can be compressed
 
-### Structure 3 — Parent-attestation patterns
+### Compression 1 — Contributor address interning
 
-parentAttestations frequently reference recent claims rather than distant ones. Index-from-recent instead of full 32-byte hash: 4 bytes (index) vs 32 bytes (hash) per parent. ~8x savings for chained attributions.
+Many attestations share contributors. If Alice attests 50 claims, her 20-byte address repeats 50 times = 1000 bytes.
 
-### Structure 4 — Description similarity
+With address interning: store the 20-byte address once, reference it via a 2-byte index 50 times = 120 bytes. ~8x compression for that part.
 
-Description strings often have repeated structure ("Issue #N — <title>"). Template-based encoding with fill-ins: ~50-80% compression on descriptions.
+For a typical contribution graph with ~500 unique contributors and ~10000 attestations: address interning saves ~80% on the contributor field.
 
-### Combined
+### Compression 2 — Timestamp delta encoding
 
-Naive: ~300 bytes/link. Compressed: ~40-60 bytes/link for typical patterns. 5-7x savings.
+Timestamps are monotonic (generally increasing). Instead of storing absolute 8-byte timestamps, store 2-byte deltas from previous.
 
-Post-compression: N = 10^9 chain becomes ~50 GB. Still large but within archival feasibility.
+A delta ranging from 0 to ~16 hours fits in 2 bytes. For most attestations, this works. For rare cases where the delta exceeds 16 hours, use a flag bit + extended encoding.
+
+Savings: ~75% on the timestamp field.
+
+### Compression 3 — Parent-attestation index-from-recent
+
+Parent attestations frequently reference recent claims. Instead of storing 32-byte parent hashes, store 2-byte indices pointing to recent claims in the chain.
+
+For typical chains where parents are within the last 10^6 claims: indices are 3-4 bytes.
+
+Savings: ~8x per parent attestation.
+
+### Compression 4 — Description templating
+
+Many descriptions have common structure. "Issue #42 — Bug fix for X" appears thousands of times.
+
+Template + fill-in: "{ISSUE_TEMPLATE} | 42 | Bug fix for X" where {ISSUE_TEMPLATE} is a 2-byte pointer to the template.
+
+For typical chains with ~20 common templates: descriptions compress by 70-80%.
+
+### Combined compression
+
+Naive: 300 bytes/claim average.
+After compression: ~40-50 bytes/claim for typical patterns.
+
+Compression ratio: ~6-7x.
+
+For 10^9 claims: 40-50 GB compressed. Still large but feasible for archival.
+
+## What cannot be compressed
+
+Some parts of the attestation structure have high intrinsic entropy:
+
+### Incompressible 1 — evidenceHash
+
+Cryptographic commitments are designed to be indistinguishable from random. 32 bytes of high-entropy data. No compression possible.
+
+### Incompressible 2 — ClaimId
+
+Derived from a hash; also high-entropy. Incompressible.
+
+### Incompressible 3 — Large-value fields
+
+If values are well-distributed (as they should be under proper Shapley), they can't compress well below ~20 bits precision. 32 bytes (256 bits) is over-allocated; 3-4 bytes suffices.
+
+Savings: minor.
+
+The incompressible parts floor at ~40 bytes/claim. Below this, you lose ability to reconstruct.
 
 ## The irreducible minimum
 
-What can't we compress?
+After all compression:
 
-- The evidenceHash (32 bytes) is cryptographically-committed; can't compress without breaking the commitment.
-- The value (32 bytes) has high entropy in general (different rewards for different contributions); some compression possible via delta-encoding against averages but limited.
-- The contribution structure itself (what depends on what) has structural entropy determined by the actual graph; can't go below the information needed to reconstruct the graph.
+- ~2-4 bytes address-index + 1-2 bytes contribType + 2-4 bytes timestamp-delta + 32 bytes evidenceHash + 10-30 bytes description-template-plus-fill + 3-4 bytes parent-index + 2-3 bytes value.
 
-Realistic lower bound: ~40 bytes/link for the structural components + the evidenceHash. Below this, we lose reconstructability.
+Total: ~55-80 bytes/claim irreducible.
+
+Less than that and we've lost reconstructability. The Kolmogorov lower bound for attribution is ~50 bytes/claim.
 
 ## The retrieval-cost trade-off
 
-Compressed storage has two modes:
+Compression has two costs:
 
-### Mode 1 — Read-intensive
+### Cost 1 — Decompression latency per read
 
-Every retrieval decompresses. Cheap to write (just append compressed link); expensive to read (decompress + look up). Good if writes >> reads.
+Every read requires decompression. For a lineage query walking back 10 hops: 10 decompressions × ~0.1 ms = ~1 ms overhead. Acceptable for interactive queries.
 
-### Mode 2 — Write-intensive
+For bulk analysis (compute Shapley over 1M claims): 1M decompressions = 1000 seconds = 16 minutes. Possibly too slow.
 
-Every write maintains a decompressed "hot" copy alongside the compressed archive. Expensive to write (maintain both); cheap to read (hot copy is directly accessible). Good if reads >> writes.
+### Cost 2 — Write-time complexity
 
-VibeSwap's pattern is predominantly read-intensive at decade timescales: claims are written rarely (contributions per contributor) and read often (retrieval for every governance vote, Shapley round, audit).
+Writing a compressed chain requires address-interning (lookup), timestamp-delta computation, parent-indexing, description-templating. Writes become ~2-3x slower.
 
-Implication: Mode 1. Compressed archive + decompression on read. The cost of decompression is a per-read cost, which scales with retrieval count.
+Most chains are read-heavy (many reads per write). Compression is net-positive.
 
-## The path-query cost
+## Storage-tier architecture
 
-Navigating an attribution chain from node N back to its originating Source means:
+For VibeSwap's long-arc storage, three tiers:
 
-- Look up N's parentAttestations (1 read)
-- For each parent, recurse
-- Terminal condition: parent list is empty (Source-level attribution)
+### Hot tier
 
-In the worst case, a contribution's full lineage depth could be O(log total-claims) — because each claim cites O(1) parents and the tree branches. Practically, lineage depth for a typical claim is 1-10 hops, not 100.
+~10^5 recent claims. Stored fully decompressed in on-chain state. Accessible in O(1) via mapping.
 
-A query for full lineage of a claim: ~10 reads × ~5 ms/read = ~50 ms. Acceptable for one-off queries.
+Cost: expensive per claim but few claims.
 
-For bulk analyses (e.g., "compute all Shapley values in a round"), the read cost can be substantial:
+### Warm tier
 
-- N claims to process.
-- Each requires lineage lookup (~10 reads × ~5 ms).
-- Total: N × 50 ms.
+~10^7 middle-age claims. Stored compressed but on readily-accessible L2 or sidechain. Decompression on read.
 
-For N = 10,000: 500 seconds = 8 minutes. Tolerable.
+Cost: moderate both ways.
 
-For N = 1,000,000: 50,000 seconds = 14 hours. Problematic.
+### Cold tier
 
-Bulk analysis at large N needs either bulk indexing (materialize a summary) or pagination (process N in chunks).
+~10^9 historical claims. Stored compressed on IPFS/Arweave. Merkle-commitments on-chain for verification.
 
-## The archival problem
+Cost: cheap to store, expensive to retrieve but rarely needed.
 
-On-chain storage is expensive. A 300-byte claim at ~20 gwei = ~$0.03 in gas on Ethereum L1 (2024 prices). For 10^6 claims: $30,000 in just-writing fees. Too expensive for bulk attribution.
+Transition between tiers: claims that aren't recently-accessed migrate hot → warm → cold over time.
 
-Solution: most claims live on cheaper substrates (L2, IPFS, dedicated sidechain) with L1 anchoring via Merkle roots. The commitment anchor makes the archival content tamper-evident; the actual data lives where storage is cheaper.
+## Temperature analogy
 
-This is already the pattern in [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md): evidenceHash commits the off-chain artifact; the artifact itself lives off-chain.
+Think of claims as having temperature:
 
-Scaling to long-arc: the anchor substrate must also scale. L1 Ethereum's scaling roadmap (rollups, danksharding) suggests this is viable for the next 10-20 years. Beyond, substrate migration may be necessary — hence [Mind Persistence Mission](./MIND_PERSISTENCE_MISSION.md)'s emphasis on substrate-independence.
+- **Hot**: frequently accessed. In active cache.
+- **Warm**: occasionally accessed. In nearby storage.
+- **Cold**: rarely accessed. In archival.
 
-## The Kolmogorov bound on chain length
+Three-tier storage matches this temperature gradient.
 
-Claim: the maximum reconstructable chain length is bounded by total information capacity of the archival substrate.
+Cognitive parallel: your working memory (hot), episodic long-term (warm), implicit procedural (cold). Same structure in cognitive substrate. Matches ETM's cognitive-economic mirror.
 
-At ~40 bytes/claim compressed, 50 GB storage holds ~1.25 × 10^9 claims. This is roughly the total contribution count at current human-scale over a century — feasible.
+## For students
 
-Above this, we must either:
-- Accept partial-reconstructability (some chains are lost; some attributions become unverifiable).
-- Compress harder (lossy, if we can afford it).
-- Scale storage substrates commensurately.
+Exercise: compute the Kolmogorov complexity of some simple strings:
 
-The Kolmogorov bound tells us what's theoretically possible. Engineering tells us what's practically affordable.
+- "aaaaaaaaaa" (10 a's): K ≈ length of "print 'a' 10 times" ≈ very small.
+- "2718281828": K = small ( e truncated).
+- Random 10 characters: K ≈ 10 bytes (no compression).
+
+Apply to attribution: imagine you're archiving 100 claims. Estimate:
+- Naive storage size.
+- Compressed storage size.
+- Compression ratio.
+
+Do the arithmetic by hand. Observe the savings.
 
 ## The dignity-of-storage argument
 
-There's an ethical flavor: if VibeSwap's attribution promises to contributors are on the order of "your contribution is remembered forever", the storage cost to honor that promise is real. A protocol that collects attributions and then garbage-collects them at 10 years is breaking an implicit commitment.
+There's an ethical dimension to long-arc attribution storage. If the protocol promises contributors that their attestations are "remembered forever", the storage cost to honor that promise is real.
 
-This is not free: honoring the promise requires sustained storage budget. Budget comes from either protocol treasury, state-rent fees, or a purpose-specific endowment. The economic-sustainability question is non-trivial.
+A protocol that collects attributions and then garbage-collects them at 10 years is breaking an implicit commitment.
 
-VibeSwap's CKB-native state-rent model ([Three-Token Economy](./THREE_TOKEN_ECONOMY.md)) provides a partial answer: claims that continue earning attestation-weight continue paying their own rent. Claims that don't earn fresh attestations over time get evicted. Survival-of-the-fittest applied to attribution.
+VibeSwap's three-tier architecture + CKB state-rent model ([Three-Token Economy](./THREE_TOKEN_ECONOMY.md)) provides a sustainable answer:
 
-This is actually desirable: it means the chain naturally prunes to the claims that continue to matter. Attribution-length decay is not a failure; it's a feature that keeps storage tractable while preserving the most-load-bearing attributions.
+- Hot tier claims stay on-chain with state-rent.
+- Warm tier migrated to L2 + Merkle-anchored.
+- Cold tier archived; retrievable but slow.
+- Eviction happens only for unfunded claims whose state-rent can't be paid.
 
-## The temperature metaphor
+Claims that continue earning attestation-weight continue paying their own rent. Claims that don't earn fresh attestations over time eventually evict.
 
-Think of attribution as having a "temperature" — hot claims (recently attested, frequently cited, actively paid rent on) stay in active storage. Warm claims (occasionally referenced) migrate to slower but cheaper storage. Cold claims (no fresh activity) can be archived or evicted.
-
-Three-tier storage:
-- **Hot** (on-chain): ~10^5 recent claims. Cheap read, expensive write.
-- **Warm** (L2 anchored): ~10^7 mid-age claims. Moderate cost both ways.
-- **Cold** (IPFS archive + Merkle commitment): ~10^9 historical claims. Cheap write, expensive read but rarely needed.
-
-Eviction from hot → warm → cold is natural. Re-activation (hot again) on renewed attestation is also natural. This matches the cognitive-economic model of memory: recently-used facts are cheaply accessible; long-dormant facts are expensive to retrieve but not lost.
-
-## Relationship to ETM
-
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive memory has the same temperature-tiered structure. Working memory = hot; episodic long-term = warm; implicit procedural = cold. Retrieval cost scales with temperature.
-
-VibeSwap's three-tier storage is the on-chain mirror of cognitive temperature-tiering. Same dynamics, different substrates. The ETM bijection holds at this layer too.
+This is natural filtering: the chain keeps what continues mattering.
 
 ## Open questions
 
-1. **What's the optimal compression scheme for attribution-chain bytecode?** Something beyond generic gzip that exploits the graph structure.
-2. **How do we handle attributions that span storage tiers?** If a warm claim cites a cold parent, retrieval spans tiers — need caching strategy.
-3. **What's the right eviction policy?** Random expiration? Attestation-weight-based? Activity-based? Each has tradeoffs.
-
-These shape the long-arc feasibility of VibeSwap's attribution stack.
+1. **Optimal compression scheme** — something beyond generic gzip exploiting graph structure specifically.
+2. **Cross-tier caching** — when a warm claim cites a cold parent, retrieval spans tiers; what's the right caching strategy?
+3. **Eviction policy** — activity-based? Attestation-weight-based? Random? Each has tradeoffs.
 
 ## One-line summary
 
-*Attribution chains have irreducible information cost ~40 bytes/link; at compressed ~50 GB total they hold 10^9 claims (centuries of human-scale contribution); three-tier hot/warm/cold storage keeps retrieval tractable — matches cognitive-memory temperature-tiering per ETM.*
+*Attribution chains have irreducible storage floor ~40-50 bytes/claim after contributor-address interning + timestamp deltas + parent indexing + description templating. 10^9 claims → ~50 GB compressed. Three-tier storage (hot/warm/cold) mirrors cognitive memory temperature gradient per ETM. Natural eviction is correct — not a failure mode.*

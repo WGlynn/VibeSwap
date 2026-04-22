@@ -270,4 +270,49 @@ contract OracleAggregationCRATest is Test {
         vm.expectRevert(bytes("Reveal not yet ended"));
         agg.settleBatch(agg.getCurrentBatchId());
     }
+
+    // ============ Slash ============
+
+    function test_slashNonRevealer_happy() public {
+        // Two commits, only one reveals → other is slashable
+        bytes32 ch1 = _commitHash(1500e18, bytes32(uint256(1)));
+        bytes32 ch2 = _commitHash(1600e18, bytes32(uint256(2)));
+        vm.prank(issuer1); agg.commitPrice(ch1);
+        vm.prank(issuer2); agg.commitPrice(ch2);
+        vm.warp(block.timestamp + agg.COMMIT_PHASE_DURATION() + 1);
+        vm.prank(issuer1); agg.revealPrice(1, 1500e18, bytes32(uint256(1)));
+        vm.warp(block.timestamp + agg.REVEAL_PHASE_DURATION() + 1);
+
+        // issuer2 did not reveal — slashable
+        vm.prank(issuer3);
+        vm.expectEmit(true, true, false, true);
+        emit IOracleAggregationCRA.IssuerSlashed(1, issuer2, 0, "non-reveal");
+        agg.slashNonRevealer(1, issuer2);
+    }
+
+    function test_slashNonRevealer_revertIfRevealed() public {
+        bytes32 ch = _commitHash(1500e18, bytes32(uint256(1)));
+        vm.prank(issuer1); agg.commitPrice(ch);
+        vm.warp(block.timestamp + agg.COMMIT_PHASE_DURATION() + 1);
+        vm.prank(issuer1); agg.revealPrice(1, 1500e18, bytes32(uint256(1)));
+        vm.warp(block.timestamp + agg.REVEAL_PHASE_DURATION() + 1);
+
+        vm.expectRevert(bytes("Issuer revealed — not slashable"));
+        agg.slashNonRevealer(1, issuer1);
+    }
+
+    function test_slashNonRevealer_revertIfNoCommit() public {
+        // No commits at all
+        vm.warp(block.timestamp + agg.COMMIT_PHASE_DURATION() + agg.REVEAL_PHASE_DURATION() + 1);
+        vm.expectRevert(bytes("Issuer did not commit"));
+        agg.slashNonRevealer(1, issuer1);
+    }
+
+    function test_slashNonRevealer_revertIfRevealNotEnded() public {
+        bytes32 ch = _commitHash(1500e18, bytes32(uint256(1)));
+        vm.prank(issuer1); agg.commitPrice(ch);
+        // Don't advance past reveal deadline
+        vm.expectRevert(bytes("Reveal not yet ended"));
+        agg.slashNonRevealer(1, issuer1);
+    }
 }

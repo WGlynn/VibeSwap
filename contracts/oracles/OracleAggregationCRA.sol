@@ -150,8 +150,30 @@ contract OracleAggregationCRA is
         return issuerRegistry != address(0);
     }
 
-    function revealPrice(uint256, uint256, bytes32) external pure {
-        revert("not implemented");
+    function revealPrice(uint256 batchId, uint256 price, bytes32 nonce) external nonReentrant {
+        require(price > 0, "Zero price");
+        BatchData storage b = _batches[batchId];
+        require(b.commitDeadline != 0, "Unknown batch");
+        require(block.timestamp > b.commitDeadline, "Still in commit phase");
+        require(block.timestamp <= b.revealDeadline, "Reveal phase ended");
+
+        // Auto-advance: COMMIT -> REVEAL on first reveal that lands in window.
+        if (b.phase == BatchPhase.COMMIT) {
+            b.phase = BatchPhase.REVEAL;
+        }
+        require(b.phase == BatchPhase.REVEAL, "Not in reveal phase");
+
+        bytes32 expected = _commits[batchId][msg.sender];
+        require(expected != bytes32(0), "No commit found");
+        require(_reveals[batchId][msg.sender] == 0, "Already revealed");
+
+        bytes32 actual = keccak256(abi.encodePacked(price, nonce));
+        require(actual == expected, "Hash mismatch");
+
+        _reveals[batchId][msg.sender] = price;
+        _revealedPrices[batchId].push(price);
+
+        emit PriceRevealed(batchId, msg.sender, price);
     }
 
     function settleBatch(uint256) external pure returns (uint256) {

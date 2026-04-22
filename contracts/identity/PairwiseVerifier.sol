@@ -32,6 +32,8 @@ import "./interfaces/IAgentRegistry.sol";
  * - Settle disputes about subjective contribution value
  */
 contract PairwiseVerifier is IPairwiseVerifier, OwnableUpgradeable, ReentrancyGuardUpgradeable, UUPSUpgradeable {
+    event AgentRegistryUpdated(address indexed previous, address indexed current);
+
 
     // ============ Constants ============
 
@@ -440,7 +442,9 @@ contract PairwiseVerifier is IPairwiseVerifier, OwnableUpgradeable, ReentrancyGu
     // ============ Admin ============
 
     function setAgentRegistry(address _agentRegistry) external onlyOwner {
+        address prev = address(agentRegistry);
         agentRegistry = IAgentRegistry(_agentRegistry);
+        emit AgentRegistryUpdated(prev, _agentRegistry);
     }
 
     // ============ Internal ============

@@ -23,6 +23,9 @@ contract ILProtectionVault is
 {
     using SafeERC20 for IERC20;
 
+    event PoolQuoteTokenUpdated(bytes32 indexed poolId, address indexed previous, address indexed current);
+    event IncentiveControllerUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant BPS_PRECISION = 10000;
@@ -423,7 +426,9 @@ contract ILProtectionVault is
      * @notice Set quote token for a pool
      */
     function setPoolQuoteToken(bytes32 poolId, address token) external onlyOwner {
+        address prev = poolQuoteTokens[poolId];
         poolQuoteTokens[poolId] = token;
+        emit PoolQuoteTokenUpdated(poolId, prev, token);
     }
 
     /**
@@ -431,7 +436,9 @@ contract ILProtectionVault is
      */
     function setIncentiveController(address _controller) external onlyOwner {
         if (_controller == address(0)) revert ZeroAddress();
+        address prev = incentiveController;
         incentiveController = _controller;
+        emit IncentiveControllerUpdated(prev, _controller);
     }
 
     // ============ Internal Functions ============

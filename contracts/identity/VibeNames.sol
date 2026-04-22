@@ -15,6 +15,8 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
  *      Fees are forwarded to the protocol treasury.
  */
 contract VibeNames is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    event TreasuryUpdated(address indexed previous, address indexed current);
+
 
     // ============ Structs ============
 
@@ -275,7 +277,9 @@ contract VibeNames is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgrad
      */
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert InvalidAddress();
+        address prev = treasury;
         treasury = _treasury;
+        emit TreasuryUpdated(prev, _treasury);
     }
 
     // ============ Internal ============

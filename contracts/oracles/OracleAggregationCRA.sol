@@ -213,8 +213,19 @@ contract OracleAggregationCRA is
         emit BatchSettled(batchId, medianPrice, n);
     }
 
-    function slashNonRevealer(uint256, address) external pure {
-        revert("not implemented");
+    function slashNonRevealer(uint256 batchId, address issuer) external nonReentrant {
+        BatchData storage b = _batches[batchId];
+        require(b.commitDeadline != 0, "Unknown batch");
+        require(block.timestamp > b.revealDeadline, "Reveal not yet ended");
+        require(_commits[batchId][issuer] != bytes32(0), "Issuer did not commit");
+        require(_reveals[batchId][issuer] == 0, "Issuer revealed — not slashable");
+
+        // V1: clear commit (prevents double-slash), record violation, emit.
+        // V1.5 will route to IssuerReputationRegistry.slash(issuer, NON_REVEAL_SLASH_BPS)
+        // for real stake reduction. Slash-pool accounting reserved.
+        _commits[batchId][issuer] = bytes32(0);
+
+        emit IssuerSlashed(batchId, issuer, 0, "non-reveal");
     }
 
     // ============ Views ============

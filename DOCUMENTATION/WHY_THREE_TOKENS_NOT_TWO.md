@@ -1,58 +1,112 @@
 # Why Three Tokens, Not Two
 
-**Status**: Formal trade-off analysis. The deeper case for [Three Token Economy](./THREE_TOKEN_ECONOMY.md).
+**Status**: Formal trade-off analysis with historical failure modes.
+**Audience**: First-encounter OK. Terra/Luna-style failures explicit.
 
 ---
 
-## The naive question
+## The skeptical question
 
-"Why do you have three tokens? Isn't that over-complicating? Why not collapse JUL and VIBE and use one token that handles both monetary and governance roles?"
+Someone new to VibeSwap asks: "Three tokens? That's complicated. Why not simplify — just one token for everything?"
 
-The answer depends on Tinbergen's Rule, but the Rule alone doesn't fully explain — let's go deeper.
+Their instinct is right, kind of. Token complexity IS usually a red flag. Most three-token projects have failed because complexity isn't justified.
 
-## Tinbergen's Rule, formalized
+But VibeSwap's three tokens aren't complexity for its own sake. They're a specific response to specific goals. Collapsing would break things in predictable ways.
 
-Jan Tinbergen (Nobel-laureate econometrician): to hit N independent policy goals, you need at least N independent policy instruments. Using one instrument to pursue two goals means neither is pursued optimally — the instrument is tugged between conflicting optimizations.
+This doc makes the case concrete.
 
-Applied to crypto-constitutional design: if a project has three distinct policy goals, three distinct tokens.
+## The principle — Tinbergen's Rule
+
+Jan Tinbergen (1969 Nobel laureate): to hit N independent policy goals, you need at least N independent policy instruments.
+
+Using one instrument to pursue two goals means neither is optimally pursued. The instrument is tugged between conflicting optimizations.
+
+Applied to constitutional crypto-design: three distinct policy goals demand three distinct tokens.
 
 ## Three distinct policy goals
 
 ### Goal 1 — Provide a stable unit of account
 
-The application layer needs a token users can price trades in, hold balances in, reason about values in. This token must be value-stable (volatility distorts the unit) and PoW-objective (value comes from underlying computational work, not from stake-issuance whims).
+The application layer needs a token users can price trades in, hold balances in, reason about values in.
+
+This token should be:
+- Value-stable (volatility distorts the unit).
+- Objective-backed (value comes from underlying work, not just speculation).
+- Widely-held (not concentrated in governance hands).
+
+JUL fills this.
 
 ### Goal 2 — Coordinate governance authority
 
-The governance layer needs a token that represents legitimate voting power. This token must be slashable (misbehavior loses power), stakable (alignment with the protocol's longevity), and concentrable-for-legitimate-reasons (founders and long-term contributors hold more than short-term speculators).
+The governance layer needs a token representing legitimate voting power.
+
+This token should be:
+- Slashable (misbehavior loses power).
+- Stakable (alignment with protocol longevity).
+- Concentrable-for-legitimate-reasons (founders + long-term contributors hold more).
+
+VIBE fills this.
 
 ### Goal 3 — Pay state-rent on the substrate
 
-The consensus substrate needs a token that pays for the storage/computation/bandwidth the system consumes. This token must be issued-by-the-substrate (not by application-layer fiat), have a bounded supply (so rent is finite), and be economically decoupled from the governance layer (so governance doesn't tune state-rent for its own benefit).
+The consensus substrate needs a token paying for storage, computation, bandwidth.
 
-These three goals are genuinely independent. Each has a different optimal volatility profile, a different optimal issuance rule, a different optimal concentration profile.
+This token should be:
+- Issued by the substrate (not application-layer fiat).
+- Bounded supply (so rent is finite).
+- Economically decoupled from governance (so governance doesn't tune state-rent for its own benefit).
 
-## What collapsing breaks
+CKB-native fills this.
 
-### Collapse money + governance (two tokens: combined JUL-VIBE + CKB-native)
+These three goals are genuinely independent. Each has different optimal volatility, issuance rule, concentration profile.
 
-Governance token holders have votes proportional to holdings. Under collapse, they also hold the unit of account. Now a governance vote to expand issuance = directly enriching governance voters. Governance becomes the mint authority.
+## What collapsing breaks — four scenarios
 
-This is the Terra/Luna failure pattern: governance-token-as-money leads to inflationary death-spirals because governance cannot credibly commit to sound money when its own wealth depends on monetary expansion.
+### Collapse 1: Money + Governance (two tokens: JUL-VIBE + CKB-native)
 
-### Collapse governance + state-rent (two tokens: JUL + combined VIBE-CKB)
+Governance token holders have votes proportional to holdings. Under collapse, they also hold the unit of account.
 
-State-rent funds the substrate; governance manages the protocol. Under collapse, governance holders pay state-rent and also receive state-rent-derived subsidies. Fee levels become a governance parameter set by beneficiaries.
+Now a governance vote to expand issuance = directly enriching governance voters. **Governance becomes the mint authority.**
 
-Breaks [Augmented Governance](./AUGMENTED_GOVERNANCE.md) Physics > Constitution > Governance hierarchy: state-rent should be Physics (substrate-enforced), not Governance (vote-tuned).
+This is the Terra/Luna failure pattern:
 
-### Collapse money + state-rent (two tokens: combined JUL-CKB + VIBE)
+**Terra's story**: governance-token holders (LFG foundation + Do Kwon) decided issuance rules. Issuance rules included backing the peg with Luna inflation. As Luna's price rose, peg held. When Luna fell, the feedback loop accelerated: more issuance → more inflation → lower Luna → need more issuance → ... death spiral.
 
-Monetary stability requires low volatility; substrate state-rent requires predictable, possibly-rising prices (to fund substrate growth). Two contradictory pressures on one token. Neither goal optimally met.
+The collapse-protection VIBRswap needs: governance and money must be separate tokens. Then governance CAN'T credibly commit to inflationary expansion (they don't control the monetary issuance directly).
 
-### Keep one token for all three goals
+JUL is PoW-backed, not subject to governance whim. Governance (VIBE) can't inflate JUL. Structural safety.
 
-Maximally collapsed. All three distortions compound. Observed empirically in ETH/ERC-20 projects that try "one token, multiple roles" — always governance-captured over time (the fee-and-issuance controls get tuned to benefit holders, not users or substrate).
+### Collapse 2: Governance + State-rent (two tokens: JUL + VIBE-CKB)
+
+State-rent funds the substrate; governance manages the protocol. Under collapse, governance holders pay state-rent and also receive state-rent-derived subsidies.
+
+Fee levels become a governance parameter set by BENEFICIARIES. Governance can vote to reduce their own state-rent while leaving user-storage-costs high.
+
+This breaks [Augmented Governance](./AUGMENTED_GOVERNANCE.md): state-rent should be Physics (substrate-enforced), not Governance (vote-tuned). Collapsing violates the hierarchy.
+
+### Collapse 3: Money + State-rent (two tokens: JUL-CKB + VIBE)
+
+Monetary stability requires low volatility. Substrate state-rent requires predictable, possibly-rising prices to fund substrate growth.
+
+Two contradictory pressures on one token. Neither goal optimally met.
+
+### Collapse 4: One token for all three roles
+
+Maximally collapsed. All three distortions compound.
+
+**Observed empirically**: ETH/ERC-20 projects that tried "one token, multiple roles." Always governance-captured over time. The fee + issuance controls get tuned to benefit holders, not users or substrate.
+
+## Why JUL's specific dual role WORKS
+
+JUL plays two roles (money + PoW pillar) but NOT three (it's not governance):
+
+These roles ALIGN:
+- Monetary role demands stable issuance + deep liquidity.
+- PoW role demands stable issuance + high computational expense.
+
+Both point in the same direction. Both benefit from computational backing. Neither conflicts.
+
+JUL's dual role is sustainable because the two roles are aligned. VIBE and CKB-native play roles that would CONFLICT with either of JUL's, which is why they're separate.
 
 ## The three-token separation visualized
 
@@ -60,55 +114,83 @@ Maximally collapsed. All three distortions compound. Observed empirically in ETH
 |---|---|---|---|
 | Role | Money / PoW | Governance / PoS | State-rent / PoBB |
 | Volatility target | Low | Moderate | N/A (substrate-priced) |
-| Issuance | PoW-mined, halving schedule | Genesis + governance unlocks | Substrate-native |
-| Concentration profile | Wide (everyone who transacts holds) | Concentrated (governance participants) | Held by state-consumers |
+| Issuance | PoW-mined, halving | Genesis + governance unlocks | Substrate-native |
+| Concentration | Wide (all who transact) | Concentrated (governance participants) | Held by state-consumers |
 | Governance vote power | No | Yes | No |
-| Required to trade | Yes | No | No |
-| Required to govern | No | Yes | No |
-| Required to run contracts | No | No | Yes |
+| Required for trading | Yes | No | No |
+| Required for governance | No | Yes | No |
+| Required for contract deployment | No | No | Yes |
 
-Each column is a distinct purpose. Collapsing any two rows gives you a column with internal contradictions.
+Each column is a distinct purpose. Collapsing any two columns creates a column with internal contradictions.
 
-## Why this maps to cognitive economy
+## Why this is hard to appreciate without the failures
+
+When you look at VibeSwap cold, three tokens DOES seem complex. The three-token argument requires understanding the failure modes of fewer-token alternatives.
+
+The three-token argument makes sense only if you:
+
+1. Know the Terra/Luna pattern of monetary-governance collapse.
+2. Know the Augmented Governance hierarchy (Physics > Constitution > Governance).
+3. Know ETM's three-layer cognitive-economy framing.
+
+Without that context, "three tokens" seems arbitrary. With it, "one token" or "two tokens" seems dangerous.
+
+## The cognitive-economy grounding
 
 Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognition has three economic layers:
 
-1. **Exchange medium** — tokens of immediate value (felt reward, in-the-moment motivation). Moment-to-moment decisions use this.
-2. **Coordination authority** — shared norms and implicit voting (social-group status). Governance decisions use this.
-3. **Substrate rent** — attention-budget paid for keeping information active. Memory uses this.
+1. **Exchange medium** — tokens of immediate value (pleasure, motivation). Moment-to-moment decisions use this.
+2. **Coordination authority** — shared norms, implicit voting (status, alliances). Social decisions use this.
+3. **Substrate rent** — attention-budget paid for active information. Memory uses this.
 
-These are distinguishable in cognition. An agent pursues immediate pleasure (Exchange Medium) while also holding long-term alliances (Coordination Authority) while also selecting what to remember (Substrate Rent). Three orthogonal processes running concurrently.
+These are orthogonal in cognition. An agent can maximize immediate pleasure while also holding long-term alliances while also selecting what to remember. Three orthogonal processes concurrently.
 
-If a brain tried to use one variable for all three — attempted to collapse them — it would fail in predictable ways. Pleasure-maximization at every moment destroys long-term alliances. Alliance-maintenance that ignores pleasure leads to brittle social networks. Memory allocation that ignores coordination-value misses what's worth remembering.
+If the brain tried to use ONE variable for all three — collapse them — it would fail predictably. Pleasure-only → destroys long-term alliances. Alliance-only → ignores pleasure, brittle networks. Memory-only → misses what's worth remembering.
 
-Cognition evolved three systems. On-chain replication should also have three. Deeper justification than Tinbergen's Rule: the three-layer structure is not a policy choice; it is what cognitive economy actually looks like.
+Cognition evolved three systems because three are needed. On-chain replication should also have three. Deeper justification than Tinbergen's Rule alone.
 
 ## Why this is marketable
 
-Three-token systems face skepticism from crypto audiences: "complex tokenomics = red flag, avoid." This skepticism is empirically justified — most three-token projects have failed because they over-engineer.
+Three-token systems face skepticism from crypto audiences. "Complex tokenomics = red flag." This skepticism is empirically justified — most three-token projects have failed because they over-engineered.
 
-The VibeSwap case differs: the three tokens are not a feature-list, they are a formal consequence of three independent goals. Removing any one token would require either abandoning a goal or collapsing instruments (with the distortions described above).
+VibeSwap's case differs: the three tokens are a FORMAL CONSEQUENCE of three goals. Removing any one token requires either abandoning a goal or collapsing instruments (with known distortions).
 
-When a sophisticated investor asks "why three?", the answer is Tinbergen + ETM's three-layer cognitive structure. Not "because we want three different communities" or "because each token has a cool theme". The answer is formal and load-bearing.
+When an investor asks "why three?", the answer has teeth:
+- Tinbergen's Rule + three goals.
+- Terra/Luna-style failure modes under collapse.
+- ETM's three-layer cognitive-economic structure.
 
-## What the three tokens must NOT do
+Not "we wanted three communities." Not "each token has a cool theme." Formal and load-bearing.
 
-- **Must not be convertible at a fixed rate.** Fixed conversion = effectively one token in three costumes. Each token's value must emerge from its own supply/demand.
-- **Must not share fee flows.** Fees paid in one token's denomination for services in another token's substrate create hidden coupling.
-- **Must not share governance.** VIBE is the only voting token; JUL holders don't get voting power on governance parameters; CKB-native holders don't either.
+## What the three tokens MUST NOT do
 
-Coupling between the tokens is limited to: economic flows (trades via AMMs) and operational flows (you need JUL to pay for VIBE issuance, CKB-native to deploy contracts). These couplings are cost-based, not governance-based.
+- **Must not be convertible at a fixed rate.** Fixed conversion = effectively one token in costumes. Each token's value must emerge from its own supply/demand.
+- **Must not share fee flows.** Fees paid in one denomination for services in another substrate create hidden coupling.
+- **Must not share governance.** VIBE is the only voting token. JUL/CKB-native holders don't get governance power on protocol parameters.
+
+Coupling between tokens limited to: economic flows (trades via AMMs) and operational flows (pay JUL to issue VIBE, CKB-native to deploy contracts). These are cost-based, not governance-based.
 
 ## Relationship to Augmented Governance
 
 [Augmented Governance](./AUGMENTED_GOVERNANCE.md) specifies Physics > Constitution > Governance. Three-token separation implements this:
 
-- **Physics** = CKB-native substrate (state-rent math, storage economics).
-- **Constitution** = JUL (monetary axioms, PoW-objectivity — mathematically enforced, not voted).
-- **Governance** = VIBE (DAO votes, proposals, slashing-for-misbehavior).
+- **Physics** = CKB-native substrate (state-rent, storage economics, mathematical invariants).
+- **Constitution** = JUL (monetary axioms, PoW-objectivity — enforced, not voted).
+- **Governance** = VIBE (DAO votes, proposals, slashing).
 
-The layer-token mapping is not incidental. It is how the constitutional hierarchy is operationalized.
+The layer-token mapping is not incidental. It operationalizes the constitutional hierarchy.
+
+## For students
+
+Exercise: choose a well-known crypto project with complex tokenomics. Analyze:
+
+1. What goals does each token serve?
+2. Are those goals truly orthogonal, or could fewer tokens serve them?
+3. What happens under collapse scenarios for that project?
+4. Has the project exhibited any collapse-style failure?
+
+Apply to Terra (Luna), Synthetix (SNX+sUSD), Compound (COMP+cTokens), etc. Compare their analyses to VibeSwap's.
 
 ## One-line summary
 
-*Three tokens because three independent goals (Tinbergen's Rule) AND because cognition evolved three economic layers (ETM); collapsing any two tokens breaks specific invariants with predictable failure patterns.*
+*Three tokens because three orthogonal policy goals (stable monetary layer, governance authority, substrate state-rent) per Tinbergen's Rule + cognition's three-layer structure per ETM. Four collapse scenarios analyzed with historical failure patterns (Terra/Luna most famously). JUL's dual role works because its two sub-roles align; VIBE+CKB-native would conflict with JUL's, hence separate. Not complexity — formal consequence of the goals.*

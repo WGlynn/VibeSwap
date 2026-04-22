@@ -1,152 +1,216 @@
 # The Uncomputable Marginal
 
-**Status**: Computability analysis of Shapley value in practice.
-**Depth**: Why real-world Shapley is approximation, not exact, and what the approximation bounds mean.
-**Related**: [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md), [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md), [The Novelty Bonus Theorem](./THE_NOVELTY_BONUS_THEOREM.md).
+**Status**: Computability analysis with numeric examples of exponential explosion + Monte Carlo approximation.
+**Audience**: First-encounter OK. Complexity bounds walked through step-by-step.
 
 ---
 
-## The claim
+## An intuition about combinatorial explosion
 
-Shapley value is defined as the expected marginal contribution of an agent across all permutations of coalition formation. For N agents, this requires evaluating the characteristic function `v(S)` for every subset S of the N agents — that's 2^N subsets.
+Imagine you have 2 coins to flip. There are 4 possible outcomes: HH, HT, TH, TT.
 
-At N = 20, that's 1M evaluations. At N = 50, it's 10^15. At N = 1000 (plausible for VibeSwap), it's 10^300. Combinatorially explosive.
+3 coins: 8 outcomes.
+4 coins: 16 outcomes.
+10 coins: 1024 outcomes.
+30 coins: ~1 billion outcomes.
+50 coins: ~1 quadrillion.
+100 coins: 10^30 — vastly more than atoms in the observable universe.
 
-More fundamentally: even evaluating `v(S)` for a single subset S requires knowing what that coalition would have produced, which is counterfactual reasoning over a complex cooperative process. The counterfactual itself is not computable exactly — it depends on what agents would have done if the coalition were different, which is a simulation over bounded rationality.
+This is **combinatorial explosion**. The growth rate is 2^N where N is the number of coins. For even modest N, 2^N outstrips any computer's capacity.
 
-So exact Shapley value is doubly uncomputable: exponential in N AND requiring uncomputable counterfactuals per subset.
+Shapley value computation has this same explosion. Let's see why.
 
-Any real Shapley distribution is approximation. Understanding the approximation bounds is important because fairness claims depend on how close the approximation is to the ideal.
+## Shapley's requirement
 
-## Why this is a real problem
+Per [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md), the Shapley value for contributor `i` is the average over all permutations of their marginal contribution.
 
-DeFi projects that use "Shapley-like" distributions often hand-wave the computability issue. They compute some marginal-like metric and call it Shapley. But if the computation is off by more than ~10%, fairness claims erode: a contributor's reward can be 20% or 50% different from true Shapley, and they have no way to verify which.
+For N contributors, the number of permutations is N! (N-factorial). The number of subsets is 2^N.
 
-This matters for:
-- **Trust in the mechanism**: if contributors see others getting wildly different rewards for similar work, the protocol looks extractive even if it isn't.
-- **Governance legitimacy**: trust-weights derived from Shapley feed voting power; inaccurate Shapley yields incorrect voting distributions.
-- **Long-term participation**: contributors who feel under-rewarded leave; the protocol bleeds its most productive members.
+For each subset, we need to evaluate the characteristic function `v(S)`.
 
-An uncomputable-but-approximated Shapley is not disqualifying, but it has to be honest about approximation error.
+For 10 contributors: 1024 subsets to evaluate + 3.6M permutations to average over.
+For 20 contributors: 1M subsets + 2.4×10^18 permutations.
+For 50 contributors: 10^15 subsets + way more permutations.
+For 100 contributors: 10^30 subsets.
+For 1000 contributors (realistic for VibeSwap at scale): 10^300 subsets. Infeasible.
 
-## Approximation strategies
+At VibeSwap-scale, exact Shapley is uncomputable.
 
-### Strategy 1 — Random sampling (Monte Carlo Shapley)
+## Two layers of uncomputability
 
-Sample K random permutations; for each, compute each agent's marginal contribution at the position where they appear in the permutation; average over samples.
+Actually, Shapley is doubly-uncomputable in practice:
 
-- Complexity: O(K × N) per agent (K samples × N-step coalition buildup).
-- Approximation error: O(1/√K) — standard Monte Carlo convergence.
-- For 1% error at typical confidence: K ~ 10^4 samples. Feasible for N up to ~10,000 in minutes.
+### Uncomputable layer 1 — 2^N subset explosion
 
-VibeSwap's implementation uses Monte Carlo with K = 5,000 per round. Error bound ~1.4%. Acceptable for most distribution decisions.
+As shown above. For N > ~30, computing 2^N subsets exceeds any practical computer's time budget.
 
-### Strategy 2 — Structured approximation
+### Uncomputable layer 2 — v(S) is counterfactual
 
-Exploit structure in `v(S)`. If `v` is submodular (diminishing returns — typical for cooperative production), there are polynomial-time approximations with O(1/ε) error.
+Even if we could enumerate all subsets, evaluating `v(S)` for each is expensive.
 
-- Used for: broad Shapley over large N where Monte Carlo would be too slow.
-- Limitation: assumes submodularity; real v's may violate it in edge cases (strong complementarities).
+`v(S)` = "what value would this coalition S have produced?" This is a counterfactual. Nobody knows what S alone would have produced without running the experiment.
 
-### Strategy 3 — Proxy-based
+Per [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md) Gap #1, `v(S)` has 10-30% estimation error even when we can estimate it.
 
-Use a simpler computable proxy instead of true Shapley — e.g., "proportional to attestation weight" is a crude proxy. Much faster but known-biased.
+So: the outer sum is infeasibly large, AND each term requires an expensive counterfactual estimate with substantial error.
 
-- Error: unbounded. Good for rough ordering; bad for precise distribution.
-- VibeSwap uses this only in pre-deployment stubs; production uses Monte Carlo.
+Exact Shapley = impossible in practice. We must approximate.
 
-## The v(S) estimation problem
+## Monte Carlo Shapley — the working solution
 
-Even with efficient approximation of Shapley, we still need to evaluate `v(S)` for many subsets. `v(S)` is "the value this coalition would produce" — counterfactual over what S alone, without the other agents, would have accomplished.
+Instead of all N! permutations, sample K random permutations. For each sample, compute each contributor's marginal contribution at the position where they appear.
 
-Estimating this requires one of:
+Average over samples. Error decreases as O(1/√K).
 
-### Option A — Outcome-based estimation
+### Worked example
 
-Look at actual coalitions that existed historically; interpolate from observed values. Requires enough diverse historical data, which may not exist for new projects.
+Suppose N = 100 contributors. Exact Shapley needs 100! ≈ 9×10^157 permutation evaluations. Infeasible.
 
-### Option B — Expert estimation
+Monte Carlo with K = 1,000 samples:
+- Each sample: pick a random permutation; evaluate contributions. Cost ~ N × cost(v).
+- Total cost: K × N × cost(v) = 1,000 × 100 × cost(v) = 100,000 × cost(v).
 
-A committee (or trust-weighted group of attestors) estimates `v(S)` for key subsets. Subjective but grounded in domain knowledge.
+That's feasible. 100,000 v(S) evaluations.
 
-### Option C — Simulation-based estimation
+Standard error:
+- Single-sample variance of marginal contribution per contributor: bounded by [0, max_v].
+- Error in the Monte Carlo estimate: O(1/√K).
+- For K = 1,000: error ~ 1/√1000 ≈ 3%.
 
-Run a counterfactual simulation of what S would have produced. Requires a model of cooperative production; the model itself has error.
+3% error per contributor is acceptable for most distribution decisions.
 
-### Option D — Hybrid
+## Scaling Monte Carlo to VibeSwap
 
-Combine observed + expert + simulated estimates with trust-weighted aggregation. VibeSwap's approach: attestation branches + tribunal review provide implicit v-estimation through the attestation weights themselves.
+For realistic VibeSwap scenarios:
 
-All four options have estimation error. The composite error (Shapley approximation × v estimation) bounds the total distribution error.
+### Scenario: 100 contributors, $100,000 pool
 
-## The bounds, honestly
+K = 1,000 samples. Error ~3%.
 
-At best-case (good Monte Carlo + good v estimation): distribution error ~ 5-10% per contributor.
+Each contributor's expected share: $100,000 / 100 = $1,000 (if roughly equal).
+Error per contributor: 3% × $1,000 = $30.
 
-At worst-case (limited Monte Carlo budget + heterogeneous v estimates): error ~ 20-30%.
+Tolerable for most purposes. A contributor receiving $970 instead of $1,000 due to Monte Carlo noise won't notice or complain.
 
-These are per-contributor errors. In aggregate, systematic biases can be larger (e.g., consistent under-estimation of non-Code contributions).
+### Scenario: 1,000 contributors, $1,000,000 pool
 
-This is what VibeSwap promises: Shapley-shaped distribution within ~10-30% of theoretical ideal, with the approximation loop itself verifiable via governance and tribunal escalation.
+K = 5,000 samples.
+Each sample: 1,000 marginal contributions.
+Total: 5M v(S) evaluations.
+Error ~1.4%.
+
+Per contributor's expected share: $1,000,000 / 1,000 = $1,000.
+Error per contributor: 1.4% × $1,000 = $14.
+
+Even tighter precision.
+
+### Scenario: 10,000 contributors, $10,000,000 pool
+
+K = 10,000 samples.
+Error ~1%.
+
+Per contributor: $1,000. Error: $10.
+
+Still tolerable. Scales further but with diminishing returns on precision.
+
+## The sampling budget-versus-accuracy trade-off
+
+More samples = better accuracy but higher gas cost on-chain (or higher compute off-chain).
+
+For on-chain Monte Carlo: 100 samples costs ~2M gas. 1,000 samples costs ~20M gas. 10,000 costs ~200M gas. 10,000 exceeds block gas limits on most chains.
+
+Solution: compute off-chain, commit via Optimistic Shapley ([`OPTIMISTIC_SHAPLEY.md`](./OPTIMISTIC_SHAPLEY.md)). Off-chain Monte Carlo runs in seconds or minutes; commit result via Merkle root; challenge window allows verification.
+
+## The v(S) estimation budget
+
+Monte Carlo bounds the Shapley summation. But v(S) estimation is another source of error.
+
+For each sampled subset, we estimate v(S). Three approaches:
+
+### Approach 1 — Outcome-based
+
+Look at actual coalitions that existed; interpolate from observed values.
+
+Error: O(sample size of historical data). Usually 20-30% for sparse data.
+
+### Approach 2 — Expert-committee
+
+Have a trusted committee estimate v(S) for key subsets.
+
+Error: subjective. 15-30% cross-observer variation (see [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md)).
+
+### Approach 3 — Simulation-based
+
+Model the counterfactual via simulation. Requires accurate simulation-model.
+
+Error: depends on model validity. 10-20% typical.
+
+All three introduce substantial error. The composite Shapley error is the Monte Carlo error × v estimation error ≈ 5-30% per contributor.
+
+## The total error bounds, honestly
+
+At best-case (large Monte Carlo sample + accurate v estimation): 5-10% per contributor.
+
+At worst-case (limited Monte Carlo budget + heterogeneous v estimates): 20-30%.
+
+These are per-contributor errors. In aggregate (all contributors), total distribution error may be larger (correlated errors compound).
+
+This is VibeSwap's honest promise: Shapley-shaped distribution within ~10-30% of theoretical ideal.
 
 ## The philosophical implication
 
-Fairness is not a point but a region. A protocol can be "fair within 10%" but never "fair to a decimal". The Fairness Fixed Point paper ([`THE_FAIRNESS_FIXED_POINT.md`](./THE_FAIRNESS_FIXED_POINT.md)) analyzes this; the Uncomputable Marginal adds the computational reason.
+**Fairness is not a point; it's a region.**
 
-Practically: precision-claims in distribution should be accompanied by error bars. "Contributor X received 0.12345 ETH" is misleading; "Contributor X received ~0.123 ETH ± 0.01 (10%)" is accurate.
+A protocol can be "fair within 10%" but never "fair to a decimal." Decimal-precision claims are false precision. The bottom digits are uncomputable noise; treating them as meaningful is mis-calibrated.
 
-The bottom three decimals of the first number are uncomputable noise. Treating them as meaningful creates false precision.
-
-## Why the error tolerance is OK
-
-Real cooperative production has its own natural variance. Two similar contributors doing similar work will produce slightly different outcomes based on context, timing, mood. The intrinsic "fair reward" is itself a distribution, not a point.
-
-Shapley approximation error is smaller than the intrinsic variance of what's being approximated. Caring about ≥10% error in Shapley computation while ignoring ~30% natural variance in contribution outcomes is mis-calibrated.
-
-This doesn't excuse sloppy computation — it contextualizes what precision is meaningful. VibeSwap aims for Shapley approximation error ≈ intrinsic variance of contribution outcomes. Below that, extra computational precision is wasted.
+When VibeSwap says "Contributor X receives $0.123 ETH", honest framing would be "receives ~$0.12 ± $0.01 (10%)."
 
 ## The alternative-mechanism comparison
 
 Other distribution mechanisms have their own bounds:
 
-- **Pro-rata by stake**: exact but ignores contribution quality. "Error" is structural, not computational — it's using the wrong function.
-- **Committee-allocated**: bounded by committee size (~5 people); each member's estimate is biased, aggregation reduces but doesn't eliminate.
-- **Quadratic voting**: computable exactly; relies on voter-preference estimates which have their own counterfactual issue.
+- **Pro-rata by stake**: exact but ignores contribution quality. "Error" is structural (wrong function) not computational.
+- **Committee-allocated**: bounded by committee size (~5 people). Each estimate is biased; aggregation reduces but doesn't eliminate.
+- **Quadratic voting**: computable exactly. Relies on preference estimates which have their own counterfactual issue.
 
-Among mechanisms that claim to measure contribution, none is exactly computable. Shapley is at least axiomatically well-defined even when approximated. Others don't have the fairness guarantee even at perfect computation.
+None is exactly computable. All are approximations. Shapley is at least axiomatically well-defined even when approximated; others lack the fairness guarantee even at perfect computation.
 
-## VibeSwap's disclosure
+## Disclosure discipline
 
 A transparent Shapley-distribution system should publish:
 
-1. The Shapley approximation strategy (Monte Carlo? Structured? Proxy?).
-2. The sampling budget (K for Monte Carlo).
-3. The estimated approximation error.
-4. The v(S) estimation method.
-5. The overall error bound.
+1. Shapley approximation strategy (Monte Carlo? Structured? Proxy?).
+2. Sampling budget (K for Monte Carlo).
+3. Estimated approximation error.
+4. v(S) estimation method.
+5. Overall error bound.
 
-This is the ship-time-verification-surface ([`memory/feedback_ship-time-verification-surface.md`](../memory/feedback_ship-time-verification-surface.md)) applied to distribution: don't claim precision you can't verify.
+VibeSwap's commitment: publish these openly alongside distribution results. Don't claim precision you can't verify.
 
-## Relationship to substrate incompleteness
+## Why this is OK
 
-[Substrate Incompleteness](./SUBSTRATE_INCOMPLETENESS.md): every mechanism has capture surfaces. One specific type of capture is numerical imprecision — small errors that compound across many distributions.
+Real cooperative production has its own natural variance. Two similar contributors doing similar work produce slightly different outcomes based on context, timing, mood. The "fair reward" is itself a distribution, not a point.
 
-Uncomputable marginal is a form of substrate incompleteness. We can reduce the error; we can't eliminate it.
+Monte Carlo error ≈ intrinsic variance of contribution outcomes. Beyond this, extra precision is wasted — computing to the millionth decimal when the real-world signal is noisy at the hundredth.
 
-## The iteration stability concern
+## For students
 
-Shapley approximation errors propagate through the fixed-point iteration ([Fairness Fixed Point](./THE_FAIRNESS_FIXED_POINT.md)). A 10% error per round compounds: 10 rounds could produce 30-40% cumulative drift if errors are correlated.
+Exercise: work through Shapley approximation for a small case.
 
-Mitigation: un-correlate error per round via Monte Carlo re-randomization. Still, the iteration's fixed point is a blurry region, not a sharp point.
+- N = 5 contributors, pool = $500.
+- Characteristic function: v({i}) = 100 for each i; v(pairs) = 200; v(triples) = 300; etc.
+- Compute exact Shapley by hand for each contributor.
+- Monte Carlo with K = 100 samples. What's the error?
+- Monte Carlo with K = 10 samples. What's the error?
 
-## Open research
+Compare to exact. Observe the trade-off between K and accuracy.
 
-1. **Better structured approximations** for specific cooperative-production forms (code contribution, design, governance).
-2. **Bayesian Shapley** — update posteriors over contributor Shapley values as new data arrives, rather than recomputing cold each round.
-3. **Differential Shapley** — compute the change in Shapley values between rounds efficiently instead of the absolute values.
+## Relationship to other primitives
 
-All three would improve the error bounds without requiring exponential compute.
+- **Parent**: [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md) — the foundation.
+- **Integration**: [Optimistic Shapley](./OPTIMISTIC_SHAPLEY.md) — Monte Carlo off-chain + challenge window on-chain.
+- **Related**: [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md) — v(S) estimation is one of five gaps.
 
 ## One-line summary
 
-*Exact Shapley is uncomputable at VibeSwap scale (exponential in N plus counterfactual v estimation); real-world Shapley is 5-30% approximation with honest error bounds. Fairness is a region, not a point — and that's OK as long as the region is narrower than contribution-outcome natural variance.*
+*Exact Shapley is doubly-uncomputable at VibeSwap scale — exponential in N (2^N subsets) AND requires counterfactual v(S) estimates per subset. Monte Carlo approximation with K = 1,000-10,000 samples gives 1-3% Shapley error; v(S) estimation adds 10-30% more. Total: 5-30% error per contributor. Fairness is a region (within ~10-30% of theoretical ideal), not a point.*

@@ -56,6 +56,8 @@ contract DecentralizedTribunal is
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
+    event EligibilityUpdated(uint256 prevMinReputation, uint256 prevMinLevel, uint256 currentMinReputation, uint256 currentMinLevel);
+
     // ============ Enums ============
 
     enum TrialPhase {
@@ -497,8 +499,11 @@ contract DecentralizedTribunal is
     }
 
     function setEligibility(uint256 _minReputation, uint256 _minLevel) external onlyOwner {
+        uint256 prevRep = minJurorReputation;
+        uint256 prevLevel = minJurorLevel;
         minJurorReputation = _minReputation;
         minJurorLevel = _minLevel;
+        emit EligibilityUpdated(prevRep, prevLevel, _minReputation, _minLevel);
     }
 
     function setSoulboundIdentity(address _soulboundIdentity) external onlyOwner {

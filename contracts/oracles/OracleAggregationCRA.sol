@@ -123,8 +123,31 @@ contract OracleAggregationCRA is
     // ============ Stub: commit/reveal/settle/slash ============
     // Implementations land in subsequent commits per cadence-restore rule.
 
-    function commitPrice(bytes32) external pure {
-        revert("not implemented");
+    function commitPrice(bytes32 commitHash) external nonReentrant {
+        require(commitHash != bytes32(0), "Zero hash");
+        require(_isAuthorizedIssuer(msg.sender), "Not registered issuer");
+
+        // Auto-advance: if current batch's commit window elapsed, open a new batch.
+        BatchData storage current = _batches[currentBatchId];
+        if (block.timestamp > current.commitDeadline) {
+            _openNewBatch();
+            current = _batches[currentBatchId];
+        }
+        require(current.phase == BatchPhase.COMMIT, "Not in commit phase");
+        require(_commits[currentBatchId][msg.sender] == bytes32(0), "Already committed");
+
+        _commits[currentBatchId][msg.sender] = commitHash;
+        _committers[currentBatchId].push(msg.sender);
+
+        emit PriceCommitted(currentBatchId, msg.sender, commitHash);
+    }
+
+    /// @dev Issuer authorization gate. Currently a permissive stub — full
+    /// integration with IssuerReputationRegistry lands in next commit.
+    function _isAuthorizedIssuer(address /*issuer*/) internal view returns (bool) {
+        // V1 permissive: any non-zero registry presence allows.
+        // Replaced with real registry check in next commit.
+        return issuerRegistry != address(0);
     }
 
     function revealPrice(uint256, uint256, bytes32) external pure {

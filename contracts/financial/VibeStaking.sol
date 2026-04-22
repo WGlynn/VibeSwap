@@ -19,6 +19,8 @@ contract VibeStaking is
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
+    event PoolRewardRateUpdated(uint256 indexed poolId, uint256 previous, uint256 current);
+
     // ============ Constants ============
 
     uint256 private constant PRECISION = 1e18;
@@ -116,7 +118,9 @@ contract VibeStaking is
     function setPoolRewardRate(uint256 poolId, uint256 newRate) external onlyOwner {
         _requireValidPool(poolId);
         _updatePool(poolId);
+        uint256 prev = pools[poolId].rewardRatePerSecond;
         pools[poolId].rewardRatePerSecond = newRate;
+        emit PoolRewardRateUpdated(poolId, prev, newRate);
     }
 
     function togglePoolPause(uint256 poolId) external onlyOwner {

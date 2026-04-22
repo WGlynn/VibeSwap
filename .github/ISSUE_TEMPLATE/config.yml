@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contribution Traceability Guide
+    url: https://github.com/wglynn/vibeswap/blob/master/DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md
+    about: "Read this before opening a blank issue. Every issue should carry a Source block — see the canonical templates above for the pre-filled format."
+  - name: Telegram community
+    url: https://t.me/+3uHbNxyZH-tiOGY8
+    about: "General discussion. When a thread yields something concrete, flag it to be captured into an issue with the Source field preserved."

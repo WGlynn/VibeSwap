@@ -1,0 +1,153 @@
+name: DAG Attribution Sweep
+
+# Scans merged commits for the canonical "DAG-ATTRIBUTION: pending" token and
+# surfaces a queue of unresolved attestations. The sweep is observational in V1 —
+# it doesn't mint. It writes .traceability/pending-attestations.json as a workflow
+# artifact and, on PRs whose HEAD commit carries "pending", posts a nudge comment.
+#
+# Background: DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md §Layer 4 (Tooling).
+
+on:
+  push:
+    branches: [master, 'feature/**']
+  pull_request:
+    branches: [master]
+  schedule:
+    # Every 6 hours — catches drift between merges.
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  sweep:
+    name: Scan for DAG-ATTRIBUTION pending
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan last 500 commits on the current ref
+        id: scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .traceability
+
+          # Collect commits that contain "DAG-ATTRIBUTION: pending".
+          # We scan the current ref's recent history (cap at 500 to bound runtime).
+          git log --format='%H %s' -500 > .traceability/.all-commits.txt
+
+          PENDING_FILE=.traceability/pending-attestations.json
+          echo '[]' > "$PENDING_FILE"
+
+          WORK_FILE=$(mktemp)
+          echo '[]' > "$WORK_FILE"
+
+          while read -r SHA SUBJECT; do
+              BODY=$(git log -1 --format='%B' "$SHA")
+              if echo "$BODY" | grep -qE '^DAG-ATTRIBUTION:[[:space:]]*pending[[:space:]]*$'; then
+                  # Extract the Closes #N reference (if any).
+                  ISSUE_NUM=$(echo "$BODY" | grep -oE 'Closes #[0-9]+' | head -1 | grep -oE '[0-9]+' || echo "")
+                  # Extract the SOURCE: line (if any).
+                  SOURCE_LINE=$(echo "$BODY" | grep -E '^SOURCE:' | head -1 | sed 's/^SOURCE:[[:space:]]*//' || echo "")
+                  AUTHOR=$(git log -1 --format='%an <%ae>' "$SHA")
+                  DATE=$(git log -1 --format='%cI' "$SHA")
+
+                  jq --arg sha "$SHA" \
+                     --arg subject "$SUBJECT" \
+                     --arg issue "$ISSUE_NUM" \
+                     --arg source "$SOURCE_LINE" \
+                     --arg author "$AUTHOR" \
+                     --arg date "$DATE" \
+                     '. += [{sha:$sha, subject:$subject, issue:$issue, source:$source, author:$author, date:$date}]' \
+                     "$WORK_FILE" > "$WORK_FILE.tmp"
+                  mv "$WORK_FILE.tmp" "$WORK_FILE"
+              fi
+          done < .traceability/.all-commits.txt
+
+          cp "$WORK_FILE" "$PENDING_FILE"
+          COUNT=$(jq 'length' "$PENDING_FILE")
+          echo "pending_count=${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Found ${COUNT} commits with DAG-ATTRIBUTION: pending."
+          jq . "$PENDING_FILE"
+
+      - name: Compute debt age (commits older than 14 days → TRACEABILITY-DEBT)
+        id: debt
+        shell: bash
+        run: |
+          set -euo pipefail
+          CUTOFF=$(date -u -d '14 days ago' +%s 2>/dev/null || date -u -v-14d +%s)
+          DEBT_COUNT=$(jq --arg cutoff "$CUTOFF" \
+              '[.[] | select((.date | fromdateiso8601) < ($cutoff | tonumber))] | length' \
+              .traceability/pending-attestations.json)
+          echo "debt_count=${DEBT_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "Debt entries (pending > 14 days): ${DEBT_COUNT}"
+
+      - name: Upload pending-attestations artifact
+        if: steps.scan.outputs.pending_count != '0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pending-attestations
+          path: .traceability/pending-attestations.json
+          retention-days: 90
+
+      - name: Nudge PR author when HEAD commit is pending
+        if: github.event_name == 'pull_request' && steps.scan.outputs.pending_count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const pending = JSON.parse(fs.readFileSync('.traceability/pending-attestations.json', 'utf8'));
+            const headSha = context.payload.pull_request.head.sha;
+            const match = pending.find(p => p.sha === headSha);
+            if (!match) return;
+
+            const body = [
+              '### 🔖 DAG Attribution pending for this commit',
+              '',
+              `The HEAD commit \`${match.sha.slice(0, 12)}\` carries \`DAG-ATTRIBUTION: pending\`. This is fine — it means the on-chain attestation will be minted out-of-band — but the closed loop is open until the mint lands and the closing comment on the linked issue is posted.`,
+              '',
+              '**Next steps** (after merge):',
+              `1. Run \`scripts/mint-attestation.sh ${match.issue || '<issue-number>'} ${match.sha.slice(0, 12)}\``,
+              '2. Copy the generated closing-comment markdown to the linked issue.',
+              '3. Confirm the attestation ID is recorded.',
+              '',
+              `Source (from commit): \`${match.source || '<missing — check the linked issue body>'}\``,
+              '',
+              '<sub>See DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md for the full loop spec. This nudge is observational, not a block.</sub>',
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+
+      - name: Fail softly if traceability debt exceeds threshold
+        if: steps.debt.outputs.debt_count != '0'
+        shell: bash
+        run: |
+          DEBT=${{ steps.debt.outputs.debt_count }}
+          echo "::warning::Traceability debt: ${DEBT} commits with DAG-ATTRIBUTION: pending older than 14 days."
+          echo "::warning::Surface these to memory/project_rsi-backlog.md as TRACEABILITY-DEBT-N rows."
+          # V1 is observational — do not fail the run. V2 may flip to hard-fail once the mint loop is automated.
+
+      - name: Sweep summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### DAG Attribution Sweep"
+            echo ""
+            echo "- Pending commits (scanned last 500): **${{ steps.scan.outputs.pending_count }}**"
+            echo "- Traceability debt (>14 days): **${{ steps.debt.outputs.debt_count }}**"
+            echo ""
+            echo "See \`DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md\` for the canonical loop."
+          } >> "$GITHUB_STEP_SUMMARY"

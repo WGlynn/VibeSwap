@@ -120,4 +120,78 @@ contract OracleAggregationCRATest is Test {
         IOracleAggregationCRA.BatchInfo memory info = agg.getBatch(2);
         assertEq(info.commitCount, 1);
     }
+
+    // ============ Reveal Phase ============
+
+    function _commitAndAdvanceToReveal(address[] memory issuers, uint256[] memory prices, bytes32[] memory nonces) internal {
+        for (uint256 i = 0; i < issuers.length; i++) {
+            vm.prank(issuers[i]);
+            agg.commitPrice(_commitHash(prices[i], nonces[i]));
+        }
+        // Advance past commit deadline into reveal window
+        vm.warp(block.timestamp + agg.COMMIT_PHASE_DURATION() + 1);
+    }
+
+    function test_revealPrice_happy() public {
+        address[] memory issuers = new address[](1);
+        uint256[] memory prices = new uint256[](1);
+        bytes32[] memory nonces = new bytes32[](1);
+        issuers[0] = issuer1;
+        prices[0] = 1500e18;
+        nonces[0] = bytes32(uint256(42));
+
+        _commitAndAdvanceToReveal(issuers, prices, nonces);
+
+        vm.prank(issuer1);
+        agg.revealPrice(1, 1500e18, bytes32(uint256(42)));
+
+        IOracleAggregationCRA.BatchInfo memory info = agg.getBatch(1);
+        assertEq(info.revealCount, 1);
+        assertEq(uint256(info.phase), uint256(IOracleAggregationCRA.BatchPhase.REVEAL));
+    }
+
+    function test_revealPrice_revertHashMismatch() public {
+        address[] memory issuers = new address[](1);
+        uint256[] memory prices = new uint256[](1);
+        bytes32[] memory nonces = new bytes32[](1);
+        issuers[0] = issuer1;
+        prices[0] = 1500e18;
+        nonces[0] = bytes32(uint256(42));
+
+        _commitAndAdvanceToReveal(issuers, prices, nonces);
+
+        // Wrong price — hash won't match
+        vm.prank(issuer1);
+        vm.expectRevert(bytes("Hash mismatch"));
+        agg.revealPrice(1, 9999e18, bytes32(uint256(42)));
+    }
+
+    function test_revealPrice_revertStillInCommitPhase() public {
+        bytes32 ch = _commitHash(1500e18, bytes32(uint256(1)));
+        vm.prank(issuer1);
+        agg.commitPrice(ch);
+
+        // No time advance — still in commit phase
+        vm.prank(issuer1);
+        vm.expectRevert(bytes("Still in commit phase"));
+        agg.revealPrice(1, 1500e18, bytes32(uint256(1)));
+    }
+
+    function test_revealPrice_revertDoubleReveal() public {
+        address[] memory issuers = new address[](1);
+        uint256[] memory prices = new uint256[](1);
+        bytes32[] memory nonces = new bytes32[](1);
+        issuers[0] = issuer1;
+        prices[0] = 1500e18;
+        nonces[0] = bytes32(uint256(42));
+
+        _commitAndAdvanceToReveal(issuers, prices, nonces);
+
+        vm.prank(issuer1);
+        agg.revealPrice(1, 1500e18, bytes32(uint256(42)));
+
+        vm.prank(issuer1);
+        vm.expectRevert(bytes("Already revealed"));
+        agg.revealPrice(1, 1500e18, bytes32(uint256(42)));
+    }
 }

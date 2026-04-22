@@ -82,26 +82,23 @@ Observation: when your mind is lightly loaded, you remember almost everything. W
 
 This is the convex pattern. α ≈ 1.4-1.7 empirically. Matches Ebbinghaus and modern replications.
 
-## Why VibeSwap's NCI currently has a bug here
+## Why VibeSwap's NCI currently has a gap here (reconciled 2026-04-23)
 
-The NCI (Nakamoto Consensus Infinity) has a retention-weight function. Currently it's LINEAR in time:
+**Earlier drafts said NCI applies linear retention `base - k × t`. Verification against the contract shows no time-decay is applied at all — `cumulativePoW` is monotone-cumulative and `mindScore` is refresh-on-demand.**
 
-```
-retentionWeight(t) = base - k × t
-```
+The real gap is: ABSENT. Where cognitive substrate demands convex retention on the work-and-mind pillars, NCI has nothing.
 
-This doesn't match cognition's actual convex pattern. Linear retention means:
-- Early mind-scores decay at the same rate as late mind-scores.
-- No phase transition (no "knee").
-- Retention of old mind-scores stays linear, doesn't drop off sharply when system load is high.
-
-Per [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1, the fix is to make this convex:
+The fix per [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1 is to add convex decay where it belongs (PoW and PoM — not PoS, since stake is present-tense locked capital, not a historical record):
 
 ```
 retentionWeight(t) = base × (1 - (t/T)^α)
 ```
 
-with α ≈ 1.6. This matches cognitive substrate geometry.
+with α ≈ 1.6. This matches cognitive substrate geometry per paper §6.4.
+
+### Shipped C40 (2026-04-23)
+
+Pure primitive `calculateRetentionWeight(elapsedSec, horizonSec)` landed in NCI with α hardcoded at 1.6 via cubic polynomial approximation. Returns basis-points weight; max ~3% error vs exact. Not yet wired into per-pillar weight recompute — see [NCI_WEIGHT_FUNCTION.md](./NCI_WEIGHT_FUNCTION.md#shipped-c40-2026-04-23) for the six design decisions gating integration (C40b).
 
 ## Worked example — the linear-vs-convex difference
 

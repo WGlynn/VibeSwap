@@ -231,11 +231,43 @@ Validators with large stake (high PoS weight) but no active participation.
 
 Mitigation: active-validator requirement. `totalActiveWeight` tracking only counts actively-participating validators. Absentees lose active status over time.
 
-## Gap #1 in ETM Alignment Audit
+## Gap #1 in ETM Alignment Audit — reconciled 2026-04-23
 
-Current retention-weight function uses linear decay. [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1 says this should be convex (state-rent-like) with α ≈ 1.6.
+**Earlier drafts of this doc (and [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md), and [`ETM_BUILD_ROADMAP.md`](./ETM_BUILD_ROADMAP.md)) asserted that NCI currently applies linear time-decay: `retentionWeight(t) = base - k × t`. Verification against the contract contradicts that.**
 
-This is separate from the NCI weight function itself. The weight function combines pillars; retention-decay is a time-modifier applied to each pillar's cumulative. Current implementation linear; target convex. Fix planned for C40.
+Actual on-chain state in `contracts/consensus/NakamotoConsensusInfinity.sol`:
+- `cumulativePoW` is monotone-cumulative. No time-decay applied.
+- `mindScore` is refresh-on-demand via `refreshMindScore()`. No time-decay applied.
+- `stakedVibe` is linear in stake. No time-decay applied (and should not have one — active capital, not historical record).
+- `totalActiveWeight` is an O(1) running total; no time-decay sweep exists.
+
+So the gap is not "linear → convex." It's "retention not implemented; add convex where cognitive substrate demands it."
+
+The confusion was load-bearing for a reason — it matters WHERE retention belongs. Not every pillar needs it:
+- **PoW should decay**: cognitive parallel is mined-work-as-proof; relevance fades with time.
+- **PoM should decay**: cognitive parallel is attention-to-prior-contributions; the exact substrate Ebbinghaus measured.
+- **PoS should NOT decay**: stake is present-tense locked capital. Decay would double-count slashing/unbonding.
+
+Retention is a PoW-and-PoM primitive, not a universal weight modifier.
+
+### Shipped C40 (2026-04-23)
+
+- **Pure primitive landed**: `calculateRetentionWeight(uint256 elapsedSec, uint256 horizonSec)` — returns retention in basis points (0 = fully decayed, 10000 = fresh).
+- **α = 1.6 hardcoded** (paper §6.4). Implemented via cubic polynomial approximation `0.1744·x + 1.116·x² − 0.2904·x³`, max error ~3% vs exact `x^1.6` on [0, 1].
+- **Governance-tunable α deferred** to C40c. When a real tuning need appears, the polynomial is swapped for a general-α formulation.
+
+### Not yet wired (deferred to C40b)
+
+The pure function is a CORRECTNESS-PROOF primitive. It is not yet called from `_recalculateWeights`. Wiring it into per-pillar weight computation requires six design decisions:
+
+1. Decay anchor — per-validator `lastHeartbeat`, per-PoW-submission timestamp, per-mindScore-refresh timestamp?
+2. Per-pillar timestamp storage (bloats `Validator` struct).
+3. Apply at query-time (view function) or persist during weight recompute?
+4. Horizon T per-pillar or global? (Paper §6.4 suggests 365 days for PoM; PoW unspecified.)
+5. `totalActiveWeight` O(1) invariant interaction — time-varying weight breaks O(1) unless queried-lazily.
+6. Governance migration path — existing validators retroactively subject to decay, or grandfathered?
+
+C40b lands when these six are decided. Until then, the pure primitive is callable (for off-chain analytics and future integration).
 
 ## Relationship to Shapley
 

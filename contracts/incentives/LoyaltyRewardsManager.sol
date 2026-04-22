@@ -22,6 +22,9 @@ contract LoyaltyRewardsManager is
 {
     using SafeERC20 for IERC20;
 
+    event IncentiveControllerUpdated(address indexed previous, address indexed current);
+    event TreasuryUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant BPS_PRECISION = 10000;
@@ -446,12 +449,16 @@ contract LoyaltyRewardsManager is
 
     function setIncentiveController(address _controller) external onlyOwner {
         if (_controller == address(0)) revert ZeroAddress();
+        address prev = incentiveController;
         incentiveController = _controller;
+        emit IncentiveControllerUpdated(prev, _controller);
     }
 
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert ZeroAddress();
+        address prev = treasury;
         treasury = _treasury;
+        emit TreasuryUpdated(prev, _treasury);
     }
 
     // ============ UUPS ============

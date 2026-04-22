@@ -42,6 +42,8 @@ contract FractalShapley is
 {
     using SafeERC20 for IERC20;
 
+    event MinAttestationsUpdated(uint256 previous, uint256 current);
+
     // ============ Constants ============
 
     uint256 public constant PRECISION = 1e18;
@@ -415,7 +417,9 @@ contract FractalShapley is
 
     /// @notice Update minimum attestations required
     function setMinAttestations(uint256 _min) external onlyOwner {
+        uint256 prev = minAttestations;
         minAttestations = _min;
+        emit MinAttestationsUpdated(prev, _min);
     }
 
     // ============ Internal ============

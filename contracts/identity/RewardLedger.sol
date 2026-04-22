@@ -33,6 +33,9 @@ import "./interfaces/IContributionDAG.sol";
  * @dev Non-upgradeable. Pull-pattern claims.
  */
 contract RewardLedger is IRewardLedger, Ownable, ReentrancyGuard {
+    event ContributionDAGUpdated(address indexed previous, address indexed current);
+    event RewardTokenUpdated(address indexed previous, address indexed current);
+
     using SafeERC20 for IERC20;
 
     // ============ Constants (from SHAPLEY_CONFIG) ============
@@ -292,13 +295,17 @@ contract RewardLedger is IRewardLedger, Ownable, ReentrancyGuard {
     /// @notice Update the ContributionDAG address
     function setContributionDAG(address _dag) external onlyOwner {
         if (_dag == address(0)) revert ZeroAddress();
+        address prev = address(contributionDAG);
         contributionDAG = IContributionDAG(_dag);
+        emit ContributionDAGUpdated(prev, _dag);
     }
 
     /// @notice Update the reward token address
     function setRewardToken(address _token) external onlyOwner {
         if (_token == address(0)) revert ZeroAddress();
+        address prev = address(rewardToken);
         rewardToken = IERC20(_token);
+        emit RewardTokenUpdated(prev, _token);
     }
 
     // ============ Internal: Shapley Distribution ============

@@ -30,6 +30,8 @@ contract PriorityRegistry is
     OwnableUpgradeable,
     UUPSUpgradeable
 {
+    event AuthorizedRecorderUpdated(address indexed recorder, bool previous, bool current);
+
     // ============ Enums ============
 
     enum Category {
@@ -275,7 +277,9 @@ contract PriorityRegistry is
     // ============ Admin ============
 
     function setAuthorizedRecorder(address recorder, bool authorized) external onlyOwner {
+        bool prev = authorizedRecorders[recorder];
         authorizedRecorders[recorder] = authorized;
+        emit AuthorizedRecorderUpdated(recorder, prev, authorized);
     }
 
     // ============ UUPS ============

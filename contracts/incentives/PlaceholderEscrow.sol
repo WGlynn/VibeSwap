@@ -40,6 +40,8 @@ contract PlaceholderEscrow is
 {
     using SafeERC20 for IERC20;
 
+    event PairwiseVerifierUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant GOVERNANCE_APPROVAL_THRESHOLD = 6600; // 66% supermajority
@@ -161,7 +163,9 @@ contract PlaceholderEscrow is
     }
 
     function setPairwiseVerifier(address _pairwiseVerifier) external onlyOwner {
+        address prev = pairwiseVerifier;
         pairwiseVerifier = _pairwiseVerifier;
+        emit PairwiseVerifierUpdated(prev, _pairwiseVerifier);
     }
 
     // ============ Identity Registration ============

@@ -1,175 +1,255 @@
 # Cooperative Emergence Threshold
 
-**Status**: Research memo. When cooperative intelligence emerges from VibeSwap's mechanism set — can we derive a critical-mass parameter?
-**Depth**: Complex-systems analysis with concrete VibeSwap predictions.
-**Related**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), [Augmented Mechanism Design](./AUGMENTED_MECHANISM_DESIGN.md), [The Fairness Fixed Point](./THE_FAIRNESS_FIXED_POINT.md).
+**Status**: Research memo with specific 9-15 month projection.
+**Audience**: First-encounter OK. Each parameter walked with concrete state.
 
 ---
 
+## Start with an observation about scale
+
+If you put 5 people in a room, they can have a conversation. Decisions get made by agreement.
+
+Put 50 people in the same room, decisions get made by small groups dominating while others watch.
+
+Put 500 people, chaos. No coherent decisions emerge.
+
+Something happens between 5 and 50. And something else between 50 and 500. These transitions aren't continuous — they're phase transitions.
+
+This doc is about VibeSwap's analogous phase transition. When does cooperative intelligence EMERGE from the mechanism set? Below the threshold, the protocol executes but the collective doesn't have emergent properties. Above it, the collective exhibits self-correcting, routing, coordinating behaviors no individual has.
+
 ## The question
 
-At what system size does VibeSwap transition from "a set of contracts some people use" to "a coordination primitive that behaves intelligently at the collective level"?
+If VibeSwap has 100 contributors, does "cooperative intelligence" exist?
 
-This is a phase-transition question. Below the threshold, the mechanisms execute but the collective behavior is no better than uncoordinated individual action. Above it, the collective behaves as if it knows things no individual participant knows — routing capital, surfacing insight, self-correcting when gamed.
+With 1,000? 10,000?
 
-If we can estimate the threshold, we can:
-- Predict when VibeSwap's claimed advantages become real (rather than theoretical).
-- Target bootstrap strategy to reach the threshold efficiently.
-- Recognize if we're approaching vs. stuck-below.
+What ABOUT the 100 vs 1,000 transition makes the emergence occur?
 
-## Why threshold exists
+## The Santa Fe research
 
-Santa Fe Institute-style research on coordination (Miller, Page, Scott, others) has empirically identified a pattern: cooperative systems exhibit a phase transition at which collective intelligence emerges. Below the transition, the system is the sum of its parts. Above it, the whole exhibits properties no single part has.
+Complex-systems research (Santa Fe Institute, Ostrom, Page, Axelrod, Scott) has identified a pattern: cooperative systems exhibit phase transitions. Below the transition, system = sum of parts. Above, whole > sum of parts.
 
-The transition depends on:
-- **Connectivity**: how densely interconnected participants are.
-- **Heterogeneity**: how diverse participant types, strategies, or information are.
-- **Feedback speed**: how quickly the system's current state propagates to new decisions.
-- **Institutional fit**: whether the coordination mechanism matches the substrate's geometry.
+The transition depends on four parameters:
 
-VibeSwap can quantify each of these. The question is whether the numerical values have crossed thresholds empirically observed in comparable systems.
+1. **Connectivity** — how densely interconnected participants are.
+2. **Heterogeneity** — how diverse participant types / strategies / information are.
+3. **Feedback speed** — how fast system state propagates to new decisions.
+4. **Institutional fit** — how well coordination mechanism matches substrate.
 
-## VibeSwap's four parameters
+Each parameter has an empirically-observed threshold. Below threshold, emergence doesn't fire. Above, it does.
 
-### 1. Connectivity
+Meeting 3 of 4 produces degraded coordination (some emergence, some not). Meeting all 4 produces full phase transition.
 
-Measured as: median trust-graph degree in `ContributionDAG`. How many other contributors does the average contributor have handshakes with?
+## Walk through each parameter
 
-- **Critical value**: empirical studies suggest median degree ≥ 5 for small-world coordination properties to emerge.
-- **Current state** (2026-04-22): bootstrap phase. Median degree is probably 1-3. Below threshold.
-- **To reach**: conscious handshake facilitation early; curation rather than random connection.
+Let me apply each to VibeSwap's current state.
 
-### 2. Heterogeneity
+### Parameter 1 — Connectivity
 
-Measured as: entropy of contribution-type distribution. Are contributors all doing the same thing (Code only) or spread across the 9 ContributionTypes (Code, Design, Research, Community, Marketing, Security, Governance, Inspiration, Other)?
+**Measure**: median trust-graph degree in ContributionDAG — how many handshakes per average contributor.
 
-- **Critical value**: Shannon entropy ≥ 2.5 bits across contribution types. Requires meaningful presence of at least 5-6 types.
-- **Current state**: Code and Research dominate. Entropy probably 1.5-2.0 bits. Below threshold.
-- **To reach**: deliberate [Non-Code Proof of Work](./NON_CODE_PROOF_OF_WORK.md) outreach — recruit designers, audit specialists, governance thinkers, community operators.
+**Critical value**: median degree ≥ 5. Below this, small-world coordination properties don't emerge. Above, they do.
 
-### 3. Feedback speed
+**Current state (2026-04-22)**: bootstrap phase. Median degree probably 1-3. **BELOW threshold.**
 
-Measured as: time from contribution → attestation → reward distribution → future-contribution incentive. How fast does the system's current state propagate to new decisions?
+**To reach threshold**: conscious handshake facilitation. Onboarding pairs new contributors with existing ones. Events that produce handshakes. 12-18 months at current recruitment pace.
 
-- **Critical value**: feedback loop ≤ 1 week for behavioral adjustment to occur within typical cooperative-production horizons.
-- **Current state**: ContributionAttestor claimTTL = 1 day; tribunal escalation adds days; governance escalation adds weeks. Average happy-path feedback < 1 week. **Above threshold.**
-- **Risk**: escalation paths can dramatically extend feedback when invoked. Need to ensure escalation is rare.
+**Gap analysis**: we need ~3x growth in handshake density. Achievable.
 
-### 4. Institutional fit
+### Parameter 2 — Heterogeneity
 
-Measured as: degree to which mechanisms match substrate geometry. [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) + [Correspondence Triad](./CORRESPONDENCE_TRIAD.md) compliance.
+**Measure**: Shannon entropy of contribution-type distribution. 9 possible types (Code, Design, Research, Community, Marketing, Security, Governance, Inspiration, Other).
 
-- **Critical value**: no hard threshold; qualitatively — "every mechanism has passed the Triad gate."
-- **Current state**: ~80% of mechanisms pass the Triad; some inherited ones (linear NCI retention, see [ETM Build Roadmap Gap #1](./ETM_BUILD_ROADMAP.md)) are still substrate-mismatched.
-- **To reach**: ship the Roadmap gap fixes; audit remaining mechanisms; iterate until Triad compliance is universal.
+**Critical value**: Shannon entropy ≥ 2.5 bits. Requires meaningful presence of 5-6 types each.
 
-## The composite threshold
+**Current state**: Code + Research + Inspiration dominate. Entropy probably 1.5-2.0 bits. **BELOW threshold.**
 
-Emergence requires all four parameters to cross their thresholds simultaneously. Meeting three out of four produces a degraded coordination (some properties emerge, others don't). Meeting all four produces the full phase transition.
+**Concrete gap**: Design, Security, Community, Governance need more active contributors. Need targeted outreach to specific communities (design DAOs, audit firms, DAO-governance-experienced contributors).
 
-VibeSwap's current state (2026-04-22): **1 of 4** parameters above threshold (feedback speed). 3 below.
+**To reach threshold**: 9-15 months with deliberate effort.
 
-This is the bootstrap phase. The protocol executes; users interact; mechanisms fire. But the collective intelligence hasn't yet emerged.
+### Parameter 3 — Feedback speed
 
-## Predicted emergence timeline
+**Measure**: time from contribution → attestation → reward distribution → future-contribution incentive.
 
-Assuming current trajectory:
+**Critical value**: feedback loop ≤ 1 week.
 
-- **Connectivity** reaches threshold when active contributors ~100-200 with healthy handshake density. Estimate 6-12 months at current rate.
-- **Heterogeneity** reaches threshold when 5+ contribution types have ≥10% of attestations each. Estimate 9-15 months; depends on targeted outreach.
-- **Feedback speed** is already at threshold. Maintaining this requires keeping escalation rare.
-- **Institutional fit** reaches threshold when all flagged Roadmap gaps are shipped + audited. Estimate 3-6 months.
+**Current state**: 
+- ContributionAttestor claimTTL = 1 day.
+- Happy-path attestation: hours to a day.
+- Tribunal escalation: days.
+- Governance escalation: weeks.
+- Average happy-path feedback: < 1 week.
 
-Composite: **9-15 months** from 2026-04-22 to full emergence, if we execute. Earlier if outreach accelerates; later if contributor count plateaus.
+**Result**: **ABOVE threshold** (for happy path).
 
-## What "emergence" looks like in practice
+**Risk**: escalation paths can extend feedback dramatically. Need to ensure escalation remains rare.
+
+### Parameter 4 — Institutional fit
+
+**Measure**: degree to which mechanisms match substrate geometry. [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) compliance + [Correspondence Triad](./CORRESPONDENCE_TRIAD.md) compliance.
+
+**Critical value**: qualitative — every mechanism passes the Triad gate.
+
+**Current state**: ~80% of mechanisms pass. Some inherited (linear NCI retention) don't. ETM Build Roadmap Gaps 1-3 address these.
+
+**To reach threshold**: 3-6 months if Roadmap gaps ship on cadence.
+
+### Composite
+
+Current state: 1 of 4 parameters above threshold (feedback speed). 3 below.
+
+Bootstrap phase. Protocol executes; collective doesn't yet have emergent properties.
+
+## The emergence timeline
+
+Assuming current trajectory, realistic estimates:
+
+| Parameter | Current state | Target reach |
+|---|---|---|
+| Connectivity | ~30% of threshold | 12-18 months |
+| Heterogeneity | ~50% of threshold | 9-15 months |
+| Feedback speed | ABOVE | — (maintain) |
+| Institutional fit | ~80% | 3-6 months |
+
+Earliest full threshold crossing: **9-15 months** from 2026-04-22.
+
+Earlier if outreach accelerates. Later if contributor count plateaus.
+
+## What emergence looks like in practice
 
 Once the four parameters cross threshold, observable phenomena:
 
-- **Self-correcting drift**: someone proposes an extractive mechanism; the community surfaces the extraction via multiple independent attestations before the proposal reaches governance.
-- **Cross-substrate routing**: a contributor who specializes in Design gets credited for enabling Security outcomes they didn't implement but whose attention-framing prevented the need for.
-- **Gaming resistance**: attempts to game attestations fail because multiple attestation branches converge on gaming-awareness.
-- **Knowledge compounding**: later contributors routinely reference earlier work explicitly; the DAG develops visible lineage depth.
-- **Novel mechanism suggestions**: community proposes mechanism refinements that the core team hadn't considered; some are adopted.
+### Self-correcting drift
 
-Before the transition, none of these reliably occur. After the transition, they become the default mode of operation.
+Someone proposes an extractive mechanism. The community surfaces the extraction via multiple independent attestations BEFORE the proposal reaches governance. The system recognizes the threat without central coordination.
 
-## The critical-mass mobilization strategy
+### Cross-substrate routing
 
-Given the ~9-15 month timeline, what should bootstrap strategy focus on?
+A contributor who specializes in Design gets credited for enabling Security outcomes they didn't implement but whose attention-framing prevented the need for.
 
-### Phase 1 (now – 3 mo): institutional fit
+### Gaming resistance
+
+Attempts to game attestations fail because multiple attestation branches converge on gaming-awareness. Attacker gets detected, not rewarded.
+
+### Knowledge compounding
+
+Later contributors routinely reference earlier work explicitly. DAG develops visible lineage depth. Ideas that would have been forgotten are preserved via lineage.
+
+### Novel mechanism suggestions
+
+Community proposes mechanism refinements that core team hadn't considered. Some are adopted. Contribution extends beyond what the founding team envisioned.
+
+Before the transition, NONE of these reliably occur. After, they become default operating mode.
+
+## Bootstrap strategy for the 9-15 month window
+
+### Phase 1 (now – 3 months) — Institutional fit
 
 Ship Roadmap gap fixes (C40-C43). Bring mechanism set to Triad compliance. This is prerequisite — emergent coordination doesn't emerge on mis-fitted mechanisms.
 
-### Phase 2 (3-6 mo): heterogeneity
+### Phase 2 (3-6 months) — Heterogeneity
 
-Recruit across contribution types. Not "more Code contributors" but "Design + Research + Security contributors". [Non-Code Proof of Work](./NON_CODE_PROOF_OF_WORK.md) argues that PoM makes this economically viable; now it has to happen operationally.
+Recruit across contribution types. Not "more Code contributors" but "Design + Research + Security + Governance contributors." Targeted outreach to:
+- Design DAOs (Frontier Foundation, etc.)
+- Audit firms (Sigma Prime, Trail of Bits, Zellic).
+- DAO-governance-experienced folks (Aragon community, DAOhaus).
 
-Key: deliberate outreach to 2-3 communities with high-type-density (e.g., design community for UI/UX, security community for audits, governance community for proposal work).
+### Phase 3 (6-9 months) — Connectivity
 
-### Phase 3 (6-9 mo): connectivity
+Facilitate handshakes systematically. Not left to chance.
 
-Facilitate handshakes systematically. Don't leave it to chance. Conversation events, working-group formation, explicit introduction protocols. The handshake graph needs to become dense; this requires institutional effort.
+Tactics:
+- Working-group formation around specific topics.
+- Regular community calls producing introductions.
+- Explicit "onboarding pair" protocol for new contributors.
+- Events (hackathons, conferences) that create handshake opportunities.
 
-### Phase 4 (9-12 mo): emergence
+### Phase 4 (9-12 months) — Emergence
 
-All four parameters approaching threshold. Watch for emergence phenomena; respond to them. Resist premature optimizations that could push parameters back below threshold.
+All four parameters approaching threshold. Watch for emergence phenomena; respond to them.
 
-### Phase 5 (12-15 mo): consolidation
+Resist premature optimizations that could push parameters back below threshold.
 
-Emergence phenomena stable. System now has collective-intelligence properties. Mechanism refinement at this point is about improving efficiency, not triggering emergence.
+### Phase 5 (12-15 months) — Consolidation
+
+Emergence phenomena stable. System has collective-intelligence properties.
+
+Mechanism refinement shifts from "trigger emergence" to "improve efficiency."
 
 ## What could prevent emergence
 
+Four specific risks:
+
 ### Trap 1 — Premature scaling
 
-Adding many contributors without connectivity or heterogeneity just increases N without crossing the thresholds. Emergence doesn't fire.
+Growing contributor count without growing connectivity or heterogeneity. Result: N increases but parameters 1, 2 stay below threshold.
 
-Mitigation: resist growth-for-growth's-sake metrics. Prioritize connectivity and heterogeneity over headcount.
+Mitigation: resist growth-for-growth's-sake metrics. Prioritize connectivity + heterogeneity over headcount.
 
 ### Trap 2 — Single-type dominance
 
-If Code contributors continue to dominate, entropy stays low, heterogeneity threshold unreached. The protocol looks like a DEX with extra credit rather than a coordination primitive.
+Code contributors continue to dominate. Entropy stays low. Heterogeneity threshold unreached.
 
-Mitigation: actively credit non-Code contributions; publicize high-profile non-Code contributor stories; balance team's own contribution types.
+Mitigation: actively credit non-Code contributions. Publicize non-Code contributor stories. Balance the team's own contribution types.
 
 ### Trap 3 — Mechanism drift
 
-If Triad compliance slips (new mechanism passes audit but distorts substrate), institutional fit degrades. Below-threshold institutional fit makes other emergence signals noisy.
+Triad compliance slips. New mechanisms pass audit but distort substrate. Institutional fit degrades.
 
-Mitigation: ongoing ETM alignment audits; Triad gate as hard requirement.
+Mitigation: ongoing ETM alignment audits. Triad gate as hard requirement for new mechanisms.
 
 ### Trap 4 — Economic constraint
 
-If contributors can't afford to work on VibeSwap while waiting for emergence-driven payouts, they leave. Phase 1-3 requires sustained contributor engagement.
+Contributors can't afford to work on VibeSwap while waiting for emergence-driven payouts. They leave.
 
-Mitigation: deploy some initial liquidity to seed contribution rewards; use founder allocations to front-load the compensation curve.
+Mitigation: deploy initial liquidity to seed contribution rewards. Use founder allocations to front-load the compensation curve.
 
-## The threshold and ETM
+## The cognitive parallel
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive intelligence is also a phase-transition phenomenon — individual neurons don't think, networks of neurons do. The transition depends on connectivity, heterogeneity, feedback speed, and institutional fit within the brain substrate.
+Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive intelligence is also a phase-transition phenomenon. Individual neurons don't think; networks of neurons do.
 
-The ETM claim: the same transition dynamics operate on-chain. VibeSwap's cooperative emergence is the chain-substrate version of the cognitive-substrate's intelligence emergence. Understanding one informs the other.
+The transition in cognition depends on connectivity, heterogeneity, feedback speed, and institutional fit within the brain substrate. Same 4-parameter framework.
 
-This implies: if we know from cognitive science how to cross the threshold (and it's an extensively-studied problem in human coordination), we can apply those learnings to on-chain coordination.
+If cognitive science knows how to cross the threshold (and it does — extensively studied), we can apply the learnings on-chain.
 
-## Relationship to "critical mass" in network effects
+## Quality over quantity
 
-Classical network-effects theory has a simpler critical mass: Metcalfe's Law says value scales quadratically with participants. But Metcalfe doesn't distinguish quality — more participants are more value regardless.
+Network-effects theory (Metcalfe's Law): value scales with N². More participants = more value.
 
-Emergence-threshold theory is stronger: more participants are not enough; connectivity + heterogeneity + feedback speed + institutional fit are required. A VibeSwap with 10,000 homogeneous shallow-handshake users might not emerge; a VibeSwap with 500 heterogeneous deeply-handshake'd users likely would.
+But Metcalfe doesn't distinguish quality. More participants are more value regardless.
+
+Emergence-threshold theory is stronger: more participants aren't enough. Connectivity + heterogeneity + feedback + institutional-fit are REQUIRED.
+
+A VibeSwap with 10,000 homogeneous shallow-handshake users might not emerge.
+A VibeSwap with 500 heterogeneous deep-handshake users WOULD emerge.
 
 Quality over quantity, with specific mechanics determining quality.
 
+## For students
+
+Exercise: identify a coordination system you're familiar with (team, club, company). For each of the 4 parameters:
+
+1. What's its current state?
+2. Has the system crossed the threshold?
+3. Do you observe emergence phenomena?
+
+Apply to academic departments, open-source projects, company departments, etc. Observe: emergence is rare. Most systems stay below threshold.
+
+## Relationship to other primitives
+
+- **Depends on**: [Correspondence Triad](./CORRESPONDENCE_TRIAD.md) (for Parameter 4).
+- **Feeds**: [The Community Bootstrap Playbook](./THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.md) (operational tactics).
+- **Grounded in**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) (cognitive emergence parallel).
+
 ## Open research
 
-1. **Empirical calibration**: what are the actual threshold values for the four parameters? Draw on coordination studies from Ostrom, Elinor; Page, Scott; Axelrod, Robert; etc.
-2. **Gradient indicators**: are there leading indicators that predict emergence (e.g., trust-graph clustering coefficient, contribution-type entropy trend)?
-3. **Threshold interactions**: do the four parameters have interaction effects? (Could high connectivity compensate for low heterogeneity, or are the thresholds independent?)
+1. **Empirical calibration** — what ARE the actual threshold values for VibeSwap specifically?
+2. **Gradient indicators** — leading indicators (clustering coefficient, contribution-type entropy trend) that predict approach to threshold?
+3. **Parameter interactions** — can high connectivity compensate for low heterogeneity, or are thresholds independent?
 
-These research directions will inform bootstrap strategy over the next 12 months.
+Each is research direction. Data from the 9-15 month bootstrap will inform.
 
 ## One-line summary
 
-*Cooperative intelligence emerges at a threshold — VibeSwap currently meets 1/4 parameters (feedback speed); reaching the other 3 (connectivity, heterogeneity, institutional fit) is the 9-15 month bootstrap challenge. Quality over quantity; deliberate cultivation, not viral growth.*
+*Cooperative intelligence emerges at a phase transition (Santa Fe lineage). Four parameters with empirically-observed thresholds: connectivity (median degree ≥ 5), heterogeneity (Shannon entropy ≥ 2.5 bits), feedback speed (≤ 1 week), institutional fit (mechanisms pass Triad). VibeSwap currently: 1/4 above (feedback speed). Emergence timeline 9-15 months with deliberate bootstrap. Four traps to avoid. Quality > quantity; Metcalfe's Law insufficient.*

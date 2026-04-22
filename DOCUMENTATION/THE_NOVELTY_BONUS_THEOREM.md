@@ -1,119 +1,234 @@
 # The Novelty Bonus Theorem
 
-**Status**: Formal argument. Why early contributors need super-linear rewards to counter late free-riding.
+**Status**: Formal argument with worked numeric example.
+**Audience**: First-encounter OK. Numbers walked end-to-end.
 
 ---
 
-## The claim
+## Start with a small injustice
 
-Under cooperative production with multiple contributors arriving at different times, a distribution mechanism that pays equal shares per contribution will systematically under-reward early contributors and over-reward late ones, even when late contributions are trivially derivable from early ones.
+Three researchers write papers:
 
-To prevent this drift, the distribution mechanism must include a time-indexed novelty bonus that pays early contributors super-linearly relative to their nominal share.
+- **Alice** publishes a novel idea. Nobody else has ever written about this topic. Her paper creates a new research direction.
+- **Bob** publishes 6 months later. His paper builds directly on Alice's. He acknowledges her but proves something new.
+- **Carol** publishes 2 years later. Her paper rehashes what Alice and Bob established. She adds nothing substantive.
 
-## The setup
+All three papers get cited. All three are of similar length and rigor. But only Alice's is genuinely novel; Bob's is substantial incremental progress; Carol's is mostly replicated work.
 
-N contributors arrive sequentially. Each contributes `x_i` at time `t_i`. The system's state at time `t` is a function `S(t) = f(x_1, ..., x_k)` where the x's are all contributions with `t_i ≤ t`.
+How much credit does each deserve?
 
-Value created at time `t` is `V(S(t)) - V(S(t-1))` — the marginal value added by the latest contribution.
+Intuitively: Alice much more than Bob, Bob more than Carol. Novelty matters.
 
-## The naive distribution
+Now suppose you use plain Shapley distribution (the standard axiom-compliant fairness method). It turns out plain Shapley gives all three EQUAL credit — because Shapley is permutation-symmetric. It averages over all orders of arrival, and in some of those orders, Alice is "last" (arrives after Bob and Carol) — in which case her contribution looks like Carol's.
 
-Pay each contributor a fraction proportional to their nominal contribution:
+This is a problem. Plain Shapley is fair in a narrow mathematical sense, but it doesn't capture the real-world importance of temporal priority.
+
+That's the concern this theorem addresses.
+
+## The theorem, informally
+
+**No permutation-symmetric distribution mechanism can distinguish "novel first-arriver" from "replication-of-prior-work" contributions.**
+
+Therefore, if you want to reward novelty (which you should in any knowledge-producing system), you need a mechanism that breaks permutation symmetry.
+
+The Novelty Bonus does exactly this.
+
+## A worked numeric example
+
+Let's put numbers on it. Three contributors Alice, Bob, Carol. Each contributes work worth 1 unit. Total pool to distribute: $900.
+
+### Plain Shapley Distribution
+
+Characteristic function (plain):
+- v({}) = 0
+- v({Alice}) = 1
+- v({Bob}) = 1 (same marginal if they happened to be "first")
+- v({Carol}) = 1 (ditto)
+- v({A, B}) = 2 (one additional 1-unit added)
+- v({A, C}) = 2
+- v({B, C}) = 2
+- v({A, B, C}) = 3
+
+Permutation-averaged Shapley:
+- Each contributor's expected marginal contribution across all 6 orderings is 1.
+- Total: 3.
+
+Shares:
+- Alice: 1/3 × $900 = $300.
+- Bob: 1/3 × $900 = $300.
+- Carol: 1/3 × $900 = $300.
+
+**All equal** despite the intuitive injustice.
+
+### Applying the Novelty Bonus
+
+The Novelty Bonus is multiplied onto Shapley:
 
 ```
-share_i = x_i / Σ_j x_j
+reward_i = Shapley(i) × novelty_bonus(i)
 ```
 
-Problem: this ignores *order of arrival*. Suppose `x_1 = x_2 = x_3 = 1` unit each, but `x_1` alone builds `V(S(1)) = 10`, `x_2` adds nothing novel (it's equivalent to `x_1`), and `x_3` adds nothing novel.
+Where `novelty_bonus(i)` depends on how novel contributor i's work was RELATIVE to the knowledge-set that existed when they arrived.
 
-Under naive distribution, each gets 1/3 of total value = 10/3. But `x_2` and `x_3` added nothing — they free-rode on `x_1`'s novelty. Equal shares mis-compensate.
+For our example, let's compute novelty bonuses using semantic-similarity scores:
 
-## The Shapley fix
+- **Alice's paper**: similarity to prior = 0 (she arrived when knowledge-set was empty). novelty_bonus = 2.0 (super-linear reward for establishing a field).
+- **Bob's paper**: similarity to prior = 0.5 (half-derivable from Alice's). novelty_bonus = 1.3.
+- **Carol's paper**: similarity to prior = 0.9 (mostly derivable from Alice + Bob). novelty_bonus = 0.7.
 
-[Shapley value](./SHAPLEY_REWARD_SYSTEM.md) averages marginal contributions over all permutations. Computing Shapley for the above:
+Combined rewards:
+- Alice: $300 × 2.0 = $600.
+- Bob: $300 × 1.3 = $390.
+- Carol: $300 × 0.7 = $210.
 
-- Permutation [x_1, x_2, x_3]: x_1 marginal = 10, x_2 marginal = 0, x_3 marginal = 0.
-- Permutation [x_2, x_1, x_3]: x_2 marginal = 10 (first arrival establishes value), x_1 marginal = 0, x_3 marginal = 0.
-- ... (all 6 permutations symmetrically).
+**Total = $1,200.** Oops, exceeds our pool.
 
-Averaged: each gets 10/3. Back to equal shares.
+### Normalizing back to the pool
 
-Why? Because Shapley is *permutation-averaged*. In the cooperative-game formalism, each contributor is credited for "what they add when they arrive at a random permutation". Duplicates get equal shares because the permutation-averaging smooths over arrival order.
-
-This is axiomatically fair under the cooperative-game model. But it under-values *actual temporal priority* — the fact that `x_1` really did arrive first, which gave `x_2` and `x_3` the ability to exist at all.
-
-## The problem with pure Shapley
-
-In the real world, late arrivers free-ride on early ones. A late arriver sees `x_1`'s value and can replicate it. Under permutation-symmetric Shapley, the late arriver gets equal credit for a replication that took no novel work.
-
-In the cooperative-game world, this is fine — every contribution that could've been "first" gets equal credit. In the real world, contributions are actually-ordered, and actually-first contributions deserve more credit because they can't be replicated from priors (there were no priors when they arrived).
-
-## The novelty bonus
-
-To correct for this, pair Shapley with a time-indexed novelty bonus:
-
+We need to normalize:
 ```
-share_i = Shapley(v, i) × novelty_bonus(t_i, context)
+normalized_reward_i = total_pool × (raw_reward_i / Σ raw_rewards_j)
 ```
 
-Where `novelty_bonus(t, context) > 1` when the contribution at time t adds to the knowledge-set-at-t (i.e., genuinely novel), and `= 1` or less when replicable from prior knowledge-set.
+- Σ raw = 600 + 390 + 210 = 1200.
+- Alice: $900 × (600/1200) = $450.
+- Bob: $900 × (390/1200) = $292.50.
+- Carol: $900 × (210/1200) = $157.50.
 
-Practically:
+**Total = $900.** ✓
 
-```
-novelty_bonus(x_i, t_i) = max(1, (1 + earliness_weight × (1 - similarity_to_prior(x_i, S(t_i-))))))
-```
+Compare to plain Shapley ($300 each):
 
-Where `similarity_to_prior` is computed off-chain (via hash similarity, semantic comparison, etc.) and committed on-chain.
+| Contributor | Plain Shapley | With Novelty Bonus | Δ |
+|---|---|---|---|
+| Alice | $300 | $450 | +$150 (she's rewarded for novelty) |
+| Bob | $300 | $292.50 | −$7.50 (close to Shapley; moderate novelty) |
+| Carol | $300 | $157.50 | −$142.50 (penalized for replication) |
 
-If `x_i` has high similarity to prior state → `similarity_to_prior → 1` → bonus → 1 (no bonus). If low similarity → bonus >> 1 (super-linear reward).
+The Novelty Bonus shifts rewards toward genuine novelty and away from replication. Alice gets +50% vs her Shapley share; Carol gets -47%.
 
-## The theorem
+This is the fair-by-novelty outcome that plain Shapley couldn't produce.
 
-**Theorem**: Under a cooperative-production setting with sequential arrivals, no permutation-symmetric distribution mechanism (including plain Shapley) can simultaneously:
+## The theorem, more formally
+
+**Claim**: No permutation-symmetric distribution mechanism M satisfies BOTH:
 1. Reward all contributions proportionally to their structural value in the cooperative game.
 2. Reward contributions of genuine temporal novelty more than replicable contributions.
 
-**Proof sketch**: Permutation symmetry implies that for any two contributions that play structurally-identical roles in the cooperative game, their Shapley values are equal regardless of when they arrived. But "first contribution that establishes a novel pattern" and "Nth contribution replicating the pattern" play structurally-identical roles in the cooperative-game formalism (they're both "contributors to the coalition"). So plain Shapley pays them equally.
+**Proof sketch**: Permutation symmetry means: for any two contributors with identical structural roles, M gives them identical rewards, regardless of arrival order.
 
-To distinguish, you need to break permutation symmetry. The novelty bonus does that — it's an asymmetric modifier that depends on arrival order relative to the knowledge-set at arrival time.
+But "first-to-establish-X" and "Nth-to-replicate-X" have identical structural roles in the cooperative-game formalism (both "contribute 1 unit of knowledge-production to the coalition"). Plain Shapley has no axis to distinguish them.
 
-## Consequence for VibeSwap
+To distinguish, M must break permutation symmetry. The Novelty Bonus does this explicitly — by depending on the knowledge-set-at-arrival-time, not just the contribution itself.
 
-Plain Shapley underweights true-novelty contributions. VibeSwap's [ETM Build Roadmap Gap #2](./ETM_BUILD_ROADMAP.md) specifically names this: *Shapley distribution's time-indexed marginal*. The fix is to extend `ShapleyDistributor.computeShare` with a time-indexed multiplier that reduces late-replication rewards.
-
-This is not a tuning preference. It is a theorem-consequence: plain Shapley provably fails to distinguish novel from replicated, so the fix is structural.
+QED (informally).
 
 ## Where the bonus comes from
 
-The bonus is paid from the same pool as Shapley itself (not an additional reward pool). High-novelty contributors' bonus is funded by lower-than-Shapley shares to low-novelty contributors. Total payout unchanged; distribution re-weighted toward novelty.
+Important: the Novelty Bonus doesn't inflate the total pool. It re-distributes within the existing pool. High-novelty contributors get more; low-novelty contributors get less. Total unchanged.
 
-This keeps P-001 (no-extraction) satisfied — no new value is created or extracted; existing value is just allocated with a novelty-sensitive weight.
+This keeps P-001 ([No Extraction Axiom](./NO_EXTRACTION_AXIOM.md)) satisfied. No new value created; existing value just re-allocated with a novelty-weighted measure.
 
 ## The similarity function
 
 Computing `similarity_to_prior` is the hard part. Three approaches:
 
-1. **Semantic embedding** — embed each contribution into a vector space, measure distance from prior-state-embedding.
-2. **Code diff / topic modeling** — more literal: how much of this contribution is derivable from prior contributions by standard techniques?
-3. **Expert panel** — a tribunal or committee rates novelty.
+### Approach 1 — Semantic embedding
 
-All three have tradeoffs. Semantic embedding is objective but imperfect. Code diff is exact but narrow. Expert panel is thorough but slow and gameable.
+Embed each contribution into a vector space using a model like sentence-transformers. Compute cosine similarity to prior contributions' embeddings.
 
-VibeSwap's planned approach: tournament of all three. Each contributes a score; aggregate via trust-weighted average; commit the function itself via commit-reveal so keepers can't retroactively tune.
+**Concrete**: Alice's paper embeds as vector [0.2, 0.5, 0.1]. Bob's paper embeds as [0.3, 0.4, 0.2] (moderately similar). Carol's paper embeds as [0.22, 0.48, 0.12] (very similar to Alice).
 
-## Why prior reward systems didn't do this
+Cosine similarity: Alice vs prior (none) = 0. Bob vs Alice = 0.5. Carol vs Alice + Bob = 0.9. Match the numbers we used earlier.
 
-- **SourceCred** and **Gitcoin** used upvote-based weighting → captures popularity, not novelty.
-- **Optimism RetroPGF** used committee voting → captures committee preferences, not algorithmic novelty measure.
-- **Plain Shapley** is permutation-symmetric → provably fails to capture novelty.
+### Approach 2 — Diff-based
 
-VibeSwap's time-indexed Shapley aims to be the first mechanism that formally addresses the theorem's constraint.
+Literally: how much of this contribution is derivable from existing ones using standard techniques?
 
-## Relationship to the Lawson Constant
+**Concrete**: Alice's paper adds 50,000 tokens of new content. Bob's paper adds 25,000 novel tokens (half derivable from Alice). Carol's paper adds 5,000 novel tokens.
 
-[Lawson Constant](./LAWSON_CONSTANT.md): "the greatest idea cannot be stolen." This theorem is the economic teeth: if idea-originators are systematically under-credited, they rationally under-produce ideas. The novelty bonus realigns incentives so idea-originators are proportionally-rewarded, making ideas economically viable to produce.
+Novelty score = novel content / total content.
+
+### Approach 3 — Expert panel
+
+A tribunal rates each contribution's novelty (0-1 scale).
+
+Scales well when the tribunal has domain expertise. Doesn't scale when the domain is large.
+
+### VibeSwap's approach
+
+A tournament of all three:
+- Each produces a novelty score.
+- Aggregate via trust-weighted average.
+- Commit the function itself via commit-reveal so keepers can't retroactively tune.
+
+The aggregation is ETM-aligned: multi-source consensus via weighted aggregation.
+
+## Why this matters for VibeSwap
+
+The [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #2 specifically identifies this: plain Shapley under-rewards novelty. The fix is to extend `ShapleyDistributor.computeShare` with a novelty bonus.
+
+This is not a tuning preference. It's a theorem-consequence:
+- Plain Shapley provably fails to distinguish novel from replicated.
+- Fix is structural (break permutation symmetry).
+- The Novelty Bonus is the specific structural fix.
+
+Implementation planned for C41-C42 per the roadmap.
+
+## What could go wrong
+
+### Failure mode 1 — Similarity-detector gaming
+
+Contributors who know the similarity function can craft content that appears novel but actually replicates.
+
+Mitigation: commit-reveal of the similarity function itself. Keepers can't retroactively tune.
+
+### Failure mode 2 — Tribunal capture
+
+If the novelty-tribunal has a bias (e.g., favors certain research directions), novelty scores are distorted.
+
+Mitigation: tribunal selection is random from high-trust pool; decisions are time-boxed; appeals possible.
+
+### Failure mode 3 — False novelty
+
+Apparent novelty that's actually noise or random variation. Awards high reward to content that shouldn't get it.
+
+Mitigation: peer attestation requirement (high-trust attestors must confirm novelty).
+
+## The bigger principle
+
+The Novelty Bonus isn't just a DeFi mechanism. It's a pattern for any credit-assignment system that needs to reward originality:
+
+- **Academic citation networks**: later papers cite earlier ones. Earlier novel papers should earn more per-citation than latter replications.
+- **Code contribution tracking**: the first implementation of a pattern earns more than the 47th copy.
+- **Creative work attribution**: the artist who originates a style earns more than those who replicate it.
+- **Scientific discovery**: the theorist who first articulates a theory earns more than those who refine it.
+
+VibeSwap's on-chain implementation is one concrete instantiation of this broader pattern.
+
+## For students
+
+Exercise: work through a 4-contributor example by hand:
+
+- Contributors: A, B, C, D
+- Shapley shares (plain): each 25%
+- Novelty bonuses: A=2.5, B=1.8, C=1.2, D=0.7
+- Total pool: $1000
+
+Compute:
+1. Raw-novelty-adjusted rewards.
+2. Normalized rewards (sum to $1000).
+3. Compare to plain Shapley.
+4. Interpret: who gets more, who gets less, why?
+
+Do the math by hand; verify the reasoning.
+
+## Relationship to other mechanisms
+
+- **[Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md)**: the underlying fairness. Novelty Bonus is a modifier on top.
+- **[Lawson Floor](./THE_LAWSON_FLOOR_MATHEMATICS.md)**: ensures every attributed contributor gets at least a floor. Composes with Novelty Bonus: floor protects low-novelty contributors from zero-reward; bonus rewards high-novelty above the floor.
+- **[Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md)**: provides the source-timestamps needed to compute novelty.
 
 ## One-line summary
 
-*Plain Shapley is permutation-symmetric and provably under-rewards novelty relative to replication; the fix is a time-indexed novelty bonus that breaks permutation symmetry — a theorem-consequence, not a tuning choice.*
+*Plain Shapley is permutation-symmetric and provably under-rewards novelty. Novelty Bonus breaks permutation symmetry via similarity-to-prior-state computation. Worked example: Alice/Bob/Carol each earn 1/3 under plain Shapley; under Novelty Bonus, Alice gets $450 (novel), Bob $292.50 (moderate), Carol $157.50 (replication). Total preserved; distribution shifted toward originality.*

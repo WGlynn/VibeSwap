@@ -1,189 +1,251 @@
 # Why VibeSwap Wins in 2030
 
 **Status**: Strategic scenario analysis. 5-year projection from 2026-04-22.
-**Depth**: Formal competitive dynamics; assumes realistic adoption curves; tests sensitivity to key parameters.
-**Related**: [GEV Resistance](./GEV_RESISTANCE.md), [Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md), [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md).
+**Audience**: First-encounter OK. Investor-facing + community-facing.
 
 ---
 
-## The question
+## A thought experiment
 
-Fast-forward to Q1 2030. Is VibeSwap still running, and is it winning?
+Skip forward in your imagination. It's January 2030.
 
-"Winning" here is defined specifically: VibeSwap is either the default coordination primitive for meaningful-cognitive-work attribution, OR it has lost to a competitor that captured the same niche. We argue the former, with specific conditions that must hold.
+You're asking: "How did VibeSwap turn out?"
 
-This isn't a hype projection. It's scenario analysis: what has to be true for each outcome?
+Three possibilities:
+
+**A**: VibeSwap won. It's the default coordination primitive for meaningful cognitive work attribution. Projects integrate it like they integrate OAuth. Contributors earn DAG credit from dialogue, design, audit, code. A multi-billion-dollar category exists and VibeSwap defines it.
+
+**B**: VibeSwap found a niche. It has a committed but small community. Educational partnerships keep it alive. Not the default, but respected; not dominant, but durable.
+
+**C**: VibeSwap didn't make it. Funding ran out, or contributors drifted, or an extraction drift killed trust. The infrastructure lives on as open-source reference; other projects adopt patterns.
+
+Which is it?
+
+Depends on what happens in the next 4 years. This doc walks specific conditions that would produce each outcome.
 
 ## The core thesis
 
-VibeSwap's competitive moat is **not** technology. Every mechanism we've built is publicly open-source; any capable team can fork the contracts. The technology will be replicated.
+VibeSwap's moat is NOT technology. Every mechanism is open-source; any capable team can fork. The code will be replicated.
 
-The moat is **accumulated attention-graph**: who trusts whom, who attested whose work, who has cited whom, who has built on whose designs. This graph takes time to grow. Later-arriving competitors have to build attention-graph from scratch while VibeSwap's graph compounds.
+The moat is **accumulated attention-graph**: who trusts whom, who attested whose work, who has cited whom, who has built on whose designs. This takes years. Late-arriving competitors have to build attention-graph from scratch while VibeSwap's graph compounds.
 
-2030 outcome depends on whether VibeSwap's attention-graph grew enough to be defensible by 2028-29 (when serious competitors typically emerge).
+By 2030, the graph has either:
+- Grown enough to be defensible (Scenario A), or
+- Grown partially (Scenario B), or
+- Not grown enough (Scenario C).
 
-## Three scenarios
+## Three scenarios with probabilities
 
-### Scenario A — Dominant winner (the thesis)
+### Scenario A — Dominant winner (probability ~45%)
 
-**By 2030, VibeSwap is the default coordination primitive; attribution-aware cooperation flows through it.**
+**What it looks like**:
+- Active contributors: 50,000+.
+- External integrations: 1,500+ (projects adopting Chat-to-DAG Traceability).
+- Market-size capture: 2-5% of $1T coordination-primitive market = $20B-$50B annual value routed.
+- Protocol treasury: $100M-$500M.
+- Token market cap (JUL + VIBE combined): $3B-$10B.
 
-Conditions:
+**Investor seed return**: 100x-500x on initial investment.
 
-1. **Emergence threshold crossed by 2028.** The four-parameter phase transition ([Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md)) fires; collective intelligence emerges; the protocol exhibits self-correcting behavior.
-2. **Attention-graph density > competitors**. Even if a better-funded competitor forks our contracts, we maintain attention-graph advantage via 2028 (our N = 10,000+ active contributors with rich handshake structure).
-3. **Constitutional stability**. Governance stays aligned with P-000 and P-001; no drift into extraction. Fork threats are deterred because forks would lose the attention-graph.
-4. **External adoption**. Non-VibeSwap-native projects integrate VibeSwap's Chat-to-DAG Traceability primitives (as they integrate OAuth or Stripe today). Attribution infrastructure becomes industry-standard.
+**Conditions for this**:
 
-Probability if we execute on the current roadmap: ~45%. High, not guaranteed.
+1. **Emergence threshold crossed by 2028**. Four-parameter phase transition fires. Collective intelligence emerges. Self-correcting drift observable.
+2. **Attention-graph density > competitors**. Even if well-funded competitor forks our contracts, we maintain attention-graph advantage.
+3. **Constitutional stability**. Governance stays aligned with P-000 and P-001. No drift into extraction.
+4. **External adoption**. Non-VibeSwap-native projects integrate Traceability primitives. Attribution infrastructure becomes industry-standard.
 
-### Scenario B — Graceful niche (realistic)
+**Probability estimate**: ~45%.
 
-**By 2030, VibeSwap has a committed but niche user base; not dominant but sustainable.**
+### Scenario B — Graceful niche (probability ~35%)
 
-Conditions:
+**What it looks like**:
+- Active contributors: 5,000-10,000.
+- External integrations: 50-200.
+- Market capture: 0.1-0.5% = $1B-$5B annual.
+- Protocol treasury: $10M-$50M.
+- Token market cap: $300M-$1B.
 
-1. **Emergence threshold partially crossed**. Some cooperative-intelligence properties emerge, but not across all contribution types. Some communities adopt VibeSwap; most don't.
-2. **Attention-graph has moderate density**. Enough contributors to sustain but not grow dominantly.
-3. **Competitor captures mainstream**. A more aggressive-marketing competitor captures the broader market; VibeSwap retains "serious/philosophical" niche.
-4. **Educational partnerships succeed**. Eridu Labs and similar academic partners adopt VibeSwap as a teaching platform. Niche is durable.
+**Investor seed return**: 15x-50x.
 
-Probability: ~35%. Very plausible; not ideal but not failure.
+**Conditions for this**:
 
-### Scenario C — Underdog
+1. **Emergence threshold partially crossed**. Some cooperative-intelligence properties emerge, but not across all contribution types. Some communities adopt; most don't.
+2. **Moderate attention-graph density**. Enough to sustain but not grow dominantly.
+3. **Competitor captures mainstream**. A more aggressive-marketing competitor captures broader market. VibeSwap retains "serious/philosophical" niche.
+4. **Educational partnerships succeed**. Eridu Labs and similar academic partners adopt VibeSwap for teaching. Niche is durable.
 
-**By 2030, VibeSwap has failed to reach critical mass; dormant but not dead.**
+**Probability estimate**: ~35%. Very plausible; not ideal but not failure.
 
-Conditions:
+### Scenario C — Underdog (probability ~20%)
 
-1. **Bootstrap phase prolonged**. Emergence threshold not crossed; mechanisms execute but collective behavior doesn't emerge.
-2. **Attention-graph thin**. Handshake structure remains sparse; trust-scores concentrate in small cliques.
-3. **Core team attrition**. Will or key collaborators burnout or redirect. Capability gap that successor-team can't fill.
+**What it looks like**:
+- Active contributors: 100-500 (stagnant).
+- External integrations: 0-5.
+- Market capture: minimal.
+- Protocol treasury: $1M-$5M.
+- Token market cap: $10M-$50M.
+
+**Investor seed return**: 0.5x-2x. Possibly negative in real terms.
+
+**Conditions for this**:
+
+1. **Bootstrap prolonged**. Emergence threshold not crossed. Mechanisms execute but collective doesn't emerge.
+2. **Attention-graph thin**. Handshake structure sparse; trust-scores concentrate in small cliques.
+3. **Core team attrition**. Will or key collaborators burnout/redirect. Successor-team can't fill capability gap.
 4. **Funding exhausted** before adoption reaches self-sustaining levels.
 
-Probability: ~20%. Not negligible — bootstrap-stage protocols face this reality regularly.
+**Probability estimate**: ~20%.
 
-## What determines which scenario
+## Expected value calculation
 
-### Determinant 1 — Execution cadence
+Simple-weighted expected return:
 
-Current cadence: ~3-5 cycles per week (RSI + doc + feature work). 12 months at this cadence = ~250-300 shipped items. Enough to cover the Priority 1 roadmap gaps.
+```
+EV = 0.45 × 300x + 0.35 × 30x + 0.20 × 1x
+   = 135x + 10.5x + 0.2x
+   = ~146x
+```
 
-If cadence slows: fewer gaps close; Priority 1 items pile up; audit findings accumulate; momentum flags. → Scenario C.
+Rough: 150x expected return on seed investment.
 
-If cadence holds: roadmap gaps close; V2 features land; we're competitive at the technology layer by 2027. → A or B.
+**Not a promise**. A model with stated assumptions.
 
-### Determinant 2 — Contributor recruitment
+Sensitivity:
+- If Scenario A probability drops to 30%: EV becomes ~100x.
+- If Scenario C probability rises to 40%: EV ~70x.
+- If black-swan exogenous shock included at 10%: EV drops 10-15%.
 
-Attention-graph density depends on contributor count.
+Realistic under worst reasonable assumptions: 30-50x.
+Under best: 200-500x.
 
-At 2026-04-22 cadence (~1-3 new contributors/month): ~50-100 active by end of 2027. Bottom of emergence-threshold range.
+## The 2026-2030 execution path
 
-At 5x recruitment (10-15 new/month): ~500 active. Clear emergence.
+Year-by-year what has to happen.
 
-At 25x (50/month): ~1500 active. Dominant trajectory.
+### 2026 (current)
 
-The multiplier comes from: deliberate outreach, credible educational partnerships (Eridu role), community events, high-profile contributor acquisitions.
-
-### Determinant 3 — Regulatory environment
-
-Crypto regulation 2026-2030 remains uncertain. Two regimes:
-
-- **Permissive**: crypto economic activity is legal, attestation-based systems are untouched. VibeSwap operates freely.
-- **Restrictive**: governance tokens classified as securities; attestation-based attribution seen as a scheme; operations restricted.
-
-VibeSwap's [Augmented Governance](./AUGMENTED_GOVERNANCE.md) hierarchy is specifically designed to be regulatable (Physics + Constitution are non-governance; only Governance is governance-layer). This should help under restrictive regimes but isn't guaranteed.
-
-### Determinant 4 — Competitive response
-
-Current competitors (Gitcoin, Optimism RetroPGF, etc.) are adjacent — not directly competing for VibeSwap's niche but close. If one pivots into our space with more funding, competitive pressure intensifies.
-
-Mitigation: own the narrative. "Coordination primitive, not a casino" is our positioning. "Attribution-as-structural (Lawson Constant)" is our differentiation. Continuous publication (this 30-doc pipeline) reinforces the narrative.
-
-### Determinant 5 — Partnership integrations
-
-External projects integrating Chat-to-DAG Traceability primitives compound our moat. Each integration brings their users into our attention-graph.
-
-Early candidates: DAO governance platforms, on-chain audit workflows, grant-funded research communities.
-
-5-10 serious integrations by 2028 → Scenario A likely. 0-2 → Scenario B or C.
-
-## The competitive dynamics, play-by-play
-
-### 2026 (current year)
-
-- Complete ETM Build Roadmap Gaps 1-3 (C40-C43). Ship first external alignment fix.
-- Launch Chat-to-DAG Traceability tooling in production. First external minting.
-- Publish 30-doc content pipeline. Amplify narrative.
+- Complete ETM Build Roadmap Gaps 1-3 (C40-C43).
+- Launch Chat-to-DAG Traceability in production. First external minting.
+- Publish 30-doc content pipeline.
 - Grow contributor base from ~20 to ~100 active.
-- First Eridu Labs course on VibeSwap components.
+- First Eridu course.
 
 ### 2027
 
-- External integrations begin. 2-3 projects adopt Traceability primitives.
+- External integrations begin. 2-3 projects adopt Traceability.
 - V2 features: permissionless oracle aggregator, IPFS frontend, timelock upgrade governance.
-- First high-profile contributor acquisition — a recognized researcher or designer joins core contributors.
+- First high-profile contributor acquisition — recognized researcher or designer joins core.
 - Contributor base ~300-500; emergence-threshold-approaching.
 
 ### 2028
 
 - Emergence phenomena observable. Self-correcting drift. Cross-substrate routing working.
-- V3 features: ZK attribution, cross-chain LayerZero integration, automated mint via CI.
+- V3 features: ZK attribution, cross-chain LayerZero, automated CI minting.
 - External integrations: 5-10 substantial projects.
 - Contributor base 1,000+.
 
 ### 2029
 
-- VibeSwap is the cited example in cooperative-economics research.
-- Several DAOs use Traceability as their default attribution infrastructure.
-- Fork threat: low. The attention-graph is too dense to replicate.
+- VibeSwap is cited example in cooperative-economics research.
+- Several DAOs use Traceability as default attribution infrastructure.
+- Fork threat: low. Attention-graph too dense to replicate.
 
 ### 2030
 
-- Either Scenario A (dominant), B (graceful niche), or C (underdog).
+- Scenario A, B, or C materializes.
 - Conditional on execution + recruitment + regulation + competition.
+
+## Five determinants rank-ordered by leverage
+
+### Determinant 1 — Execution cadence
+
+Current: ~3-5 cycles per week. 12 months at this cadence = ~250-300 shipped items.
+
+If cadence slows: fewer gaps close; Priority 1 items pile up; momentum flags → Scenario C.
+
+If cadence holds: roadmap gaps close; V2 features land; we're competitive at tech layer by 2027 → A or B.
+
+### Determinant 2 — Contributor recruitment
+
+At current rate (1-3/month): ~50-100 active by end 2027. Bottom of emergence-threshold.
+At 5x (10-15/month): ~500 active. Clear emergence.
+At 25x (50/month): ~1500 active. Dominant trajectory.
+
+Multiplier from: deliberate outreach, credible educational partnerships (Eridu), community events, high-profile acquisitions.
+
+### Determinant 3 — Regulatory environment
+
+Crypto regulation 2026-2030 uncertain. Two regimes:
+
+- **Permissive**: operations free; growth unconstrained.
+- **Restrictive**: governance tokens classified as securities; attestation-based attribution restricted.
+
+[Augmented Governance](./AUGMENTED_GOVERNANCE.md) is designed to be regulatable. Should help under restrictive regimes. Not guaranteed.
+
+### Determinant 4 — Competitive response
+
+Current competitors (Gitcoin, Optimism RetroPGF) are adjacent. If one pivots into VibeSwap's space with more funding, pressure intensifies.
+
+Mitigation: own the narrative. "Coordination primitive, not a casino" is our positioning. Continuous publication reinforces.
+
+### Determinant 5 — Partnership integrations
+
+External projects integrating Traceability compound our moat. 5-10 serious integrations by 2028 → Scenario A likely. 0-2 → Scenario B/C.
 
 ## What we need to NOT do
 
 ### Anti-pattern 1 — Premature scaling
 
-Don't chase contributor count without ensuring heterogeneity + connectivity + feedback speed. A 10x contributor-count at single-type low-handshake-density is worse than 1x at healthy substrate.
+Don't chase contributor count without ensuring heterogeneity + connectivity + feedback speed.
 
 ### Anti-pattern 2 — Centralized intermediation
 
-Don't add intermediaries to solve short-term friction. Each intermediary drops the [Disintermediation Grade](./DISINTERMEDIATION_GRADES.md). Stay patient; solve structurally, not compromisingly.
+Don't add intermediaries for short-term friction. Solve structurally, not compromisingly.
 
 ### Anti-pattern 3 — Constitutional drift
 
-Don't let governance override P-000 or P-001 "just this once". The first override legitimates more overrides; extraction normalizes; the protocol becomes DeFi-as-usual. Dead protocol walking.
+Don't let governance override P-000 or P-001 "just this once." First override legitimates more. Extraction normalizes. Dead protocol.
 
 ### Anti-pattern 4 — Core-team burnout
 
-Don't run the core team past sustainable capacity. Burnout is a Scenario-C trigger. Enforce sabbatical rotations; distribute load; prioritize ruthlessly.
+Don't run past sustainable capacity. Burnout is Scenario-C trigger.
 
-## What the 30-doc pipeline contributes
+## The 30-doc pipeline's role
 
-Publishing fresh technical-philosophical content has several 2030-relevant effects:
+Publishing fresh technical-philosophical content has 2030-relevant effects:
 
-- **Narrative control**: whoever publishes the definitive framings owns the category. By 2030, the 30 papers (+ their descendants) are the canonical reference for cognitive-economy-on-chain.
-- **Contributor attraction**: serious thinkers reading these papers self-select into the community. This is quality-weighted recruitment.
-- **Educational scaffolding**: Eridu and similar partners use these as course material; students graduate into the community.
-- **Regulatory legibility**: regulators reading the 30-doc set see a coherent mechanism-design approach rather than "another crypto thing". This helps under restrictive regimes.
+- **Narrative control**: whoever publishes definitive framings owns category.
+- **Contributor attraction**: serious thinkers self-select into community.
+- **Educational scaffolding**: Eridu + similar partners use as course material.
+- **Regulatory legibility**: regulators see coherent approach, not "another crypto thing."
 
-Each paper individually is a unit of intellectual capital. Together they compound into positioning advantage.
+Intellectual capital compounds into positioning advantage.
 
-## The honest uncertainty
+## Honest uncertainty
 
-I don't know which scenario materializes. The conditions are specific, probabilities are estimated from pattern-matching to similar-stage protocols, and edge cases (black swans) are excluded.
+I don't know which scenario materializes. Probabilities estimated from pattern-matching to similar-stage protocols. Edge cases excluded.
 
-What I can say with confidence:
+What I can say confidently:
 
-- **The design is sound**. Constitutional axioms + Augmented Governance + three-token separation + Shapley + Lawson compose coherently.
-- **The execution is on pace**. Current cadence is sustainable and productive.
-- **The differentiation is real**. GEV-resistance + non-code attribution + cooperative-intelligence framing are genuinely novel positioning.
+- **Design is sound** — constitutional axioms + Augmented Governance + three-token + Shapley + Lawson compose coherently.
+- **Execution is on pace** — current cadence sustainable and productive.
+- **Differentiation is real** — GEV-resistance + non-code attribution + cooperative-intelligence framing are genuinely novel.
 
-These are necessary conditions, not sufficient ones. The 2030 outcome depends on the next ~24 months of execution.
+Necessary conditions, not sufficient. 2030 outcome depends on next 24 months.
+
+## For investors considering the round
+
+Before committing:
+- Read the 30-doc content pipeline. Judge intellectual substance.
+- Review the repo. Judge technical substance.
+- Talk to the team. Judge personal fit.
+- Model your own scenario probabilities. Don't take ours.
+
+After committing:
+- Track cadence metrics (commits/week, contributor growth, integration progress).
+- Participate in governance if aligned with P-000/P-001.
+- Hold for 4-5 year horizon. Early liquidation defeats the thesis.
 
 ## One-line summary
 
-*VibeSwap's 2030 outcome is ~45% dominant / 35% niche / 20% underdog, depending on emergence-threshold-crossing (contributor recruitment + connectivity), constitutional stability (no axiom drift), external integrations (5-10 by 2028), and cadence maintenance. The moat is attention-graph density, not technology; 30-doc pipeline contributes to narrative control which compounds.*
+*2030 outcome ~45% dominant (100-500x return) / 35% niche (15-50x) / 20% underdog (0.5-2x). EV ~150x. Moat is attention-graph density, not technology. Five determinants rank-ordered: execution cadence, contributor recruitment, regulation, competition, integrations. Four anti-patterns to avoid. 30-doc pipeline contributes narrative control. Honest uncertainty acknowledged; design+execution+differentiation are necessary not sufficient.*

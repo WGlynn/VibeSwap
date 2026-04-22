@@ -1,149 +1,231 @@
 # Rational Ignorance as Mechanism
 
-**Status**: Public-choice theory applied to on-chain governance and attestation.
-**Depth**: Why informed participation is economically irrational, and design patterns that work with (not against) that reality.
-**Related**: [Augmented Governance](./AUGMENTED_GOVERNANCE.md), [The Observer Effect in Attestation](./THE_OBSERVER_EFFECT_IN_ATTESTATION.md), [Why Three Tokens Not Two](./WHY_THREE_TOKENS_NOT_TWO.md).
+**Status**: Public-choice theory applied to on-chain governance + attestation.
+**Audience**: First-encounter OK. Math walked with specific cost estimates.
 
 ---
 
-## The observation
+## Start with your own voting history
 
-Anthony Downs, 1957: a voter who votes is rational to invest less in being informed than the benefit of voting correctly. The probability that any single vote changes the outcome is tiny; the cost of being well-informed is real. Rational voters stay shallow.
+Have you voted in a national election? A local election? A corporate vote? An online poll?
 
-This isn't laziness. It's the equilibrium outcome of a specific information-economy. In any large-N voting system, the marginal benefit of deeper information collapses as N grows.
+Did you deeply research each candidate / issue / option? Or did you go with a heuristic — party line, friend's recommendation, gut feel?
 
-Applied to VibeSwap: the same calculus applies to attestations. A potential attestor evaluating whether a claim is meritorious must invest in understanding the claim's substance. For a single attestation's weight, that investment is almost never cost-effective. Rational attestors stay shallow — they skim, pattern-match, or abstain.
-
-This looks like a bug. Design-for-reality says treat it as a feature to design around.
-
-## Why this matters
-
-Governance and attestation systems assume informed participation. If participants are rationally ignorant, the assumption fails. Outcomes are then determined by:
-
-- Whoever cares most (irrational or highly-invested — e.g., proposers themselves)
-- Whoever pays attention for non-economic reasons (ideologues, enthusiasts)
-- Shallow pattern-matchers who default to heuristics
-
-Not necessarily bad, but not "broad-based informed consent" either. Honest framing matters.
+Most of us use heuristics. Most of us don't invest hours of research per vote. And we're usually correct to — there's a specific economic reason.
 
 ## The calculation
 
-For a single attestation decision:
+Anthony Downs, economist, 1957. Proposed:
 
-- Cost to become informed: read the issue body (5 min) + verify evidence (15 min) + consider context (10 min) = 30 min of labor.
-- Monetary value of 30 min: $50-$200 depending on contributor's opportunity cost.
-- Benefit from correct attestation: fraction of the Shapley share weighted by this attestation's impact on the aggregate weight.
-- For 1-of-50 attestations on a claim with modest Shapley value ($100): expected marginal benefit per attestation ~= $2. Far below cost.
+A voter's decision to invest in being informed is economically rational when:
 
-Rational individual response: skim or abstain.
+```
+cost of being informed < benefit to voter from informed vote
+```
 
-Collective consequence: attestations become ceremonial; shallow rubber-stamps or no-participation. Gaming-resistance weakens because the gamers care and the non-gamers don't.
+Let's run the math for a typical voter.
 
-## Four design responses
+**Cost of being informed on a proposition**:
+- Read background (30 min).
+- Consider multiple perspectives (30 min).
+- Understand implications (30 min).
+- Total: ~90 min.
 
-### Response 1 — Align incentives
+**Monetary value**: at $20-50/hour (median earnings), 90 min = $30-75 in labor cost.
 
-Pay attestors for thoroughness. If the attestor who invests 30 min of careful review gets additional reward (e.g., higher Shapley share for thoroughly-verified claims), the calculation flips.
+**Benefit of being correctly informed**:
+- Voter's vote is one of millions.
+- Probability vote changes outcome: ~1 in 10M for state/national, 1 in 10K for local.
+- Voter's share of outcome benefit: tiny.
 
-VibeSwap implementation: `previewAttestationWeight` — shows the attestor their effective weight before they commit. Plus: trust-weighted multipliers mean high-trust attestors' votes count for more, increasing their per-attestation benefit.
+**Expected benefit**: perhaps pennies in expected value.
 
-Limitation: this only works if "thoroughness" is itself measurable. [Goodhart](./THE_OBSERVER_EFFECT_IN_ATTESTATION.md) bites here too.
+**Conclusion**: for any specific vote, rational cost-benefit says DO NOT research. Use heuristics.
 
-### Response 2 — Delegate to informed
+This is rational ignorance. It's not laziness — it's equilibrium outcome of a specific information-economy.
 
-Build a delegation system: most attestors delegate to a small number of "expert" attestors who are paid for the work. The experts care because they're paid; the delegators get representation without individually investing.
+## Why this is a PROBLEM for governance systems
 
-VibeSwap implementation: partial, via trust-weighting. High-trust attestors are effectively delegates — their weight represents their past accuracy. But delegation is implicit; no explicit proxy.
+Most governance systems assume informed participation. They design for the "rational engaged voter" who researches and votes.
 
-Limitation: expert-delegate capture. If a small group of experts gains delegation, they can be lobbied or bribed; delegation centralizes power.
+Rational ignorance says this voter is rare. Actual voter participation is mostly heuristic-driven.
+
+Consequences:
+- Outcomes determined by: whoever CARES most (highly-invested minority).
+- Or whoever pays attention for NON-ECONOMIC reasons (ideologues, enthusiasts).
+- Or default heuristics (status quo bias, whoever-sounds-best, whoever-paid-for-ads).
+
+NOT "informed broad-based consent."
+
+## Applied to VibeSwap attestation
+
+Same calculus applies to attestations. A potential attestor evaluating whether a claim is meritorious faces:
+
+**Cost to be informed**:
+- Read issue body (5 min).
+- Verify evidence (15 min).
+- Consider context (10 min).
+- Total: ~30 min of labor.
+
+**Monetary value of 30 min**: $50-200 depending on opportunity cost.
+
+**Benefit from correct attestation**:
+- Fraction of the Shapley share weighted by this attestation's impact on aggregate weight.
+- For 1-of-50 attestations on a claim with modest Shapley value ($100): expected marginal benefit per attestation ~$2.
+
+**Result**: cost ($50-200) >> benefit ($2). Rational individual response: skim or abstain.
+
+Collectively: attestations become ceremonial. Shallow rubber-stamps or no-participation. Gaming-resistance weakens.
+
+## Design responses
+
+If rational ignorance is inevitable, governance systems must design AROUND it, not against it. Four responses:
+
+### Response 1 — Align incentives (pay for thoroughness)
+
+If the attestor who invests 30 min of careful review gets additional reward, calculation flips.
+
+**VibeSwap implementation**:
+- `previewAttestationWeight` — shows attestor their effective weight before committing.
+- Trust-weighted multipliers — high-trust attestors' votes count for more → per-attestation benefit is higher for them → rational to invest.
+
+**Limitation**: only works if "thoroughness" is measurable. [Goodhart's Law](./THE_OBSERVER_EFFECT_IN_ATTESTATION.md) bites here too.
+
+### Response 2 — Delegate to informed (expert proxies)
+
+Most attestors delegate to small number of "expert" attestors who are paid for work. Experts care because they're paid; delegators get representation without individual investment.
+
+**VibeSwap implementation**: partial via trust-weighting. High-trust attestors effectively serve as delegates.
+
+**Limitation**: expert-delegate capture. If small group of experts gains delegation, they can be lobbied or bribed.
 
 ### Response 3 — Reduce the cost of informedness
 
-Make the information legible. Clear issue templates ([Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md)) reduce the cost of evaluation. Evidence hashes link to preservation. Closing comments summarize resolution.
+Make information legible. Canonical issue templates + traceability chains + closing comments.
 
-VibeSwap implementation: canonical format for issues, commits, closing comments. A reviewer can evaluate substance in 5 min instead of 30.
+**VibeSwap implementation**: [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) canonical format reduces per-attestation evaluation cost from ~30 min to ~5 min.
 
-Effectiveness: high for reducing the cost side of the equation. Doesn't eliminate rational ignorance but moves the threshold.
+**Effectiveness**: high — cost side of equation reduced dramatically.
 
 ### Response 4 — Accept and design around
 
-If rational ignorance is inevitable, design mechanisms that don't assume informed participation. Rely on:
+Design mechanisms that DON'T ASSUME informed participation.
 
-- Aggregate votes across many shallow reviewers to wash out noise.
+- Rely on aggregate votes across many shallow reviewers to wash out noise.
 - Tribunal escalation for cases where shallow review is insufficient.
-- Governance override for meta-level issues that require depth.
+- Governance override for meta-level issues.
 
-VibeSwap implementation: three-branch architecture. Executive branch (peer attestation) is where rational-ignorance drives shallow voting; tribunal (judicial) is where depth can be invoked; governance (legislative) is the depth-reservoir.
+**VibeSwap implementation**: three-branch architecture explicitly:
+- Executive branch — rational-ignorance-compatible. Many shallow votes aggregate.
+- Judicial branch — rational-ignorance-bypass. Tribunal jurors compensated + random-selected.
+- Legislative branch — rational-ignorance-override. Governance participants highly invested.
 
-This is the most robust response because it doesn't fight human nature.
+This is the most robust response. Doesn't fight human nature.
+
+## Walk through a specific scenario
+
+Let me show how these four responses compose.
+
+### A claim is submitted
+
+Alice submits a claim about Bob's contribution. Claim needs attestations to accept.
+
+### Rational-ignorance response
+
+Most potential attestors skim the issue, form quick impression. Don't invest 30 min per vote.
+
+### Executive branch handles it
+
+Many shallow attestations roll in. Each is weighted by trust × multiplier. Aggregate signals whether the claim has support.
+
+Gaming attempt (Alice creates sockpuppets to inflate attestations): harder because sockpuppets have low trust-weight. Shallow-vote aggregation washes out low-trust noise.
+
+Accepted if aggregate > threshold.
+
+### If contested
+
+Dave contests the claim. Now it's not rolling to auto-accept. Escalates to tribunal.
+
+Tribunal jurors are compensated (say, $200 per claim). At $200, rational-ignorance calculation flips. Jurors invest 30 min to evaluate thoroughly. Their verdict is informed.
+
+### If exceptional
+
+Tribunal verdict is disputed at governance level. Legislative branch engages. Governance participants are highly-invested (token holders); they care intrinsically.
+
+Rational-ignorance handled at each branch appropriately.
 
 ## The three-branch re-framing
 
 Viewed through rational ignorance:
 
 - **Executive branch** — rational-ignorance-compatible. Many shallow votes aggregate; high volume compensates for low depth.
-- **Judicial branch** — rational-ignorance-bypass. Tribunal jurors are compensated and random-selected; they invest in depth because they're paid.
-- **Legislative branch** — rational-ignorance-override. Governance participants are highly-invested (token holders with significant stake); they care intrinsically.
+- **Judicial branch** — rational-ignorance-bypass. Tribunal jurors compensated; they invest in depth because paid.
+- **Legislative branch** — rational-ignorance-override. Governance participants highly-invested; they care intrinsically.
 
-The three-branch architecture is not arbitrary. It's designed so different branches handle different ignorance-profiles. Executive is populous + shallow; judicial is small + deep; legislative is invested + strategic.
+The three-branch architecture is not arbitrary. Designed so different branches handle different ignorance-profiles. Populous + shallow, small + deep, invested + strategic. Each does its job.
 
 ## The cost of high attestor burden
 
-If attestation becomes too burdensome, no one does it. The mechanism relies on attestations firing; rational-ignorance equilibrium could kill the protocol.
+If attestation becomes too burdensome, no one does it. Mechanism relies on attestations firing; rational-ignorance equilibrium could kill the protocol.
 
 Mitigations:
 - Keep attestations lightweight (fast path, easy UX).
 - Reward meaningful participation explicitly.
 - Make skipping explicitly costly only in high-stakes cases.
-- Accept that 80% of claims will get rubber-stamp attestations; design so rubber-stamping is still fair for typical claims.
+- Accept that 80% of claims will get rubber-stamp attestations; design so rubber-stamping is still FAIR for typical claims.
 
-The last is the most important. A mechanism that requires deep attention for every decision fails. A mechanism that has fast paths for typical cases and depth for exceptions succeeds.
+The last is most important. A mechanism requiring deep attention for every decision fails. A mechanism with fast paths for typical cases + depth for exceptions succeeds.
 
-## Rational ignorance in governance
+## Rational ignorance in governance voting
 
-Token-weighted governance voting is especially prone to rational ignorance. Someone with 0.01% of tokens is rationally indifferent to whether they vote informed. Quadratic voting partially addresses this (diminishing returns for concentration), but even with quadratic voting, the rational-ignorance pressure remains.
+Token-weighted voting especially prone to rational ignorance. Someone with 0.01% of tokens is rationally indifferent to whether they vote informed.
+
+Quadratic voting partially addresses this (diminishing returns for concentration), but even with quadratic voting, rational-ignorance pressure remains.
 
 VibeSwap's responses:
-
-- **Quadratic voting** as the first layer — reduces whale-capture, gives informed small-holders relative advantage.
+- **Quadratic voting** first layer — reduces whale-capture.
 - **Proposal structure** — proposals must include Source + rationale + expected outcome + reversibility. Reduces evaluation cost.
-- **Expert delegation** (partial) — via trust-weighting, high-trust attestors' votes matter more.
+- **Expert delegation (partial)** — via trust-weighting, high-trust attestors' votes matter more.
 - **Augmented governance hierarchy** — Physics + Constitution override governance, so governance errors are bounded in blast radius.
 
 None eliminates rational ignorance. All reduce its harm.
-
-## The interaction with attention economy
-
-Rational ignorance is a specific attention-allocation pattern: allocate attention to things where the marginal benefit exceeds the marginal cost. For most one-off attestation decisions, the benefit side is too low.
-
-But attestation over time can compound. An attestor who builds reputation for accurate attestations sees their trust-score rise and their per-attestation benefit rise accordingly. For sustained-participation attestors, the calculation flips.
-
-Implication: the rational-ignorance equilibrium is worst for casual one-time attestors and least-bad for sustained participants. Mechanism design should implicitly favor sustained participation to shift the population toward less-rationally-ignorant.
-
-VibeSwap does this: trust compounds with attestation-accuracy over time. Long-term attestors accumulate advantage; short-term rubber-stampers don't.
 
 ## Honest marketing
 
 Don't claim: "VibeSwap's governance is fully-informed broad-based consent."
 
-Do claim: "VibeSwap's governance is structured to handle rational ignorance — aggregating many shallow votes at the executive branch, investing deeply at the tribunal branch, concentrating influence among long-term participants."
+Do claim: "VibeSwap's governance is structured to handle rational ignorance — aggregating shallow votes at Executive, investing deeply at Judicial, concentrating influence among long-term participants at Legislative."
 
-This is a defensible architectural claim. The first is a claim nobody's governance can honor.
+This is defensible. First is a claim nobody's governance can honor.
+
+## Interaction with attention economy
+
+Rational ignorance is a specific attention-allocation pattern: allocate attention to activities where marginal benefit exceeds marginal cost. For one-off attestations, benefit side is too low.
+
+But attestation over time can compound. An attestor who builds reputation for accurate attestations sees their trust-score rise and their per-attestation benefit rise. For sustained-participation attestors, the calculation flips.
+
+**Implication**: rational-ignorance equilibrium is worst for casual one-time attestors, least-bad for sustained participants. Mechanism design should IMPLICITLY FAVOR sustained participation.
+
+VibeSwap does this: trust compounds with attestation accuracy over time. Long-term attestors accumulate advantage; short-term rubber-stampers don't.
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), rational ignorance is a cognitive-economic equilibrium: attention is scarce, decisions are many, most decisions don't justify full attention. Humans have evolved heuristics (gut feel, pattern-match, defer-to-expert) that navigate this economy well.
+Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), rational ignorance is a cognitive-economic equilibrium. Attention is scarce, decisions are many, most decisions don't justify full attention. Humans evolved heuristics (gut feel, pattern-match, defer-to-expert) that navigate this economy well.
 
-VibeSwap's architecture mirrors these cognitive heuristics on-chain. Trust-delegation = defer-to-expert. Pattern-matching = shallow but fast evaluation. Tribunal escalation = reach for deep attention when it matters.
+VibeSwap's architecture mirrors these heuristics on-chain. Trust-delegation = defer-to-expert. Pattern-matching = shallow fast evaluation. Tribunal escalation = reach for deep attention when it matters.
 
-Not fighting the cognitive economy; implementing it.
+Not fighting cognitive economy; implementing it.
 
-## Open questions
+## For students
 
-1. **Optimal attestation UX** — how much information is the right amount to show an attestor? Too little → superficial; too much → overwhelms.
-2. **Delegation market** — should VibeSwap have explicit delegation primitives, or rely on implicit trust-weighting?
-3. **Rational-ignorance metrics** — can we measure the mean depth-of-attention-per-attestation over time? Alert on decline?
+Exercise: track your own voting/attestation-like decisions for a week. Note:
+
+1. How much effort did you invest per decision?
+2. Were you rationally ignorant?
+3. Did your heuristic-decision turn out correct (can you check retroactively)?
+
+Most of us make 80-90% heuristic decisions. That's rational. The meta-question is: are we in systems that exploit or respect our rational-ignorance?
 
 ## One-line summary
 
-*Rational ignorance is inevitable at large N — informed participation costs more than it benefits per-decision. VibeSwap's three-branch architecture accepts this: populous-shallow executive + small-deep tribunal + invested-strategic legislative; don't fight human nature, design around it.*
+*Rational ignorance is equilibrium outcome of information-economy — informed participation costs more than it benefits per-decision at scale. VibeSwap's three-branch architecture handles this: Executive (populous-shallow aggregation) + Judicial (compensated-deep tribunal) + Legislative (invested-strategic governance). Doesn't fight human nature; designs around it. Trust compounds over time, favoring sustained participants.*

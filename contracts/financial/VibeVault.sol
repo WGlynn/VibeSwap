@@ -38,6 +38,8 @@ contract VibeVault is
 {
     using SafeERC20 for IERC20;
 
+    event ConcentrationCapUpdated(address indexed token, uint256 previous, uint256 current);
+
     // ============ Constants ============
 
     uint256 private constant BPS = 10_000;
@@ -728,7 +730,9 @@ contract VibeVault is
     function setConcentrationCap(address token, uint256 newCap) external onlyOwner {
         if (!assetConfigs[token].whitelisted) revert AssetNotWhitelisted(token);
         if (newCap == 0 || newCap > MAX_CONCENTRATION_BPS) revert InvalidConcentrationCap();
+        uint256 prev = assetConfigs[token].concentrationCap;
         assetConfigs[token].concentrationCap = newCap;
+        emit ConcentrationCapUpdated(token, prev, newCap);
     }
 
     /**

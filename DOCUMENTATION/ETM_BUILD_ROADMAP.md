@@ -1,166 +1,257 @@
 # ETM Build Roadmap
 
-**Status**: Step 2 of 4 in the ETM Build Plan (Step 1 = [`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md), complete).
-**Primitive**: [`memory/primitive_economic-theory-of-mind.md`](../memory/primitive_economic-theory-of-mind.md)
+**Status**: Step 2 of 4 in the ETM Build Plan. Step 1 ([`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md)) complete.
+**Audience**: First-encounter OK. Each gap-fix walked end-to-end with before/during/after states.
 **Directive**: Will, 2026-04-21 — *"we want to build toward this as a reality. asap."*
 
 ---
 
-## Purpose
+## Why a roadmap exists
 
-This roadmap translates the prioritized gap list from [`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md) into concrete engineering cycles. Each row maps a cognitive-economy property from the [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) to a specific contract change, new primitive, test, or documentation artifact.
+Step 1 of the ETM plan audited VibeSwap's mechanisms against ETM. Each mechanism got classified: MIRRORS (faithful), PARTIALLY MIRRORS (distorted), or FAILS TO MIRROR (misaligned).
 
-The audit returned:
-- **16 MIRRORS** — mechanisms that already reflect cognitive-economic structure faithfully.
-- **3 PARTIALLY MIRRORS** — mechanisms that reflect with distortion; candidates for refinement.
-- **0 FAILS TO MIRROR** — no full-redesign gaps found.
+Results:
+- **16 MIRRORS** — mechanisms that already reflect cognitive-economic structure faithfully. No action needed.
+- **3 PARTIALLY MIRRORS** — mechanisms that reflect with distortion. Refinement needed.
+- **0 FAILS TO MIRROR** — no full-redesign gaps.
 
-This roadmap addresses the 3 partially-mirroring mechanisms and adds new work that strengthens already-mirroring ones.
+This doc is the roadmap for addressing those 3 PARTIAL gaps + strengthening already-mirroring mechanisms.
 
----
+## What makes a gap worth fixing
 
-## Framing
+A PARTIAL gap means a mechanism is "mostly right, slightly wrong." Fixing it brings it closer to the cognitive-economic property it's supposed to mirror. The protocol becomes more ETM-aligned.
 
-VibeSwap's thesis: the mind functions as an economy, and blockchain is the legible externalization of that pattern. For the externalization to be faithful, every mechanism must correspond to a cognitive-economic property. When correspondence is imperfect, either the mechanism refines or the theory does — but the divergence is load-bearing: it's where the design is wrong.
+Small gaps are real. A mechanism that 90% mirrors the correct property can still cause 10% distortion — which compounds over time across many users. Fixing even small gaps is worth cycles.
 
-Roadmap prioritization:
+## Gap #1 — NCI Convex Retention
 
-1. **Closest-to-correspondence fixes first.** A mechanism that already mirrors 80% of the cognitive property is cheaper to bring to 95% than a mechanism at 40% is to bring to 80%. Concentrate on the narrowing gap.
-2. **Substrate before ornament.** Fixes that land on the substrate layer (CKB state-rent, consensus weight function, Shapley distribution) propagate upward. Fixes on the ornament layer (UI, documentation, integrations) don't.
-3. **Test-before-ship, always.** Every cycle ships with regression tests proving the mirror property. The test itself becomes the ETM-correspondence assertion in executable form.
+### What the gap IS
 
----
+[NCI weight function](./NCI_WEIGHT_FUNCTION.md) uses LINEAR decay:
 
-## Priority queue — the 3 PARTIAL gaps
+```solidity
+retentionWeight(t) = base - k × t
+```
 
-### Gap #1 — NCI weight function retention-cost asymmetry
+This doesn't match cognition. Cognitive retention decays CONVEXLY:
 
-**Audit classification**: PARTIALLY MIRRORS. The NCI weight function captures most of the cognitive retention-economy (contributions weighted by recency × attestation × liveness), but the retention-cost curve is linear where ETM predicts a convex (state-rent-like) shape.
+```
+retentionWeight(t) = base × (1 - (t/T)^α)
+```
 
-**ETM source property**: CKB state-rent pays the cost of *keeping* a memory alive in proportion to how much attention-surface it currently occupies. Linear retention cost = flat utility curve; convex retention cost = attention-scarcity-matched.
+with α ≈ 1.6 (Ebbinghaus + modern replications).
 
-**Fix**:
-- Replace `NCI.retentionWeight(t) = base - k*t` with a convex function `base * (1 - (t/T)^alpha)` where `alpha > 1` (empirically tuned; paper §6.4 suggests α=1.6).
-- Or: layer a second multiplicative term that scales with the contributor's currently-active-weight sum, so retention cost compounds when attention-surface is large.
+### Why this matters
+
+**Before (linear)**:
+- Contributor's mindScore decays at fixed rate.
+- No phase transition ("knee") where decay accelerates.
+- Medium-term contributions over-preserved; long-term contributions decay too slowly.
+
+**Concrete numeric impact** (per [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md)):
+- Day 1: 1000 × (1 - 1/365) ≈ 997.3
+- Day 30: 1000 × (1 - 30/365) ≈ 917.8
+- Day 180: 1000 × (1 - 180/365) ≈ 506.8
+- Day 365: 0
+
+**After (convex, α=1.6)**:
+- Day 1: 1000 × (1 - (1/365)^1.6) ≈ 999.98
+- Day 30: 1000 × (1 - (30/365)^1.6) ≈ 986
+- Day 180: 1000 × (1 - (180/365)^1.6) ≈ 662
+- Day 365: 0
+
+Convex is more lenient to recent contributions (986 vs 918 at day 30; 662 vs 507 at day 180) and more decisive at end (both hit 0 by day 365 but convex accelerates toward the end).
+
+### The cycle
+
+**Cycle C40 (target 2026-04-23)**:
+
+- **Before**: `NakamotoConsensusInfinity.retentionWeight()` uses linear decay.
+- **During**: replace the function implementation. Add α parameter (governance-tunable, default 1.6). Update regression tests.
+- **After**: convex decay matches cognitive substrate. +8 regression tests.
+
+**Estimated effort**: 1 RSI cycle. Target: C40 lands by end of week.
+
+### Risk
+
+α = 1.6 is paper-§6.4-sourced. Deviation risks:
+- α < 1 (concave): decays too slowly initially, too fast later. Wrong shape.
+- α > 2: decays too slowly — contributions persist longer than they should.
+
+Governance can tune α, but within bounded ranges [1.2, 1.8]. No arbitrary values allowed.
+
+## Gap #2 — Shapley Time-Indexed Marginal
+
+### What the gap IS
+
+[Shapley distribution](./SHAPLEY_REWARD_SYSTEM.md) computes marginal contribution purely within each batch. Doesn't weight by *time-indexed marginality* (was this insight novel to the ecosystem when it arrived, or already derivable from priors?).
+
+### Why this matters
+
+Per [`THE_NOVELTY_BONUS_THEOREM.md`](./THE_NOVELTY_BONUS_THEOREM.md): plain Shapley is permutation-symmetric and provably under-rewards novelty.
+
+**Before (plain Shapley)**:
+- Alice publishes first. Bob publishes 6 months later with similar content.
+- Plain Shapley gives them equal credit.
+- Alice's priority is uncompensated.
+
+**After (Novelty Bonus)**:
+- Alice: 2.0x multiplier for high novelty.
+- Bob: 1.3x multiplier for moderate novelty.
+- Carol (replicates 2 years later): 0.7x multiplier for low novelty.
+
+Rewards shift toward originators. Replications still credited (Lawson Floor) but less.
+
+### The cycle
+
+**Cycle C41-C42 (target 2026-04-25 to 04-28)**:
+
+- **Before**: `ShapleyDistributor.computeShare()` uses permutation-averaged Shapley only.
+- **During (C41)**: extend signature to accept `priorContext: bytes32` representing the knowledge-set at the contribution's time. Modify Shapley to weight by similarity to prior-state.
+- **During (C42)**: implement off-chain similarity-keeper. Commits similarity scores on-chain via commit-reveal.
+- **After**: Shapley rewards incorporate novelty multipliers. Similarity function is commit-reveal-protected from retroactive tuning.
 
 **Deliverables**:
-- `contracts/consensus/NakamotoConsensusInfinity.sol` — replace `retentionWeight` function + update the fee schedule.
-- Regression tests — prove convexity + monotonic decay + alpha-sensitivity.
-- `memory/primitive_convex-retention-cost.md` — extract as durable primitive.
+- `contracts/incentives/ShapleyDistributor.sol` — extended signature.
+- `contracts/identity/ContributionAttestor.sol` — expose `getClaimsByContributorSince(contributor, since)` for similarity computation.
+- Off-chain keeper in `scripts/similarity-keeper.py`.
+- Regression tests proving novelty-correlation holds.
 
-**Estimated cycle**: 1 standard RSI cycle. Target: C40.
+**Estimated effort**: 2 RSI cycles.
 
-**Risk**: the alpha parameter is a tuning choice. Lean on [Augmented Mechanism Design](./AUGMENTED_MECHANISM_DESIGN.md) paper §6.4 values before asking Will.
+### Risk
 
----
+Off-chain similarity computation has trust boundary. Mitigation: commit-reveal of the similarity function itself, so the keeper can't retroactively tune to favor specific contributors.
 
-### Gap #2 — Shapley distribution's time-indexed marginal
+Residual risk: similarity function itself could have biases not detected by commit-reveal. Monitor.
 
-**Audit classification**: PARTIALLY MIRRORS. Shapley distributes batch surplus proportional to marginal contribution — the cognitive parallel is that insight is valued by its novelty (marginal increase in the knowledge set). The current implementation computes marginal purely within the batch; it doesn't weight by *time-indexed marginality* (was this insight novel to the ecosystem as a whole when it arrived, or was it already derivable?).
+## Gap #3 — Attested Circuit-Breaker Resume
 
-**ETM source property**: In cognition, an idea that arrives early has higher marginal value than the same idea arriving later — the second speaker gets less credit because the first already shifted the knowledge set. Batch-local Shapley loses this axis.
+### What the gap IS
 
-**Fix**:
-- Extend `ShapleyDistributor.computeShare` with a `timeIndex` modifier that consults a snapshot of the knowledge-set's prior state at `sourceTimestamp`.
-- Practically: weight by `(1 + earlinessBonus)` where `earlinessBonus = max(0, 1 - cumulativeSimilarContributions / saturationConstant)`.
-- Similarity is computed off-chain and committed on-chain via the same evidence-hash pattern used in [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md).
+Circuit breakers trip on extreme volume/price/withdrawal. The cognitive parallel is the flinch response. Current implementation lacks a symmetric resume condition tied to PoM re-certification.
+
+### Why this matters
+
+**Before**:
+- Circuit breaker trips.
+- Fixed cooldown period (e.g., 1 hour) passes.
+- Trading auto-resumes.
+
+After cooldown, trading resumes even if underlying condition hasn't changed. Trips can recur in rapid succession if system remains stressed.
+
+**After**:
+- Circuit breaker trips.
+- Cooldown floor (minimum 1 hour) passes — no resume before this.
+- BUT no automatic resume either.
+- Resuming requires M-of-N attestation from governance-certified attestors.
+- Attestors evaluate whether the stress condition is actually resolved.
+
+Cognitive parallel: after a "flinch," you don't auto-relax at a timer. You re-evaluate: "is the situation safe now?" Only on safety-confirmation do you relax.
+
+### The cycle
+
+**Cycle C43 (target 2026-04-30)**:
+
+- **Before**: `CircuitBreaker` auto-resumes after cooldown.
+- **During**: add `requireResumeAttestation(bytes32 claimId)` path. Resume requires a valid claim with attestation weight from M-of-N certified attestors. Cooldown floor unchanged; ceiling removed.
+- **After**: automatic cooldown is a floor; attestation is the resume gate.
 
 **Deliverables**:
-- `contracts/incentives/ShapleyDistributor.sol` — extend signature to accept time-indexed priors.
-- `contracts/identity/ContributionAttestor.sol` — expose `getClaimsByContributorSince(contributor, since)` for the earliness computation.
-- Off-chain component: a "similarity keeper" that commits hashes periodically. (This is the tool form of the Chat-to-DAG Traceability sweep; reuse the CI hook.)
-- Regression tests — prove earliness monotonically reduces as similar contributions accumulate.
-- `memory/primitive_time-indexed-marginal.md` — extract as durable primitive.
-
-**Estimated cycle**: 2 RSI cycles (contract changes + off-chain keeper). Target: C41–C42.
-
-**Risk**: off-chain similarity computation has trust boundary. Mitigate via commit-reveal of the similarity function itself, so the keeper can't retroactively tune to favor a contributor.
-
----
-
-### Gap #3 — Circuit breaker / PoM feedback asymmetry
-
-**Audit classification**: PARTIALLY MIRRORS. Circuit breakers trip on extreme volume/price/withdrawal — the cognitive parallel is the "flinch" response: when the system detects a signal exceeding normal bounds, it pauses to prevent runaway. The current implementation lacks a symmetric resume condition tied to PoM (Proof-of-Mind) re-certification.
-
-**ETM source property**: After a flinch, cognition doesn't resume because time passed — it resumes because the observer re-evaluates and re-certifies safety. The current circuit-breaker auto-resumes after a cooldown window, which is a weaker version.
-
-**Fix**:
-- Add `CircuitBreaker.requireResumeAttestation(bytes32 claimId)` — resuming after a trip requires a PoM-weighted attestation from M-of-N governance-certified attestors.
-- The cooldown window still exists as a floor (no resume before X seconds), but no ceiling — trip stays in place until attestation accumulates.
-- Aligns circuit-breaker resume with [Augmented Governance](./AUGMENTED_GOVERNANCE.md)'s Physics > Constitution > Governance hierarchy: the Physics layer (breaker trip threshold) fires independent of governance; the resume step is a governance action gated by attestation weight.
-
-**Deliverables**:
-- `contracts/core/CircuitBreaker.sol` — add `requireResumeAttestation` path + tests.
-- `memory/primitive_attested-resume.md` — extract.
+- `contracts/core/CircuitBreaker.sol` — `requireResumeAttestation` function + tests.
+- Primitive extracted: `memory/primitive_attested-resume.md`.
 - Documentation update to `CIRCUIT_BREAKER_DESIGN.md`.
 
-**Estimated cycle**: 1 RSI cycle. Target: C43.
+**Estimated effort**: 1 RSI cycle.
 
-**Risk**: adds friction to incident recovery. Mitigate by setting the attestation threshold low (1-of-3 certified attestors) for first deployment, raising over time as attestor network matures.
+### Risk
 
----
+Attestors could be slow to respond, extending resume latency. Mitigation: attestation threshold is low (1-of-3 certified attestors) for first deployment. Can raise over time as attestor pool matures.
 
 ## Strengthening already-mirroring mechanisms
 
-These don't fix gaps — they deepen the correspondence where it already exists. Schedule interleaved with the priority-queue cycles.
+These aren't fixes; they deepen alignment where it already exists.
 
-### Strengthen #1 — Commit-Reveal Auction: add explicit "attention window" accounting
+### Strengthen #1 — CRA Attention-Window Naming
 
-The 8-second commit + 2-second reveal window IS the attention span of the batch. Surface this as a named constant (`ATTENTION_WINDOW_COMMIT`, `ATTENTION_WINDOW_REVEAL`) tied to the ETM-framing, so future tunings are anchored to cognitive load data, not arbitrary numbers.
+[Commit-reveal auction](./TRUE_PRICE_ORACLE_DEEP_DIVE.md) uses 8-second commit + 2-second reveal = 10 seconds. Why 10 and not 15 or 5? Because the human+bot substrate has a ~10-second characteristic attention-time.
 
-### Strengthen #2 — SoulboundIdentity: bind to PoM source-lineage
+Action: surface this via `ATTENTION_WINDOW_COMMIT = 8` + `ATTENTION_WINDOW_REVEAL = 2` constants in the contract. NatSpec documents the cognitive-economic rationale.
 
-Issue on identity mint: the minted identity's metadata currently captures (address, mint timestamp). Add (source-lineage-hash) derived from the first attested contribution, so identity roots link into the ContributionDAG by design.
+Benefit: future engineers tuning these constants see the rationale, reject arbitrary changes.
 
-### Strengthen #3 — ContributionDAG bidirectional vouch → attention trade-off
+### Strengthen #2 — SoulboundIdentity Source-Lineage Binding
 
-The 1-day handshake cooldown models attention-rarity. Document this correspondence in `ContributionDAG.sol` NatSpec. Quantify via a short audit: what % of handshakes hit the cooldown floor? Data informs whether cooldown should be raised (more attention-scarce) or lowered (less).
+Identity mint currently captures (address, mint timestamp). Add (source-lineage-hash) — derived from the first attested contribution. This ties identity roots into the ContributionDAG by design.
 
----
+### Strengthen #3 — ContributionDAG Handshake Cooldown Audit
+
+The 1-day handshake cooldown models attention-rarity. Worth auditing: what percentage of handshakes hit the cooldown floor? Data informs whether cooldown should be raised (more rare) or lowered (less rare).
 
 ## New primitive candidates
 
-During audit writeup, three primitive candidates surfaced that don't yet exist in `memory/`:
+Three primitive candidates surfaced during audit:
 
-1. **Attention-surface scaling** — mechanisms that scale rent/cost with how much shared-state they occupy. Generalizes the NCI fix.
+1. **Attention-surface scaling** — mechanisms that scale rent/cost with shared-state occupancy. Generalizes the NCI fix.
 2. **Time-indexed marginal credit** — generalizes the Shapley fix beyond economics into any credit-assignment setting.
-3. **Attested resume** — any paused-state system that resumes via attestation-weight threshold rather than wall-clock timeout.
+3. **Attested resume** — paused-state systems that resume via attestation-weight, not wall-clock timeout.
 
-Extract these to `memory/primitive_*.md` as the respective cycles ship.
-
----
+Extract to `memory/primitive_*.md` as respective cycles ship.
 
 ## Cycle budget and sequencing
 
-| Cycle | Target | Scope | Expected ship |
-|---|---|---|---|
-| C40 | Gap #1 | Convex retention cost in NCI | 2026-04-23 |
-| C41 | Gap #2a | Shapley signature extension + ContributionAttestor query | 2026-04-25 |
-| C42 | Gap #2b | Off-chain similarity keeper + commit-reveal of function | 2026-04-28 |
-| C43 | Gap #3 | Attested circuit-breaker resume | 2026-04-30 |
-| C44 | Strengthen #1 | CRA attention-window NatSpec + tuning anchor | 2026-05-01 |
-| C45+ | Strengthen #2, #3 | As bandwidth allows | ongoing |
+| Cycle | Target ship | Scope |
+|---|---|---|
+| C40 | 2026-04-23 | Gap #1 — Convex retention in NCI |
+| C41 | 2026-04-25 | Gap #2a — Shapley signature + ContributionAttestor query |
+| C42 | 2026-04-28 | Gap #2b — Similarity keeper + commit-reveal |
+| C43 | 2026-04-30 | Gap #3 — Attested circuit-breaker resume |
+| C44 | 2026-05-01 | Strengthen #1 — CRA attention-window NatSpec |
+| C45+ | ongoing | Strengthen #2, #3 + primitive extractions |
 
-This cadence assumes continued All-Out Mode. If funding event slots in before C42, C42 slips; the off-chain keeper is deferrable.
-
----
+Estimated total: 1 week for gaps, 2 weeks with strengthens.
 
 ## Step 3 and Step 4 references
 
-**Step 3** (Positioning rewrite) — addressed in the whitepaper + investor-summary refresh cycle, scheduled parallel to C40–C43. See `VIBESWAP_WHITEPAPER.md` and `INVESTOR_SUMMARY.md`.
+The original ETM plan had 4 steps:
 
-**Step 4** (First concrete alignment fix) — Gap #1 (NCI convex retention) IS the first concrete fix. C40 is Step 4.
+- **Step 1**: ETM Alignment Audit (complete — [`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md)).
+- **Step 2**: Build Roadmap (this doc).
+- **Step 3**: Positioning rewrite — update whitepaper + investor summary to reframe from "DEX + AI" to "cognitive economy externalized." Parallel to C40-C43.
+- **Step 4**: First concrete alignment fix — Gap #1 (NCI convex retention) IS this. C40.
 
----
+## What this document is for
 
-## How to use this document
+It's a work plan. Specific deliverables mapped to specific cycles with specific dates.
 
-- **If you're an engineer starting a cycle**: read the gap section → check the primitive cross-references → implement the deliverables in order → write the regression test that proves the mirror property → ship.
-- **If you're reviewing**: the mirror property is the correctness criterion, not "it compiles". An implementation that compiles and tests green but doesn't prove the ETM correspondence is not done.
-- **If you're external**: this is the transparent, read-anytime form of the engineering plan. It's intentionally specific so external contributors can pick up cycles. See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) for how external contributions earn DAG credit.
+It's NOT a vision doc (that's [`THE_COGNITIVE_ECONOMY_THESIS.md`](./THE_COGNITIVE_ECONOMY_THESIS.md) and [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md)).
 
----
+When you're ready to ship, look here for the next target. When you want to understand WHY we ship, look at the vision docs.
+
+## For engineers
+
+If you're starting a cycle:
+
+1. Read the gap section for the relevant gap.
+2. Check primitive cross-references.
+3. Implement the deliverables.
+4. Write the regression test that proves the ETM mirror property.
+5. Ship.
+
+The mirror property is the correctness criterion, not just "it compiles." A test that asserts "α=1.6 convex retention produces the expected curve" is the correctness proof.
+
+## For external contributors
+
+If you're external, these cycles are plausibly-accessible. The Gap #1 fix is ~50 LOC change + tests. A contributor with Solidity experience could ship it.
+
+See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) for how external contributions earn DAG credit.
+
+## Relationship to other primitives
+
+- **Feeds into**: [`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md) — Step 1.
+- **Feeds from**: [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md) (Gap #1), [`THE_NOVELTY_BONUS_THEOREM.md`](./THE_NOVELTY_BONUS_THEOREM.md) (Gap #2).
+- **Delivers to**: production codebase (contracts/consensus/, contracts/core/, contracts/incentives/).
 
 ## One-line summary
 
-*Translate the ETM alignment audit's 3 PARTIAL gaps into 4 concrete RSI cycles (C40–C43) that deepen the cognitive-economy → on-chain correspondence, shipping substrate-layer fixes before ornament-layer ones.*
+*Step 2 of 4 in ETM Build Plan — addresses 3 PARTIAL gaps found in Step 1 audit (convex NCI retention C40, time-indexed Shapley C41-C42, attested circuit-breaker resume C43). Each cycle walked before/during/after with concrete numbers and mechanism references. Budget ~1 week for gaps + 2 weeks with strengthens. First concrete alignment fix is C40 — deployed convex retention function matches cognitive substrate's α=1.6.*

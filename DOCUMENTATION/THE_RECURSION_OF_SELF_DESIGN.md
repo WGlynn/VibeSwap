@@ -1,101 +1,208 @@
 # The Recursion of Self-Design
 
-**Status**: Meta-stability analysis. What prevents self-reward loops.
+**Status**: Meta-stability analysis with concrete scenarios.
+**Audience**: First-encounter OK. Walk through specific failure modes + stability conditions.
 
 ---
 
-## The paradox
+## The uncomfortable situation
 
-VibeSwap is a mechanism that rewards contributions. Designing the mechanism IS a contribution. Under the mechanism's own rules, designers get rewarded for designing it. This looks like self-reward — Ponzi-adjacent.
+Suppose you decide to build a mechanism that rewards contributions. You spend 6 months designing the mechanism. Now you deploy it.
 
-If left unexamined, the recursion would be a red flag. Projects where founders credit themselves for creating the credit system are historically extractive.
+Here's the awkward question: *should you get credit for designing the mechanism?*
 
-VibeSwap's claim: the recursion is stable under specific conditions. This doc names those conditions and the safeguards that enforce them.
+If yes, the mechanism is paying you for designing itself. That's recursion: the rules you built reward the work of building them.
 
-## The recursion formalized
+If no, you get nothing for 6 months of design work. That seems unfair.
 
-Let `M` be the mechanism, `D` be the designer, `C(x, M)` be the credit computed for contribution x under mechanism M.
+Both answers feel wrong. The recursion-of-self-design problem is navigating this intuition.
 
-Naive: `D` designs `M`. D claims credit `C(design_M, M)` — design-of-M credited by M. Recursive.
+## Why it matters
 
-Stable condition: `C(design_M, M) ≤ C_fair(design_M)`, where `C_fair` is the credit `D` would have earned under an unbiased external audit. If M doesn't over-credit its own design, the recursion doesn't diverge.
+Most projects dodge this question. Founders just allocate themselves tokens based on their own judgment. "Founders get 30%". No mathematical justification; just precedent.
 
-## What could go wrong
+VibeSwap can't dodge it. The protocol's values (fairness, anti-extraction, attribution-as-structural) make the usual answer ("founders just get X%") incompatible. We have to confront the recursion honestly.
 
-**Case 1 — Self-inflation.** M is designed so that designing M is weighted dramatically higher than other contributions. Designer captures value disproportionate to the work of designing.
+## The basic tension
 
-**Case 2 — Founder-perpetuity.** M is designed so that designers retain governance control disproportionate to ongoing contribution. Stable at year 1; oppressive at year 10.
+A system that rewards contributions has a mechanism. Someone designed the mechanism. Should they get credit for that design under the mechanism's own rules?
 
-**Case 3 — Design-capture via design.** M's rules about what counts as a contribution are themselves a governance parameter, and designers vote to expand "design contribution" to include more of their own future work.
+If YES → recursion. The mechanism is rewarding the work of its own design. This looks circular.
 
-**Case 4 — Cross-coupling.** Designers also serve as attestors / tribunal jurors / governance voters, and use those roles to confirm their own contribution weights.
+If NO → the designer is effectively working for free. And the design itself is a contribution. Unrewarded contribution violates P-000 (Fairness).
 
-Each is a real failure pattern that other projects have exhibited.
+Neither pure yes nor pure no works. The answer must be a bounded yes.
 
-## The stability conditions
+## What the naive answer fails
 
-VibeSwap's recursion is stable because of four specific choices:
+Suppose you just let design credit flow without constraint.
 
-### Condition 1 — Shapley-capped initial design credit
+**Scenario**: Alice designs VibeSwap's reward mechanism. She's the sole designer. The mechanism pays out based on marginal contribution. She claims the design work was load-bearing (true) and assigns herself, say, 80% of all future rewards.
 
-Design credit for the mechanism itself is Shapley-computed over the cooperative game that includes all contributors. Designers get their marginal-contribution share — which is substantial (design is load-bearing) but bounded. Not "founders get 30% forever."
+Problems:
+- 80% to a single person is extractive.
+- Later contributors see 80% go to founder; they underinvest.
+- Governance can't really check this (she designed the governance too).
+- The recursion runs away.
 
-### Condition 2 — Constitutional separation
+This is why naive yes doesn't work.
 
-P-000 (fairness) and P-001 (no-extraction) are [Constitutional axioms](./NO_EXTRACTION_AXIOM.md) that even governance cannot override. Designers cannot vote to rewrite the Constitution. Self-amplification requires amending the Constitution, which requires the Constitution to allow it — which P-000 explicitly forbids.
+## What's required for stability
+
+The recursion is stable iff specific conditions hold:
+
+### Condition 1 — Initial design credit is Shapley-bounded
+
+Design credit for the mechanism itself is computed via Shapley over the cooperative game that includes ALL contributors (not just the designer).
+
+Alice gets her marginal-contribution share. If the design was crucial and unique, her share is high. If others also contributed substantially, her share is lower.
+
+**Concrete**: Alice designed the core mechanism. Bob wrote tests. Carol did UX. Dana did governance. Shapley values might be: Alice 50%, Bob 20%, Carol 15%, Dana 15%. Alice still gets the most but not 80%.
+
+### Condition 2 — Constitutional axioms block self-amplification
+
+P-000 (Fairness) and P-001 (No Extraction) are constitutional — NOT governance parameters. Alice cannot vote to make them "except in her case". See [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md).
+
+If a future Alice tries to game the mechanism for self-benefit, the constitutional axioms block it. Amendment requires amending the Constitution, which requires the Constitution to allow it — which P-000 explicitly forbids.
 
 ### Condition 3 — Founder-weight decay
 
-[`ContributionDAG`](./CONTRIBUTION_DAG_EXPLAINER.md) founder-multiplier is 3.0x but decays across hops (15% per hop). At hop 3 from a founder, the effective multiplier is `3.0 × 0.85^3 ≈ 1.84`. At hop 6 (max), `3.0 × 0.85^6 ≈ 1.13`. The founder-advantage dilutes organically as the trust graph grows.
+Alice (founder) has trust-multiplier 3.0x in ContributionDAG. But trust decays 15% per hop. At hop 3 from Alice, effective multiplier is `3.0 × 0.85^3 ≈ 1.84`. At hop 6, `3.0 × 0.85^6 ≈ 1.13`.
 
-### Condition 4 — Three-branch attestation resists single-actor capture
+Alice's direct influence is substantial but dilutes organically as the graph grows. Over 3 years with ~5000 active contributors, Alice's actual weight in distributions is a bounded fraction.
 
-Accepting a claim requires either executive (trust-weighted peers), judicial (tribunal), or legislative (governance). Founders as a single-vote bloc cannot swing all three branches. See [ContributionAttestor Explainer](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
+### Condition 4 — Three-branch attestation resists capture
 
-All four conditions together bound the recursion.
+Accepting a claim requires either executive (trust-weighted peers), judicial (tribunal), or legislative (governance). Alice alone cannot swing all three branches. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
 
-## The convergence claim
+Even if Alice could bias executive branch (she has high trust-weight), tribunal jury selection is random and governance requires quadratic voting. No single actor can capture all three.
 
-Under the four conditions:
+### What these four conditions ensure
 
-- Design credit converges to a bounded fraction of total distributed value.
-- Founder voting power converges to a modest multiple of average participant voting power over 5-10 years of graph growth.
-- Constitutional axioms remain immutable regardless of governance composition.
-- No single actor (or small coalition) can capture claims / rewards / governance.
+Under all four conditions, recursion converges:
+- Design credit is bounded (Shapley-limited).
+- Founder voting power is bounded (3.0x with decay).
+- Constitutional axioms are immutable.
+- Multi-branch capture is infeasible.
 
-The system converges to a stable distribution where designers are credited fairly for creation-work and subsequently fade into ordinary contributor status.
+Alice gets fair credit for design work. She doesn't accumulate unbounded wealth or power. Over time, her advantage dilutes as contributors compound.
 
-## The test: would designers be comfortable under external design?
+Convergent, not divergent. Recursion is safe.
 
-A useful test: if the mechanism had been designed by strangers — and then applied to a different project — would designers be comfortable being subject to it?
+## Concrete scenario — year 5 of the protocol
 
-If yes, the self-design is fair (they're not granting themselves special treatment).
+Let's project forward to see this play out.
 
-If no, the mechanism is self-biased — designers have built-in advantages they wouldn't accept if the shoe were on the other foot.
+**Year 0 (launch)**: Alice is sole designer. Shapley share for initial mechanism design: say, 25% of early-stage rewards. Founder multiplier: 3.0x.
 
-VibeSwap's answer is "yes" — the mechanism's rules are symmetric across designer / non-designer, and the initial-credit-for-design-work is small enough that designers gain more from long-term-ordinary-participation than from a founders'-lockup. Sustainability over time > extraction-at-t=0.
+**Year 1**: ~50 active contributors. Shapley distribution shifts — new contributors add 5% each collectively. Alice's effective rewards: now ~15% of ongoing rewards (her 25% of year-0 pool + smaller share of year-1 pool).
+
+**Year 3**: ~500 active contributors. Alice's ongoing share: ~5% of each year's pool. Her accumulated wealth is substantial but her influence dilutes.
+
+**Year 5**: ~5,000 active contributors. Alice's share: ~1-2% of each year's pool. Her founder-multiplier is still 3.0x but only 5-10 contributors are at hop-0 from her; most of the graph has diluted her influence.
+
+**Year 10**: ~50,000 active contributors. Alice's share: negligible per-year. She's retained her original cumulative allocation but the protocol is no longer "hers" in any controlling sense.
+
+This trajectory is stable — Alice fades into ordinary participant status over time. Sustainable over decades.
+
+The alternative (naive 80% forever): extractive, unsustainable, protocol dies.
+
+## What could break stability
+
+Even with the four conditions, specific attacks could break convergence:
+
+### Attack 1 — Self-attestation via sockpuppets
+
+Alice creates 20 pseudo-identity accounts and has them attest her work to inflate her Shapley share.
+
+**Counter**: 
+- SoulboundIdentity prevents Sybil accumulation (only one identity per real human).
+- Quadratic voting dampens coordinated vote patterns.
+- Attestation weight scales with attestor trust, so low-trust sockpuppets barely boost.
+
+Net: sockpuppet attacks cost more than they gain. Not a real threat.
+
+### Attack 2 — Pre-governance capture
+
+Alice deploys the protocol with governance-captured configurations (e.g., quorum thresholds set to favor her). Years later she uses this to block amendments that would fix her advantage.
+
+**Counter**:
+- Initial governance config is published transparently before launch.
+- Community can fork if Alice misuses.
+- Constitutional axioms (P-000, P-001) are not governance parameters.
+
+Fork-threat is a real constraint. Alice can't just ignore community if community holds accumulated attention-graph.
+
+### Attack 3 — Mechanism ossification
+
+Alice refuses to allow mechanism updates that would dilute her advantage. "Can't change this; too much work already done."
+
+**Counter**:
+- Governance has explicit amendment paths.
+- Tribunal escalation is possible.
+- External pressure (community, investors, competitors) forces adaptation.
+
+Ossification is mitigable, though it's a real risk in concentrated-founder protocols.
+
+## The "test against external design" principle
+
+A useful mental test: if the mechanism had been designed by strangers and then applied to Alice, would Alice find it fair?
+
+If yes → the mechanism is symmetric (not biased toward Alice).
+
+If no → Alice is getting special treatment that wouldn't pass external review.
+
+Apply to VibeSwap:
+- Shapley distribution: applies equally to designers and non-designers. Symmetric. ✓
+- Founder multiplier: 3.0x for Alice. But same 3.0x would apply to any non-Alice founder. Symmetric. ✓
+- Constitutional axioms: constrain everyone equally. ✓
+
+Alice's position in VibeSwap's mechanism is not privileged beyond what any equivalent contributor would receive. Test passes.
+
+## Why this matters for positioning
+
+External skeptics see "Will created VibeSwap, wouldn't he get all the benefits?" This doc is the answer: the recursion is bounded by the four conditions, the test-against-external-design passes, the trajectory is Will-fading-to-ordinary-contributor, and this is auditable.
+
+Serious investors will ask this question. Serious contributors will care about the answer. Having an explicit, honest response builds trust.
 
 ## Why this matters beyond VibeSwap
 
-Any project that builds a credit mechanism faces this paradox. Most punt the question ("we're founders, of course we get founder shares"). Some collapse into extraction over time. Few explicitly articulate what stability conditions their design must satisfy.
+Every cooperative-production system that tries to build a reward mechanism hits this paradox. Most fail to address it. The ones that address it best end up with protocols that survive the founder.
 
-Making the stability conditions explicit:
-- Invites external audit (anyone can check whether VibeSwap satisfies them).
-- Enables specific falsification (if condition X breaks, VibeSwap has drifted).
-- Provides a template other projects can adapt.
+VibeSwap's approach is transferable:
+- Shapley-bounded initial credit.
+- Constitutional axioms that block self-amplification.
+- Founder-weight decay.
+- Multi-branch capture-resistance.
+
+Apply these four conditions to any credit-assignment system. They produce stable recursion.
 
 ## The meta-recursion
 
-This doc is itself a contribution. Writing this doc earned DAG credit. The mechanism for earning DAG credit for writing docs is described in this doc. One more level of recursion.
+This doc is itself a contribution. Writing this doc earned DAG credit. The mechanism for earning DAG credit for docs is described within this doc. One more level of recursion.
 
-Stable because: the credit earned is proportional to marginal contribution (is this doc making the stack clearer?) and not to self-assertion (is this doc claiming credit for itself?). Recursive, yes. Divergent, no.
+Stable because: credit is proportional to marginal contribution (is this doc clarifying the stack?) not to self-assertion (is this doc claiming credit?). Recursive, yes. Divergent, no. The same four conditions apply.
 
 ## Relationship to the Lawson Constant
 
-[Lawson Constant](./LAWSON_CONSTANT.md): "the greatest idea cannot be stolen because part of it is admitting who came up with it." The recursion is safe when attribution is preserved down through successive rounds of design — you can always trace who did what when. When attribution is stripped, recursion becomes unauditable, and drift sets in.
+The Lawson Constant (see [`LAWSON_CONSTANT.md`](./LAWSON_CONSTANT.md)) ensures attribution is preserved across successive rounds of design. You can always trace who did what when.
+
+This is what makes recursion auditable. Without attribution-preservation, recursion becomes invisible; drift compounds undetected. With attribution-preservation, each recursive round is legible; drift can be detected and corrected.
 
 The Lawson Constant is the structural guarantee that recursion-audit is possible.
 
+## For students
+
+Exercise: propose a credit mechanism for a small project (e.g., a study group's collaborative project). Apply the recursion-of-self-design analysis:
+
+1. Identify the designer (maybe yourself).
+2. What would Shapley-bounded credit for your design look like?
+3. What constitutional axioms would you need?
+4. How would founder-weight decay in your graph?
+5. What attestation branches would resist capture?
+
+Work through the four conditions for your proposed mechanism. Can you make the recursion convergent?
+
 ## One-line summary
 
-*The mechanism rewards its own designers, but only under Shapley-bounded credit, constitutional axioms that block self-amplification, founder-weight decay, and three-branch capture-resistance — making the recursion convergent, not divergent.*
+*Recursion-of-self-design: the mechanism rewards its own designers. This is convergent (not divergent) iff four conditions hold: Shapley-bounded initial credit + constitutional axioms blocking self-amplification + founder-weight decay + three-branch attestation capture-resistance. Concrete year-0-through-year-10 projection shows Alice fading to ordinary contributor; pattern is transferable to any cooperative-production system.*

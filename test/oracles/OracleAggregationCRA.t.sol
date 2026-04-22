@@ -72,4 +72,52 @@ contract OracleAggregationCRATest is Test {
             abi.encodeWithSelector(OracleAggregationCRA.initialize.selector, stubRegistry, address(0))
         );
     }
+
+    // ============ Commit Phase ============
+
+    function _commitHash(uint256 price, bytes32 nonce) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(price, nonce));
+    }
+
+    function test_commitPrice_happy() public {
+        bytes32 ch = _commitHash(1500e18, bytes32(uint256(1)));
+        vm.prank(issuer1);
+        agg.commitPrice(ch);
+
+        IOracleAggregationCRA.BatchInfo memory info = agg.getBatch(1);
+        assertEq(info.commitCount, 1);
+    }
+
+    function test_commitPrice_revertZeroHash() public {
+        vm.prank(issuer1);
+        vm.expectRevert(bytes("Zero hash"));
+        agg.commitPrice(bytes32(0));
+    }
+
+    function test_commitPrice_revertDoubleCommit() public {
+        bytes32 ch = _commitHash(1500e18, bytes32(uint256(1)));
+        vm.prank(issuer1);
+        agg.commitPrice(ch);
+        vm.prank(issuer1);
+        vm.expectRevert(bytes("Already committed"));
+        agg.commitPrice(ch);
+    }
+
+    function test_commitPrice_autoAdvancesBatchAfterDeadline() public {
+        bytes32 ch1 = _commitHash(1500e18, bytes32(uint256(1)));
+        vm.prank(issuer1);
+        agg.commitPrice(ch1);
+        assertEq(agg.getCurrentBatchId(), 1);
+
+        // Skip past commit + reveal deadlines for batch 1
+        vm.warp(block.timestamp + 100);
+
+        bytes32 ch2 = _commitHash(1600e18, bytes32(uint256(2)));
+        vm.prank(issuer2);
+        agg.commitPrice(ch2);
+        assertEq(agg.getCurrentBatchId(), 2);
+
+        IOracleAggregationCRA.BatchInfo memory info = agg.getBatch(2);
+        assertEq(info.commitCount, 1);
+    }
 }

@@ -34,6 +34,10 @@ contract TruePriceOracle is
     // ============ Admin Observability Events ============
     event StablecoinRegistryUpdated(address indexed previous, address indexed current);
     event IssuerRegistryUpdated(address indexed previous, address indexed current);
+    event OracleAggregatorUpdated(address indexed previous, address indexed current);
+
+    /// @notice C39 FAT-AUDIT-2 — emitted when a TruePrice is sourced from aggregator median.
+    event TruePriceFromAggregator(bytes32 indexed poolId, uint256 indexed batchId, uint256 medianPrice, uint256 revealCount);
 
     // ============ Constants ============
 
@@ -77,6 +81,10 @@ contract TruePriceOracle is
 
     /// @notice Reference to StablecoinFlowRegistry for additional context
     IStablecoinFlowRegistry public stablecoinRegistry;
+
+    /// @notice C39 FAT-AUDIT-2 — Reference to the commit-reveal oracle aggregator.
+    /// @dev address(0) disables the aggregator pull path. Set via setOracleAggregator.
+    address public oracleAggregator;
 
     // ============ EIP-712 Type Hashes ============
 
@@ -415,6 +423,16 @@ contract TruePriceOracle is
         address prev = address(issuerRegistry);
         issuerRegistry = IIssuerReputationRegistry(registry);
         emit IssuerRegistryUpdated(prev, registry);
+    }
+
+    /**
+     * @notice C39 FAT-AUDIT-2 — Set the OracleAggregationCRA address used by pullFromAggregator.
+     * @param aggregator Aggregator address (zero to disable the pull path).
+     */
+    function setOracleAggregator(address aggregator) external onlyOwner {
+        address prev = oracleAggregator;
+        oracleAggregator = aggregator;
+        emit OracleAggregatorUpdated(prev, aggregator);
     }
 
     // ============ C12: EvidenceBundle Update Path ============

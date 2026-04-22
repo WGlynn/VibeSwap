@@ -1,118 +1,109 @@
 # The Observer Effect in Attestation
 
-**Status**: Goodhart's Law applied to attestation mechanisms.
-**Depth**: Where measuring contributions distorts what gets contributed, and how to design around it.
-**Related**: [ContributionAttestor Explainer](./CONTRIBUTION_ATTESTOR_EXPLAINER.md), [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md), [Substrate Incompleteness](./SUBSTRATE_INCOMPLETENESS.md).
+**Status**: Goodhart's Law applied with concrete gaming scenarios + counter-moves.
+**Audience**: First-encounter OK.
 
 ---
 
-## Goodhart's Law, stated
+## Goodhart's Law — a short history
 
-*When a measure becomes a target, it ceases to be a good measure.*
+In 1975, British economist Charles Goodhart made an observation about central banks. When a central bank chose "M1 money supply" as a target to control, the market adjusted around it. M1 stopped correlating with the underlying economic health it was supposed to indicate. The metric became a target; the correlation broke.
 
-Charles Goodhart, 1975. Originally observed in monetary policy: when a central bank targets M1 money supply, the market adjusts to game M1 without affecting the underlying economic variable M1 was supposed to represent.
+Marilyn Strathern generalized: *"When a measure becomes a target, it ceases to be a good measure."*
 
-The generalization (Marilyn Strathern): *When a metric is used to govern, it distorts what it measures.*
+Modern examples:
+- Schools teach to the standardized test (test score becomes a target; doesn't measure actual learning anymore).
+- Researchers publish for citation count (citation count becomes a target; research quality doesn't necessarily improve).
+- Tech workers aim for performance-review metrics (metrics become a target; actual work quality can degrade).
 
-Applied to VibeSwap: the moment attestation-weight is used to allocate rewards, contributors will optimize for attestation-weight, not for the underlying cognitive-economic contributions that attestation-weight was supposed to measure.
+This is the observer effect applied to measurement. The act of measuring changes what's measured.
 
-## Why this is inevitable
+## Applied to VibeSwap
 
-Goodhart's Law is not a contingent feature of particular mechanisms — it's a structural feature of any measurable-and-incentivized metric. The logic:
+VibeSwap's attestation mechanism weights trust × multiplier. Users contributing earn credit based on attestations. Attestations from high-trust users count more.
 
-1. Metric M measures property P.
-2. System rewards high-M.
-3. Rational agents optimize for high-M.
-4. Optimizing for high-M produces different behavior than optimizing for P (because M is a proxy, not P itself).
-5. Over time, the distribution of M drifts away from representing the distribution of P.
+The moment this becomes visible as a reward system, rational contributors will optimize for it. They will work on things that earn attestations. They will seek attestations from high-trust users. They will accumulate handshakes.
 
-The only escape is to make M = P exactly. For most P worth incentivizing, this is uncomputable (see [The Uncomputable Marginal](./THE_UNCOMPUTABLE_MARGINAL.md)). So Goodhart's Law bites every real mechanism.
+This is fine IF optimizing for the metric produces the behavior we want (good contributions → attestations → rewards). If NOT, Goodhart fires: people optimize for attestation-shaped work rather than actually-good work.
 
-## VibeSwap-specific Goodhart pressures
+## The four Goodhart pressures on VibeSwap
 
 ### Pressure 1 — Attestation-weight gaming
 
-Attestation weight is computed from trust × multiplier. Rational contributors maximize by accumulating handshakes with high-trust nodes, building trust-score, and appearing in many attestations.
+Contributors try to accumulate attestation weight directly — not by producing valuable work, but by working the system.
 
-If this produces more cooperative-production (the underlying P), great. If it produces shallow reciprocity (I attest your claim, you attest mine, neither contribution is substantive), the metric has drifted.
+**Concrete gaming scenario**: Alice and Bob form a "handshake ring." They mutually attest each other's claims. Their trust-scores rise rapidly because they each get a high-weight attestation per claim.
 
-Observed in similar systems: cross-attestation rings where a small group of users mutually attest to inflate each other's weights.
+**Why this gets through**: plain attestation-weight would reward them equally to legitimately-high-trust contributors.
+
+**Counter-move**: quadratic voting (smaller weight per additional vote from same source). Random selection for tribunals bypasses coordinated-attestation. Three-branch capture-resistance means their executive-branch gaming doesn't carry to tribunal or governance.
+
+**Residual gaming possible**: 2-3 person rings that stay below detection. Small value extracted; acceptable residual.
 
 ### Pressure 2 — Contribution-type gaming
 
-9 contribution types. Different types may have different Shapley value distributions. Rational contributors focus on the type that pays best per unit effort.
+Different contribution types (Code, Research, Security, etc.) may have different payoff curves. Contributors will gravitate to the types that pay best per unit effort.
 
-If Code is highly rewarded but Design is not, contributors shift toward Code even when Design would have been their comparative advantage. Result: a stack of mediocre Code with insufficient Design — not what was incentivized.
+**Concrete gaming scenario**: Code contributions are highly rewarded. Design contributions are less so. Contributors shift toward Code even when their comparative advantage is in Design. Result: lots of mediocre Code; insufficient Design.
+
+**Counter-move**: the heterogeneity mandate (see [Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md)) — Shannon entropy of contribution types must remain high. Governance can adjust payoff curves per type to restore balance.
+
+**Residual gaming possible**: within a single type, contributors still game relative payoffs.
 
 ### Pressure 3 — Evidence-hash gaming
 
-The evidenceHash commits to off-chain content. Rational contributors might commit to content that looks substantive (long, complex) without actually creating value. The hash can't evaluate content quality.
+evidenceHash commits to off-chain content. Rational contributors might commit to content that looks substantive (long, complex, impressive) without actually creating value.
 
-Observed in similar systems: content-length optimization, fancy-formatting optimization, keyword-stuffing — all of which increase apparent-substance without increasing real-substance.
+**Concrete gaming scenario**: Alice submits a "security audit" that's really 50 pages of pseudo-formal prose with few actual findings. Looks substantive; doesn't prevent real bugs.
+
+**Why this gets through**: the evidenceHash verifies content exists but doesn't evaluate quality.
+
+**Counter-move**: peer attestations evaluate quality. Tribunal re-evaluation for disputed claims. Multi-branch requirements prevent pure-evidence-hash capture.
+
+**Residual gaming possible**: novice reviewers might be fooled by surface-substantive content. Takes time for community to develop detection.
 
 ### Pressure 4 — Lineage-depth gaming
 
-ParentAttestations create lineage. Contributors benefit from being cited as a parent. Rational contributors try to position their contributions as load-bearing predecessors — writing the "first" on a topic, making claims that later work has to cite.
+ParentAttestations create lineage. Contributors benefit from being cited as a parent. Rational contributors position themselves as load-bearing predecessors.
 
-If this produces genuine precedent-setting work, great. If it produces race-to-claim-a-topic without substantive depth, the lineage structure is distorted.
+**Concrete gaming scenario**: Alice claims her 2022 Telegram message was the foundational inspiration for Bob's 2026 breakthrough. She retroactively claims lineage credit for significant downstream work.
 
-## The design toolkit
+**Why this gets through**: if Alice's claim has even a modest evidence base, the lineage link gets credit.
 
-VibeSwap's architecture includes several anti-Goodhart primitives:
+**Counter-move**: Novelty Bonus (see [Novelty Bonus Theorem](./THE_NOVELTY_BONUS_THEOREM.md)) penalizes contributions with high similarity-to-prior. Lineage-claiming requires demonstrable influence, not just priority.
 
-### Tool 1 — Multiple branches
+**Residual gaming possible**: subtle lineage-gaming where influence IS plausible but overstated.
 
-[Three-branch attestation](./CONTRIBUTION_ATTESTOR_EXPLAINER.md) means gaming one branch (executive peer-attestation) doesn't capture the others (judicial tribunal, legislative governance). Gaming becomes exponentially harder when three independent measures must all be spoofed.
+## Why no single tool prevents Goodhart
 
-Effectiveness: high for gross gaming, medium for subtle gaming. Sophisticated actors can still bias the executive branch while staying out of tribunal and governance scope.
+Substrate Incompleteness ([`SUBSTRATE_INCOMPLETENESS.md`](./SUBSTRATE_INCOMPLETENESS.md)) applies. Every mechanism has gaming surfaces. Composing mechanisms doesn't eliminate them; it reduces them.
 
-### Tool 2 — Quadratic weighting
+The asymmetry VibeSwap aims for: defenders (honest contributors + governance) have structural advantages over attackers (Goodharting actors).
 
-Quadratic voting in the legislative branch diminishes returns for coordinated voting. If 10 sockpuppets each vote 100 units, they achieve `sqrt(10 × 100) = 31.6`, not 1000. Gaming becomes expensive.
-
-Effectiveness: high for Sybil-style gaming, limited for coordinated-non-Sybil gaming (e.g., a small group of real-identity actors coordinating).
-
-### Tool 3 — Novelty bonus ([Novelty Bonus Theorem](./THE_NOVELTY_BONUS_THEOREM.md))
-
-Rewards early-novel contributions super-linearly and replicated contributions sub-linearly. Makes pattern-matching to recent-high-reward-contributions progressively less rewarding.
-
-Effectiveness: medium. Novelty-detection is itself a metric; can be Goodharted (people optimize for novelty-detector outputs rather than actual novelty).
-
-### Tool 4 — Tribunal escalation
-
-Disputed attestations can escalate to tribunal for jury-based adjudication. The jury is randomly selected from a high-trust pool, reducing the ability of any single gaming attempt to consistently influence outcomes.
-
-Effectiveness: high for case-specific gaming, low for meta-gaming (e.g., influencing the jury-pool selection).
-
-### Tool 5 — Governance override
-
-Ultimate supreme authority can override any attestation. Reserved for systemic-drift cases.
-
-Effectiveness: absolute in principle, political in practice. Governance itself can be Goodharted (vote-buying, proposal-ordering).
-
-## The fundamental asymmetry
-
-No single tool prevents Goodharting. The composition of tools makes Goodharting harder but not impossible. Substrate Incompleteness ([`SUBSTRATE_INCOMPLETENESS.md`](./SUBSTRATE_INCOMPLETENESS.md)) applies: every mechanism has gaming surfaces.
-
-The asymmetry VibeSwap aims for: **defenders (honest contributors + governance) have structural advantages over attackers (Goodharting actors)**. Specifically:
-
-- Defenders see all branches; attackers must fool multiple.
-- Defenders have time-integrating audits; attackers have to maintain the gaming across rounds.
-- Defenders have higher-level governance; attackers can't modify governance without exposure.
+Specifically:
+- **Defenders see all branches**: executive, judicial, legislative. Attackers must fool multiple.
+- **Defenders have time-integrating audits**: attackers have to maintain gaming across rounds.
+- **Defenders have higher-level governance**: attackers can't modify governance without exposure.
 
 The asymmetry doesn't eliminate Goodharting. It makes the cost/benefit unfavorable for most adversaries most of the time.
 
 ## Reverse-Goodhart — designing for misaligned optimization
 
-Design principle: if contributors WILL optimize for the metric, pick metrics whose optimization produces desirable behavior.
+If contributors WILL optimize for the metric, pick metrics whose optimization produces desirable behavior.
 
-Example: "Reward number of handshakes" produces social butterflies. Not useful. "Reward number of handshakes weighted by partner's trust-score" produces deliberate cultivation of high-trust relationships — closer to what we want.
+**Example of reverse-Goodhart:**
 
-Example: "Reward attestations received" produces spammy self-promotion. "Reward attestations received weighted by attestor's trust and type-diversity" produces multi-type cross-substrate collaboration — closer to what we want.
+- BAD metric: "Number of handshakes per contributor." Contributors handshake with everyone regardless of quality. Metric optimized; behavior bad.
+- BETTER metric: "Handshakes weighted by partner's trust-score." Contributors pursue deliberate cultivation of high-trust relationships. Metric optimized; behavior better.
 
-The iteration of metric design: propose a metric; predict how it gets Goodharted; modify to make the Goodharting produce good behavior; repeat.
+Another example:
 
-## The honesty-in-framing implication
+- BAD: "Number of attestations received." Contributors seek as many attestations as possible, regardless of quality.
+- BETTER: "Attestations received weighted by attestor's trust and type-diversity." Contributors pursue multi-type cross-substrate collaboration. Metric optimized; behavior substantively better.
+
+The iteration: propose metric, predict its Goodhart, refine until Goodharting produces good behavior.
+
+## The honesty discipline
 
 A transparent mechanism documents:
 - The metrics that drive rewards.
@@ -120,30 +111,60 @@ A transparent mechanism documents:
 - The known mitigations.
 - The residual gaming surfaces.
 
-Don't claim a mechanism is "Goodhart-proof". Claim it has "specific Goodhart surfaces with specific mitigations". This is honest about limits while maintaining confidence in the overall design.
+Don't claim "VibeSwap's attestation is Goodhart-proof." Claim "VibeSwap's attestation has specific Goodhart surfaces with specific mitigations and acknowledged residuals."
+
+This is honest about limits while maintaining confidence in the overall design.
 
 ## The social-epistemology dimension
 
-Goodharting is not just individual behavior — it can become collective norms. If "building attestation weight" is celebrated as smart participation, more people do it. Culture reinforces Goodharting.
+Goodharting isn't just individual behavior — it can become collective norm. If "building attestation weight" is celebrated as smart participation, more people do it. Culture reinforces Goodharting.
 
-Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize [Lawson Constant](./LAWSON_CONSTANT.md) attribution as the goal (who really did this?), not Shapley percentage as the goal (who got how much?).
+Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize [Lawson Constant](./LAWSON_CONSTANT.md) attribution as THE goal (who really did this?), not Shapley percentage as the goal (who got how much?).
 
-This is cultural design, not mechanism design. Both matter.
+This is cultural design, not just mechanism design. Both matter.
+
+## Concrete counter-culture tactics
+
+- Weekly "best contribution" highlight in Telegram celebrates quality, not attestation-weight.
+- Public "contribution-of-the-quarter" post describes WHY a contribution was valuable (substance-focused).
+- Mentor-new-contributors norm; senior members model substance-focused behavior.
+- Governance discussions reference substantive examples rather than weight-statistics.
+
+## Goodhart metrics we CAN measure
+
+Things that indicate Goodharting has started:
+
+- **Attestation concentration**: few contributors receiving disproportionate attestations.
+- **Handshake velocity**: sudden increases in handshake rate per user (potentially ring formation).
+- **Contribution-type mono-culture**: entropy drops as contributors concentrate in one type.
+- **Lineage abuse**: sudden increases in "my contribution enabled this" claims.
+
+Monitoring these via dashboards. Alerts on anomalies. Early-warning for Goodhart drift.
+
+## For students
+
+Exercise: think of a metric in your life (grades, GitHub stars, Twitter followers, step-count). For that metric:
+
+1. What's it supposed to measure?
+2. How do people optimize for it (what behaviors does it produce)?
+3. Is the behavior good for what the metric was supposed to measure?
+4. If not, what's a better metric that wouldn't Goodhart?
+
+This exercise teaches Goodhart detection.
 
 ## Relationship to cognitive economy
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure yourself by productive-hours, you schedule meetings to fill time. Each measure distorts the activity it measures.
+Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure by productive-hours, you schedule meetings to fill time.
 
 Cognition's response: periodically reframe what "productive" means. Introspection updates the measure. This prevents long-term Goodhart drift.
 
-VibeSwap's governance has the same role. Periodic governance updates to attestation weighting, Shapley parameters, and tribunal criteria are the on-chain analog of cognitive reframing.
+VibeSwap's governance has the same role. Periodic updates to attestation weighting, Shapley parameters, and tribunal criteria are the on-chain analog of cognitive reframing.
 
-## Open questions
+## Relationship to other primitives
 
-1. **Can we detect Goodharting via DAG-topology signatures?** Spam-attestation rings have characteristic graph shapes; can we automatically flag?
-2. **What's the optimal governance-update cadence?** Too frequent and the system is unstable; too rare and Goodharting entrenches.
-3. **Are there Goodhart-immune metrics?** Almost certainly not in general, but some metrics degrade more slowly than others.
+- **Connected**: [Rational Ignorance as Mechanism](./RATIONAL_IGNORANCE_AS_MECHANISM.md) — attestation-weight gaming is harder when contributors are rationally ignorant about gaming details.
+- **Counter-weights**: [Novelty Bonus](./THE_NOVELTY_BONUS_THEOREM.md), [Quadratic voting](./WHY_THREE_TOKENS_NOT_TWO.md).
 
 ## One-line summary
 
-*Goodhart's Law is structural — every measurable-incentivized metric distorts what it measures. VibeSwap's composed tools (three-branch + quadratic + novelty + tribunal + governance) make gaming exponentially harder without eliminating it; honesty about residual surfaces is the correct stance.*
+*Goodhart's Law — metrics used to govern distort what they measure. Four specific gaming pressures on VibeSwap (attestation-weight, contribution-type, evidence-hash, lineage-depth) with specific mitigations for each. No single tool prevents Goodharting; composition raises cost. Asymmetry favors defenders via multi-branch + time-integration + meta-governance. Reverse-Goodhart design: pick metrics whose optimization produces desirable behavior.*

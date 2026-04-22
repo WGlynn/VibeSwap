@@ -31,6 +31,10 @@ contract DisputeResolver is
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
+    event FeesUpdated(uint256 prevFilingFee, uint256 prevArbStake, uint256 currentFilingFee, uint256 currentArbStake);
+    event TribunalUpdated(address indexed previous, address indexed current);
+    event DurationsUpdated(uint256 prevResponse, uint256 prevArbitration, uint256 currentResponse, uint256 currentArbitration);
+
     // ============ Enums ============
 
     enum DisputePhase {
@@ -486,17 +490,25 @@ contract DisputeResolver is
     // ============ Admin ============
 
     function setFees(uint256 _filingFee, uint256 _minArbitratorStake) external onlyOwner {
+        uint256 prevFee = filingFee;
+        uint256 prevStake = minArbitratorStake;
         filingFee = _filingFee;
         minArbitratorStake = _minArbitratorStake;
+        emit FeesUpdated(prevFee, prevStake, _filingFee, _minArbitratorStake);
     }
 
     function setTribunal(address _tribunal) external onlyOwner {
+        address prev = address(tribunal);
         tribunal = DecentralizedTribunal(payable(_tribunal));
+        emit TribunalUpdated(prev, _tribunal);
     }
 
     function setDurations(uint256 _responseDuration, uint256 _arbitrationDuration) external onlyOwner {
+        uint256 prevResp = responseDuration;
+        uint256 prevArb = arbitrationDuration;
         responseDuration = _responseDuration;
         arbitrationDuration = _arbitrationDuration;
+        emit DurationsUpdated(prevResp, prevArb, _responseDuration, _arbitrationDuration);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {

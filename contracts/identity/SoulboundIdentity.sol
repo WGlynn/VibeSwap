@@ -11,6 +11,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
  * @dev One identity per address, tracks contributions, levels, and alignment
  */
 contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+    event AuthorizedRecorderUpdated(address indexed recorder, bool previous, bool current);
+
 
     // ============ Structs ============
 
@@ -485,7 +487,9 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     // ============ Admin Functions ============
 
     function setAuthorizedRecorder(address recorder, bool authorized) external onlyOwner {
+        bool prev = authorizedRecorders[recorder];
         authorizedRecorders[recorder] = authorized;
+        emit AuthorizedRecorderUpdated(recorder, prev, authorized);
     }
 
     /**

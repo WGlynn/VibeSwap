@@ -28,6 +28,8 @@ import "./AGIResistantRecovery.sol";
  * - Physical world anchors (hardware keys, video verification)
  */
 contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+    event AGIGuardUpdated(address indexed previous, address indexed current);
+
 
     // ============ Structs ============
 
@@ -191,7 +193,9 @@ contract WalletRecovery is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardU
     }
 
     function setAGIGuard(address _agiGuard) external onlyOwner {
+        address prev = address(agiGuard);
         agiGuard = AGIResistantRecovery(_agiGuard);
+        emit AGIGuardUpdated(prev, _agiGuard);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {

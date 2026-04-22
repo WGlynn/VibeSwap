@@ -1,181 +1,221 @@
 # The Dignity Gradient
 
 **Status**: Economic + social analysis.
-**Depth**: How systems that preserve dignity outcompete ones that don't — mechanism design via human experience.
-**Related**: [Lawson Constant](./LAWSON_CONSTANT.md), [No Extraction Axiom](./NO_EXTRACTION_AXIOM.md), [The Cognitive Economy Thesis](./THE_COGNITIVE_ECONOMY_THESIS.md).
+**Audience**: First-encounter OK. Concrete system comparisons.
 
 ---
 
-## The observation
+## Start with a feeling you've had
 
-Systems can be graded on a dignity gradient — how well they preserve the dignity of their participants.
+Think of a service you use. Maybe it's a social media app, maybe a streaming platform, maybe a bank app.
 
-- **Extractive systems**: treat participants as resources to extract. Ad-driven media, engagement-farming social networks, casino-style gambling, predatory lending. Dignity is zero or negative.
-- **Neutral systems**: treat participants transactionally. Utility providers, classical labor markets for replaceable skills, most traditional services. Dignity is roughly conserved.
-- **Elevating systems**: actively enhance participants' standing, recognition, capability. Apprenticeships, craft communities, mentorship structures, science at its best. Dignity grows.
+Ask yourself: does this system treat you like a person with dignity, or like a resource to extract from?
 
-The observation: elevating systems compete better over time than extractive ones, when given enough substrate to operate.
+Most people can tell the difference intuitively. Even if you can't articulate WHY, you feel it.
 
-## Why dignity-preserving systems win
+Some systems leave you feeling valued: the rent-payment app that doesn't charge hidden fees; the email provider that doesn't scan your messages for ad-targeting; the news source that respects your time.
 
-In the short term, extractive systems often win because they optimize for a narrow metric (engagement, revenue, extraction rate) and their competitors' dignity-preservation is costly.
+Others leave you feeling used: the app that nudges you to click ads you don't want; the platform that shows you outrage content to maximize engagement; the service that makes cancellation deliberately hard.
 
-In the long term, elevating systems win because:
+**The difference is the dignity gradient.** And it's measurable — systems sort along a gradient from extractive (user-as-resource) through neutral to elevating (user-as-participant with standing).
+
+## The three positions
+
+### Extractive (zero or negative dignity)
+
+The system treats participants as resources to extract. Examples:
+
+- **Ad-driven media** — your attention is inventory sold to advertisers.
+- **Engagement-maximizing social networks** — keeping you scrolling optimizes their revenue, regardless of cost to you.
+- **Casino-style gambling** — profit from user losses.
+- **Predatory lending** — designed around high-cost credit for those who can't refuse.
+- **Attention-farming content** — outrage-maximized for engagement.
+
+Dignity: zero or negative. Users leave worse off than they arrived.
+
+### Neutral (dignity roughly conserved)
+
+The system treats participants transactionally. Examples:
+
+- **Utility providers** (electricity, water) — charge reasonable rates, provide what was promised.
+- **Classical labor markets** for replaceable skills — fair exchange of work for wages.
+- **Most traditional services** — neither enhancing nor degrading.
+
+Dignity: conserved. Users leave with same standing they arrived with.
+
+### Elevating (positive dignity)
+
+The system actively enhances participants' standing, recognition, capability. Examples:
+
+- **Apprenticeships** — trade skill for skill over time; apprentice grows.
+- **Craft communities** — recognize mastery; reputation compounds.
+- **Mentorship structures** — senior invests in junior; both grow.
+- **Science at its best** — contributors' names are preserved; discoveries attributed.
+
+Dignity: grows. Users leave better off than they arrived.
+
+## Walk through the dignity gradient with specific systems
+
+### Ad-driven Facebook (circa 2020)
+
+- Participants: users, advertisers, Facebook.
+- User role: attention-resource + profile-data-resource.
+- Dignity treatment: extractive. Users are inventory.
+- Observable signals: engagement-maximizing algorithms, dark-pattern nudges, cancellation friction.
+
+### Mastodon (contemporary)
+
+- Participants: users, instance-hosts.
+- User role: full participant; owns content; can migrate freely.
+- Dignity treatment: neutral → elevating.
+- Observable signals: no ads, user-controlled moderation, migration-friendly architecture.
+
+### VibeSwap
+
+- Participants: contributors, users, governance participants.
+- User role: first-class participant with DAG attribution.
+- Dignity treatment: elevating.
+- Observable signals: attribution preserved via Lawson Constant, three-branch due-process, voluntary participation, constitutional P-001 no-extraction.
+
+Each system has different dignity-gradient placement. VibeSwap deliberately operates in the elevating zone.
+
+## Why elevating systems win long-term
+
+In the short term, extractive systems often win because they optimize for a narrow metric (engagement, revenue) and their competitors' dignity-preservation looks costly.
+
+Long-term, elevating systems win. Four mechanisms:
 
 ### Mechanism 1 — Contributor retention
 
-Extractive systems burn out contributors. Those who feel used leave. The system has to constantly acquire new contributors at increasing cost.
+Extractive systems burn out contributors. Those who feel used leave.
 
-Elevating systems retain contributors because the experience is net-positive. Long-tenure contributors accumulate deep expertise and deep trust.
+**Concrete**: a contributor to a DAO that's revealed to be extractive gives a month's notice and leaves. Their replacement has to ramp up. The DAO loses accumulated knowledge.
+
+Elevating systems retain contributors. Long-tenure contributors accumulate deep expertise and deep trust. VibeSwap's approach: contributors' work compounds into DAG attribution — they have strong reason to stay.
 
 ### Mechanism 2 — Network-effect compounding
 
-Contributors in elevating systems recruit friends. "This is a community I like being part of — you should try it." Word-of-mouth growth compounds.
+Elevating: contributors in elevating systems recruit friends. "Try this community; they treat people well." Word-of-mouth compounds.
 
-Extractive systems have anti-network-effects. "This is a place that uses people. Avoid it." Contributors warn others.
+Extractive: anti-network-effects. "Avoid this system; they use people." Users warn others.
+
+VibeSwap's community-bootstrap depends on the network-effect version. Dignity is a bootstrap accelerator.
 
 ### Mechanism 3 — Governance legitimacy
 
-Elevating systems produce legitimate governance outcomes. Participants feel heard; decisions reflect collective input.
+Elevating systems produce legitimate governance. Participants feel heard. Decisions reflect collective input.
 
-Extractive systems produce extractive governance. Users feel ruled, not represented. Legitimacy erodes; participation declines.
+Extractive systems produce extractive governance. Users feel ruled. Legitimacy erodes. Participation declines.
+
+VibeSwap's three-branch governance + constitutional axioms are dignity-preserving governance infrastructure.
 
 ### Mechanism 4 — Quality of work
 
-Work done in dignity-preserving contexts is higher-quality than work done in dignity-eroding contexts. Researchers with academic freedom do better research than those under surveillance. Developers with psychological safety ship better code than those in fear-based environments.
+Work in dignity-preserving contexts is higher-quality. Research freedom produces better research. Developers with psychological safety ship better code.
 
-Quality of work compounds into quality of product. Dignity-preserving systems produce better outputs.
+Quality compounds into quality of product. VibeSwap's work-output should benefit from the dignity investment.
 
-## Why VibeSwap is specifically dignity-preserving
+## The four VibeSwap architectural commitments to dignity
 
-The architectural choices that embed dignity:
+### Commitment 1 — Lawson Constant
 
-### Lawson Constant
+Attribution is structural, not decorative. Your contributions can't be erased. See [`LAWSON_CONSTANT.md`](./LAWSON_CONSTANT.md).
 
-The greatest idea cannot be stolen because part of it is admitting who came up with it. Attribution is structural, not discretionary. See [`LAWSON_CONSTANT.md`](./LAWSON_CONSTANT.md).
+### Commitment 2 — P-001 No Extraction
 
-Dignity implication: your contributions can't be erased or appropriated. Your work remains yours permanently.
+No mechanism extracts value disproportionate to creation. See [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md).
 
-### P-001 No Extraction Axiom
+### Commitment 3 — Three-branch due process
 
-No mechanism extracts value disproportionate to what it creates. See [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md).
+Accusations go through Executive/Judicial/Legislative. You can contest. You have recourse. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
 
-Dignity implication: you're not the product. Your participation benefits you proportional to the value you produce.
+### Commitment 4 — Voluntary participation
 
-### Three-branch attestation
+Users can enter, exit, participate, abstain at will. No lock-ins, no vendor-dependency, no trap patterns.
 
-Accusations or disputes go through executive / judicial / legislative branches with due process. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
+These aren't marketing. They're architectural consequences of P-000 (Fairness Above All).
 
-Dignity implication: you can't be summarily punished. You have recourse.
+## The asymmetry
 
-### Contest windows
+If two protocols compete, one extractive and one dignity-preserving:
 
-Clawback and governance actions have contest windows where you can respond. See [`CLAWBACK_CASCADE_MECHANICS.md`](./CLAWBACK_CASCADE_MECHANICS.md).
+- Extractive protocol CAN'T easily transition to dignity-preserving. Extractive mechanisms are load-bearing for its business model.
+- Dignity-preserving protocol CAN transition to extractive. Requires removing constitutional axioms.
 
-Dignity implication: decisions affecting you aren't unilateral. You have voice.
+**But** — this asymmetry has a protection for dignity-preserving systems: the transition-to-extractive is temptingly available but structurally blocked.
 
-### Multi-type contribution
-
-9 contribution types span Code, Design, Research, Community, Marketing, Security, Governance, Inspiration, Other. Your contribution type is valid even if it's not Code.
-
-Dignity implication: the type of work you do matters, not whether it matches a narrow elite's preference.
-
-### Voluntary participation
-
-Users can enter, exit, participate, abstain at will. No lock-ins, no vendor-dependency, no psychological trap patterns.
-
-Dignity implication: you retain agency over your relationship with VibeSwap.
-
-## The contrast with extraction-normalized DeFi
-
-Most DeFi projects are dignity-ambivalent. They don't actively erode dignity, but they don't actively preserve it either. Specific patterns:
-
-- **"Early adopter" programs** that reward early-stage contributors disproportionately, then leave later-arrivals with nothing. Dignity-erosion for latecomers.
-- **Gamified tasks** that feel like work but pay peanuts. "Do 100 swaps to earn the airdrop" treats users as cheap labor.
-- **Opaque tokenomics** where VCs extract before retail even knows what's happening. Dignity-erosion via information asymmetry.
-- **Extractive fee schedules** that users have to accept to use the protocol. Dignity-erosion via leverage-imbalance.
-
-VibeSwap makes different choices on each:
-
-- **Attribution is timeless** — contributors from year-10 of the protocol are credited same as year-1 for equivalent work.
-- **Contribution types are recognized as work, paid Shapley-proportionally** — not gamified-pennies.
-- **Tokenomics is published transparently** — no opaque VC-first allocations.
-- **Zero-fee structural default** — fees exist for specific purposes (oracle compute, tribunal), not as default extraction.
-
-These aren't marketing choices. They're architectural consequences of P-000 and P-001.
-
-## The dignity gradient is asymmetric
-
-If two protocols compete, one extractive and one dignity-preserving, the dignity-preserving one usually wins long-term. But there's an asymmetry in the transition:
-
-- An extractive protocol CAN'T easily transition to dignity-preserving. The extractive mechanisms are load-bearing for its business model; replacing them would require re-architecting the whole thing.
-- A dignity-preserving protocol CAN transition to extractive. Requires removing constitutional axioms but doesn't require architecture-level changes.
-
-This means: once a dignity-preserving protocol establishes position, defection to extraction is tempting but structurally difficult to prevent. Constitutional axioms + community vigilance are the defense.
-
-VibeSwap's architecture makes defection hard: P-000 and P-001 are non-governance-amendable. The Lawson Constant is in the bytecode of ContributionDAG. Removing these would constitute a fork, not a governance action — and the original protocol's community would resist the fork.
+VibeSwap's architecture: P-000 and P-001 are non-governance-amendable. Lawson Constant is in bytecode. Removing these constitutes a fork, not a governance action. Community would resist.
 
 ## The political angle
 
-Systems that extract attention or labor or dignity have been the political-economic default of the internet era. Ads + engagement-loops + attention-capture = industry baseline. User rebellion against these is ongoing but unfocused — lots of discomfort, few alternatives.
+Attention-extractive, labor-extractive, dignity-extractive systems have been the political-economic default of the internet era. Ads + engagement loops + attention-capture = industry baseline. User rebellion is ongoing but unfocused.
 
-VibeSwap is an alternative. Not the only one; the EU's GDPR + MiCA frames push in similar directions; Mastodon-style federated social does too; cooperative economics scholarship is growing; etc.
+VibeSwap is one alternative. Not the only one (GDPR + MiCA push in similar directions; Mastodon; cooperative economics scholarship growing).
 
-The dignity-gradient framing says: this is a direction, and it wins over time. Projects aligned with it are tailwind-beneficiaries; projects fighting it (extractive DeFi, attention-capture social, surveillance-capital marketing) are headwind-fighters even when they succeed short-term.
+The dignity-gradient framing says: this is a DIRECTION. It wins over time. Projects aligned with it are tailwind-beneficiaries. Projects fighting it (extractive DeFi, attention-capture social) are headwind-fighters even when they succeed short-term.
 
 ## The metric challenge
 
-"Dignity" is hard to measure. Unlike engagement-metrics or revenue-per-user, dignity doesn't reduce to a number.
+"Dignity" is hard to measure quantitatively. Unlike engagement or revenue-per-user.
 
-Attempt: **dignity-preservation score** = weighted combination of:
-- Retention (contributors staying).
-- Depth of engagement (deep contributions vs surface).
-- Governance participation rate.
-- Voluntary advocacy (contributors promoting unpaid).
-- Absence of grievances (how many feel extracted-from).
+Proposed composite "dignity-preservation score":
+- **Retention**: % of contributors staying after 6 months.
+- **Depth of engagement**: substantive contributions vs surface.
+- **Governance participation rate**: fraction of tokens voting.
+- **Voluntary advocacy**: contributors promoting unpaid.
+- **Absence of grievances**: how many feel extracted-from.
 
-Not a single number; a composite. Useful for trend-tracking even if not for absolute comparison.
+Not a single number; composite. Useful for trend-tracking.
 
-VibeSwap could publish this score quarterly alongside other health metrics. Transparent-accountability for its own dignity-preservation claim.
+VibeSwap could publish this score quarterly. Transparent accountability for dignity-preservation claim.
 
 ## Implications for mechanism design
 
-When designing a new mechanism, ask:
+When designing, ask:
 
-1. **Does it preserve contributors' dignity?** If a mechanism would be experienced as degrading, reconsider.
-2. **Does it preserve users' dignity?** If a mechanism would be experienced as manipulative, reconsider.
-3. **Does it preserve the broader network's dignity?** If a mechanism would spread extractive patterns, reconsider.
+1. Does it preserve contributors' dignity?
+2. Does it preserve users' dignity?
+3. Does it preserve the broader network's dignity?
 
-These are architectural questions. Running them as part of [Correspondence Triad](./CORRESPONDENCE_TRIAD.md) check #4 (new — not in the original Triad formulation but would be a useful extension).
+These are architectural questions. Proposed Correspondence Triad Check 4: "Does it preserve dignity?" (not yet officially in the Triad; proposed extension).
 
 ## The dignity premium
 
-Users will pay a premium for dignity-preservation. Look at:
-- **Mastodon vs. Twitter** — Mastodon is slower, less featured; users tolerate this for the non-extractive model.
-- **Signal vs. Meta messaging** — Signal is less integrated; users accept this for privacy and dignity.
-- **Cooperatives vs. traditional employers** — cooperative structure often means less maximal-earnings but higher satisfaction.
+Users will pay a premium for dignity-preservation:
 
-VibeSwap operates in this same dignity-premium space. Users willing to accept slightly more-friction for substantially-more-dignity are the target audience. Not everyone — but the ones who care deeply.
+- **Mastodon vs Twitter**: Mastodon is slower, less featured; users tolerate for non-extractive model.
+- **Signal vs Meta messaging**: Signal is less integrated; users accept for privacy.
+- **Cooperatives vs traditional employers**: cooperatives often mean less maximal-earnings but higher satisfaction.
 
-## Implications for VibeSwap's positioning
+VibeSwap operates in this premium space. Users willing to accept slightly-more-friction for substantially-more-dignity are target audience.
 
-The "coordination primitive, not a casino" tagline captures the dignity choice. Coordination primitive preserves and elevates; casino extracts.
+Not everyone. The ones who care.
 
-The 30-doc content pipeline amplifies this positioning. Each doc makes explicit the dignity-preservation principles embedded in mechanism choice. Readers who value dignity self-select into the community.
+## Implications for education (Eridu × VibeSwap)
 
-## Implications for Eridu Labs educational content
+Education is inherently dignity-sensitive. Good teachers preserve student dignity. Bad teachers extract.
 
-Education is inherently dignity-sensitive. Good teachers preserve students' dignity (don't shame for not-knowing, don't gatekeep by credentials, don't treat learners as objects). Bad teachers extract from students (attention without returning insight, credentials without capability, labor without credit).
-
-Eridu × VibeSwap education embeds the dignity gradient. Course design principles:
+Eridu × VibeSwap course design principles:
 - Student contributions earn DAG credit.
-- Questions and confusions are treated as valuable signals, not deficits.
-- Peer-to-peer help is explicitly valued.
-- Multiple paths to understanding are offered.
+- Questions and confusions treated as valuable signals, not deficits.
+- Peer-to-peer help explicitly valued.
+- Multiple paths to understanding offered.
 - No gatekeeping on who can learn.
 
-The educational arm becomes itself an instance of the dignity-preserving architecture — teaching the mechanisms while embodying them.
+The educational arm embodies the dignity-preserving architecture.
+
+## For designers
+
+If you're building mechanism design:
+
+Ask: where does my design fall on the dignity gradient?
+
+If extractive: redesign. Extraction-based models don't survive user-awareness.
+
+If neutral: consider if it could be elevating. Would cost little; could attract serious participants.
+
+If elevating: explicitly commit. Document the commitments. Let users hold you accountable.
 
 ## One-line summary
 
-*Systems sort along a dignity gradient from extractive (zero/negative) through neutral to elevating (positive); elevating systems win over time via retention + network-effect + governance-legitimacy + work-quality. VibeSwap's P-000/P-001/Lawson Constant/three-branch/contest-window architecture specifically embeds dignity-preservation; attempts to revert would require removal of constitutional axioms, making the commitment structurally durable.*
+*Systems sort along a dignity gradient from extractive (ad-Facebook, casinos, attention-farming) through neutral (utility providers, labor markets) to elevating (apprenticeships, craft communities, VibeSwap). Elevating wins long-term via retention + network-effect + governance-legitimacy + work-quality. VibeSwap's four architectural commitments (Lawson Constant + P-001 + three-branch + voluntary) are constitutional dignity-preservation. Transition-to-extractive structurally blocked for dignity-preserving systems; inverse not true.*

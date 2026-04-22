@@ -1,96 +1,193 @@
 # Externality as Substrate
 
-**Status**: Reframing. Coordination externalities are the raw material of VibeSwap, not side effects.
+**Status**: Reframing with concrete capture walkthroughs.
+**Audience**: First-encounter OK. Economic textbook terms unpacked.
 
 ---
 
-## The reframe
+## A short economics story
 
-Economic textbooks treat externalities as side effects to be internalized. Pollution, noise, congestion — externalities are "market failures" that require intervention (pigouvian tax, tradable permit, regulation).
+Economics textbooks teach about "externalities" early on. The classic examples:
 
-VibeSwap inverts: the coordination externalities that DeFi generates ARE the substrate. The protocol doesn't minimize externalities; it captures them, attributes them, and distributes the captured value back to the generators.
+- **Pollution**: a factory produces something valuable (widgets) but emits smoke. The smoke harms nearby residents. The harm is an "external" cost — external to the factory's own balance sheet. The factory doesn't pay for the smoke; the residents suffer unpaid.
+- **Noise**: a bar plays loud music. Patrons inside enjoy it. Residents across the street have disturbed sleep. External cost.
+- **Education**: a student studies and becomes skilled. They personally benefit. Society also benefits (better workers, better citizens). External benefit.
 
-This is a fundamental shift. Under the conventional frame, externalities are a cost; under this frame, they are raw material.
+The textbook treatment: externalities are "market failures" to be corrected. Tax the factory. Regulate the bar. Subsidize education.
 
-## What counts as a coordination externality
+This is the **externality-as-market-failure** framing. Externalities are something to be minimized or internalized.
 
-When agent A transacts, agents B, C, D benefit without being parties to A's transaction:
+## The VibeSwap inversion
 
-- A provides liquidity → B gets execution → C sees less slippage → D sees better pricing. B, C, D are externalities of A's liquidity provision.
-- A audits a contract → B deploys safely → C trusts the protocol → D invests. B, C, D are externalities of A's audit.
-- A frames a problem → B solves it → C builds on the solution → D runs a business on it. B, C, D are externalities of A's framing.
+VibeSwap flips this. Coordination externalities aren't market failures to be corrected. They're the **raw material** the protocol operates on.
 
-Conventional economics attributes value to the direct transaction (A → direct counterparty). Externality-as-substrate attributes to the full ripple (A → B → C → D).
+Specifically: every positive externality that would otherwise go uncompensated — Alice's idea that enables Bob's work, Carol's audit that prevents Dana's exploit, Eve's framing that unlocks Frank's breakthrough — VibeSwap captures and routes.
 
-## Why externalities are normally lost
+In traditional economics, these are "problems" (externalities). In VibeSwap, they're **inputs**.
 
-**Measurability**: direct transactions have counterparty, price, quantity. Externalities have diffuse impact across many agents over time. Hard to measure, therefore hard to price, therefore not priced.
+## What a coordination externality looks like
 
-**Attribution**: who caused the benefit? Usually many agents' work combined. The counterfactual (what would've happened without A?) is hard to establish.
+Let's walk through a specific case.
 
-**Transaction costs**: even if you could measure and attribute, compensating the chain of downstream beneficiaries back upstream to the original provider requires infrastructure that doesn't exist in classical markets.
+### The externality, explicit
 
-Result: externalities are systematically under-compensated. Agents under-produce positive externalities (audit work, design work, framing, documentation) because they can't capture the value. Agents over-produce negative externalities (MEV, information asymmetry exploitation) because they can capture them without paying the cost.
+Alice is a security researcher. She spots a bug pattern in a DeFi protocol. She writes a Telegram message to a friend mentioning it — casual dialogue.
 
-## VibeSwap's capture infrastructure
+Bob runs a different protocol. Bob's friend (Carol) reads Alice's Telegram message. Carol mentions it to Bob in a different chat. Bob audits his protocol for the pattern — finds a real vulnerability. Patches it. Prevents a $500K exploit.
 
-Three primitives together capture coordination externalities:
+**Who produced the value of the prevented exploit?**
 
-### 1. [ContributionDAG + ContributionAttestor](./CONTRIBUTION_ATTESTOR_EXPLAINER.md)
+- Alice (original observation)
+- Carol (cross-chat propagator)
+- Bob (audit + patch execution)
 
-Attribution substrate. When contribution X enables contribution Y, Y's attestation can cite X as a parent. The lineage is on-chain; the causal chain is preserved.
+In traditional attribution: Bob gets full credit (he patched the bug). Carol gets informal thanks. Alice gets nothing — she wasn't part of Bob's protocol.
 
-### 2. [Shapley Distribution](./SHAPLEY_REWARD_SYSTEM.md)
+In VibeSwap-style attribution: Alice's observation was the causally-upstream contribution. Carol's propagation moved the knowledge across boundaries. Bob executed. Shapley-like math should distribute credit proportional to marginal contribution.
 
-Marginal-contribution computation. Captures the fact that X unlocked Y as a value X should be credited for. Not just proportional-to-X, but marginal-impact-if-X-is-removed.
+Without VibeSwap's infrastructure, Alice's contribution is an externality — value created for someone else without compensation back to Alice.
 
-### 3. [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md)
+### How VibeSwap captures it
 
-Upstream-source capture. Chat that influenced a design → GitHub issue → code → DAG attribution. Externalities that arose in conversations now have a path to compensation.
+The [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) loop:
 
-The three together make coordination externalities capturable: measurable (evidenceHash), attributable (DAG lineage), compensable (Shapley distribution).
+1. Alice's Telegram message is flagged (by Alice or a bot) as a `[Dialogue]` contribution. Issue opened. Source field = Alice + date.
 
-## The insight in ETM terms
+2. Carol's cross-chat propagation is noted (perhaps via citation in Bob's audit memo, or in a follow-up `[Dialogue]` issue crediting Carol).
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), coordination externalities are the cognitive-economic equivalent of knowledge spillover in cognition — ideas that emerge from one process informing many others. Cognitive systems evolved to handle these (episodic memory, social learning, language itself). On-chain systems mostly don't.
+3. Bob's audit + patch commits reference the original issue via `Closes #N`.
 
-VibeSwap's architectural claim: bringing cognitive-economic externality-capture on-chain produces a different class of protocol. Not a DEX, not a DAO, not an index — a *coordination primitive* that rewards positive externalities as a first-class activity.
+4. When the patch ships, on-chain attestations mint:
+   - Credit to Alice (original dialogue contribution).
+   - Credit to Carol (propagation contribution).
+   - Credit to Bob (implementation contribution).
 
-The tagline — "A coordination primitive, not a casino" — is this framing compressed.
+5. Each contribution earns a DAG attribution-ID. Future downstream contributions can cite these as lineage.
+
+The externality is captured. Alice is no longer uncompensated; her contribution earns DAG credit.
+
+## Why prior systems didn't capture this
+
+### Prior attribution systems were code-focused
+
+Git + GitHub captures commit authorship well. But commits are downstream — the ideas that LED to the commit are invisible to git history.
+
+VibeSwap captures the dialogue → issue → commit → attestation chain. Non-code origination becomes credit-worthy.
+
+### Prior systems required explicit coordination
+
+CoordiNape required participants to consciously allocate credit. Requires coordination overhead; scales poorly.
+
+VibeSwap captures automatically via the issue-template + mint-script flow. Coordination is the template; execution is automated.
+
+### Prior systems had weak attribution survival
+
+SourceCred's "cred" was not on-chain. Could be lost, revoked, or changed by maintainers. Alice's credit wasn't durably anchored.
+
+VibeSwap writes attestations to ContributionAttestor on-chain. Durable; cryptographically-anchored.
+
+## Externalities VibeSwap captures (by type)
+
+### Type 1 — Design externalities
+
+Alice designs a mechanism that informs many downstream implementations. Each implementation earns credit; Alice should earn a fraction via lineage.
+
+**Capture**: `[Design]` issue with Source field + parent-attestations from downstream claims.
+
+### Type 2 — Audit externalities
+
+Alice spots a vulnerability class. The insight informs many audits across the ecosystem. Each audit prevents a different exploit.
+
+**Capture**: `[Audit]` issue; downstream audits cite it; Alice earns proportional credit.
+
+### Type 3 — Dialogue / framing externalities
+
+Alice asks a clarifying question. The discussion that follows produces multiple concrete improvements.
+
+**Capture**: `[Dialogue]` issue with Alice as source; implementations citing the dialogue earn her credit.
+
+### Type 4 — Mentorship externalities
+
+Alice onboards 10 new contributors over 2 years. Each contributes meaningfully to the project. Alice's mentorship was the upstream enabler.
+
+**Capture**: `[Community]` or `[Meta]` contributions; mentorship-specific attestation paths. Partially captured (this is an area where VibeSwap's infrastructure has room to grow).
+
+### Type 5 — Open-source upstream externalities
+
+VibeSwap builds on open-source libraries (OpenZeppelin, Foundry, etc.). These upstream maintainers enabled VibeSwap.
+
+**Capture**: Lawson Constant anchors acknowledgment; downstream attestations can cite upstream projects. Limited captured — external contributors aren't necessarily in VibeSwap's DAG.
 
 ## The macro implication
 
-If coordination externalities are systematically under-compensated globally, and VibeSwap systematically compensates them locally, VibeSwap has a comparative advantage in attracting positive-externality-producing contributors.
+If coordination externalities are systematically under-compensated globally (traditional market outcome), and VibeSwap systematically compensates them locally, VibeSwap has a comparative advantage in attracting positive-externality producers.
 
 Over time:
-- Good auditors gravitate to VibeSwap because their audit work earns DAG credit proportional to downstream protective impact.
-- Good designers gravitate because their design-work credit compounds through downstream implementations.
-- Good ideators gravitate because dialogue that influences design earns traceable attribution.
+- Serious researchers gravitate toward VibeSwap because their upstream insights earn DAG credit.
+- Serious designers gravitate because their framings compound through downstream implementations.
+- Serious audit specialists gravitate because their catches earn proportionate credit.
 
-The protocol's talent acquisition becomes asymmetric: positive-externality producers are relatively over-attracted. This is a moat — one that pure-DEX or pure-DAO projects don't have.
+The protocol's talent attraction becomes asymmetric. Positive-externality producers self-select in.
 
-## The micro implication
+This is the kind of moat that no mere funding-advantage can break. Funding can buy contributors temporarily; network effects of attribution capture retain them.
 
-At the individual level, contributors who previously had no capture mechanism for their positive externalities now have one. The auditor's audit prompt that prevents a hack — historically uncompensated — earns DAG credit now. The Telegram message that framed a design direction — historically invisible — becomes an on-chain attribution.
+## What VibeSwap does NOT claim
 
-This doesn't make every contribution wealth-creating. Most externalities are small. But in aggregate, over many contributions across many contributors, the captured externality value becomes a real component of the project's economic output. And individuals who produce consistently-positive externalities accumulate stable position in the DAG.
+Honest limits:
 
-## The skepticism
+### Limit 1 — Not all externalities are capturable
 
-A reasonable response: "You can't really measure externalities. Claiming to capture them is hand-waving; what you're capturing is what you measure, which is still just the direct transactions."
+Mentorship externalities are hard to measure. Emotional labor. Group dynamics. These are often valuable but resist formalization.
 
-Partial truth. The counter: the mechanisms capture *more* than pure-direct-transaction-tracking does. Even if imperfect, an improvement over zero is still an improvement. And the improvement has compound effects over time (more captured attribution → better calibrated rewards → more positive-externality production → more attribution to capture).
+VibeSwap captures what's capturable. Acknowledges the rest.
 
-Not a claim that VibeSwap perfectly captures all externalities. Only that it captures more of them than other DeFi architectures do, and that the gap between captured and uncaptured externalities continues to narrow as the tooling matures.
+### Limit 2 — Capture quality varies
 
-## Why no prior protocol did this
+A direct dialogue → solution link is high-confidence attribution. A distant lineage (5+ hops) has weaker attribution confidence.
 
-- **Prior DEXes** were focused on matching transactions; externalities weren't in scope.
-- **Prior DAOs** were governance-focused; credit went to stakeholders, not contributors.
-- **Prior reward systems** (SourceCred, Gitcoin) tried but lacked the algorithmic foundation (Shapley) or the infrastructure (traceability + on-chain attestation).
+VibeSwap's attribution is better in direct chains than in distant ones. Honest about this.
 
-VibeSwap combines all of: substrate choice (permits on-chain externality tracking), algorithmic choice (Shapley for marginal-contribution compensation), and infrastructure (traceability loop). Each alone is insufficient.
+### Limit 3 — Compensation is proportional, not equal
+
+An idea that unlocks $1B of value gets more attribution than one that unlocks $1K. This matches intuitions but some externality-producers may expect more than they receive.
+
+Calibration is done via the broader Shapley math; subject to the [Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md)'s five gaps.
+
+## The tagline connection
+
+"A coordination primitive, not a casino."
+
+Casinos extract from participants. Coordination primitives route value to its producers. Externalities are where the coordination primitive creates its distinctive advantage: value that casinos would ignore (or extract), VibeSwap routes to creators.
+
+This is what "coordination primitive" means in the context of externality-capture: infrastructure that makes it cheap to route value back to its originators.
+
+## Relationship to ETM
+
+Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive-economic externalities are the cognitive equivalent of "knowledge spillover" — ideas that emerge from one cognitive process informing many others.
+
+Cognitive systems evolved to handle these (episodic memory, social learning, language itself). On-chain systems typically don't. VibeSwap's attribution stack brings cognitive-economic externality-capture on-chain.
+
+This is the ETM bijection applied at the workflow layer. Cognition already captures externalities internally; the on-chain version does it across minds.
+
+## For students
+
+Exercise: identify a coordination externality you've experienced:
+
+1. An idea someone shared with you that helped you significantly.
+2. A mentor's advice that changed your trajectory.
+3. A book/article that influenced your thinking.
+4. An open-source library you built on.
+
+For each:
+- Who produced the value?
+- Who benefited?
+- Was there compensation flow back?
+- How much?
+
+Compare what actually happened to what a VibeSwap-style attribution infrastructure would produce.
+
+This exercise teaches how pervasive uncompensated externalities are.
 
 ## One-line summary
 
-*Coordination externalities — historically uncaptured, therefore under-produced — are VibeSwap's raw material; the attribution / attestation / Shapley stack captures them structurally, producing an asymmetric talent-attraction moat for positive-externality producers.*
+*Coordination externalities (Alice's observation → Bob's protection, Carol's framing → Dana's implementation) are the raw material of the cognitive economy — traditionally uncompensated, systematically undervalued. VibeSwap's Chat-to-DAG Traceability captures them as first-class contributions with proportional DAG credit. Five types captured (design, audit, dialogue, mentorship, open-source); honest limits on what resists capture; comparative-advantage moat in attracting positive-externality producers.*

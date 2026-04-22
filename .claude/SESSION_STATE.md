@@ -1,9 +1,64 @@
-# Session State — 2026-04-21 (continued post-reboot)
+# Session State — 2026-04-21 (post-reboot close)
 
-## Block Header — Post-Reboot Continuation
-- **Session**: Post-reboot work after the persistence-priority bump and 149-commit campaign. Three substantive deliverables shipped: (a) state-persistence layer hardening (3 new SessionStart hooks + extended link-rot detector + NDA gate patched for cleanup-deletion-allow), (b) ETM Alignment Audit Step 1 complete (all 7 sections, 19 mechanisms classified — 16 MIRRORS / 3 PARTIALLY MIRRORS / 0 FAILS), (c) C39 FAT-AUDIT-2 scaffold shipped (commit-reveal oracle aggregation, contract + 14 tests + interface). Plus admin-event-observability sweep across 11 contracts (~30 setters now emit XUpdated events). Master branch caught up to feature via merge (49 commits brought current).
-- **Branch**: `feature/social-dag-phase-1` (HEAD advanced past `08a2301c` through ~50 new commits in this continuation session)
-- **Status**: ~50/149-commit-target landed and pushed on `origin/feature/social-dag-phase-1`. `origin/master` also caught up (was 49 behind). Backlog HIGH=0, MED=0 (C28-F1 INFO closed by C38-F1 VibeSocial nonReentrant). C39 in-progress (commit-reveal oracle aggregator scaffold complete, TPO wire-in pending). NDA incident handled: contaminated `5ebcd282` working-doc deleted, off-repo Justin/MIT artifacts moved to `~/Desktop/Justin_Reports/`, default branch swap-and-restore.
+## Block Header — Post-Reboot Close (THE NIGHT'S CLOSING INSIGHT)
+
+> *"this needs to be standardized process so we can canonically trace contributions from chat to github issue to solution to dag attribution ID. from the chat to the contract level closed loop"* — Will, 2026-04-21 (closing articulation)
+
+- **Session**: Post-reboot continuation. ~80 commits shipped + pushed on `feature/social-dag-phase-1`, master caught up via merge. Persistence-layer hardened, ETM Alignment Audit Step 1 complete, C39 FAT-AUDIT-2 scaffold + TPO wire-in shipped end-to-end, admin-event-observability sweep across ~22 contracts (~50 setters now emit `XUpdated`). Then 6 of 13 dialogue issues closed with substantive comments pointing at recent ship work. Then Will articulated the *Chat-to-DAG Traceability* closed loop — captured as `memory/primitive_chat-to-dag-traceability.md` as the load-bearing closing insight. Chosen as the primary Step 2 target for next session.
+- **Branch**: `feature/social-dag-phase-1` (and `master` synced via merge tonight). Both pushed.
+- **Status**: ~80 commits landed. Backlog HIGH=0, MED=0. C28-F1 INFO closed (C38-F1 VibeSocial nonReentrant). C39 FAT-AUDIT-2 substantively complete (contract + 17 tests + TPO wire-in + 3 wire-in tests). 6 of 13 dialogue issues closed; 7 still open (5 staying open intentionally; 2 awaiting close with the new canonical format).
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+**Implement Chat-to-DAG Traceability as canonical infrastructure.** Per `memory/primitive_chat-to-dag-traceability.md` — the closed loop: chat → GitHub issue (Source + Resolution Hooks fields) → solution commit (with `DAG-ATTRIBUTION:` marker) → `ContributionDAG.attestContribution(...)` mint → closing-comment with attestationId.
+
+Concrete deliverables for next session:
+
+1. **`DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md`** — full process spec (the doc form of the primitive). Heavily linked to MASTER_INDEX.
+2. **`.github/ISSUE_TEMPLATE/dialogue.md`** — issue template enforcing the Source + Resolution Hooks sections.
+3. **`scripts/mint-attestation.sh`** — wraps `cast send` to ContributionDAG with canonical metadataHash construction `(issueNumber, commitSHA, sourceTimestamp)`.
+4. **CI hook** — scan merged commits for `DAG-ATTRIBUTION: pending`, surface to a queue.
+5. **Retroactive backfill** — close the remaining 7 dialogue issues using the canonical format. Annotate the 6 already-closed-tonight issues with the missing DAG-attribution-ID + Source-line via follow-up comments.
+
+The closed loop converts informal dialogue into first-class on-chain credit — which is exactly what the ETM-aligned design demands but didn't have explicit infrastructure for.
+
+## Anti-drift warnings for next session
+
+- **Don't skip the Source field** when opening / annotating issues. Without it, the chain breaks at stage 1 and the loop can't close.
+- **`DAG-ATTRIBUTION: pending` is a placeholder, not a final state.** A commit with `pending` should be paired with a queued mint task. Don't merge the closing comment with `pending` — wait for the actual attestationId.
+- **Ad-hoc closures don't propagate.** Tonight's 6 closes are good-as-far-as-they-go but missing DAG-attribution. Backfill is the first task that closes the loop on tonight's work itself (recursively traceability-closes the traceability-closing work).
+- **Token Mindfulness applies to the doc** — direct-write-with-Edit-append, target ~25-40 KB; it's a process spec, not a philosophy paper.
+
+## Issue closure status (2026-04-21)
+
+| # | Title | Status | DAG-attribution |
+|---|---|---|---|
+| 22 | Contract renunciation insufficient | OPEN | pending |
+| 23 | Founder's Return + Symbolic Compression | OPEN (intentional, ongoing) | n/a |
+| 24 | Open Router for Cross-Chain UX | OPEN (needs decision) | n/a |
+| 26 | Negotiating VC Investment Price | OPEN (in-flight) | n/a |
+| 27 | Cooperative Economics in VibeSwap | OPEN (broad ongoing) | pending |
+| 28 | Cooperative Game Theory in MEV | CLOSED tonight (no DAG-id yet) | **needs backfill** |
+| 29 | Verifiable Solver Fairness | CLOSED tonight (no DAG-id yet) | **needs backfill** |
+| 30 | Externalized Idempotent Overlay | CLOSED tonight (no DAG-id yet) | **needs backfill** |
+| 31 | Abstracting Swap Mechanisms | OPEN (broad ongoing) | n/a |
+| 32 | Auditing with Deepseek API | OPEN (meta-process ongoing) | n/a |
+| 33 | Oracle Security (FAT-AUDIT-2) | CLOSED tonight (no DAG-id yet) | **needs backfill** |
+| 34 | Transparency in Decentralized Governance | CLOSED tonight (no DAG-id yet) | **needs backfill** |
+| 36 | Capturing Non-Code Protocol Contributions | CLOSED tonight (no DAG-id yet) | **needs backfill** |
+
+The 6 "needs backfill" entries are the most urgent next-session task — they're the proof-of-concept for the new traceability process. Closing them properly demonstrates the loop works.
+
+## Earlier in this continuation session (chronological summary)
+
+- (a) state-persistence layer hardening (3 new SessionStart hooks + extended link-rot detector + NDA gate patched for cleanup-deletion-allow)
+- (b) ETM Alignment Audit Step 1 complete (all 7 sections, 19 mechanisms classified — 16 MIRRORS / 3 PARTIALLY MIRRORS / 0 FAILS)
+- (c) C39 FAT-AUDIT-2 end-to-end (contract + 14 tests + interface + TPO wire-in + 3 wire-in tests)
+- (d) admin-event-observability sweep across ~22 contracts (~50 setters now emit XUpdated events)
+- (e) NDA leak handled (`5ebcd282` working-doc deleted, off-repo artifacts moved, NDA gate patched)
+- (f) master ↔ feature divergence resolved via merge (49 commits caught up)
+- (g) 6 dialogue issues closed with comment-pointers to shipped artifacts
+- (h) **Chat-to-DAG Traceability primitive captured** — the night's closing insight, now load-bearing for next session
 
 ## Block Header (original 2026-04-21 session, kept for reference)
 - **Session**: All-Out Mode autopilot. Closed the entire C35→C37 RSI cycle (4 security-class fixes shipped + pushed), extracted 5 durable primitives to memory, authored the repo MASTER_INDEX.md (176 KB Wikipedia of VibeSwap) and PRIMITIVE_EXTRACTION_PROTOCOL.md (37 KB meta-paper on JARVIS's primitive-extraction skill), then — big finish — Will articulated the **Economic Theory of Mind** as a META-PRINCIPLE (Axis 0): mind is primary, blockchain economics is the *reflection*. Will directive at session end: **"we want to build toward this as a reality. asap."** Then requested session reboot.

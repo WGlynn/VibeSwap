@@ -1,25 +1,93 @@
 # Clawback Cascade — Mechanics
 
-**Status**: Live in `contracts/compliance/ClawbackRegistry.sol` + `contracts/compliance/ClawbackVault.sol`.
-**Classification**: ETM MIRRORS ([audit](./ETM_ALIGNMENT_AUDIT.md) §5.2).
-**Sibling doc**: [`CLAWBACK_CASCADE.md`](./CLAWBACK_CASCADE.md) exists as higher-level overview; this document focuses on mechanics — the topological-propagation algorithm, contest windows, and edge cases.
-**Related**: [Siren Protocol](./SIREN_PROTOCOL.md), [Augmented Mechanism Design](./AUGMENTED_MECHANISM_DESIGN.md).
+**Status**: Live in `contracts/compliance/ClawbackRegistry.sol` + `ClawbackVault.sol`.
+**Audience**: First-encounter OK. Walked taint propagation scenario.
 
 ---
 
-## The paradigm Clawback Cascade breaks
+## A story that motivates the design
 
-*"Blacklisted addresses lose their funds."*
+2021: someone hacks a DEX for $100M. They withdraw funds to their own wallet.
 
-Standard DeFi/compliance practice when funds are identified as tainted (stolen, sanctioned, or otherwise disallowed): freeze or blacklist the address. The assumption: taint is address-bound; once tainted, the address is a pariah.
+Standard response: exchanges freeze the attacker's addresses. Hack-linked wallets blacklisted.
 
-Clawback Cascade rejects this. Taint is **transaction-graph-bound**, not address-bound. When funds from address A (tainted source) are sent to address B via trade, swap, or bridge, B now holds a tainted portion proportional to A's share. B has contest rights within a window; uncontested taint claws back. B's own downstream transactions propagate the taint topologically to C, D, E, each with their own contest window.
+Problem: the attacker moves funds through:
+- CEX deposit + CEX withdrawal (laundered through exchange).
+- Decentralized mixer.
+- Multiple pass-through wallets.
+- AMM swaps for other tokens.
 
-This matches how cognitive-economic taint actually propagates: if you learn a source you relied on was fraudulent, you re-evaluate everything you learned from that source and everything you taught others based on it. The re-evaluation follows the graph, not the label.
+Each hop makes address-based freezing harder. By the end, "dirty money" is commingled with "clean money" in hundreds of wallets.
 
-## The topological propagation algorithm
+Traditional response: freeze these too. Now many legitimate users have frozen assets because a tiny fraction passed through attacker's funds. Fair? No. Effective? Barely.
 
-Given tainted source T, tainted amount V, and a transaction history H:
+This is the limit of address-based blacklisting. There must be a better way.
+
+## The Clawback Cascade approach
+
+Instead of blacklisting addresses, propagate TAINT along the transaction graph.
+
+If $100M is tainted at address X, and $1M of it flowed through address Y (alongside $9M of Y's clean funds), then Y is 10% tainted.
+
+If Y sends $1M to Z, Z is 10% tainted on the $1M = $100K tainted.
+
+Taint propagates topologically. Proportionally. Every node in the graph carries a partial taint fraction.
+
+And — crucially — anyone receiving taint has a contest window to dispute.
+
+## Walk through taint propagation
+
+**Day 0**: Attacker's address A has 100 units of stolen funds.
+
+**Day 1**: A transfers 10 units to B. B was legitimate before; now B has 10 tainted.
+
+Clawback registry records: B is 100% tainted on those 10 units.
+
+**Day 2**: B has 90 units of clean funds + 10 tainted = 100 total. B transfers 50 units to C.
+
+Proportional split: 50 × (10/100) = 5 tainted units to C. B keeps 45 clean + 5 tainted = 50.
+
+**Day 3**: C has 5 tainted + some clean funds (let's say 95 clean) = 100 total. C transfers 10 to D.
+
+D gets 10 × (5/100) = 0.5 tainted. C keeps 95 clean + 4.5 tainted = 99.5.
+
+**Day 4**: The propagation continues through many hops. Each transaction carries proportional taint based on the sending account's taint fraction.
+
+## The contest window
+
+Every address receiving taint gets a contest window (default 7 days). During the window:
+
+- The address holder can dispute the taint attribution.
+- Dispute requires evidence the receipt was in good faith.
+- Adjudicated by tribunal.
+- Resolved disputes either clear the taint or confirm clawback.
+- Unresolved disputes at window-end default to clawback.
+
+**Concrete contest example**:
+
+D (above) receives 0.5 tainted units. D says: "I bought 10 units from C on Uniswap. I didn't know C was laundering. I'm a legitimate buyer."
+
+D files a contest within the 7-day window. Tribunal reviews:
+- C was indeed passing through Uniswap.
+- D's purchase at the DEX was genuine arbitrage, not coordinated.
+
+Tribunal verdict: good faith upheld. D's 0.5 tainted units are cleared.
+
+**Non-contested example**:
+
+Another recipient E received 20 tainted units. Never contests (or their contest is rejected). After 7 days, clawback executes — E's 20 units revert to the recovery destination.
+
+## Why this defeats address-based attacks
+
+Address-based freezing is defeated by Sybil rotation. Attacker moves funds through 100 different addresses; each has to be frozen individually; by the time the 100th is frozen, funds are in address 1000.
+
+Topological propagation follows the GRAPH automatically. Moving through intermediaries doesn't escape the taint — each intermediary has proportional taint with contest rights.
+
+Attacker can't outpace the propagation. The propagation is mathematical; it happens simultaneously across the entire graph reachable from the tainted source.
+
+## The propagation algorithm
+
+Given tainted source T, tainted amount V, and transaction history H:
 
 ```
 function propagateTaint(T, V, H):
@@ -27,103 +95,90 @@ function propagateTaint(T, V, H):
     queue = [T]
     while queue is non-empty:
         current = queue.pop()
+        current_tainted = taintedAccounts[current]
+        current_balance = getBalance(current)
+        
         for each transaction TX in H where TX.from == current:
-            portion = (current_tainted_amount × TX.amount) / total_outflow(current)
+            # Proportional taint transfer
+            portion = (current_tainted × TX.amount) / current_balance
             taintedAccounts[TX.to] += portion
             queue.append(TX.to)
     return taintedAccounts
 ```
 
 Key properties:
-- **Proportional**. If address X has 10% tainted funds and sends 1000 to Y, Y becomes 100-tainted.
-- **Transitive**. Taint propagates through multiple hops.
-- **Conservation**. Total tainted across all reachable addresses equals the original V (within floating-point tolerance).
-- **Topological**. Doesn't depend on address identity, only on transaction graph.
+- **Proportional**: not all-or-nothing. 10% tainted send distributes 10% taint.
+- **Transitive**: taint propagates through multiple hops.
+- **Conservation**: total tainted across reachable addresses = original V (within floating-point tolerance).
+- **Topological**: doesn't depend on address identity, only transaction graph.
 
-The on-chain implementation is index-based for efficiency — transactions are tracked in `ClawbackRegistry` by topological index; queries follow the index rather than re-walking every time.
+## Contest window choice
 
-## Contest windows
+7-day window (default) balances:
 
-Every address receiving taint gets a contest window (default 7 days). During the window:
+- Short enough: recovery happens in reasonable time.
+- Long enough: legitimate holders have time to respond.
 
-- Address holder can dispute the taint attribution.
-- Dispute requires evidence the receipt was in good faith (e.g., arbitrage trade at market price, normal DEX swap).
-- Disputes are adjudicated by tribunal (judicial branch of [ContributionAttestor](./CONTRIBUTION_ATTESTOR_EXPLAINER.md) or a dedicated dispute contract).
-- Resolved disputes either clear the taint (good faith upheld) or confirm clawback (bad faith proven).
-- Unresolved disputes at window-end default to clawback.
+Shorter (3 days): too quick; some holders in different timezones/busy weeks can't respond.
+Longer (30 days): too slow; recovery delayed past usefulness.
 
-Window length trade-off:
-- Shorter → faster recovery; risk of cutting off good-faith holders.
-- Longer → thorough due process; recovery delayed past usefulness.
-
-Current 7-day default is empirical; subject to governance tuning.
+7 days is empirical. Subject to governance tuning.
 
 ## The clawback execution
 
 When a window expires with taint uncontested:
 
-1. `ClawbackVault.executeClaw(address, amount)` is called.
-2. The vault transfers the tainted amount from the address's balance to the recovery destination (usually a governance-controlled recovery fund).
-3. The transfer fires `ClawedBack(from, to, amount)` event.
-4. Downstream addresses that derived their taint from this one have their taint-attribution updated (their taint is now confirmed, not provisional).
+1. `ClawbackVault.executeClaw(address, amount)` called.
+2. Vault transfers tainted amount from address balance to recovery destination (usually governance-controlled recovery fund).
+3. Transfer fires `ClawedBack(from, to, amount)` event.
+4. Downstream addresses that derived their taint from this one have their taint-attribution updated.
 
-Execution is permissionless — anyone can call `executeClaw` after window-end. Permissionless execution prevents a malicious admin from selectively blocking clawback on favored addresses.
+**Permissionless execution**: anyone can call `executeClaw` after window-end. Prevents malicious admin from blocking clawback on favored addresses.
 
-## Why not address-based freezing
+## Why proportional, not all-or-nothing
 
-Address freezing has several failure modes Clawback Cascade avoids:
+Address-based: whole address frozen. Y loses 100 units because 10 were tainted. Disproportionate.
 
-### Failure 1 — Fungibility violation
+Proportional: Y loses 10 tainted units. Y keeps 90 clean. Proportionate.
 
-Address-freezing treats the entire address as tainted. But the address may hold mostly-clean funds with only a small tainted portion. Freezing the whole address punishes the clean majority for the tainted minority.
+Benefits:
+- **Fungibility preserved**: clean funds stay with owner.
+- **Clawback resistance against legitimate owners**: you can't be entirely blacklisted because a tiny fraction of your funds was once tainted.
+- **Fair for intermediaries**: AMMs etc. can receive tainted swap input without entire pool getting blacklisted.
 
-Clawback Cascade only claws back the proportional tainted amount. The clean portion stays with the holder.
+## Edge cases walked
 
-### Failure 2 — Sybil rotation
+### Edge Case 1 — Cycles in the transaction graph
 
-An address-based system can be defeated by moving tainted funds through multiple intermediaries. Each address-freeze is a per-address action; the attacker moves faster than the freezes.
+Can funds circulate A → B → C → A?
 
-Clawback Cascade's topological propagation follows the graph automatically. Moving through intermediaries doesn't escape the taint — each intermediary has their taint portion with contest rights.
+Yes. When the loop closes, A already has a taint amount from the original tainting. Re-tainted portion added, with attribution tracking preventing double-count.
 
-### Failure 3 — Governance capture
+### Edge Case 2 — Mixed-origin liquidity pools
 
-Address-freeze lists invite governance capture: who adds addresses? whose addresses? The authority to freeze is a powerful censorship primitive.
+A liquidity pool receives tainted swap input. LP's share of pool is now partially tainted proportional to pool's total tainted fraction.
 
-Clawback Cascade separates detection (anyone can flag a tainted source with evidence) from adjudication (tribunal process). No single authority controls who gets taint.
+This is real for DeFi integrations. Clawback Cascade handles correctly — applies taint fraction to LP's share, does NOT taint entire pool. Other LPs unaffected unless they themselves had tainted interaction.
 
-## Edge cases
+### Edge Case 3 — Flash-loan through tainted source
 
-### Edge case 1 — Cycles in the transaction graph
+Flash loan borrowing from tainted source and repaying in same transaction: funds never really settle. No new taint propagates (inflow matched by equal outflow instantly).
 
-Can funds circulate through A → B → C → A? Yes, and the algorithm handles this. When the loop closes, address A already has a taint amount from the original tainting; the re-tainted portion is added (with attribution tracking to prevent double-counting the conservation).
+### Edge Case 4 — Cross-chain
 
-### Edge case 2 — Mixed-origin liquidity pools
+Currently limited to same-chain. Bridged funds break the graph (new chain has different tracking).
 
-A liquidity pool receives tainted swap input. The LP's share of the pool is now partially tainted proportional to the pool's total tainted fraction.
+Planned: LayerZero integration + cross-chain registry replication. Future cycle.
 
-This is a real concern for DeFi integrations. Clawback Cascade handles it correctly by applying the taint fraction to the LP's share; it does NOT taint the entire pool. Other LPs are not affected unless they themselves had interaction with the taint.
+### Edge Case 5 — Off-chain recipients
 
-### Edge case 3 — Flash-loan through tainted source
+Tainted funds sold through CEX end at exchange's hot wallet (on-chain). Downstream off-chain flows outside Clawback Cascade's scope.
 
-A flash loan that borrows from a tainted source and repays within the same transaction: the funds never really settle. No new taint propagates in this case because the inflow is matched by an equal outflow instantly.
-
-This depends on accurate transaction-graph indexing at the right granularity.
-
-### Edge case 4 — Cross-chain
-
-Currently limited to same-chain propagation. Bridged funds break the graph (new chain has different tracking).
-
-Mitigations planned: LayerZero integration + cross-chain registry replication. Future cycle.
-
-### Edge case 5 — Off-chain recipients
-
-If tainted funds are sold through a centralized exchange, the propagation ends at the exchange's hot wallet (on-chain). Subsequent off-chain flows are outside Clawback Cascade's scope.
-
-Mitigation: coordinate with exchanges to report downstream receipts. Partial — exchanges aren't obligated to participate.
+Mitigation: coordinate with exchanges to report downstream. Partial.
 
 ## Who flags taint
 
-Detection is permissionless — anyone can submit a claim:
+Detection is permissionless:
 
 ```solidity
 function flagTaint(
@@ -135,61 +190,69 @@ function flagTaint(
 ```
 
 Requires:
-- `evidenceHash` committing to an off-chain evidence bundle (court order, stolen-funds proof, sanctions-list reference, etc.).
+- `evidenceHash` committing to off-chain evidence bundle (court order, stolen-funds proof, sanctions reference).
 - `incidentId` linking to a tribunal case or governance proposal.
-- Stake bond to prevent spam flagging (default 1 ETH; governance-tunable).
+- Stake bond (default 1 ETH) to prevent spam.
 
-Frivolous flags lose the bond. Real flags get the bond back upon tribunal confirmation.
+Frivolous flags lose bond. Real flags get bond back upon tribunal confirmation.
 
 ## Who adjudicates
 
 Tribunal jury or governance, depending on scope:
 
 - Routine taint (clearly stolen, matches on-chain attack patterns) → tribunal jury.
-- Complex or ambiguous (legal gray area, jurisdictional questions) → governance proposal.
+- Complex or ambiguous (legal gray area) → governance proposal.
 
-The adjudication produces a binding outcome. Tribunal verdicts override executive-branch provisional taint; governance overrides both.
+Adjudication produces binding outcome.
 
 ## Interaction with Siren Protocol
 
-[Siren Protocol](./SIREN_PROTOCOL.md) deters attacks; Clawback Cascade recovers proceeds when deterrence fails.
+[Siren Protocol](./SIREN_PROTOCOL.md) deters attacks. Clawback Cascade recovers when deterrence fails.
 
 Sequence:
 1. Attacker engages with protocol → Siren raises signal-score → attacker pays rent.
-2. If Siren-rent is insufficient to deter, attacker proceeds and succeeds in extracting funds.
-3. Post-attack, detection-community flags the tainted source.
-4. Clawback Cascade propagates taint through the attacker's flow.
-5. Funds recovered, proportional to how much of the flow is on-chain and within contest window.
+2. If Siren-rent insufficient to deter, attacker proceeds and succeeds.
+3. Post-attack, detection-community flags tainted source.
+4. Clawback Cascade propagates taint through attacker's flow.
+5. Funds recovered, proportional to how much of flow is on-chain + within contest window.
 
-Together, Siren + Clawback give defense-in-depth against value extraction: first deter, then recover.
+Together: defense-in-depth. First deter; then recover.
 
-## The cognitive-parallel, deeper
+## The cognitive parallel, deeper
 
-[ETM audit](./ETM_ALIGNMENT_AUDIT.md) §5.2 identified the cognitive parallel. Expanding:
+In cognition, "tainted information" (misinformation, bias, compromised source) propagates through the belief graph. The mind's response is a TOPOLOGICAL re-evaluation: update everything downstream of the compromised source.
 
-In cognition, "tainted information" (misinformation, bias, compromised source) propagates through the belief graph. The mind's response is a topological re-evaluation: update everything downstream of the compromised source.
+The temporal window parallels cognitive epistemic latency: we don't instantly update every downstream belief — we wait (days to weeks) for context to clarify, allow good-faith re-interpretation, then decisively update.
 
-The temporal window parallels cognitive "epistemic latency": we don't instantly update every downstream belief — we wait (typically days to weeks) for context to clarify, allow good-faith re-interpretation, then decisively update.
-
-VibeSwap's clawback window implements this cognitive pattern. Immediate clawback would be the cognitive equivalent of snap-updating all beliefs on any new information; permanent clawback without contest would be refusing to re-evaluate. The window is the cognitive-economic balance.
+VibeSwap's 7-day clawback window implements this cognitive pattern.
 
 ## Governance role
 
 Clawback is powerful. Governance controls:
+
 - Contest window duration.
-- Recovery destination (where clawed-back funds go).
+- Recovery destination.
 - Stake bond for flagging.
 - Tribunal jury selection criteria.
-- Meta-overrides when specific clawbacks are disputed at the governance level.
+- Meta-overrides at governance level.
 
-The governance role keeps Clawback Cascade from being a unilateral weapon. Multiple check-points prevent any single actor from weaponizing the mechanism.
+These prevent Clawback Cascade from being weaponized. Multiple checks prevent any single actor from weaponizing the mechanism.
 
-## Open questions
+## For students
 
-1. **Optimal contest window length** — 7 days is intuitive but may be suboptimal. Need empirical data on contest-processing time.
-2. **Proportional-vs-full clawback at high taint fractions** — if an address is 95% tainted, should the remaining 5% also be clawed as "practically wholly tainted"? Currently proportional; could become threshold-based.
-3. **Cross-chain registry replication** — when bridged funds span LayerZero, how do registries coordinate? Active research.
+Exercise: trace taint propagation through a specific transaction graph.
+
+Setup:
+- A has 100 tainted units.
+- A → B: 50 units.
+- B → C: 30 units.
+- B → D: 20 units.
+- C → E: 20 units.
+
+Compute taint at each node. What percentages? What dollar amounts?
+
+Apply contest reasoning: which recipients have strongest case for contesting?
 
 ## One-line summary
 
-*Clawback Cascade propagates taint topologically through the transaction graph with proportional attribution and 7-day contest windows — recovers stolen/tainted funds without freezing fungibility, preserves good-faith holders, permissionless detection + adjudicated resolution. The cognitive-economic update dynamic on-chain.*
+*Clawback Cascade propagates taint TOPOLOGICALLY through transaction graph with proportional attribution (10% taint sent = 10% of receive becomes tainted) and 7-day contest windows. Walked propagation (A→B→C→D with specific amounts). Recovers stolen/tainted funds without freezing fungibility. Permissionless detection + adjudicated resolution. Pairs with Siren Protocol: Siren deters, Clawback recovers. Cognitive epistemic-latency update pattern on-chain.*

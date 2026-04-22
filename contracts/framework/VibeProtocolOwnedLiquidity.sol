@@ -30,6 +30,12 @@ import "../financial/interfaces/IVibeRevShare.sol";
 contract VibeProtocolOwnedLiquidity is IVibeProtocolOwnedLiquidity, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    // ============ Admin Observability Events ============
+    event VibeAMMUpdated(address indexed previous, address indexed current);
+    event DAOTreasuryUpdated(address indexed previous, address indexed current);
+    event RevShareUpdated(address indexed previous, address indexed current);
+    event MaxPositionsUpdated(uint256 previous, uint256 current);
+
     // ============ Constants ============
 
     uint256 public constant DEFAULT_MAX_POSITIONS = 50;
@@ -343,19 +349,27 @@ contract VibeProtocolOwnedLiquidity is IVibeProtocolOwnedLiquidity, Ownable, Ree
     // ============ Admin ============
 
     function setVibeAMM(address _amm) external onlyOwner {
+        address prev = vibeAMM;
         vibeAMM = _amm;
+        emit VibeAMMUpdated(prev, _amm);
     }
 
     function setDAOTreasury(address _treasury) external onlyOwner {
+        address prev = daoTreasury;
         daoTreasury = _treasury;
+        emit DAOTreasuryUpdated(prev, _treasury);
     }
 
     function setRevShare(address _revShare) external onlyOwner {
+        address prev = revShare;
         revShare = _revShare;
+        emit RevShareUpdated(prev, _revShare);
     }
 
     function setMaxPositions(uint256 _max) external onlyOwner {
+        uint256 prev = maxPositions;
         maxPositions = _max;
+        emit MaxPositionsUpdated(prev, _max);
     }
 
     // ============ Views ============

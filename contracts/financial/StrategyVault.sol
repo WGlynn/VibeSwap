@@ -31,6 +31,8 @@ import "../core/interfaces/IFeeRouter.sol";
  *      (VibeBonds), lending (VibeCredit), insurance underwriting (VibeInsurance).
  */
 contract StrategyVault is ERC4626, Ownable, ReentrancyGuard, IStrategyVault {
+    event StrategyTimelockUpdated(uint256 previous, uint256 current);
+
     using SafeERC20 for IERC20;
 
     // ============ Constants ============
@@ -252,7 +254,9 @@ contract StrategyVault is ERC4626, Ownable, ReentrancyGuard, IStrategyVault {
     }
 
     function setStrategyTimelock(uint256 timelock) external onlyOwner {
+        uint256 prev = _strategyTimelock;
         _strategyTimelock = timelock;
+        emit StrategyTimelockUpdated(prev, timelock);
     }
 
     function setFeeRouter(address router) external onlyOwner {

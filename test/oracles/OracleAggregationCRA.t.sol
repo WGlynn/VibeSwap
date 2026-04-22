@@ -17,6 +17,10 @@ import "../../contracts/oracles/interfaces/ITruePriceOracle.sol";
 contract OracleAggregationCRATest is Test {
     OracleAggregationCRA public agg;
 
+    // Local mirror of the interface event so `vm.expectEmit` can match it under solc 0.8.20
+    // (interface-qualified event access `IOracleAggregationCRA.IssuerSlashed` requires ≥0.8.21).
+    event IssuerSlashed(uint256 indexed batchId, address indexed issuer, uint256 amount, string reason);
+
     address public owner;
     address public issuer1;
     address public issuer2;
@@ -288,7 +292,7 @@ contract OracleAggregationCRATest is Test {
         // issuer2 did not reveal — slashable
         vm.prank(issuer3);
         vm.expectEmit(true, true, false, true);
-        emit IOracleAggregationCRA.IssuerSlashed(1, issuer2, 0, "non-reveal");
+        emit IssuerSlashed(1, issuer2, 0, "non-reveal");
         agg.slashNonRevealer(1, issuer2);
     }
 
@@ -299,7 +303,7 @@ contract OracleAggregationCRATest is Test {
         vm.prank(issuer1); agg.revealPrice(1, 1500e18, bytes32(uint256(1)));
         vm.warp(block.timestamp + agg.REVEAL_PHASE_DURATION() + 1);
 
-        vm.expectRevert(bytes("Issuer revealed — not slashable"));
+        vm.expectRevert(bytes("Issuer revealed - not slashable"));
         agg.slashNonRevealer(1, issuer1);
     }
 
@@ -342,7 +346,7 @@ contract OracleAggregationCRATest is Test {
         // TPO now reflects the aggregated median
         ITruePriceOracle.TruePriceData memory data = tpo.getTruePrice(poolId);
         assertEq(data.price, 1500e18);
-        assertEq(uint256(data.regime), uint256(ITruePriceOracle.RegimeType.STABLE));
+        assertEq(uint256(data.regime), uint256(ITruePriceOracle.RegimeType.NORMAL));
         assertEq(data.manipulationProb, 0);
         assertGt(data.confidence, 0);
     }

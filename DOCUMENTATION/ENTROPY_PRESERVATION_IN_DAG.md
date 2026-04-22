@@ -1,164 +1,229 @@
 # Entropy Preservation in the DAG
 
-**Status**: Information-theoretic fidelity analysis of contribution recording.
-**Depth**: Does the DAG preserve the information of the contribution-stream, or is it lossy?
-**Related**: [ContributionDAG Explainer](./CONTRIBUTION_DAG_EXPLAINER.md), [Kolmogorov Complexity of Attribution](./KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.md), [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md).
+**Status**: Information-theoretic fidelity analysis with concrete N-bit accounting.
+**Audience**: First-encounter OK. Entropy concept introduced from scratch.
 
 ---
 
-## The question
+## Start with a question about recordings
 
-Contributions enter VibeSwap's DAG as attestations. Each attestation carries metadata (contributor, type, evidenceHash, description, value). The DAG indexes this metadata and layers it with trust-scores and lineage.
+You record a concert. You can:
 
-When an auditor, a future contributor, or an off-chain analyst examines the DAG, how faithfully does the DAG preserve the information of what actually happened? Is the recording lossless, lossy-but-bounded, or lossy-unbounded?
+**Option A — Full-fidelity audio**: lossless recording preserves every acoustic detail. Files are huge. You need expensive storage.
 
-Information-theoretically: what's the entropy of the actual contribution-stream, vs the entropy of what the DAG records? The difference is the loss.
+**Option B — Compressed audio**: mp3 or similar. Most people can't tell the difference. Files are much smaller.
 
-## Why this matters
+**Option C — Summary notes**: just write down "Concert on Tuesday; the piano solo in middle was great." Files are tiny.
 
-If the DAG is lossless: auditors can fully reconstruct the contribution history from DAG data. Attribution is honest.
+Each preserves LESS information than the previous. But which is "enough"?
 
-If the DAG is lossy-but-bounded: some detail is lost but the load-bearing information (who contributed what, when, with what downstream effects) is preserved. Attribution is defensible.
+Depends on use case. If you want to re-experience the concert, Option A is needed. If you want to remember it, Option B suffices. If you want to prove the concert happened, Option C is fine.
 
-If the DAG is lossy-unbounded: detail loss is unpredictable; some contributions are effectively erased over time. Attribution breaks.
+Information theory quantifies this trade-off. This doc applies it to attribution chains.
 
-Most DeFi attribution systems are lossy-unbounded because they didn't consider information theory at design time. VibeSwap's architecture aims for lossy-but-bounded with explicit loss accounting.
+## Entropy, plainly
 
-## The contribution-stream's entropy
+**Entropy** = the information content of a thing. Measured in bits.
 
-Raw contribution-stream information per event:
+More formally: entropy is the minimum number of bits needed to describe something uniquely.
 
-- Who did it (identity of contributor): ~log₂(N_contributors) bits; for 10,000 contributors ≈ 14 bits.
-- What they did (content of contribution): highly variable — a 1000-word memo is ~8,000 bits; a single code commit ~50,000 bits; a tweet ~300 bits.
-- When (time): ~40 bits at second precision over a decade.
-- Context (what prior state they were responding to): variable, depends on how much of the causal chain is relevant.
+- A coin flip: 1 bit (heads or tails).
+- A die roll: log₂(6) ≈ 2.6 bits.
+- A specific word from a 10,000-word dictionary: log₂(10,000) ≈ 13.3 bits.
+- A specific book of 80,000 words from the 10,000-word vocabulary: 80,000 × 13.3 ≈ 1 million bits (~128 KB).
 
-Total per contribution: dominated by content, typically 1,000 - 100,000 bits (125 bytes - 12 KB of raw information).
+Entropy is NOT the size of the thing. It's the minimum size of any description that uniquely identifies it. A wall-colored-white video is huge in bytes but has low entropy (same color every frame).
 
-Over 10^4 contributions: 10^7 to 10^9 bits = 1.25 MB to 125 MB of raw information.
+## Attribution chains as entropic objects
 
-## The DAG's recording entropy
+An attribution chain is a graph of contributions. Each contribution is a node. Each parent-reference is an edge. Each node has metadata.
 
-What the DAG actually stores per attestation:
+What's the entropy of this graph?
 
-- Contributor (address hash): 20 bytes = 160 bits.
-- ContributionType (enum): 4 bits.
-- evidenceHash (commits to off-chain content): 32 bytes = 256 bits.
-- Description (short title, not content): ~50 bytes = 400 bits (typical).
-- Value: 32 bytes = 256 bits.
-- Timestamp: 8 bytes = 64 bits.
-- Parent attestations: variable, typically 0-2 at 32 bytes each.
+### Structural entropy — the graph itself
 
-Total per attestation: ~200-300 bytes = ~1,600-2,400 bits on average.
+The shape of the graph. Which contributions exist. Which ones cite which. Timestamps. Contributors.
 
-This is substantially less than the raw contribution's information content. The DAG is committing to an evidenceHash of the content rather than the content itself — lossless for verification purposes (hash change = content change detected) but lossy for retrieval (the hash doesn't let you reconstruct the content).
+For N contributions and average fan-in of p parents per contribution: structural entropy ≈ O(N × log N) bits.
 
-## The off-chain tier
+For 10,000 contributions: ~10,000 × 14 = 140,000 bits ≈ 17 KB for structure.
 
-The DAG stores the commitment; the actual content lives off-chain. Ideal case: off-chain content is preserved; DAG's evidenceHash still verifies it; retrieval combines both.
+### Content entropy — what each contribution IS
 
-Real case: off-chain content decays. Telegram messages get deleted. Private repos become inaccessible. IPFS content ages out. The commitment survives; the content doesn't.
+For each contribution: the actual content (document, commit, design). Typically much larger than structure.
 
-When off-chain content is lost:
-- The evidenceHash is orphaned — it verifies nothing retrievable.
-- The attestation's "what was done" is now unknown.
-- The attestation's value, contributor, lineage are still recorded.
-- Partial information preserved; full reconstruction impossible.
+For a 1000-word contribution: content entropy ~5,000 bits (log₂ of possible 1000-word sequences).
 
-This is lossy-but-bounded: we know what's lost (content) vs what's retained (structure).
+For 10,000 contributions averaging 1000 words each: ~50 million bits = 5 MB for content.
 
-## Structural vs content entropy
+### The big difference
 
-The DAG preserves structural entropy: the graph of who-contributed-to-what-when, with lineage. This is the lower-entropy, higher-durability slice of the original information.
+**Structural entropy scales as N × log N** (sub-linear in total bits).
+**Content entropy scales as N × content_per_item** (linear in total bits).
 
-The DAG loses content entropy: the specific words, code, design decisions of each contribution. This is the higher-entropy, lower-durability slice.
+Content dominates at scale. Structure is relatively cheap.
 
-Is this the right tradeoff? Generally yes. The structural entropy is what powers the fairness math (Shapley needs structure, not content). The content entropy is nice-to-have for deep audits but not essential for rewards.
+## What the DAG preserves losslessly
 
-But the tradeoff has a failure mode: if you ever need to re-adjudicate a past reward (e.g., someone retroactively disputes attribution), you need the content. If the content is lost, re-adjudication is impossible.
+VibeSwap's DAG (ContributionDAG + ContributionAttestor) preserves STRUCTURAL entropy losslessly:
+
+- Every contribution's contributor, type, timestamp, parent references, claim-status are all stored on-chain.
+- Cryptographic commitments (evidenceHash) commit to content but don't store it.
+- Trust-weights and attestations are indexed explicitly.
+
+For the 10,000-contribution chain: ~17 KB structure, all on-chain. Preserved forever (subject to chain survival).
+
+## What the DAG does NOT preserve losslessly
+
+Content entropy is NOT preserved on-chain. Instead:
+
+- Each contribution has an evidenceHash (32 bytes) committing to the content.
+- The content itself lives off-chain (IPFS, GitHub, Arweave, etc.).
+- If the off-chain content is lost, the commitment is orphaned — verifies nothing retrievable.
+
+This is a deliberate choice. Storing 5 MB of content per chain on-chain is too expensive. Storing 32 bytes of commitment per contribution is affordable.
+
+## The trade-off, quantified
+
+### Scenario A — Preserve everything
+
+Store both structure and content on-chain. 5 MB per 10,000-contribution chain. At ~$0.01/KB-year storage: ~$600/year. Expensive.
+
+### Scenario B — Preserve structure, commit content
+
+Store structure + evidence-hashes. 50 KB per 10,000-contribution chain. ~$6/year. Affordable.
+
+### Scenario C — Preserve only summary
+
+Store aggregate statistics. Very small. Not usable for fairness-verification (can't audit individual claims).
+
+VibeSwap uses Scenario B. Structural entropy losslessly preserved; content entropy committed-but-not-retained.
+
+## Why this trade-off works
+
+The information needed to run Shapley distribution is STRUCTURAL. Shapley math needs:
+- Who contributed.
+- In what order.
+- With what marginal value (estimated).
+- Which were accepted.
+
+All structural. Content entropy (the actual text of a contribution) is not needed for Shapley math. It's nice-to-have for auditability but not required.
+
+So preserving structure + committing content is sufficient for the core mechanism. Lost content degrades auditability but doesn't break fairness computation.
+
+## Where content-loss matters
+
+### Case 1 — Retroactive re-adjudication
+
+Alice claims "Bob's work built on my earlier contribution; I deserve partial credit."
+
+If Alice's earlier contribution's content is lost, she can't prove the influence. Re-adjudication impossible; original distribution stands.
+
+Mitigation: long-lived off-chain storage (Arweave, multiple IPFS replicas). Off-chain redundancy reduces but doesn't eliminate content-loss risk.
+
+### Case 2 — Dispute resolution
+
+A tribunal is evaluating a disputed claim. They need to see the original content to judge.
+
+If lost, the dispute can't be resolved. Judgment defaults to status quo.
+
+Mitigation: same — redundant off-chain storage + Merkle-anchored content that survives even when primary storage fails.
+
+### Case 3 — Historical analysis
+
+Researchers 20 years later want to understand the protocol's evolution. They need to read old contributions.
+
+If content is lost, the history becomes skeletal — structure without texture.
+
+Mitigation: periodic snapshots to long-term archives.
 
 ## The Merkle-chain preservation pattern
 
-Mitigation: anchor content-hash commitments in an incremental Merkle tree. `ContributionDAG` already does this (`getVouchTreeRoot`, `isKnownVouchRoot`). The Merkle-root evolves over time; any leaf can be Merkle-proven against a root captured historically.
+VibeSwap uses incremental Merkle trees for content integrity. Each content piece is a leaf; the root is published on-chain.
 
-Combined with off-chain archival (IPFS, Arweave, etc.), this gives: structural entropy permanent on-chain; content entropy probabilistically preserved off-chain with Merkle-verifiable integrity.
+Later, anyone can prove "this content IS what was recorded at that time" by providing:
+- The content itself.
+- The Merkle path from the leaf to the root.
+- The on-chain root.
 
-Realistic loss rate: ~5-20% of very-old content becomes unretrievable over 10+ years. Structural entropy loss: ~0% (on-chain is permanent given the chain survives).
+If content is lost off-chain but the Merkle proof is kept, you can't reconstruct content but you can verify IF someone else holds a copy that their copy is authentic.
 
-## The "who cares" argument
+Partial preservation — commitment survives when content fades.
 
-A skeptic might say: why preserve entropy? Old contributions fade in relevance; the newest are what matters.
+## The dignity-of-storage problem
 
-Counter-argument: the whole point of attribution is long-term. A contributor's 2026 insight may pay out in 2036 through downstream citations. If we erase the 2026 insight's structural record, we erase the citation chain; the 2036 payout has nowhere to route.
+A protocol that collects contributions and then loses them is breaking an implicit commitment. Contributors reasonably expect their work to be preserved.
 
-Under [The Long Now of Contribution](./THE_LONG_NOW_OF_CONTRIBUTION.md), attribution durability across decades is load-bearing. Structural entropy preservation is the key property.
+Four tiers of preservation:
 
-## What breaks at low entropy
+### Tier 1 — Structural (on-chain)
 
-If DAG structural entropy drops substantially (e.g., due to aggressive pruning or storage limits), specific pathologies emerge:
+100% reliable. Survives chain-existence. ~17 KB per 10K-chain. Cheap.
 
-- **Lineage inversion**: downstream contributions cite parents that no longer exist in DAG; lineage becomes orphans.
-- **Fairness drift**: Shapley computation's v(S) estimation gets worse because the historical record used to calibrate is degraded.
-- **Attribution disputes**: "I contributed X in 2028" — unverifiable because the record is partial.
-- **Trust-graph degradation**: BFS-decay in trust scores computed from a degraded graph gives unrepresentative trust-levels.
+### Tier 2 — Content on fast storage (IPFS, Arweave)
 
-Each pathology degrades the protocol's load-bearing properties. Preserving structural entropy is defensive infrastructure against these failures.
+~95% reliable over 10 years. 5 MB per 10K-chain. Moderately expensive.
 
-## The minimum viable entropy
+### Tier 3 — Content on cold archive
 
-What's the minimum structural entropy the DAG needs to preserve for fairness-math to function?
+~99% reliable over 100 years. Requires active archive maintenance.
 
-Per-attestation, the irreducible:
-- Contributor (who): 160 bits.
-- Timestamp (when): 64 bits.
-- Parent reference (to what): 256 bits (hash) or ~20 bits (index-in-DAG).
-- Type (in what mode): 4 bits.
+### Tier 4 — Content on multiple independent archives
 
-Total: ~500 bits for 0-1 parent attestations, up to ~1000 for 2-3 parents. This is the non-negotiable core.
+~99.9%+ reliable. Redundancy reduces risk further.
 
-Beyond this (description, evidenceHash, value): valuable for audit and verification but not strictly needed for Shapley computation or graph navigation.
+VibeSwap's target: Tier 2 by default, Tier 4 for high-value claims. Good trade-off of cost vs. preservation.
 
-VibeSwap's current storage (~1600-2400 bits/attestation) is comfortably above this minimum. Substantial room for compression without crossing into loss-of-function.
+## The eviction-is-correct argument
 
-## The forgetting-on-purpose angle
+In cognition, memory decay is ADAPTIVE. Forgetting outdated information frees capacity for new learning.
 
-In cognition, forgetting is not purely a failure — some forgetting is adaptive (pruning outdated information frees capacity for new). [Cognitive Rent Economics](./COGNITIVE_RENT_ECONOMICS.md) models this via state-rent: info that can no longer fund its rent gets evicted.
+Applied to DAG: should we plan for some contributions to fade from detailed storage over time? Yes.
 
-Applied to DAG: should we plan for some contributions to fade from full-detail storage over time? Yes — but deliberately, not accidentally.
+Planned eviction:
+- Hot storage: recent + actively-attested contributions. Full detail.
+- Warm: middle-age, less-attested. Commitment + partial content.
+- Cold: old, dormant. Commitment only.
+- Eviction: claims that no longer earn attestations over long periods can be pruned.
 
-Deliberate fading:
-- Hot storage for recent / actively-attested contributions.
-- Warm storage for middle-age.
-- Cold storage (commitment only, content archived externally) for old.
-- Eviction from commitment only after content-replication to multiple archives.
+This is deliberate information-management. Not catastrophic loss; adaptive forgetting.
 
-Accidental loss:
-- Content disappears from off-chain while commitment remains on-chain (orphaned commitment).
-- Chain loses state during upgrade or substrate migration.
-- Network splits and loses history.
+## Natural vs. accidental loss
 
-Deliberate is fine; accidental is not. The infrastructure should be designed to prevent accidental while embracing deliberate.
+**Natural loss** (eviction via state-rent mechanism): deliberate. Claims that no longer earn fresh attestations pay the cost; those that do have their storage funded.
 
-## Entropy and iteration
+**Accidental loss** (off-chain content disappears from IPFS): undesired. Should be prevented via replication + archival.
 
-Shapley iteration ([Fairness Fixed Point](./THE_FAIRNESS_FIXED_POINT.md)) depends on historical DAG structure. If entropy is preserved, iteration is stable. If entropy is lost (especially recent-past entropy), iteration becomes unstable because historical references dangle.
+Architecture prevents accidental loss while permitting natural eviction. Infrastructure difference, not just philosophical.
 
-This is another reason to prefer deliberate-fading over accidental-loss: we control which information degrades, so we can ensure the recent-past remains fully-preserved while slightly-older content can tier to warm storage.
+## For students
+
+Exercise: compute entropy of a specific contribution chain.
+
+- 100 contributions.
+- Each has: contributor (from 10 possible), type (9 options), parent attestation count (0-3).
+- Content averaging 500 bytes per contribution.
+
+Compute:
+1. Structural entropy per contribution (bits).
+2. Content entropy per contribution.
+3. Total for the chain.
+4. Compare to on-chain storage required.
+
+Observe: structure is cheap; content dominates.
 
 ## Relationship to ETM
 
-[Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md)'s cognitive-economy model has entropy tiers: vivid episodic memories (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived). Cognition doesn't preserve entropy uniformly; it compresses over time.
+Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive memory has temperature tiers: vivid episodic (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived).
 
-VibeSwap's tiered storage mirrors this. Fresh attestations get full-detail; aging attestations get structural-only. The entropy fade is gradual and controlled.
+The DAG's hot/warm/cold storage tiers mirror this. Cognition doesn't preserve entropy uniformly; it compresses over time. Same pattern.
 
-## Open questions
+## Relationship to other primitives
 
-1. **Optimal tier-transition timing**: when should an attestation demote from hot → warm? Should it be time-based, attention-based, or rent-based?
-2. **Content archival redundancy**: how many off-chain replicas are needed for acceptable content-preservation probability?
-3. **Entropy-verification tools**: can we publish metrics about how much content is reachable from how old? Make the entropy fade auditable.
-
-These inform the long-arc architecture.
+- **Companion**: [Kolmogorov Complexity of Attribution](./KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.md) — Kolmogorov gives the storage lower bounds; entropy preservation is about which parts we keep.
+- **Instance**: [ContributionAttestor](./CONTRIBUTION_ATTESTOR_EXPLAINER.md) — stores the structural layer.
+- **Enabling**: [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) — captures source content that then goes to off-chain tiers.
 
 ## One-line summary
 
-*The DAG preserves structural entropy (graph, lineage, trust) losslessly while committing to but not retaining content entropy; deliberate tier-based fading of old content is correct (matches cognitive memory per ETM), accidental loss is not — architecture prevents the latter.*
+*The DAG preserves STRUCTURAL entropy losslessly (who, when, parents, claim-status) but COMMITS to content via evidenceHash rather than storing it. Structure is cheap (~17 KB per 10K chain); content is expensive (~5 MB). Four preservation tiers (on-chain, fast off-chain, cold archive, redundant). Deliberate eviction via state-rent is correct (matches cognitive memory temperature); accidental loss is prevented via redundant archival.*

@@ -44,6 +44,9 @@ contract VibeGovernanceHub is
 {
     using SafeERC20 for IERC20;
 
+    event CrossChainEndpointUpdated(address indexed previous, address indexed current);
+    event WeightSourcesUpdated(address indexed prevLp, address indexed prevMind, address currentLp, address currentMind);
+
     // ============ Enums ============
 
     enum GovernanceType {
@@ -867,7 +870,9 @@ contract VibeGovernanceHub is
      * @param _endpoint New endpoint address
      */
     function setCrossChainEndpoint(address _endpoint) external onlyOwner {
+        address prev = crossChainEndpoint;
         crossChainEndpoint = _endpoint;
+        emit CrossChainEndpointUpdated(prev, _endpoint);
     }
 
     /**
@@ -886,8 +891,11 @@ contract VibeGovernanceHub is
      * @param _mindSource Mind score source
      */
     function setWeightSources(address _lpSource, address _mindSource) external onlyOwner {
+        address prevLp = lpPositionSource;
+        address prevMind = mindScoreSource;
         lpPositionSource = _lpSource;
         mindScoreSource = _mindSource;
+        emit WeightSourcesUpdated(prevLp, prevMind, _lpSource, _mindSource);
     }
 
     // ============ Internal Functions ============

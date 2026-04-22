@@ -22,6 +22,8 @@ contract ClawbackVault is
 {
     using SafeERC20 for IERC20;
 
+    event RegistryUpdated(address indexed previous, address indexed current);
+
     // ============ Structs ============
 
     struct EscrowRecord {
@@ -213,7 +215,9 @@ contract ClawbackVault is
     // ============ Admin ============
 
     function setRegistry(address _registry) external onlyOwner {
+        address prev = registry;
         registry = _registry;
+        emit RegistryUpdated(prev, _registry);
     }
 
     // ============ UUPS ============

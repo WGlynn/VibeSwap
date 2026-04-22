@@ -187,14 +187,416 @@ The orthogonality property is critical for ETM-alignment. Cognition has the same
 - Pillar weights — 60/30/10 reflects current judgment on cognitive seniority. As the network matures and contribution attribution becomes more reliable, PoM weight could plausibly rise (70%+); if attribution proves gameable, weight would shift back. ETM-neutral on exact ratio so long as PoM remains senior.
 - Log-scale base for PoW — `log₂` is the current choice. `ln` or `log₁₀` would shift the diminishing-returns curve. Mechanism-economics, not alignment.
 
+### 2.2 Proof of Mind (PoM)
 
+**What it is.** PoM is the senior pillar of the NCI weight function (60%). Operationally, it is the scalar score of a participant's cognitive-economic contribution to the network, computed from several backing contracts: `contracts/identity/SoulboundIdentity.sol` (non-transferable identity), `contracts/identity/ContributionDAG.sol` (directed-acyclic graph of attested contributions), `contracts/identity/VibeCode.sol` + `contracts/identity/AgentRegistry.sol` (recognized contribution surfaces).
+
+**ETM analysis.** PoM is the highest-fidelity externalization of ETM's **common-knowledge anchoring** property available on any blockchain to date. The three properties that make it work:
+
+1. **Time-accumulated, not purchasable.** PoM score cannot be bought because soulbound identity prevents transfer of the underlying identity token. A wealthy actor cannot arrive and buy themselves a high PoM score; they must accumulate contributions over real time. This mirrors cognition: expertise cannot be purchased, only acquired through sustained engagement. A cognitive economy where reputation is for sale produces fake experts; ETM demands the opposite, and PoM enforces it structurally.
+
+2. **Attested by cross-referencing peers.** Contributions are scored via the Contribution DAG — each contribution is a node, references are edges, score accrues to nodes with many incoming edges (citations) from other high-PoM participants. Pure citation-count is gameable by Sybil mutual-citation rings; weighting citations by citer's PoM breaks the Sybil attack because high-PoM citers cannot themselves be Sybils (they too had to accumulate PoM over time). This is the PageRank-style recursive-authority property applied to contribution attribution, and it matches cognitive economies exactly: in academia, a citation from a Nobel laureate weighs more than a citation from an anonymous blog, and the Nobel laureate's weight came from her own citations-from-weighty-peers over decades.
+
+3. **Verifiable on-chain via the DAG.** Every claim of PoM reputation resolves to a concrete path through the DAG — which nodes cite me, which nodes cite them, all the way back to the genesis of the reputation substrate. The transparency is load-bearing because ETM's common-knowledge property requires *verifiable* status, not self-declared status. On-chain DAG gives the verifiability that cognitive economies accomplish via institutional memory (conferences, journals, citation graphs) but with lower overhead and cross-domain consistency.
+
+**Pattern-match drift warning.** PoM is explicitly called out in `primitive_pattern-match-drift-on-novelty.md` as a high-drift zone. Do **not** round PoM to "reputation score" or "trust score." Those framings miss the time-accumulated + soulbound + citation-weighted-by-cited-weight property set, which is the complete structural property that makes PoM work. It's closer to "on-chain academic reputation" than "DeFi trust score," but even that analogy falls short because academic reputation has no analog of the soulbound property — a dead academic's h-index doesn't transfer to their heirs.
+
+The 60% weight in NCI is the right weight *because* PoM is the senior common-knowledge signal. ETM would predict that any healthy cognitive economy puts common-knowledge at the top of its weight stack; NCI complies.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- DAG traversal cost for large participation sets. As PoM-node count grows, recursive-authority scoring becomes expensive. Future cycle may want cached sub-scores with periodic recomputation, or SNARK-backed authority proofs. ETM-neutral on implementation.
+- Score-decay calibration. PoM score should decay modestly for inactive participants (cognitive seniority decays too — a decade out of the field costs reputation), but the decay rate is sensitive. Too fast → penalizes sabbaticals; too slow → allows zombie-authority. Empirical tuning.
+
+### 2.3 Soulbound Identity and Heartbeat
+
+**What it is.** `contracts/identity/SoulboundIdentity.sol` issues non-transferable identity tokens — once bound to an address, they cannot move. `contracts/consensus/NakamotoConsensusInfinity.sol` enforces validator heartbeats — nodes must emit a liveness signal within `HEARTBEAT_WINDOW`; failure triggers downtime slashing (`SLASH_DOWNTIME = 5%` per NCI constant) and eventual deactivation. Together these ensure that participation is bound to a single time-continuous entity, not a transferable asset, and that entity must actively demonstrate presence.
+
+**ETM analysis.** The soulbound + heartbeat pair externalizes a property cognitive economies always have but blockchains historically don't: **continuity-of-identity over time is the unit that accumulates rent-paying power.** In cognition, your reputation accrues to *you* — not to a transferable token you could sell. In most PoS blockchains, stake is the unit; stake is transferable; reputation-weight moves with the coin. That structure fails ETM's seniority-of-common-knowledge property because it makes the senior signal a liquid asset.
+
+Soulbound fixes this by making the identity-unit non-transferable. Heartbeat fixes the adjacent failure: soulbound alone lets a long-inactive identity retain weight forever (dead-hand problem). Continuous heartbeat is the continuous-rent-payment in the identity dimension — presence must be demonstrated continuously, same as any other rent.
+
+The C24 primitive *Enforced Liveness Signal* (`primitive_enforced-liveness-signal.md`) made the load-bearing observation: a heartbeat CONSTANT without a corresponding gate or eviction is theater. The primitive flagged this as a failure mode and the implementation corrected: NCI's heartbeat is paired with `_checkHeartbeats` (called on epoch advance) that deactivates non-heartbeating validators. Without that teeth, the heartbeat constant would have been ETM-failing (rent-declared but not rent-enforced). With the teeth, it's ETM-aligned.
+
+The heartbeat + soulbound pair closes the continuity loop: (a) identity cannot be transferred, so weight always corresponds to the original-accruing participant; (b) identity must be continuously maintained by liveness, so dormant identities decay.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- `HEARTBEAT_WINDOW` — currently fixed. Cognitive economies don't have uniform attention demands across all participants; scholars can be heads-down for months without reputational decay, but active-duty professionals cannot be absent for days. A future refinement might make the window role-specific (e.g. tied to operational class), though the added complexity may not earn its rent.
+- `SLASH_DOWNTIME` = 5%. Probably appropriate for casual liveness failure; may need escalation for repeated failures. Parameter-space, not alignment.
+
+## Section 3 — Three-token monetary system
+
+The three-token system (JUL / VIBE / CKB-native) externalizes the cognitive-economic insight that **money, governance authority, and rent-paying capital are three orthogonal dimensions** that should not be collapsed into a single asset. ETM predicts collapse-failure modes in single-token economies: when one token must serve all three roles, the value-extracting actor on one axis (speculator on price) interferes with load-bearing-of-value on the other axes (governance vote, state-rent payment). Three orthogonal tokens prevent this by structural separation. Each subsection below evaluates whether the actual token's design preserves the orthogonality ETM demands.
+
+> **Pattern-match-drift gate.** JUL is the historical highest-drift entity in this codebase per `feedback_jul-is-primary-liquidity.md`. Per the memo: "the JUL serves its own purpose as primary liquidity in the network because it has POW objectivity and fiat-like stability ... dont forget that EVER." If anywhere below you find yourself describing JUL as a "bootstrap" or "precursor" token, that is the drift firing — re-read the memo and Section 3.1 before continuing.
+
+### 3.1 JUL — primary liquidity (money + PoW pillar)
+
+**What it is.** `contracts/monetary/Joule.sol` (often referenced as JUL). Two standalone load-bearing roles plus a downstream nicety:
+
+1. **Economy**: primary liquidity. PoW-objective + fiat-stable = the network's medium of exchange.
+2. **Consensus**: PoW pillar of NCI. Backs the 10% PoW component of `W(node)`.
+3. **Downstream nicety**: JUL burn bootstraps CKB-native circulation. A welcome side effect, *not* the reason JUL exists.
+
+**ETM analysis.** JUL externalizes the **money** dimension of the cognitive economy. In cognition, money corresponds to the *exchange medium of attention* — the ambient resource that flows freely between activities, can be used to acquire any cognitive resource, and is itself produced by sustained engagement (real work). JUL satisfies all three properties:
+
+- *Free-flowing exchange.* JUL trades against any other token; it is not domain-locked. Fiat-like stability comes from supply responsiveness to mining demand rather than to speculation, giving it the unit-of-account property without centralized issuance. ETM-aligned because attention-as-currency in cognition is similarly fiat-like — fungible across applications, neutral, not an asset class to hold.
+- *Real-work-backed.* Every JUL is backed by SHA-256 PoW. No shortcut, no shortcut-via-capital. ETM-aligned because attention in cognition cannot be faked by spending money — only by spending real cognitive effort. The PoW objectivity transfers this property on-chain.
+- *PoW pillar of consensus.* Through the NCI weight function, holding JUL via mining contributes to consensus weight. This makes JUL not just "the money" but also "the energy-spent signal." ETM-aligned because in cognitive economies, energy-spent-on-real-engagement is itself a load-bearing signal of seriousness, separate from reputation (PoM) and capital lockup (PoS).
+
+The combination of these three properties is **specifically what makes JUL not collapsible into VIBE or CKB-native.** Removing JUL would simultaneously destroy the money layer (no fiat-stable medium), the PoW objectivity (no real-work-backed asset), and the time-of-genuine-work consensus dimension. Three load-bearing failures, one collapse.
+
+**Pattern-match drift correction.** If you describe JUL as "the token used to bootstrap CKB-native minting" — drift. The bootstrap is a side effect of the burn pathway, not the role JUL plays. The role is *money + PoW pillar.* If you describe JUL as "a complexity that could be removed for simplicity" — drift. The complexity is justified by three orthogonal load-bearing roles. If you describe JUL as "the legacy mining token" — drift. JUL is current and senior; mining produces JUL, JUL backs PoW consensus, JUL trades as money.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets** (no redesign):
+- Mining difficulty curve — sets the rate of JUL issuance, which in turn sets the rate of monetary-supply growth. Tuning is monetary-policy work, not alignment.
+- JUL-VIBE-CKB exchange-rate dynamics — emergent from market activity. ETM-neutral on rates as long as the orthogonality of roles is preserved (which it is by construction).
+
+### 3.2 VIBE — governance share
+
+**What it is.** `contracts/monetary/VIBEToken.sol`. Capped supply (21M, Bitcoin-genesis homage). Distributed via Shapley to participants in proportion to their cognitive-economic contribution. Used for governance votes (DAO) and for staking that feeds the PoS pillar of NCI through `CKBNativeToken.sol` integration.
+
+**ETM analysis.** VIBE externalizes the **governance share** dimension — the right to participate in deciding what the substrate becomes. In cognition, this corresponds to the *agency-over-direction* a participant has within a knowledge community. Healthy cognitive economies distribute this agency in proportion to past contribution (those who built the substrate get to shape its future); unhealthy ones distribute it in proportion to present capital (whoever shows up with money decides). VIBE is built around the first model.
+
+Three structural properties keep VIBE ETM-aligned:
+
+- *Capped supply (21M).* Hard-cap means VIBE cannot inflate to dilute past contributors. The dilution that powers the rent dynamics in CKB-native (Section 3.3) does not apply to VIBE because VIBE is not the rent-source — it's the governance-share. ETM-aligned because cognitive governance authority should not dilute as new contributors arrive; new contributors get *their* share of VIBE through Shapley distribution, but existing holders retain their previously-earned share.
+- *Shapley-distributed.* Per `contracts/incentives/ShapleyDistributor.sol` and the FractalShapley refinement, VIBE allocations on each issuance event are proportional to participants' marginal contributions (Shapley values) over the contribution graph. This is the formal cognitive-economic model: governance authority is allocated by mechanism-derived contribution score, not by purchase. ETM-aligned because Shapley specifically captures the recursive-attribution property that PoM also depends on.
+- *Governance-only utility.* VIBE is not designed as a money asset (JUL fills that role) or a state-rent asset (CKB-native fills that). The role-discipline keeps the orthogonality intact. If governance-token holders had to also serve money or rent functions, the speculation pressure on the money axis would interfere with the governance-vote signal.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Vote-weight curves. Currently linear in VIBE held. Quadratic-voting variants might improve plurality-vs-plutocracy properties; ETM-neutral on the curve as long as governance authority remains earned-not-purchased.
+- VIBE staking yield. If staking VIBE produces JUL or CKB-native rewards, design with care — don't reintroduce a "hold VIBE → get money" loop that would re-couple governance to money. Current design is ETM-aligned; future yield-mechanism additions are the watch.
+
+### 3.3 CKB-native — state-rent capital
+
+**What it is.** `contracts/monetary/CKBNativeToken.sol`. The state-rent asset of the substrate. Locked into cells via `StateRentVault.sol` (Section 1.1) to occupy bytes; diluted continuously via secondary issuance (Section 1.2). Backs the 30% PoS pillar of NCI.
+
+**ETM analysis.** CKB-native externalizes the **rent-paying capital** dimension. In cognition, this corresponds to *commitment of finite resource to a particular memory-cell* — when you choose to invest cognitive bandwidth in maintaining one piece of expertise, you're paying for it with a finite resource that could have gone to other expertise. CKB-native makes this trade-off legible on-chain: locking 100 CKB-native to keep a cell active is exactly the cognitive analog of dedicating ~100 units of mental bandwidth to maintaining a memory.
+
+The orthogonality with JUL (money) and VIBE (governance) is what keeps CKB-native ETM-aligned:
+
+- *Not money.* CKB-native is not designed for free-flowing exchange. Its primary use is to be *locked* (in cells, in PoS positions). If it were also money, the locking decision would be in tension with the speculation decision; users would underinvest in state-rent because the locked asset could be deployed for trading. ETM-aligned by being lockup-purposed, not exchange-purposed.
+- *Not governance.* CKB-native does not vote (VIBE does). If it did, then state-rent contribution would map directly to governance authority, which would re-couple the rent-payment role to the agency role. ETM warns against collapsing these dimensions.
+- *Elastic supply via secondary issuance.* The continuous dilution is the engine of the rent dynamic. ETM-aligned because rent that doesn't continuously erode is rent-as-one-time-fee, not rent-as-continuous-pressure. The elasticity is structurally load-bearing for the cell-rent mechanism to work.
+- *PoS pillar of NCI.* Beyond cell-rent, CKB-native is the consensus-stake asset (30% weight). This is consistent with the rent-paying-capital role: PoS stake is exactly "I am locking capital to commit to this network" — same primitive, applied to consensus participation rather than cell occupancy.
+
+**Three-token decomposition is structurally complete and minimal.** Every load-bearing axis (money, governance, rent-paying) has a dedicated token. No axis is doubled-up; no axis is missing. Per `feedback_jul-is-primary-liquidity.md`: *"Each role is orthogonal. Each token serves its own axis. Together they give the three-dimensional consensus weight function (NCI: 10% PoW + 30% PoS + 60% PoM). Collapsing any one of the three destroys the corresponding axis and the consensus property."*
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- Issuance schedule (covered in Section 1.2). Same tuning targets apply.
+- Lockup vs liquid balance for active mining/consensus participants. Operational hygiene, not alignment.
 
 <!-- SECTION-3-MARKER -->
 
+## Section 4 — Mechanism layer
+
+The mechanism layer covers the on-chain primitives that perform discrete operations: how trades clear, how prices form, how rewards distribute, how AMM pools price assets, how fairness floors gate settlement, how contribution graphs accrue weight. ETM's audit of this layer asks: do the mechanisms themselves preserve the cognitive-economic structure the substrate-and-token layers establish? A perfectly ETM-aligned substrate can be undermined by mechanism-layer choices that re-introduce extractive dynamics (MEV, rent-free state, Sybil-vulnerable scoring) above the substrate.
+
+### 4.1 Commit-Reveal Batch Auction (CRA)
+
+**What it is.** `contracts/core/CommitRevealAuction.sol`. 10-second batches: 8s commit phase (users submit `hash(order || secret)` with deposit), 2s reveal phase (orders + optional priority bids revealed), settlement via Fisher-Yates shuffle using XORed secrets, uniform clearing price. MEV elimination at the mechanism layer; same-batch trades clear at the same price regardless of submission order within the batch.
+
+**ETM analysis.** CRA externalizes a property cognitive economies have at the social-coordination layer but blockchains historically don't: **batch resolution at uniform clearing price prevents extraction by ordering.** In cognition, healthy decision-making batches alternatives, evaluates them on shared criteria, and resolves at one decision applied to all — not a sequential resolution where the early-arriving alternative gets a structural advantage over the later-arriving one. The CRA externalization on-chain prevents the analogous failure on the trading layer (front-running, sandwich attacks, ordering exploitation), which would be an extractive dynamic that ETM warns against.
+
+Three structural properties keep CRA ETM-aligned:
+
+- *Commit-reveal opacity during commit phase.* Bidders cannot observe each other's intentions before committing, so order-flow information cannot be used to extract value. This is the cognitive-economic principle of *blind allocation* — when allocations are made under blind conditions, no participant can exploit knowledge of others' positions to extract from them.
+- *Uniform clearing price.* All trades within a batch clear at the same price, derived from the aggregate supply-demand intersection. No participant gets a worse price for being later in the batch. ETM-aligned because cognitive economies don't structurally privilege the early-arriving idea over the later-arriving one within a single decision cycle (innovation timing matters across cycles, but not within a single batch).
+- *Fisher-Yates shuffle using XORed secrets.* Even within the batch, the order in which orders are processed for ledger-update purposes is randomized via a verifiable shuffle. No participant can position themselves to be processed first or last in ways that would matter. ETM-aligned: the substrate gives no spatial-positioning advantage either.
+
+The 10-second batch length is the parameter that trades off (MEV-elimination strength, throughput latency). Shorter batches → less MEV-elimination opportunity (the attacker has less time to enter the batch); longer batches → more user-felt latency. Current 10s is mechanism-tuning; ETM-neutral on exact value.
+
+**Pattern-match drift warning.** Do *not* round CRA to "Uniswap with a delay." That framing misses the uniform-clearing-price + shuffle properties, which are structural not cosmetic. CRA is closer to "Walrasian batch auction at the mechanism layer" than to any AMM pattern. The novelty is the batch-uniform-clearing combined with on-chain commit-reveal opacity.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Batch length adaptation. Could vary by liquidity / volume conditions — high-volume periods could shorten batches for throughput, low-volume could lengthen for better aggregation. ETM-neutral on adaptation as long as the uniform-clearing property is preserved.
+- Cross-batch coordination. Currently each batch is independent. For cross-chain order books or sequential dependencies, may need batch-of-batches structures. Future cycle.
+
+### 4.2 True Price Oracle (TPO)
+
+**What it is.** `contracts/oracle/TruePriceOracle.sol` plus the EvidenceBundle scheme + IssuerReputationRegistry shipped in C12. TPO converts off-chain price signals into on-chain truth via signed evidence bundles from registered issuers; issuer signatures are stake-bonded and slashable for misreporting; the registry tracks per-issuer reputation with time-mean-reversion; the oracle exposes a damped/validated price to consumer contracts.
+
+**ETM analysis.** TPO externalizes the cognitive-economic property that **truth-claims should be grounded in stake-bonded attestation that scales with reputation**. In cognition, the same property holds: a claim from a participant who has staked their reputation on its accuracy carries more weight than an anonymous assertion, and the participant who is wrong loses some reputation as a consequence. ETM predicts that any healthy oracle mechanism must externalize this structure; TPO does.
+
+The structural properties:
+
+- *Stake-bonded issuance.* Issuers must stake to register; misreporting (caught by downstream slashing or social-tier signals) costs the stake. ETM-aligned because reputation-without-skin-in-the-game is unenforced reputation, which doesn't survive ETM's continuous-rent test.
+- *Permissioned slashing with mean-reversion.* Reputation is penalty-only (negative-only adjustments), with a time-decay back toward neutral (MID=5000bps, half-life=30 days). This matches cognitive economies where past errors fade if not repeated, but recent errors weigh more. ETM-aligned because rent-paying-power should reflect *current* attentiveness, not eternal historical accumulation.
+- *EvidenceBundle as cryptographic substrate.* Every reported price must arrive in a signed bundle with version + context-hash + issuer-key fields. Fabrication invalidates the signature. ETM-aligned because verification cost should be cheap (signature check) but fabrication cost should be high (slash + reputation hit).
+- *Damped validated price.* The oracle does not surface the raw last-reported price; it applies TWAP + 5% deviation gate (per VibeAMM integration) before exposing it to consumer contracts. This is the cognitive-economic property of *shock-absorbing the substrate against single-point-of-error inputs* — when one issuer reports anomalously, the damping prevents that single signal from immediately destabilizing dependent mechanisms.
+
+**Partial-mirror caveat.** TPO has one ETM-axis where the alignment is incomplete: the **5% deviation gate** is a policy-level mitigation, not a structural one. A determined attacker who can move external markets by 4.9% repeatedly can attack the oracle by riding within the gate. The Augmented Mechanism Design paper's principle says "augment with math-enforced invariants, not policy," and a 5% gate is policy. The currently-deferred backlog item `FAT-AUDIT-2` (commit-reveal oracle aggregation for TWAP hardening) addresses exactly this gap — by making oracle aggregation itself a commit-reveal-batch primitive, the gate becomes structural rather than threshold-based.
+
+**Classification: ◐ PARTIALLY MIRRORS.**
+
+**Refinement targets** (FAT-AUDIT-2 is the canonical):
+- *Commit-reveal oracle aggregation.* Issuers commit prices, reveal together, median computed on the batch. Pattern identical to CRA commit-reveal — high code reuse. Eliminates the 5% gate as the load-bearing protection by making structural what was previously threshold-based.
+- *Sub-oracle reputation specialization.* Different issuers may be better at different asset classes (crypto vs fiat vs commodity). Reputation could be per-asset-class rather than monolithic. ETM-neutral, just better fidelity.
+- *Cross-oracle dispute primitive.* If two oracles report incompatible prices, a dispute window with cryptographic challenge-response would resolve the truth-claim more rigorously than current single-oracle reporting.
+
+### 4.3 Shapley Distribution / FractalShapley
+
+**What it is.** `contracts/incentives/ShapleyDistributor.sol` and the FractalShapley refinement in adjacent contracts. Shapley value computation distributes rewards from a contribution pool to participants in proportion to their *marginal* contribution — the average increment they bring to all possible coalitions of contributors. FractalShapley extends this recursively: each contribution is itself decomposable into sub-contributions that get their own sub-Shapley distribution.
+
+**ETM analysis.** Shapley distribution externalizes the **fair-attribution-of-collective-output** property. In cognition, when many participants jointly produce something, the cognitive economy needs a way to allocate credit that is (a) fair to the marginal contributor (their share reflects what they actually added, not just headcount), (b) not gameable by ordering or coalition formation, and (c) consistent (the same contribution structure always produces the same allocation). Shapley value uniquely satisfies all three properties (Shapley's axioms: efficiency, symmetry, dummy, additivity). It is *the* mathematically-correct attribution function for cognitive-collective-output.
+
+ETM-aligned because:
+
+- *Marginal contribution captures real cognitive economics.* The participant who, when added to a coalition, increases output the most, is doing the most cognitive-economic work. Pay them in proportion to that marginal increment, not in proportion to their seniority or headcount or order-of-arrival.
+- *Symmetry: identical contributors get identical rewards.* No structural advantage from being early, late, named, or anonymous. ETM demands structural neutrality, and Shapley enforces it.
+- *Coalition-resistance.* Two contributors cannot collude to extract more than their joint marginal contribution would justify; the math doesn't allow it. ETM-aligned because cognitive-economic primitives must resist Sybil-coalition extraction.
+
+The FractalShapley refinement extends ETM-fidelity further: most blockchain reward systems treat "a contribution" as a leaf node, but real cognitive contributions decompose recursively (a contribution to VibeSwap might itself be backed by a contribution from Uniswap V4's design, which itself comes from constant-product AMM theory, etc.). FractalShapley's recursive sub-distribution lets credit flow upstream through the contribution lineage, which matches how cognitive economies actually work — credit flows backward through the ideas that made the current contribution possible.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- Computation cost. Exact Shapley is exponential in coalition size; approximations (Monte Carlo sampling, structural decomposition) keep it tractable. Per-participant gas budget is the limiting parameter; ETM-neutral on the choice of approximation.
+- Recursion depth for FractalShapley. How far back through the contribution graph does credit flow? Cognitive analog: how many citation-hops back does academic credit propagate? Empirically tunable; ETM-neutral.
+
+### 4.4 VibeAMM constant-product
+
+**What it is.** `contracts/amm/VibeAMM.sol`. Constant-product AMM (`x * y = k`) for liquidity pools. Trades execute via batch settlement (post-CRA), with the cap that trader payout cannot exceed the natural curve amount even if the externally-derived clearing price would have given more (the C34 fix). LPs deposit pairs; receive LP tokens; earn fees from trades.
+
+**ETM analysis.** This is the audit's most interesting case. Constant-product AMM is the canonical *neutral pricing primitive* — it has no notion of memory rent, no notion of contribution graph, no notion of soulbound identity. It's pure market mechanism: liquidity in, liquidity out, price discovered from the curve. So is it ETM-aligned?
+
+The answer is **partial**: VibeAMM mirrors ETM at the operational layer (the batch-settlement integration with CRA preserves the uniform-clearing property; the C34 curve-cap preserves the k-invariant under price damping) but does NOT mirror ETM at the LP-position layer (LP positions don't pay state-rent, they sit unbounded, and they accrue fees in proportion to time-locked liquidity rather than in proportion to attentive maintenance).
+
+What's right:
+- *Curve-bounded payout.* The C34 fix (`amountOut = min(linear, curve)`) means the AMM's structural invariant is preserved against externally-imposed pricing pressure. ETM-aligned: the substrate (k-invariant) is honored even when other mechanisms (TPO damping) push against it.
+- *Batch settlement integration with CRA.* All pool trades land via uniform-clearing batches, so MEV doesn't attack the AMM-side of trades. ETM-aligned via inheritance from CRA's MIRROR.
+- *LP fee distribution proportional to liquidity contribution.* Standard AMM math; matches contribution-proportional reward (Shapley-adjacent for the simple two-asset case).
+
+What's NOT right:
+- *No state-rent on LP positions.* An LP position occupies state forever (until withdrawn) without paying continuous rent. This is a violation of the substrate-layer rent property — the pool data takes up cells in state, but the LP doesn't pay dilution-based rent on those cells. ETM would predict: dormant LP positions (low fee earnings, low utilization) should face increasing rent pressure to either re-deploy or exit, freeing capacity for higher-utility positions.
+- *Time-locked rather than attention-rewarded.* LP rewards accrue in proportion to time-in-pool, not in proportion to active rebalancing or thoughtful position management. A passive LP and an active LP earn the same fee share for the same time-weighted liquidity. ETM-aligned mechanism would distinguish these — active LPs (who reposition as conditions warrant, who provide where it's most needed) should earn more than passive LPs, even at the same time-weighted notional.
+
+**Classification: ◐ PARTIALLY MIRRORS.**
+
+**Refinement targets**:
+- *State-rent on LP positions.* Apply CKB-native lockup proportional to position byte-occupancy. LP positions then pay rent the same way cells do; dormant positions face dilution pressure; the pool gets self-cleaning of stale liquidity.
+- *Active-vs-passive LP differentiation.* Concentrated-liquidity (Uniswap V3 style) is one path; on-chain rebalancing-attribution metrics (per-LP, per-block) is another. ETM-aligned mechanisms would reward active position management over passive holding.
+- *IL-protection vault re-evaluation.* The currently-deferred FAT-AUDIT-1 backlog item asks whether the IL-protection vault is insurance against a symptom rather than a fix for the cause. ETM frame says: yes, IL is the symptom of an unbounded-LP-state mechanism; fix the mechanism (rent on LP positions) and IL-protection becomes redundant.
+
+### 4.5 Lawson Floor
+
+**What it is.** A fairness lower bound that gates settlement: a settlement is valid only if the worst-off participant's utility meets the Lawson floor. Not a threshold of quality; a *minimum-outcome constraint* derived from Rawlsian-maximin fairness analysis. Backed by `docs/papers/contribution-dag-lawson-constant.md` (formal theory), `sims/lawson_floor_sim.py` (simulation), and `test/vectors/lawson_floor.json` (test vectors).
+
+**ETM analysis.** Lawson Floor externalizes the cognitive-economic property that **a cognitive economy maintains a lower bound on participant experience, below which the economy refuses to operate**. In cognition, this corresponds to: a healthy knowledge community does not accept collective decisions that crush the worst-off participant for aggregate gain. There is a fairness floor below which the community rejects the outcome, even if it would be aggregate-pareto-optimal above the floor.
+
+Applied to on-chain settlement, Lawson Floor is the mechanism that refuses to settle a trade batch, a governance decision, or an incentive distribution if the minimum participant-utility below a threshold. The floor is not a policy parameter ("we like to have at least 10% payout") — it's a mathematically-derived constant from the fairness-model's maximin optimization. That structural derivation is what makes it ETM-aligned rather than ETM-failing.
+
+Three properties that keep it aligned:
+
+- *Settlement-gating, not post-hoc compensation.* Lawson Floor refuses to finalize outcomes that fail the floor; it doesn't let them finalize and then try to compensate. ETM-aligned because post-hoc compensation admits the extractive dynamic first and attempts to un-extract — which is fundamentally weaker than preventing the extraction at settlement.
+- *Maximin-derived rather than threshold-derived.* The floor is computed from Rawlsian maximin over the participant set, giving a mathematically-unique value. Per the Augmented Mechanism Design paper's augmentation-not-policy principle: math-derived floors are structural; arbitrary thresholds are policy. ETM-aligned via the math-derivation.
+- *Works across mechanisms.* Lawson Floor isn't bound to one contract — the mathematical floor applies to any outcome-producing mechanism (batch auctions, Shapley distributions, governance allocations). This cross-cutting-ness is ETM-aligned because the cognitive-economic fairness-floor is itself cross-cutting: it applies to any collective-output mechanism, not just one specific domain.
+
+**Pattern-match drift warning.** Do NOT round Lawson Floor to "a minimum-guaranteed-price" or "a quality threshold." Both framings miss the maximin-derivation and the settlement-gating-not-compensation properties. The closest mainstream analog is "Rawlsian veil-of-ignorance applied to mechanism outcomes" — but even that requires the on-chain enforcement specificity to match VibeSwap's use.
+
+**Classification: ✅ MIRRORS.**
+
+**Tuning targets**:
+- Floor level calibration. The maximin produces a value dependent on participant utility functions; those functions are mechanism-specific. Empirical work post-mainnet to confirm the floor matches real participant welfare.
+- Cross-mechanism Lawson-floor uniformity. Currently floor is computed per-mechanism; a unified cross-mechanism floor (if provable) would be stronger. Formal-theory work queued in `project_lawson-floor-research-agenda.md`.
+
+### 4.6 Contribution DAG
+
+**What it is.** `contracts/identity/ContributionDAG.sol`. Directed acyclic graph where nodes are contributions, edges are `contribution-A references/depends-on contribution-B`. Each node has authors (from SoulboundIdentity), timestamps, attestations. Contribution weight accrues along the DAG via recursive-authority scoring (PageRank-like, weighted by citer's PoM).
+
+**ETM analysis.** The Contribution DAG is the **on-chain substrate for the common-knowledge layer of the cognitive economy.** In cognition, common knowledge is the web of cross-referenced ideas that anchor the substrate — each idea's authority derives from which other ideas cite it, which in turn derive their authority from *their* citers, and so on recursively. The DAG is the literal data structure of this web. Externalizing it on-chain means: (a) contribution-authority is computable rather than declared, (b) the computation is transparent and verifiable, (c) new contributions can accrue authority over time by being cited by established nodes.
+
+ETM-aligned structural properties:
+
+- *Acyclic constraint.* Citations go backward in time; no self-citation loops; no mutual-citation rings that artificially inflate authority. The DAG's acyclicity is load-bearing — it prevents the Sybil-coalition mutual-citation attack. ETM demands this structure because cognitive-economic common-knowledge works the same way: ideas must build on prior ideas, not on themselves.
+- *PoM-weighted citation.* A citation from a high-PoM node weighs more than from a low-PoM or new node. This prevents Sybil inflation (Sybil nodes can cite, but they have low PoM weight) while rewarding legitimate contributions (a citation from a recognized expert is valuable). ETM-aligned: matches academic citation-authority weighting.
+- *Soulbound attribution.* Each DAG node's author is soulbound-identity-bound; contribution-weight is not transferable. ETM-aligned because cognitive contribution accrues to the contributor, not to an asset they could sell.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Traversal cost at scale. Already noted under Section 2.2 (PoM). Same issue; same mitigation paths.
+- Contribution-type specialization. Different contribution classes (code, docs, research, operational) might warrant different citation-weighting curves. ETM-neutral on specialization as long as within-class symmetry is preserved.
+
 <!-- SECTION-4-MARKER -->
+
+## Section 5 — Defense layer mechanisms
+
+The defense layer is where ETM alignment is most frequently violated in blockchain systems generally. Most defense mechanisms are policy-level overlays (blacklists, whitelists, timelocks, circuit breakers, pause switches) that impose discretionary authority on top of the substrate. ETM predicts that defense-via-policy is structurally weaker than defense-via-rent — because policy admits governance capture, enforcement drift, and attacker-learnable thresholds, while rent imposes continuous structural cost that cannot be threshold-gamed. VibeSwap's defense layer takes the harder path: rent on attacker cells (Siren), topological-taint propagation (Clawback), with circuit breakers and TWAP guards as the known policy-level exceptions.
+
+### 5.1 Siren Protocol
+
+**What it is.** `contracts/core/HoneypotDefense.sol` and `contracts/core/OmniscientAdversaryDefense.sol` together implement the Siren Protocol: instead of blocking attackers via blacklist, the protocol engages attackers in progressively-expensive shadow operations until the attacker's resource commitment exhausts itself against the defense. The attacker cannot tell initially whether a transaction is real or honey; the defense charges progressively more rent as engagement depth increases.
+
+**ETM analysis.** Siren externalizes the cognitive-economic defense pattern: **a healthy cognitive economy doesn't blacklist attackers; it exhausts them through rent.** An attacker who commits resources to attacking a memory substrate finds that each attack step costs more than the last, because the substrate's defenses scale their rent charge with the evidence of attack. Eventually the attacker's marginal cost exceeds their marginal expected benefit, and they exit voluntarily. This is the economic-rationality parallel of biological immune systems: they don't "ban" pathogens; they exhaust them by raising the cost of replication until replication becomes unprofitable.
+
+Three properties keep Siren ETM-aligned:
+
+- *Cost-scaling instead of blocklisting.* Siren doesn't reject attacker transactions outright; it accepts them but progressively increases their cost. ETM-aligned because blocklist-based defenses admit governance capture (who decides who goes on the list?) and structural holes (Sybil-rotation defeats blocklists); rent-based defenses don't have these failure modes.
+- *Asymmetric cost: high for attacker, low for honest user.* The rent is triggered by attack-signals, not by traffic volume. Honest users pay minimal or no Siren rent; attackers pay escalating rent. ETM-aligned because cognitive substrates similarly distinguish attention-worthy input from attention-consuming noise.
+- *Engagement-until-exhaustion rather than rejection.* By accepting the attacker into the honeypot space, Siren forces the attacker to expend resources for zero substrate-destabilizing effect. Rejection returns the attacker's unspent resources; engagement consumes them.
+
+**Pattern-match drift warning.** Do NOT round Siren to "blacklist plus timelock." That framing misses the engagement-until-exhaustion property. Siren is closer to "economic tar pit with progressively-sticky walls" — the attacker is welcomed in, and leaving becomes expensive.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Attack-signal calibration. False positives (honest users flagged as attackers, paying Siren rent) and false negatives (attackers not detected, paying no rent) are the two failure modes. Tuning is mechanism-economics; ETM-neutral.
+- Cross-contract Siren integration. Currently Siren primarily applies at specific contract entry points; a network-wide Siren layer could amortize cost across contracts. Future cycle.
+
+### 5.2 Clawback Cascade
+
+**What it is.** `contracts/compliance/ClawbackRegistry.sol` + `contracts/compliance/ClawbackVault.sol`. When a transaction is identified as tainted (malicious, stolen-funds-derived, sanctions-flagged), the clawback mechanism propagates the taint along the DAG of downstream transactions — anyone who received the funds from the tainted source is also tainted. Recovery happens topologically: all downstream holders are notified, have a window to contest, and on non-contest, the tainted portion is clawed back to the registry.
+
+**ETM analysis.** Clawback Cascade externalizes the cognitive-economic property that **provenance-based quality assessment propagates through the substrate.** In cognition, if you learn that a source you relied on was fraudulent, you don't just update that one claim — you re-evaluate everything you learned from that source, and everything you taught others based on it. The re-evaluation propagates topologically through your knowledge graph. Clawback Cascade is this dynamic, applied to value-flow rather than belief-propagation, but with the same structural geometry: topological-taint, contest windows, cascading update.
+
+ETM-aligned structural properties:
+
+- *Topological propagation.* Taint flows along the transaction graph, not by address-list membership. This is substrate-faithful: cognitive taint also follows the graph of information flow, not membership in a "bad" category.
+- *Contest windows preserve good-faith holders.* Anyone who received tainted funds legitimately (e.g., an AMM counterparty unaware of the source) can contest within the window; uncontested taint claws back, contested taint gets adjudicated. ETM-aligned because rigid propagation without contest would amount to strict liability, which no cognitive economy would tolerate.
+- *Registry-based centralization of the adjudication, not the detection.* The detection can be permissionless (anyone can flag a tainted source with evidence); the adjudication routes through the registry for consistency. ETM-aligned because consistent adjudication is a common-knowledge anchor that permissionless-detection + Sybil-prone-adjudication would not provide.
+
+**Pattern-match drift warning.** Do NOT round Clawback Cascade to "freeze funds" or "blacklist addresses." Both framings miss the topological-propagation-with-contest property that is the structural substance of the mechanism.
+
+**Classification: ✅ MIRRORS.**
+
+**Refinement targets**:
+- Contest-window duration. Too short → legitimate holders can't contest; too long → recovery is delayed past usefulness. Empirical tuning.
+- Cross-chain taint propagation. Currently contained to native-chain transactions. LayerZero integration + registry-replication across chains would extend the topological scope. Future cycle.
+
+### 5.3 Circuit Breakers / TWAP guards
+
+**What it is.** `contracts/core/CircuitBreaker.sol` + TWAP deviation checks in `contracts/amm/VibeAMM.sol` (max 5% deviation). Circuit breakers halt trading when volume/price/withdrawal thresholds are exceeded; TWAP guards reject individual trades whose price exceeds the time-weighted average by more than the deviation threshold.
+
+**ETM analysis.** Here ETM-alignment runs out. Circuit breakers and TWAP deviation gates are **policy-level defenses**: a threshold is set, an action fires when the threshold is crossed. They do not impose continuous rent, do not propagate topologically, and do not engage-until-exhaustion. They are classical pause-switches and bounded-rejection filters, imposed on top of the substrate rather than emerging from it.
+
+These mechanisms exist for pragmatic reasons: structural defenses against extreme oracle manipulation or flash-crash cascades require complex primitives (commit-reveal oracle aggregation, adaptive fee curves, Treasury Stabilizer expansion) that are not all shipped. Circuit breakers + TWAP guards are the bridge mechanisms that protect against worst cases while the structural refinements are queued.
+
+What's aligned:
+- *Transparent thresholds.* The firing conditions are on-chain and observable; no off-chain discretion in the firing decision itself.
+- *Last-resort disposition.* Per backlog entries FAT-AUDIT-2 (commit-reveal oracle) and FAT-AUDIT-3 (adaptive fees + Stabilizer expansion), the current design acknowledges these are last-resort policy mechanisms and that the goal is to reduce their firing domain over time by shipping structural alternatives.
+
+What's NOT aligned:
+- *Attacker-learnable thresholds.* An attacker studying on-chain history can stay-just-under the threshold, drive-to-halt-wait-resume, or front-run-the-halt. ETM predicts this — discretionary thresholds create exactly this class of exploit.
+- *Governance-set parameters.* Who decides the circuit-breaker thresholds? The DAO. What stops governance capture from setting thresholds that serve captors? Only the augmented-governance hierarchy (Physics > Constitution > Governance), which is strongest at the structural-invariant level and thinnest at the parameter-setting level. Circuit breakers live in the thin territory.
+- *No continuous rent.* A participant whose activity consistently runs near the threshold pays no continuous cost for that positioning. ETM-aligned defense would impose continuous rent proportional to proximity-to-threshold (e.g., steeper fee curves as volume or price-move approaches the circuit-breaker threshold).
+
+**Classification: ◐ PARTIALLY MIRRORS.** The transparency and last-resort disposition keep it from being a full FAIL; the policy-level nature and attacker-learnable thresholds keep it from being a full MIRROR.
+
+**Refinement targets** (these are the FAT-AUDIT-3 + FAT-AUDIT-2 canonicals):
+- *Adaptive fee curves.* Fee grows superlinearly with volume / price-move, so the cascade-profit motive drops organically before the breaker fires. Converts policy-threshold to structural-rent.
+- *Treasury Stabilizer expansion.* Auto-provides liquidity during stress rather than halting. Preserves trading during the exact moments breakers would otherwise fire.
+- *Commit-reveal oracle aggregation* (FAT-AUDIT-2). Removes the TWAP-deviation gate's load-bearing role by making oracle aggregation structural.
+- *Last-resort shrinkage.* Keep circuit breakers as true last-resort (unreachable in normal + near-normal operation), not as first-line defense. As structural mechanisms ship, relax breaker parameters so they only fire under catastrophic conditions.
 
 <!-- SECTION-5-MARKER -->
 
+## Section 6 — Summary table
+
+| # | Mechanism | Class | Notes |
+|---|---|---|---|
+| 1.1 | CKB State-Rent | ✅ MIRRORS | Canonical instantiation; cell + rent + citation-density + reaping. |
+| 1.2 | Secondary Issuance | ✅ MIRRORS | Continuous dilution is the rent engine. Split ratios ETM-neutral. |
+| 1.3 | Operator-Cell Assignment (OCR V1+V2a) | ✅ MIRRORS | Per-cell bond = attention rent; V2a permissionless challenge converts governance-slashing to math-enforced game. |
+| 1.4 | Content Merkle Registry / PAS (V2b) | ✅ MIRRORS | Extends rent from liveness to content-delivery. K-sampling structural. |
+| 2.1 | NCI 3D Consensus weight (PoW 10% / PoS 30% / PoM 60%) | ✅ MIRRORS | Three orthogonal cognitive resources; PoM seniority correct. |
+| 2.2 | Proof of Mind (PoM) | ✅ MIRRORS | Highest-fidelity common-knowledge externalization on any chain. |
+| 2.3 | Soulbound Identity + Heartbeat | ✅ MIRRORS | Continuity-of-identity as rent-unit; eviction-with-teeth (Enforced Liveness Signal primitive). |
+| 3.1 | JUL — primary liquidity | ✅ MIRRORS | Money + PoW pillar. Do NOT round to "bootstrap." |
+| 3.2 | VIBE — governance share | ✅ MIRRORS | Capped 21M, Shapley-distributed, governance-only utility. |
+| 3.3 | CKB-native — state-rent capital | ✅ MIRRORS | Locked-not-exchanged; elastic via issuance. Three-token orthogonality complete + minimal. |
+| 4.1 | Commit-Reveal Batch Auction (CRA) | ✅ MIRRORS | Walrasian batch at mechanism layer; eliminates ordering-extraction. |
+| 4.2 | True Price Oracle (TPO) | ◐ PARTIALLY | Stake-bonded + reputation + EvidenceBundle align; 5% deviation gate is policy, not structural. Refinement: FAT-AUDIT-2. |
+| 4.3 | Shapley + FractalShapley Distribution | ✅ MIRRORS | Mathematically-unique fair attribution function; recursive credit flow matches citation graph. |
+| 4.4 | VibeAMM constant-product | ◐ PARTIALLY | Operational layer aligned; LP positions sit rent-free + time-locked-not-attention-rewarded. Refinement: rent on LP positions + active-LP differentiation. |
+| 4.5 | Lawson Floor | ✅ MIRRORS | Maximin-derived settlement gate; structural not threshold. |
+| 4.6 | Contribution DAG | ✅ MIRRORS | Acyclic + PoM-weighted + soulbound-attributed. Substrate for common-knowledge layer. |
+| 5.1 | Siren Protocol | ✅ MIRRORS | Rent-until-exhaustion, not blacklist. High-drift zone handled correctly. |
+| 5.2 | Clawback Cascade | ✅ MIRRORS | Topological taint + contest windows. Not "freeze funds." |
+| 5.3 | Circuit Breakers + TWAP guards | ◐ PARTIALLY | Transparent last-resort, but attacker-learnable thresholds, no continuous rent. Refinement: FAT-AUDIT-2 + FAT-AUDIT-3. |
+
+**Totals**: 16 MIRRORS / 3 PARTIALLY MIRRORS / 0 FAILS TO MIRROR across 19 major mechanisms audited.
+
+**The 0 FAILS TO MIRROR result is itself noteworthy.** VibeSwap was designed against the cognitive-economic spec before the spec was articulated as ETM. The absence of full-fail mechanisms says: the underlying design intuition has been consistently ETM-aligned across the mechanism space. The 3 PARTIAL cases are known backlog items (FAT-AUDIT-1, FAT-AUDIT-2, FAT-AUDIT-3) already queued for refinement.
+
 <!-- SECTION-6-MARKER -->
+
+## Section 7 — Prioritized gap list (feeds Step 2 Build Roadmap)
+
+The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order is by leverage — the gap whose closure most strengthens the overall ETM-fidelity of the system, not necessarily by implementation cost.
+
+### Gap 1 — VibeAMM LP positions are rent-free (HIGH leverage)
+
+**From Section 4.4.** LP positions occupy state, accrue fees in proportion to time-locked-liquidity, and never face dilution pressure. ETM predicts: dormant positions should pay rent the same way other cells do; active position management should be rewarded over passive holding.
+
+**Why HIGH leverage**: this is the most-frequent participant interface in the system. Every LP touches this; every fee distribution is shaped by it. Closing the gap here propagates ETM-alignment into the daily-experience surface of the protocol.
+
+**Refinement direction**:
+- Apply CKB-native lockup proportional to LP-position byte-occupancy. LP positions then participate in the same rent dynamics as cells in `StateRentVault`.
+- Differentiate active-rebalancing LPs from passive-holding LPs in fee distribution (concentrated-liquidity-position-style metrics, or per-block rebalancing attribution).
+- Reframe IL-protection vault as conditional-on-residual-IL after rent + active-LP differentiation reduce the underlying problem.
+
+**Rough scope**: 2-3 cycles. New `LPRentRegistry` sidecar + VibeAMM wire-in + fee-distribution recomputation.
+
+### Gap 2 — TPO uses 5% deviation gate as primary defense (MED-HIGH leverage)
+
+**From Section 4.2.** Deviation-threshold protection is policy-level. Determined attacker can ride within the gate.
+
+**Why MED-HIGH leverage**: oracle correctness is upstream of every pricing-dependent mechanism (CRA settlement, AMM trades, liquidations). A failure here cascades. Not the highest-frequency participant interface but the highest-criticality one.
+
+**Refinement direction (canonical: FAT-AUDIT-2)**:
+- Commit-reveal oracle aggregation. Issuers commit prices, reveal together, median computed. Pattern identical to CRA — high code reuse.
+- Replaces the deviation-gate's load-bearing role with structural commit-reveal opacity.
+- Hardens VibeStable liquidation path (closes C7-GOV-008 dependency).
+
+**Rough scope**: 1-2 cycles. New aggregation contract + TPO wire-in + VibeStable liquidation path update.
+
+### Gap 3 — Circuit breakers / TWAP deviation are policy thresholds (MED leverage)
+
+**From Section 5.3.** Last-resort policy mechanisms; attacker-learnable; no continuous rent.
+
+**Why MED leverage**: secondary defense layer, fires only under stress. ETM-alignment matters but the failure mode (a stress event survives the last-resort defense and propagates) is rare.
+
+**Refinement direction (canonical: FAT-AUDIT-3)**:
+- Adaptive fee curves: fees scale superlinearly with volume / price-move. Cascade profit motive drops organically before breaker fires.
+- Treasury Stabilizer expansion: auto-provides liquidity during stress, preserving trading rather than halting.
+- Goal: shrink breaker firing domain over time. Keep breakers as true last-resort, not first-line.
+
+**Rough scope**: 2-3 cycles. New fee-curve contract + Treasury Stabilizer extension + breaker parameter rebalance.
+
+### Gap 4 — IL Protection Vault may be insurance against a symptom (LOW-MED leverage, post-mainnet decision)
+
+**From Section 4.4 + backlog FAT-AUDIT-1.** ETM predicts: if rent-on-LP-positions (Gap 1) closes the IL exposure at the source, the IL-protection vault becomes redundant. But this is empirical — needs mainnet IL-claim-frequency data before the call can be made.
+
+**Why LOW-MED leverage**: depends on Gap 1 closure first; depends on real volume data. Decoupling delays this.
+
+**Refinement direction**:
+- Ship Gap 1 first.
+- Instrument IL-claim frequency on mainnet launch.
+- Re-audit post-volume. If claim data supports low-incidence, route Vault revenue streams (priority bid % + early-exit penalty %) directly to LPs — simpler, cheaper, same user outcome.
+
+**Rough scope**: depends on Gap 1 + mainnet runtime data.
+
+---
+
+## Step 2 entry point
+
+`DOCUMENTATION/ETM_BUILD_ROADMAP.md` will translate these 4 gaps into concrete engineering tasks: per-gap acceptance criteria, contracts to modify, primitives to draft, tests to write. Each gap becomes ~1-3 RSI cycles in the build queue.
+
+## Step 4 candidate
+
+C39 (next concrete alignment fix) should be **Gap 2 — TPO commit-reveal oracle aggregation**. Reasons: smaller scope than Gap 1 (1-2 cycles vs 2-3), high code reuse from existing CRA primitive (4th invocation of commit-reveal pattern, see Cycle 36 memory), unblocks downstream VibeStable refresh. Gap 1 should be C40+ after Gap 2 ships, with the LPRentRegistry pattern informed by what we learn from oracle aggregation.
 
 <!-- SECTION-7-MARKER -->

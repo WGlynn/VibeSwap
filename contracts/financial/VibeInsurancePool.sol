@@ -20,6 +20,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *      - Premiums dynamically priced by utilization ratio
  */
 contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    event MaxCoverageRatioUpdated(uint256 previous, uint256 current);
+
     using SafeERC20 for IERC20;
 
     // ============ Types ============
@@ -325,7 +327,9 @@ contract VibeInsurancePool is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function setMaxCoverageRatio(uint256 ratioBps) external onlyOwner {
         require(ratioBps <= 10000, "Invalid ratio");
+        uint256 prev = maxCoverageRatioBps;
         maxCoverageRatioBps = ratioBps;
+        emit MaxCoverageRatioUpdated(prev, ratioBps);
     }
 
     // ============ View ============

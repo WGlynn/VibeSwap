@@ -70,6 +70,9 @@ contract IdeaToken is ERC20 {
  * @dev Non-upgradeable.
  */
 contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, ReentrancyGuard {
+    event AuthorizedCallerUpdated(address indexed caller, bool previous, bool current);
+    event RewardLedgerUpdated(address indexed previous, address indexed current);
+
     using SafeERC20 for IERC20;
 
     // ============ Constants ============
@@ -461,11 +464,15 @@ contract ContributionYieldTokenizer is IContributionYieldTokenizer, Ownable, Ree
     // ============ Admin ============
 
     function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {
+        bool prev = authorizedCallers[caller];
         authorizedCallers[caller] = authorized;
+        emit AuthorizedCallerUpdated(caller, prev, authorized);
     }
 
     function setRewardLedger(address _ledger) external onlyOwner {
+        address prev = address(rewardLedger);
         rewardLedger = IRewardLedger(_ledger);
+        emit RewardLedgerUpdated(prev, _ledger);
     }
 
     // ============ Internal: Stream Settlement ============

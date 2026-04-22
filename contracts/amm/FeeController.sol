@@ -36,6 +36,8 @@ import "../libraries/ILMeasurement.sol";
  *      No committee picks fees. No governance vote on tiers. The math responds to reality.
  */
 contract FeeController is Ownable {
+    event AuthorizedCallerUpdated(address indexed caller, bool previous, bool current);
+
     using ILMeasurement for uint256;
 
     // ============ Constants ============
@@ -133,7 +135,9 @@ contract FeeController is Ownable {
 
     /// @notice INT-R1-FT005: Set authorized callers (AMM, VibeSwapCore, keepers)
     function setAuthorizedCaller(address caller, bool authorized_) external onlyOwner {
+        bool prev = authorizedCallers[caller];
         authorizedCallers[caller] = authorized_;
+        emit AuthorizedCallerUpdated(caller, prev, authorized_);
     }
 
     // ============ Initialization ============

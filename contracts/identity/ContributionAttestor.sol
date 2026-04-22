@@ -68,6 +68,8 @@ interface ITribunal {
  * @dev Non-upgradeable. Gas-bounded attestation arrays.
  */
 contract ContributionAttestor is IContributionAttestor, Ownable, ReentrancyGuard {
+    event ContributionDAGUpdated(address indexed previous, address indexed current);
+
 
     // ============ Constants ============
 
@@ -499,6 +501,8 @@ contract ContributionAttestor is IContributionAttestor, Ownable, ReentrancyGuard
     /// @notice Update ContributionDAG address (executive branch)
     function setContributionDAG(address _dag) external onlyOwner {
         if (_dag == address(0)) revert ZeroAddress();
+        address prev = address(contributionDAG);
         contributionDAG = IContributionDAG(_dag);
+        emit ContributionDAGUpdated(prev, _dag);
     }
 }

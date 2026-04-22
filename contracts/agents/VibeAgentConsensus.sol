@@ -131,6 +131,9 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
     event StakeWithdrawalQueued(address indexed committer, uint256 amount);
     event StakeWithdrawn(address indexed committer, uint256 amount);
     event SlashPoolSwept(address indexed treasury, uint256 amount);
+    event PowDifficultyUpdated(uint256 previous, uint256 current);
+    event MinStakeUpdated(uint256 previous, uint256 current);
+    event SlashBpsUpdated(uint256 previous, uint256 current);
 
     // ============ Init ============
 
@@ -411,9 +414,22 @@ contract VibeAgentConsensus is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     // ============ Admin ============
 
-    function setPowDifficulty(uint256 d) external onlyOwner { powDifficulty = d; }
-    function setMinStake(uint256 s) external onlyOwner { minStake = s; }
-    function setSlashBps(uint256 s) external onlyOwner { require(s <= 5000); slashBps = s; }
+    function setPowDifficulty(uint256 d) external onlyOwner {
+        uint256 prev = powDifficulty;
+        powDifficulty = d;
+        emit PowDifficultyUpdated(prev, d);
+    }
+    function setMinStake(uint256 s) external onlyOwner {
+        uint256 prev = minStake;
+        minStake = s;
+        emit MinStakeUpdated(prev, s);
+    }
+    function setSlashBps(uint256 s) external onlyOwner {
+        require(s <= 5000);
+        uint256 prev = slashBps;
+        slashBps = s;
+        emit SlashBpsUpdated(prev, s);
+    }
 
     // ============ View ============
 

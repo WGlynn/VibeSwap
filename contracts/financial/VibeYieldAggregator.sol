@@ -33,6 +33,8 @@ import "./interfaces/IStrategyVault.sol";
  *      UUPS upgradeable for protocol evolution.
  */
 contract VibeYieldAggregator is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    event ShapleyDistributorUpdated(address indexed previous, address indexed current);
+
     using SafeERC20 for IERC20;
 
     // ============ Constants ============
@@ -661,7 +663,9 @@ contract VibeYieldAggregator is OwnableUpgradeable, UUPSUpgradeable, ReentrancyG
     }
 
     function setShapleyDistributor(address _distributor) external onlyOwner {
+        address prev = address(shapleyDistributor);
         shapleyDistributor = IShapleyDistributor(_distributor);
+        emit ShapleyDistributorUpdated(prev, _distributor);
     }
 
     function setVaultFees(uint256 vaultId, uint256 perfBps, uint256 mgmtBps)

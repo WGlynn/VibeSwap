@@ -87,6 +87,7 @@ contract VibeAgentMarketplace is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
     event DisputeResolved(uint256 indexed taskId, bool favorAgent);
     event AgentRated(bytes32 indexed agentId, uint256 indexed reviewId, uint256 rating);
     event PlatformWithdrawn(address indexed to, uint256 amount);
+    event ArbitratorUpdated(address indexed previous, address indexed current);
 
     // ============ Errors ============
     error AgentAlreadyExists();
@@ -315,7 +316,9 @@ contract VibeAgentMarketplace is OwnableUpgradeable, UUPSUpgradeable, Reentrancy
 
     // ============ Admin ============
     function setArbitrator(address _arbitrator) external onlyOwner {
+        address prev = arbitrator;
         arbitrator = _arbitrator;
+        emit ArbitratorUpdated(prev, _arbitrator);
     }
 
     function withdrawPlatformFees(address to) external onlyOwner nonReentrant {

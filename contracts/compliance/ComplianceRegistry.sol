@@ -116,6 +116,12 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
     event JurisdictionUpdated(bytes2 indexed jurisdiction, bool blocked);
     event ComplianceOfficerUpdated(address indexed officer, bool authorized);
     event VolumeRecorded(address indexed user, uint256 volumeUsd, uint256 dailyTotal);
+    event KYCProviderUpdated(address indexed provider, bool previous, bool current);
+    event AuthorizedContractUpdated(address indexed contractAddr, bool previous, bool current);
+    event SecurityTokenUpdated(address indexed token, bool previous, bool current);
+    event DerivativeTokenUpdated(address indexed token, bool previous, bool current);
+    event DefaultKycValidityUpdated(uint64 previous, uint64 current);
+    event CompliancePausedUpdated(bool previous, bool current);
 
     // ============ Errors ============
 
@@ -534,7 +540,9 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
      * @param authorized Whether authorized
      */
     function setKYCProvider(address provider, bool authorized) external onlyOwner {
+        bool prev = kycProviders[provider];
         kycProviders[provider] = authorized;
+        emit KYCProviderUpdated(provider, prev, authorized);
     }
 
     /**
@@ -543,7 +551,9 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
      * @param authorized Whether authorized
      */
     function setAuthorizedContract(address contractAddr, bool authorized) external onlyOwner {
+        bool prev = authorizedContracts[contractAddr];
         authorizedContracts[contractAddr] = authorized;
+        emit AuthorizedContractUpdated(contractAddr, prev, authorized);
     }
 
     /**
@@ -552,7 +562,9 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
      * @param isSecurity Whether token is a security
      */
     function setSecurityToken(address token, bool isSecurity) external onlyOwner {
+        bool prev = securityTokens[token];
         securityTokens[token] = isSecurity;
+        emit SecurityTokenUpdated(token, prev, isSecurity);
     }
 
     /**
@@ -561,7 +573,9 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
      * @param isDerivative Whether token is a derivative
      */
     function setDerivativeToken(address token, bool isDerivative) external onlyOwner {
+        bool prev = derivativeTokens[token];
         derivativeTokens[token] = isDerivative;
+        emit DerivativeTokenUpdated(token, prev, isDerivative);
     }
 
     /**
@@ -569,7 +583,9 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
      * @param validity Validity period in seconds
      */
     function setDefaultKycValidity(uint64 validity) external onlyOwner {
+        uint64 prev = defaultKycValidity;
         defaultKycValidity = validity;
+        emit DefaultKycValidityUpdated(prev, validity);
     }
 
     /**
@@ -577,7 +593,9 @@ contract ComplianceRegistry is OwnableUpgradeable, UUPSUpgradeable {
      * @param paused Whether to pause
      */
     function setCompliancePaused(bool paused) external onlyOwner {
+        bool prev = compliancePaused;
         compliancePaused = paused;
+        emit CompliancePausedUpdated(prev, paused);
     }
 
     /**

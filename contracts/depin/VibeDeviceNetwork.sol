@@ -20,6 +20,9 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
  *      - Fleet management for enterprise operators
  */
 contract VibeDeviceNetwork is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    event DeviceStakeUpdated(uint256 previous, uint256 current);
+    event HeartbeatTimeoutUpdated(uint256 previous, uint256 current);
+
     // ============ Types ============
 
     enum DeviceType { RFID, CAMERA, SENSOR, ROBOT, PHONE, AI_COMPUTE, GATEWAY, MEDICAL, VEHICLE }
@@ -309,11 +312,15 @@ contract VibeDeviceNetwork is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function setDeviceStake(uint256 stake) external onlyOwner {
+        uint256 prev = deviceStake;
         deviceStake = stake;
+        emit DeviceStakeUpdated(prev, stake);
     }
 
     function setHeartbeatTimeout(uint256 timeout) external onlyOwner {
+        uint256 prev = heartbeatTimeout;
         heartbeatTimeout = timeout;
+        emit HeartbeatTimeoutUpdated(prev, timeout);
     }
 
     // ============ View ============

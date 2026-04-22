@@ -129,6 +129,9 @@ contract VibeAgentProtocol is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     event TaskDisputed(uint256 indexed taskId);
     event AgentMessageSent(bytes32 indexed from, bytes32 indexed to, bytes32 contentHash);
     event AgentUpgraded(bytes32 indexed agentId, AutonomyLevel newLevel);
+    event FrameworkAdapterUpdated(AgentFramework indexed framework, bytes32 previous, bytes32 current);
+    event AgentVerified(bytes32 indexed agentId);
+    event PlatformFeeUpdated(uint256 previous, uint256 current);
     event MindScoreUpdated(bytes32 indexed agentId, uint256 newScore);
 
     // ============ Init ============
@@ -366,16 +369,21 @@ contract VibeAgentProtocol is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGua
     // ============ Admin ============
 
     function setFrameworkAdapter(AgentFramework framework, bytes32 adapterHash) external onlyOwner {
+        bytes32 prev = frameworkAdapters[framework];
         frameworkAdapters[framework] = adapterHash;
+        emit FrameworkAdapterUpdated(framework, prev, adapterHash);
     }
 
     function verifyAgent(bytes32 agentId) external onlyOwner {
         agents[agentId].verified = true;
+        emit AgentVerified(agentId);
     }
 
     function setPlatformFee(uint256 feeBps) external onlyOwner {
         require(feeBps <= 1000, "Max 10%");
+        uint256 prev = platformFeeBps;
         platformFeeBps = feeBps;
+        emit PlatformFeeUpdated(prev, feeBps);
     }
 
     // ============ Internal ============

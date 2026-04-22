@@ -12,6 +12,20 @@
 
 ---
 
+## Start with a familiar scene
+
+You're in a Telegram group chat. Someone types: *"What if oracle updates could be commit-reveal to prevent last-mover advantage?"*
+
+Conversation happens. The idea gets refined. Someone asks clarifying questions. A design takes shape.
+
+Weeks later, engineer Sarah ships the implementation. Her commit is in git. Her name is on the contributor list.
+
+But who came up with the idea? The person in Telegram. The one whose offhand question started the whole chain.
+
+In most projects, their contribution is UNCOMPENSATED. They're not in git. They don't get credit. Their idea became infrastructure, and the infrastructure forgets them.
+
+This is the gap the Chat-to-DAG Traceability loop closes. Every step in the chain — from the original Telegram question through the GitHub issue to Sarah's commit to the on-chain DAG attestation — becomes a first-class traceable path.
+
 ## Why this document exists
 
 VibeSwap's founding thesis — that the mind functions as an economy, and that blockchain is the substrate where that economy becomes legible, composable, and multi-participant — collapses if the *workflow* that produces contributions isn't traceable onto the chain. If the only contributions the on-chain DAG sees are `git commit` objects, then the DAG reflects code, not cognition. The upstream provenance (the chat message, the design question, the framing that unlocked a solution) goes uncredited, which is the exact failure mode VibeSwap exists to fix.

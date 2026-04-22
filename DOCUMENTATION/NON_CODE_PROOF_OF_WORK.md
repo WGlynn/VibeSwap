@@ -1,59 +1,107 @@
 # Non-Code Proof of Work
 
-**Status**: Argument. Why dialogue, design, and framing contributions constitute *computational* work.
+**Status**: Argument. Why dialogue, design, framing constitute *computational* work.
+**Audience**: First-encounter OK. Grounded in examples from CS theory + VibeSwap practice.
 
 ---
 
+## Start with an injustice you've seen
+
+You're on a team. Someone — let's call her Alice — has a way of asking questions that reframes problems elegantly. She rarely writes code. But when she's in the room, design decisions go faster and better.
+
+The team ships. In the git log, 95% of commits are from the engineers who wrote the code. Alice shows up occasionally with comments and reviews.
+
+At compensation time, bonuses go to "biggest contributors." Alice gets a small bonus. The engineers get big ones.
+
+Alice's framing-work was essential. It enabled the engineers. But it didn't appear in git; it didn't have her name attached to code; it's invisible to the compensation system.
+
+This is the pattern Non-Code Proof of Work addresses.
+
 ## The claim
 
-Non-code contributions to a technical project are not auxiliary to code — they are the computational substrate that produces code. Dialogue that explores a design space IS work; framing that narrows an ill-posed problem IS work; audit prompts that name a vulnerability IS work. Treating code as the only provable work-output misdescribes how the work actually gets done.
+Non-code contributions to a technical project are not auxiliary to code — they are the **computational substrate** that produces code.
+
+Dialogue that explores a design space IS work. Framing that narrows an ill-posed problem IS work. Audit prompts that name vulnerabilities ARE work.
+
+Treating code as the only provable work-output misdescribes how the work actually gets done.
 
 This is the justification for PoM (Proof of Mind) being a valid consensus pillar alongside PoW and PoS.
 
 ## Why this matters
 
-DeFi projects default to rewarding code-visible work. GitHub commits. Tokens allocated to devs. This produces a systematic bias: people who do upstream work that enables the code (research, architecture, framing, audit, debugging support, emotional labor holding the group together) are under-credited relative to the marginal value they create.
+DeFi projects default to rewarding code-visible work. GitHub commits. Tokens allocated to devs. This produces a systematic bias: people who do upstream work (research, architecture, framing, audit, debugging support, emotional labor) are under-credited relative to value created.
 
-Under-crediting upstream work has a predictable effect: upstream work gets under-supplied, which bottlenecks the project. Most DeFi project failures are not failures of code — they are failures of upstream work that code execution couldn't substitute for.
+Under-crediting upstream work has a predictable effect: upstream work gets under-supplied, which bottlenecks the project. Most DeFi project failures are failures of upstream work that code couldn't substitute for.
 
-VibeSwap's bet is that properly crediting upstream work (Proof of Mind) produces a project that accumulates upstream-work advantage — a compounding moat that pure-PoW and pure-PoS projects can't replicate.
+VibeSwap's bet: properly crediting upstream work produces compounding upstream-work advantage — a moat that pure-PoW and pure-PoS projects can't replicate.
 
-## What work means, formally
+## What counts as "work," formally
 
-Work in the computational sense: a process that, given inputs, produces outputs that weren't trivially derivable from the inputs. Complexity-theoretic.
+Work in the computational sense: a process that, given inputs, produces outputs that weren't trivially derivable from the inputs.
 
-A code commit produces a new state given the prior codebase plus the commit diff. This is work. Measurable: the diff exists; the state change is verifiable; the output took real compute to produce.
+A code commit produces a new state given prior codebase + diff. This is work — measurable: diff exists, state change verifiable, compute was real.
 
 But the diff didn't write itself. Upstream of the diff:
-- **Problem recognition** — noticing that a thing needs changing. Given all the inputs, the non-trivial output is the identification of which input-element is the problem. This is search work.
-- **Design framing** — converting "the thing needs changing" into "here's the shape of the solution". Given a problem statement, the non-trivial output is a solution-shape that isn't pre-determined by the problem. This is model-selection work.
-- **Solution validation** — reasoning that the solution-shape actually works before coding. Given a proposed solution, the non-trivial output is the correctness argument. This is proof-search work.
-- **Dialogue iteration** — refining a solution across multiple minds. Given a proposed solution and critiques, the non-trivial output is the revised solution. This is social-computation work.
 
-Each of these is work in the computational sense. The output took compute. The compute happened in a brain rather than a CPU but the substrate doesn't change the work-status.
+### Work 1 — Problem recognition
 
-## The bijection back to chain PoW
+Noticing that a thing needs changing. Given all inputs, the non-trivial output is IDENTIFYING which input-element is the problem.
 
-In cryptocurrency PoW, "work" is hashing — a computation whose output (a nonce satisfying a difficulty bound) is expensive to produce and cheap to verify. The asymmetry is what makes it valuable: the prover invests; the verifier cheaply confirms.
+This is **search work** — searching the space of possible-problems to find the actual one.
+
+**Concrete**: a user reports "my transaction failed." The support person diagnoses: "Oh, you're hitting the per-pool rate limit because of Sybil-attack from address X." The diagnosis is work. Not trivial.
+
+### Work 2 — Design framing
+
+Converting "the thing needs changing" into "here's the shape of the solution."
+
+This is **model-selection work** — choosing a solution-shape that isn't pre-determined by the problem.
+
+**Concrete**: given "rate-limiting feels too aggressive," the designer proposes "damping curve instead of cliff" (Fibonacci Scaling approach). The proposal is work — not derivable from the problem alone.
+
+### Work 3 — Solution validation
+
+Reasoning that the solution actually works before coding.
+
+This is **proof-search work** — walking the space of correctness arguments.
+
+**Concrete**: the designer also produces the invariant check: "after this change, the rate limiter preserves attack-resistance while not affecting normal users." That reasoning is work.
+
+### Work 4 — Dialogue iteration
+
+Refining a solution across multiple minds.
+
+This is **social-computation work** — computation distributed across multiple agents.
+
+**Concrete**: a pair programming session that yields a better solution than either could have produced alone. The session IS work, even though no single person "solved it."
+
+Each of these is computational work. Different from code-writing but mathematically equivalent (input → non-trivial output).
+
+## The PoW asymmetry works for non-code too
+
+Cryptocurrency PoW hashing: the prover invests compute; the verifier cheaply confirms. Asymmetry makes the commitment credible.
 
 Non-code contributions have the same asymmetry:
-- **Design work** produces a solution shape; verifying a solution-shape's correctness is cheaper than deriving it.
-- **Audit work** produces a vulnerability report; verifying the vulnerability is cheaper than finding it.
-- **Framing work** produces a problem statement; using the frame is cheaper than coming up with it.
 
-PoM proposes that these asymmetries should accumulate credit on-chain just like PoW does. The verifier-asymmetry pattern is the same; the substrate is different.
+- **Design work**: produces a solution-shape. Verifying the shape is cheaper than deriving it.
+- **Audit work**: produces a vulnerability report. Verifying the vulnerability is cheaper than finding it.
+- **Framing work**: produces a problem statement. Using the frame is cheaper than coming up with it.
+
+PoM proposes that these asymmetries should accumulate credit on-chain just like PoW does. Same verifier-asymmetry pattern; different substrate.
 
 ## Why not just weight everyone equally
 
-Equal-weight contribution recording (post to issue, get credit) fails because:
+Equal-weight contribution recording (post to issue, get credit) fails:
+
 - Bots and Sybils inflate contribution counts arbitrarily.
-- High-quality contributions are drowned in low-quality noise.
-- Real contributors disengage when they see their work undifferentiated from spam.
+- High-quality contributions drowned in low-quality noise.
+- Real contributors disengage when their work is undifferentiated from spam.
 
 PoM-weighted attribution requires:
-- Evidence of the contribution (the idea, the audit, the framing, produced on a verifiable date via a traceable channel).
-- Attestation by trust-weighted peers that the contribution is real and valuable.
-- Resistance to capture (multi-branch attestation, see [ContributionAttestor Explainer](./CONTRIBUTION_ATTESTOR_EXPLAINER.md)).
+
+- **Evidence**: the contribution was produced (verifiable via source/date/channel).
+- **Attestation**: trust-weighted peers confirm the contribution is real and valuable.
+- **Resistance to capture**: multi-branch attestation prevents single-actor bias.
 
 This raises the cost of faking contributions to prohibitive levels while leaving the cost of real contributions natural.
 
@@ -61,33 +109,105 @@ This raises the cost of faking contributions to prohibitive levels while leaving
 
 PoM in NCI combines:
 
-1. **Attestation weight** — the cumulative trust-weighted attestation mass a contributor has received.
-2. **DAG lineage depth** — the number of downstream contributions that cite this one, decayed by distance.
-3. **Persistence** — contributor's participation over time, decayed by dormancy.
+1. **Attestation weight**: cumulative trust-weighted attestations received.
+2. **DAG lineage depth**: downstream contributions citing this one (decayed by distance).
+3. **Persistence**: contributor's participation over time (decayed by dormancy).
 
-A contributor with only attestations is a one-shot. A contributor with only lineage depth is influence-without-recent-action. A contributor with only persistence is activity-without-impact. Combining all three weighs cognitive contributors in the same multi-dimensional way PoW chains weigh computational miners.
-
-## What PoM is NOT
-
-- **Not reputation score.** Reputation is a summary; PoM is work-measure with economic consequence.
-- **Not upvotes.** Upvotes are costless; PoM attestations have staking and slashing.
-- **Not identity.** Identity (SoulboundIdentity) is the substrate PoM attestations live on; PoM is the aggregate work-measure.
-- **Not a replacement for PoW or PoS.** NCI weight function is a sum; PoM is one axis. Dominance is bounded.
+A contributor with only attestations is a one-shot. Only lineage depth is influence-without-recent-action. Only persistence is activity-without-impact. Combining all three weighs cognitive contributors multi-dimensionally, mirroring how PoW chains weigh miners.
 
 ## Implications for audits
 
-An audit prompt ("have you considered oracle manipulation from a stale-feed angle?") that leads to a HIGH-severity finding and a shipped fix IS computational work. It took expertise and time. It prevented a real loss. Under PoW-only crediting, the auditor gets paid only if they write the fix themselves — which they often can't (different codebase, different expertise profile).
+An audit prompt ("have you considered oracle manipulation from a stale-feed angle?") that leads to a HIGH-severity finding and a shipped fix IS computational work. It took expertise and time. It prevented a real loss.
 
-Under PoM, the auditor gets credited proportional to the value of the prompt. The person who writes the fix gets credited for the code-level work. Both get paid; the total allocated matches the total value created.
+Under PoW-only crediting: the auditor gets paid only if they write the fix themselves — which they often CAN'T (different codebase, different expertise).
 
-This changes the economics of audit. Good auditors can specialize in prompt-work (their comparative advantage) rather than trying to be full-stack code-contributors. Projects get better audit coverage.
+Under PoM: the auditor gets credited proportional to the value of the prompt. The code-writer gets credited for the code-level work. Both get paid; total allocated matches total value created.
 
-## Relationship to Lawson Constant
+This changes audit economics. Good auditors specialize in prompt-work (their comparative advantage) rather than trying to be full-stack contributors. Projects get better audit coverage.
 
-[Lawson Constant](./LAWSON_CONSTANT.md): "the greatest idea cannot be stolen because part of it is admitting who came up with it." This formalizes as: non-code provenance is first-class attribution data.
+## What PoM is NOT
 
-The Lawson Constant is the philosophical statement; PoM is its operational mechanism; NCI is its integration into consensus; [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) is its workflow.
+Careful to distinguish:
+
+### NOT reputation score
+
+Reputation is a summary; PoM is work-measure with economic consequence.
+
+### NOT upvotes
+
+Upvotes are costless; PoM attestations have staking and slashing.
+
+### NOT identity
+
+Identity (SoulboundIdentity) is the substrate PoM attestations live on; PoM is the aggregate work-measure.
+
+### NOT a replacement for PoW or PoS
+
+NCI is a sum of all three. PoM is one axis. Dominance is bounded.
+
+## Concrete scenario — audit prompt compensation
+
+Let me walk a specific case.
+
+**Day 1**: Alice is a security researcher. She reads VibeSwap contracts. She notices a specific oracle-manipulation vector. She posts a `[Dialogue]` issue with the observation.
+
+**Day 2**: Bob (VibeSwap engineer) reads the issue. He investigates. It's real. He writes a fix.
+
+**Day 3**: Bob ships the fix. His commit references `Closes #42 — Alice's audit observation on oracle feed staleness`.
+
+**Day 5**: The attestation mints for both:
+- Alice: `Security` type contribution, `value = 5e18` (Audit base).
+- Bob: `Code` type contribution, `value = 3e18` (Feature base).
+
+**Day 30**: Shapley distribution round fires. Alice and Bob both receive rewards. Alice's Shapley share reflects the marginal value of her observation. Bob's reflects the implementation.
+
+Both are proportionally compensated. Alice's observation, which would have been UNCOMPENSATED in a code-only system, is now worth its actual marginal contribution.
+
+This is PoM in practice. Non-code work → on-chain credit → economic reward.
+
+## Relationship to the Lawson Constant
+
+[Lawson Constant](./LAWSON_CONSTANT.md): "the greatest idea cannot be stolen because part of it is admitting who came up with it."
+
+Applied: non-code provenance is first-class attribution data. An idea attributed to Alice earns her credit; removing the attribution would violate the Lawson Constant (hardcoded in bytecode).
+
+The Constant is the philosophical statement; PoM is its operational mechanism; NCI is its integration into consensus; [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) is its workflow.
+
+## For external contributors
+
+If you're an external contributor thinking "I don't code; do I have anything to offer VibeSwap?":
+
+Yes. If you:
+- Notice patterns others miss.
+- Frame problems clearly.
+- Ask audit-relevant questions.
+- Bring expertise in cognitive science / economics / mechanism design / game theory / etc.
+
+All of these are computational work. All of these are DAG-creditable. All of these earn rewards proportional to marginal contribution.
+
+[Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) is the workflow that makes your contribution visible. Start there.
+
+## For students
+
+Exercise: audit a recent technical discussion you were in (meeting, thread, chat). Identify:
+
+1. The specific problem being discussed.
+2. Who contributed what:
+   - Who identified the problem?
+   - Who proposed solutions?
+   - Who validated proposals?
+   - Who synthesized decisions?
+3. Under code-only crediting, who would get credit?
+4. Under PoM, who would get credit?
+
+Compare the two distributions. Note the ones under-credited by code-only.
+
+## Relationship to other primitives
+
+- **Parent**: ETM — cognitive-economic processes are the substrate.
+- **Applied via**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) — how non-code work gets attributed.
+- **Counter-evidence for**: "only code counts" frame.
 
 ## One-line summary
 
-*Dialogue, design, and framing ARE computational work in the complexity-theoretic sense; PoM records them with the same verifier-asymmetry pattern PoW uses for hashes, producing a compounding upstream-work advantage that code-only-crediting projects can't replicate.*
+*Dialogue, design, framing, audit are computational work — produce non-trivial outputs from inputs, with the same verifier-asymmetry that makes PoW credible. Under code-only crediting, upstream work is under-supplied. PoM records them with same pattern PoW uses; NCI combines PoM with PoW + PoS. Alice's audit observation + Bob's implementation both earn proportional credit. This is the compounding upstream-work moat that code-only systems don't have.*

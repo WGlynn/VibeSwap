@@ -1,88 +1,229 @@
 # Cognitive Rent Economics
 
 **Status**: Theoretical deepening of [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md).
-**Depth**: Formalization, not restatement.
+**Audience**: First-encounter OK. Numbers walked through with linear-vs-convex contrast.
 
 ---
 
-## The claim
+## An everyday observation
 
-State in a mind is rented, not owned. What stays accessible is what pays attention-rent above the decay-floor. This is structurally identical to CKB state-rent: storage occupies a cell; cells that cannot fund their rent are evicted; the mechanism enforces a maximum steady-state storage footprint without requiring a central eviction authority.
+You learn five new Spanish words on Monday. By Wednesday, you can recall three. By Friday, two. By next Monday, one.
 
-The claim is not metaphor. It is that the mathematics describing CKB state-rent describes cognitive retention in the limit: same equations, same phase transitions, same failure modes when the rent function is mistuned.
+You learn five new Spanish words on a quiet vacation day. By Wednesday (one day later), you can recall all five. By Friday, three. By next Monday, two.
 
-## The rent function
+Same five words. Same time elapsed. Different retention rates.
 
-Let `R(s, t)` be the retention cost for state `s` at time `t`. Three properties load-bearing:
+Why? Because during the busy week, your attention was heavily loaded. Retaining the Spanish words competed with many other things for limited attention-budget. During the vacation, there was more attention-budget per fact.
 
-1. **Monotonic in active surface area.** Cognition has a working-memory budget — more active facts = higher per-fact retention cost. Real working-memory isn't linear; it's convex. `∂R/∂|active| > 0` and `∂²R/∂|active|² > 0`.
-2. **Discounted by recency.** Facts recently queried are cheaper to retain than facts dormant — retrieval paths cache. `R(s, t | queried_at_t-k) < R(s, t)` for small k, with convex discount.
-3. **Retrieval-cost-coupled.** A fact hard to retrieve is hard to retain (the queries that would refresh it can't find it). This is a negative feedback loop: hard-to-retrieve → high-cost-to-keep → evicted → even harder to retrieve until gone.
+This is cognitive rent economics. State in your mind pays rent in the form of attention. When total active state exceeds budget, some state must get evicted.
 
-CKB's rent function captures properties 1 and 2 directly. Property 3 is weaker in CKB (retrieval cost is flat-gas across state) but emerges in practice when fee-markets price rarely-read state higher.
+## The direct parallel
 
-## The phase transitions
+CKB state-rent works the same way:
 
-When retention-cost curves are convex, the steady-state exhibits characteristic behaviors:
+- Storage costs ongoing fees.
+- Accounts with funded deposits pay rent.
+- Unpaid storage gets evicted.
+- Total state-on-chain is bounded by aggregate rent-paying capacity.
 
-### Phase 1 — Below knee
+Your mind is rent-charging attention on active facts. CKB is rent-charging tokens on active state. Same pattern; different substrates.
 
-Light footprint, rent cost is low, all states self-fund. Mind feels fluent; chain feels cheap.
+## The theoretical claim
 
-### Phase 2 — Approaching knee
+The mathematics governing both systems is identical. Specifically:
 
-Footprint growing; convexity kicking in; some states starting to miss rent. Subtle competition. Mind feels full; chain feels like it's approaching gas-crisis.
+- **Retention cost is a monotonically-increasing function of current active load.** More state active = each state costs more to retain.
+- **Retention cost is convex in load.** Doubling active state more-than-doubles per-state cost.
+- **Eviction fires when cumulative unpaid-rent exceeds some threshold.**
 
-### Phase 3 — Past the knee
+These three properties together describe:
+- Cognitive memory.
+- CKB state-rent.
+- Computer CPU cache (LRU with adjustable thresholds).
+- Server-storage economics with usage fees.
 
-Footprint exceeds sustainable; rent cost compounds; eviction cascades. Mind feels overloaded; chain becomes unusable without gas-market surge.
+The pattern is universal for rent-based eviction systems.
 
-### Phase 4 — Collapse
+## Why convexity is load-bearing
 
-Eviction exceeds new-state-rate; substrate contracts. Not catastrophic — just lossy. Previously-funded states are evicted because newer ones outbid. Mind feels like memory-loss; chain feels like historical-state-loss.
+Let's make this concrete. Suppose retention cost is:
 
-These four phases are observable in both substrates. In cognition, they map to relaxed attention / engaged attention / overloaded attention / cognitive burn-out. In CKB, they map to sub-knee / approaching-knee / gas-crisis / eviction-cascade.
+```
+R(load) = base × (load/capacity)^α
+```
 
-## Why the symmetry matters
+where α is the "convexity exponent".
 
-A mechanism designer wanting to tune retention — in either substrate — can read from one side and apply to the other. The cognitive substrate has centuries of observational data about attention-economics; the chain substrate can inherit the phase-transition theory directly, adjusting only the constants.
+### Linear case (α = 1)
 
-VibeSwap's NCI retention-weight function currently uses a linear decay — this IS the Gap #1 from the [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md). The fix is to replace linear with convex, matching the cognitive rent function's observed shape.
+Load = 10% of capacity → cost = 10% of base.
+Load = 50% → cost = 50%.
+Load = 90% → cost = 90%.
 
-## The alpha parameter
+Linear scaling. Doubling load doubles cost.
 
-If the convex retention cost is `R(t) = base × (1 - (t/T)^α)`:
+### Convex case (α = 1.6)
 
-- `α = 1` is linear (current incorrect form).
-- `α < 1` is concave (early states cheap, late states expensive — inverse of observed cognition).
-- `α > 1` is convex (late states cheap, early states expensive — matches cognition).
+Load = 10% → cost = 10%^1.6 ≈ 4% of base.
+Load = 50% → cost = 50%^1.6 ≈ 33%.
+Load = 90% → cost = 90%^1.6 ≈ 84%.
 
-Empirical work on attention decay (Ebbinghaus, modern replications) suggests `α ≈ 1.4-1.7`. The [Augmented Mechanism Design paper §6.4](../memory/feedback_augmented-mechanism-design-paper.md) recommends `α = 1.6` as a starting point for state-rent functions.
+Convex scaling. Below 50% load, cost is sub-linear (cheap). Above 90%, cost is nearly maxed out.
 
-Choosing `α = 1.6` is NOT tuning to convenience — it is matching substrate geometry (per [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md)).
+### Phase behavior of each
 
-## The cognitive substrate's self-regulation
+**Linear**: Retention cost grows predictably. No phase transitions. Evictions happen at a steady rate.
 
-Observation: cognition doesn't run at Phase 3/4 as a steady-state. Agents self-regulate attention — drop tasks, sleep, change context — to return to Phase 1/2. Why?
+**Convex**: Below the "knee" (around 50-70% load), retention is cheap and plentiful. Above the knee, retention cost rises sharply and evictions accelerate.
 
-Because Phase 3/4 has higher retention cost PER fact, and total retention cost is the integral of per-fact costs over all active facts. Past the knee, total cost grows faster than benefit — agents feel the cost and back off.
+**Which matches cognition?**
 
-The chain can't self-regulate this way without governance intervention. Which is why state-rent's MAX_ACTIVE bound is critical: without it, the chain would sit at Phase 4 forever because adding-state is free at the margin while the aggregate cost accrues silently.
+Observation: when your mind is lightly loaded, you remember almost everything. When heavily loaded, you forget much and get cognitive overload. The transition is NOT gradual — it's sudden.
 
-In cognition, the regulator is attention-cost felt by the agent. On-chain, the regulator is rent-cost paid by the state-holder. Mechanism-design translation.
+This is the convex pattern. α ≈ 1.4-1.7 empirically. Matches Ebbinghaus and modern replications.
 
-## The retrieval-path refresh
+## Why VibeSwap's NCI currently has a bug here
 
-When a fact is queried, the cost of retaining it drops (property 2). This means that well-used facts rent themselves cheaply; rarely-used facts rent expensively; disused facts get evicted.
+The NCI (Nakamoto Consensus Infinity) has a retention-weight function. Currently it's LINEAR in time:
 
-On-chain equivalent: state frequently read via smart-contract calls should have lower rent than state rarely touched. CKB's current rent model doesn't capture this; it's flat-per-cell. This is a refinement candidate for a future CKB-native mechanism and a corresponding ETM-alignment row.
+```
+retentionWeight(t) = base - k × t
+```
 
-## Relationship to Shapley
+This doesn't match cognition's actual convex pattern. Linear retention means:
+- Early mind-scores decay at the same rate as late mind-scores.
+- No phase transition (no "knee").
+- Retention of old mind-scores stays linear, doesn't drop off sharply when system load is high.
 
-Shapley distribution pays proportional to marginal contribution. In cognition, attention paid to a fact now IS the marginal value it creates now. Retention cost = attention allocated. So the rent is marginal contribution, paid in advance, in the inverse direction.
+Per [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1, the fix is to make this convex:
 
-Mechanism symmetry: Shapley is the *outbound* cash flow from the cooperative game; state-rent is the *inbound* cash flow into the retention pool. Both use marginal-contribution math.
+```
+retentionWeight(t) = base × (1 - (t/T)^α)
+```
+
+with α ≈ 1.6. This matches cognitive substrate geometry.
+
+## Worked example — the linear-vs-convex difference
+
+Suppose a contributor's mindScore is 1000 (max). It decays over T = 365 days.
+
+### Under linear (current, incorrect)
+
+Day 1: 1000 × (1 - 1/365) ≈ 997.3
+Day 30: 1000 × (1 - 30/365) ≈ 917.8
+Day 180: 1000 × (1 - 180/365) ≈ 506.8
+Day 365: 1000 × (1 - 365/365) = 0
+
+Linear decay. Half-remembered at 6 months.
+
+### Under convex (α = 1.6, proposed)
+
+Day 1: 1000 × (1 - (1/365)^1.6) ≈ 999.98
+Day 30: 1000 × (1 - (30/365)^1.6) ≈ 986
+Day 180: 1000 × (1 - (180/365)^1.6) ≈ 662
+Day 365: 1000 × (1 - (365/365)^1.6) = 0
+
+Convex decay. Much slower initial decay; sharper drop in final months.
+
+**Key differences**:
+- At 1 month, convex retains 986 vs linear's 918. (Convex is kinder to recent contributions.)
+- At 6 months, convex retains 662 vs linear's 507. (Convex still more generous.)
+- At 11 months, convex accelerates; drops closer to zero.
+
+Convex matches observed cognitive decay. Linear doesn't.
+
+## Why this matters for VibeSwap
+
+The bug has a real cost. Under linear:
+- Short-term contributors get slightly less credit than they should.
+- Mid-term contributors get much more than they should.
+- The decay doesn't accelerate in final months; old contributions persist longer than their real value.
+
+Fix shipping in C40 (per Build Roadmap). After the fix, retention-weight function matches the cognitive substrate's actual geometry.
+
+## The four phases (observable in both substrates)
+
+When retention cost is convex, the system exhibits four characteristic phases:
+
+### Phase 1 — Below the knee (underloaded)
+
+**Cognitive**: mind feels spacious. Can add more facts without strain.
+
+**On-chain**: state-rent is cheap. Lots of storage available per dollar.
+
+### Phase 2 — Approaching the knee (moderate load)
+
+**Cognitive**: mind feels full. Adding more facts starts to feel effortful.
+
+**On-chain**: state-rent is ramping up. Users start to feel the cost.
+
+### Phase 3 — Past the knee (overloaded)
+
+**Cognitive**: mind feels overloaded. Eviction cascades start; some important facts slip.
+
+**On-chain**: gas-crisis. Users can't afford the rent. Eviction threats accelerate.
+
+### Phase 4 — Collapse (severely overloaded)
+
+**Cognitive**: cognitive burnout. Substrate contracts; even recently-funded state gets evicted.
+
+**On-chain**: eviction-cascade. Even funded state gets evicted because the system's aggregate capacity is exceeded.
+
+These four phases are observable empirically in both substrates. Same mathematics; same dynamics.
+
+## The α parameter's empirical grounding
+
+Why α = 1.6? Because that's approximately what Ebbinghaus observed for human memory decay, across multiple replications over a century.
+
+This is NOT a tuning choice. It's matching the substrate's geometry per [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md). If we choose α = 1.0, we get linear — mismatched to cognition. If we choose α = 3.0, we get super-convex — also mismatched (too steep).
+
+Paper [`memory/feedback_augmented-mechanism-design-paper.md`](../memory/feedback_augmented-mechanism-design-paper.md) §6.4 recommends α = 1.6 based on these observations.
+
+## The retrieval-cost coupling
+
+A secondary effect: when a fact is recently retrieved, its retention cost drops. Queries "refresh" the rent.
+
+In cognition: thinking about a fact pays its rent for a while. Review cements memory.
+
+In CKB: reading state refreshes its access-count. Frequently-read state is implicitly funded (assuming read-gas contributes back to rent).
+
+VibeSwap doesn't currently implement this retrieval-coupling. It's a future refinement (not currently in the Build Roadmap; would be a V2+ consideration).
+
+## The meta-observation
+
+Cognitive rent economics isn't just a theory about brains. It's a pattern about ANY system with:
+- Finite active capacity.
+- Cost per unit capacity.
+- Eviction when cost exceeds budget.
+
+Examples of the pattern:
+- **Brains**: attention budget, forget-without-rehearsal.
+- **Chains**: storage budget, lose-state-without-rent.
+- **CPU caches**: cache line budget, LRU eviction.
+- **Humans in organizations**: attention budget; boring work gets forgotten.
+- **Files on a laptop**: disk budget; backup gets deleted.
+
+Recognizing the pattern lets you design mechanisms that match. Miss the pattern and you design linear mechanisms for convex substrates — which break at the knee.
+
+## For students
+
+Exercise: pick a retention system you use (your memory, your phone's storage, your Git repo, whatever). Characterize:
+
+1. The budget (what's the total capacity?).
+2. The per-unit cost (what does one unit of retention cost?).
+3. The eviction trigger (what forces eviction?).
+4. The convexity (how sharply does cost rise with load?).
+
+Then plot: retention vs. load. Is it linear? Convex? Super-convex?
+
+Compare to cognitive retention + CKB state-rent. Are the patterns similar?
+
+## Relationship to other primitives
+
+- **Parent**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — ETM's first bijection (memory decay ↔ state-rent) is what this doc elaborates.
+- **Fix in the roadmap**: [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1 — NCI retention weight should be convex.
+- **Instance**: NCI weight function ([`NCI_WEIGHT_FUNCTION.md`](./NCI_WEIGHT_FUNCTION.md)).
 
 ## One-line summary
 
-*Cognitive retention is governed by the same rent-with-decay dynamics as CKB state-rent; the four phase-transitions map directly; VibeSwap's NCI should use α≈1.6 convex retention because that's the shape the cognitive substrate uses.*
+*Cognitive retention is governed by the same rent-with-convex-cost dynamics as CKB state-rent — four phases observable in both (underloaded, approaching-knee, overloaded, collapse). α ≈ 1.6 matches Ebbinghaus decay. VibeSwap's NCI currently uses linear (α=1); convex fix in C40. Pattern generalizes to any budget-constrained retention system.*

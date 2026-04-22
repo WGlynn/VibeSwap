@@ -194,4 +194,80 @@ contract OracleAggregationCRATest is Test {
         vm.expectRevert(bytes("Already revealed"));
         agg.revealPrice(1, 1500e18, bytes32(uint256(42)));
     }
+
+    // ============ Settle Phase ============
+
+    function _threeCommitsAndReveals(uint256[3] memory prices) internal {
+        bytes32[3] memory nonces = [bytes32(uint256(1)), bytes32(uint256(2)), bytes32(uint256(3))];
+        address[3] memory issuers = [issuer1, issuer2, issuer3];
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(issuers[i]);
+            agg.commitPrice(_commitHash(prices[i], nonces[i]));
+        }
+        vm.warp(block.timestamp + agg.COMMIT_PHASE_DURATION() + 1);
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(issuers[i]);
+            agg.revealPrice(1, prices[i], nonces[i]);
+        }
+        // Advance past reveal deadline
+        vm.warp(block.timestamp + agg.REVEAL_PHASE_DURATION() + 1);
+    }
+
+    function test_settleBatch_medianOfThreeOdd() public {
+        // Prices: 1400, 1500, 1600 — median = 1500
+        _threeCommitsAndReveals([uint256(1400e18), uint256(1500e18), uint256(1600e18)]);
+        uint256 median = agg.settleBatch(1);
+        assertEq(median, 1500e18);
+    }
+
+    function test_settleBatch_medianRobustToOutlier() public {
+        // One extreme outlier: 1500, 1510, 999999 — median = 1510 (not skewed by outlier)
+        _threeCommitsAndReveals([uint256(1500e18), uint256(1510e18), uint256(999999e18)]);
+        uint256 median = agg.settleBatch(1);
+        assertEq(median, 1510e18, "median should resist extreme outlier");
+    }
+
+    function test_settleBatch_revertInsufficientReveals() public {
+        // Only 1 commit + reveal — below MIN_REVEALS_FOR_SETTLEMENT (3)
+        address[] memory issuers = new address[](1);
+        uint256[] memory prices = new uint256[](1);
+        bytes32[] memory nonces = new bytes32[](1);
+        issuers[0] = issuer1;
+        prices[0] = 1500e18;
+        nonces[0] = bytes32(uint256(42));
+
+        _commitAndAdvanceToReveal(issuers, prices, nonces);
+        vm.prank(issuer1);
+        agg.revealPrice(1, 1500e18, bytes32(uint256(42)));
+        vm.warp(block.timestamp + agg.REVEAL_PHASE_DURATION() + 1);
+
+        vm.expectRevert(bytes("Insufficient reveals"));
+        agg.settleBatch(1);
+    }
+
+    function test_settleBatch_revertRevealNotYetEnded() public {
+        _threeCommitsAndReveals([uint256(1400e18), uint256(1500e18), uint256(1600e18)]);
+        // Rewind to before reveal deadline to simulate premature settle attempt
+        // (not really possible since _threeCommitsAndReveals advances past it —
+        // so skip this in favor of direct setup)
+
+        // Fresh state: commits only, no warp past reveal deadline
+        // Setup again without the final warp
+        address[] memory issuers = new address[](3);
+        uint256[] memory prices = new uint256[](3);
+        bytes32[] memory nonces = new bytes32[](3);
+        issuers[0] = makeAddr("alt1"); prices[0] = 100; nonces[0] = bytes32(uint256(11));
+        issuers[1] = makeAddr("alt2"); prices[1] = 200; nonces[1] = bytes32(uint256(12));
+        issuers[2] = makeAddr("alt3"); prices[2] = 300; nonces[2] = bytes32(uint256(13));
+        _commitAndAdvanceToReveal(issuers, prices, nonces);
+        // Reveals land in reveal phase — do NOT warp past reveal deadline
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(issuers[i]);
+            agg.revealPrice(agg.getCurrentBatchId(), prices[i], nonces[i]);
+        }
+
+        vm.expectRevert(bytes("Reveal not yet ended"));
+        agg.settleBatch(agg.getCurrentBatchId());
+    }
 }

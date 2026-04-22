@@ -27,6 +27,8 @@ import "./interfaces/IContributionDAG.sol";
  * @dev Non-upgradeable. Gas-bounded BFS: MAX_TRUST_HOPS = 6.
  */
 contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
+    event SoulboundIdentityUpdated(address indexed previous, address indexed current);
+
     using IncrementalMerkleTree for IncrementalMerkleTree.Tree;
 
     // ============ The Lawson Constant ============
@@ -617,7 +619,9 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
 
     /// @notice Set SoulboundIdentity contract (address(0) to disable check)
     function setSoulboundIdentity(address _soulbound) external onlyOwner {
+        address prev = soulboundIdentity;
         soulboundIdentity = _soulbound;
+        emit SoulboundIdentityUpdated(prev, _soulbound);
     }
 
     /// @notice Exclude or re-include an address from referral bonuses

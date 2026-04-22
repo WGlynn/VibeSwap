@@ -28,6 +28,8 @@ import "./interfaces/IVibeHook.sol";
  *        - Configurable: governance controls surge parameters
  */
 contract DynamicFeeHook is IVibeHook, Ownable {
+    event WindowDurationUpdated(uint256 previous, uint256 current);
+
     // ============ Constants ============
 
     uint256 private constant BPS = 10_000;
@@ -208,7 +210,9 @@ contract DynamicFeeHook is IVibeHook, Ownable {
     }
 
     function setWindowDuration(uint256 duration) external onlyOwner {
+        uint256 prev = windowDuration;
         windowDuration = duration;
+        emit WindowDurationUpdated(prev, duration);
     }
 
     // ============ Views ============

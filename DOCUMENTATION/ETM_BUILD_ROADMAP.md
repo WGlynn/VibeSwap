@@ -25,21 +25,19 @@ Small gaps are real. A mechanism that 90% mirrors the correct property can still
 
 ## Gap #1 — NCI Convex Retention
 
-### What the gap IS
+### What the gap IS (reconciled 2026-04-23)
 
-[NCI weight function](./NCI_WEIGHT_FUNCTION.md) uses LINEAR decay:
+**Reconciliation note**: earlier drafts asserted NCI currently uses LINEAR decay `base - k × t`. Verification against `contracts/consensus/NakamotoConsensusInfinity.sol` shows no time-decay is implemented — `cumulativePoW` is monotone-cumulative, `mindScore` is refresh-on-demand. The real gap is: retention is ABSENT on the work-and-mind pillars.
 
-```solidity
-retentionWeight(t) = base - k × t
-```
-
-This doesn't match cognition. Cognitive retention decays CONVEXLY:
+Cognitive retention decays CONVEXLY:
 
 ```
 retentionWeight(t) = base × (1 - (t/T)^α)
 ```
 
 with α ≈ 1.6 (Ebbinghaus + modern replications).
+
+Retention applies to PoW and PoM only. PoS stake is present-tense locked capital, not historical record, so no decay.
 
 ### Why this matters
 
@@ -64,13 +62,14 @@ Convex is more lenient to recent contributions (986 vs 918 at day 30; 662 vs 507
 
 ### The cycle
 
-**Cycle C40 (target 2026-04-23)**:
+**Cycle C40 (shipped 2026-04-23)**:
 
-- **Before**: `NakamotoConsensusInfinity.retentionWeight()` uses linear decay.
-- **During**: replace the function implementation. Add α parameter (governance-tunable, default 1.6). Update regression tests.
-- **After**: convex decay matches cognitive substrate. +8 regression tests.
+- **Before**: no retention primitive on NCI. Zero time-decay applied to PoW or PoM.
+- **Shipped (C40a)**: pure function `calculateRetentionWeight(elapsedSec, horizonSec) → weightBps` on NCI, α=1.6 hardcoded via cubic polynomial approximation `0.1744·x + 1.116·x² − 0.2904·x³`. Max error ~3% vs exact `x^1.6` on [0, 1]. +8 regression tests covering endpoint behavior, monotonicity, convexity, and the four doc-specified reference points (day 1 / 30 / 180 / 365).
+- **Deferred (C40b)**: wiring into `_recalculateWeights`. Six design decisions blocking integration — decay anchor, per-pillar timestamp storage, query-time vs persisted, horizon T, `totalActiveWeight` O(1) interaction, validator migration path.
+- **Deferred (C40c)**: governance-tunable α in [1.2, 1.8]. Ships when a real tuning need appears; polynomial is swapped for general-α formulation.
 
-**Estimated effort**: 1 RSI cycle. Target: C40 lands by end of week.
+**Actual effort**: 1 session for C40a. C40b estimated 1-2 sessions once design decisions are taken.
 
 ### Risk
 
@@ -200,9 +199,11 @@ Extract to `memory/primitive_*.md` as respective cycles ship.
 
 ## Cycle budget and sequencing
 
-| Cycle | Target ship | Scope |
+| Cycle | Status | Scope |
 |---|---|---|
-| C40 | 2026-04-23 | Gap #1 — Convex retention in NCI |
+| C40a | SHIPPED 2026-04-23 | Gap #1 — Pure `calculateRetentionWeight` primitive on NCI (α=1.6) |
+| C40b | PENDING | Gap #1 — Wire retention into `_recalculateWeights` (6 design decisions first) |
+| C40c | PENDING | Gap #1 — Governance-tunable α in [1.2, 1.8] |
 | C41 | 2026-04-25 | Gap #2a — Shapley signature + ContributionAttestor query |
 | C42 | 2026-04-28 | Gap #2b — Similarity keeper + commit-reveal |
 | C43 | 2026-04-30 | Gap #3 — Attested circuit-breaker resume |

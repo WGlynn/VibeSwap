@@ -31,6 +31,10 @@ contract TruePriceOracle is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    // ============ Admin Observability Events ============
+    event StablecoinRegistryUpdated(address indexed previous, address indexed current);
+    event IssuerRegistryUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant PRECISION = 1e18;
@@ -398,7 +402,9 @@ contract TruePriceOracle is
      * @param registry Registry contract address
      */
     function setStablecoinRegistry(address registry) external onlyOwner {
+        address prev = address(stablecoinRegistry);
         stablecoinRegistry = IStablecoinFlowRegistry(registry);
+        emit StablecoinRegistryUpdated(prev, registry);
     }
 
     /**
@@ -406,7 +412,9 @@ contract TruePriceOracle is
      * @param registry Registry contract address (zero to disable bundle path).
      */
     function setIssuerRegistry(address registry) external onlyOwner {
+        address prev = address(issuerRegistry);
         issuerRegistry = IIssuerReputationRegistry(registry);
+        emit IssuerRegistryUpdated(prev, registry);
     }
 
     // ============ C12: EvidenceBundle Update Path ============

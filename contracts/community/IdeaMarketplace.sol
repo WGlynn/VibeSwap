@@ -47,6 +47,19 @@ contract IdeaMarketplace is
 {
     using SafeERC20 for IERC20;
 
+    // ============ Admin Observability Events ============
+    event MinIdeaStakeUpdated(uint256 previous, uint256 current);
+    event BuilderCollateralBpsUpdated(uint256 previous, uint256 current);
+    event BuildDeadlineUpdated(uint256 previous, uint256 current);
+    event DefaultSplitUpdated(uint256 prevIdeator, uint256 prevBuilder, uint256 currentIdeator, uint256 currentBuilder);
+    event IdeaSplitOverrideUpdated(uint256 indexed ideaId, uint256 previous, uint256 current);
+    event MinScorersUpdated(uint256 previous, uint256 current);
+    event TreasuryUpdated(address indexed previous, address indexed current);
+    event ContributionDAGUpdated(address indexed previous, address indexed current);
+    event PredictionMarketUpdated(address indexed previous, address indexed current);
+    event ReputationOracleUpdated(address indexed previous, address indexed current);
+    event ContextAnchorUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant BPS_PRECISION = 10000;
@@ -635,7 +648,9 @@ contract IdeaMarketplace is
      * @param _minStake New minimum stake amount
      */
     function setMinIdeaStake(uint256 _minStake) external onlyOwner {
+        uint256 prev = minIdeaStake;
         minIdeaStake = _minStake;
+        emit MinIdeaStakeUpdated(prev, _minStake);
     }
 
     /**
@@ -644,7 +659,9 @@ contract IdeaMarketplace is
      */
     function setBuilderCollateralBps(uint256 _collateralBps) external onlyOwner {
         require(_collateralBps <= BPS_PRECISION, "Collateral exceeds 100%");
+        uint256 prev = builderCollateralBps;
         builderCollateralBps = _collateralBps;
+        emit BuilderCollateralBpsUpdated(prev, _collateralBps);
     }
 
     /**
@@ -653,7 +670,9 @@ contract IdeaMarketplace is
      */
     function setBuildDeadline(uint256 _deadline) external onlyOwner {
         require(_deadline >= 1 days, "Deadline too short");
+        uint256 prev = buildDeadline;
         buildDeadline = _deadline;
+        emit BuildDeadlineUpdated(prev, _deadline);
     }
 
     /**
@@ -663,8 +682,11 @@ contract IdeaMarketplace is
      */
     function setDefaultSplit(uint256 _ideatorBps, uint256 _builderBps) external onlyOwner {
         require(_ideatorBps + _builderBps == BPS_PRECISION, "Split must sum to 10000");
+        uint256 prevIdeator = defaultIdeatorShareBps;
+        uint256 prevBuilder = defaultBuilderShareBps;
         defaultIdeatorShareBps = _ideatorBps;
         defaultBuilderShareBps = _builderBps;
+        emit DefaultSplitUpdated(prevIdeator, prevBuilder, _ideatorBps, _builderBps);
     }
 
     /**
@@ -674,7 +696,9 @@ contract IdeaMarketplace is
      */
     function setIdeaSplit(uint256 ideaId, uint256 _ideatorBps) external onlyOwner ideaExists(ideaId) {
         require(_ideatorBps <= BPS_PRECISION, "Ideator share exceeds 100%");
+        uint256 prev = ideatorShareOverride[ideaId];
         ideatorShareOverride[ideaId] = _ideatorBps;
+        emit IdeaSplitOverrideUpdated(ideaId, prev, _ideatorBps);
     }
 
     /**
@@ -683,7 +707,9 @@ contract IdeaMarketplace is
      */
     function setMinScorers(uint256 _minScorers) external onlyOwner {
         require(_minScorers >= 1, "Need at least 1 scorer");
+        uint256 prev = minScorers;
         minScorers = _minScorers;
+        emit MinScorersUpdated(prev, _minScorers);
     }
 
     /**
@@ -692,7 +718,9 @@ contract IdeaMarketplace is
      */
     function setTreasury(address _treasury) external onlyOwner {
         if (_treasury == address(0)) revert ZeroAddress();
+        address prev = treasury;
         treasury = _treasury;
+        emit TreasuryUpdated(prev, _treasury);
     }
 
     /**
@@ -700,7 +728,9 @@ contract IdeaMarketplace is
      * @param _contributionDAG New ContributionDAG address
      */
     function setContributionDAG(address _contributionDAG) external onlyOwner {
+        address prev = address(contributionDAG);
         contributionDAG = IContributionDAG(_contributionDAG);
+        emit ContributionDAGUpdated(prev, _contributionDAG);
     }
 
     /**
@@ -1007,15 +1037,21 @@ contract IdeaMarketplace is
     // ============ Cross-Contract Admin ============
 
     function setPredictionMarket(address _predictionMarket) external onlyOwner {
+        address prev = address(predictionMarket);
         predictionMarket = IPredictionMarket(_predictionMarket);
+        emit PredictionMarketUpdated(prev, _predictionMarket);
     }
 
     function setReputationOracle(address _reputationOracle) external onlyOwner {
+        address prev = address(reputationOracle);
         reputationOracle = IReputationOracle(_reputationOracle);
+        emit ReputationOracleUpdated(prev, _reputationOracle);
     }
 
     function setContextAnchor(address _contextAnchor) external onlyOwner {
+        address prev = address(contextAnchor);
         contextAnchor = IContextAnchor(_contextAnchor);
+        emit ContextAnchorUpdated(prev, _contextAnchor);
     }
 
     // ============ UUPS ============

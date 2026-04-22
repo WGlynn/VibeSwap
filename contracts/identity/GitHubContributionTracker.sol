@@ -33,6 +33,9 @@ contract GitHubContributionTracker is
 {
     using IncrementalMerkleTree for IncrementalMerkleTree.Tree;
 
+    event ContributionDAGUpdated(address indexed previous, address indexed current);
+    event RewardLedgerUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant TREE_DEPTH = 20; // 2^20 = ~1M contributions
@@ -124,13 +127,17 @@ contract GitHubContributionTracker is
     /// @notice Update ContributionDAG address
     function setContributionDAG(address _dag) external onlyOwner {
         if (_dag == address(0)) revert ZeroAddress();
+        address prev = address(contributionDAG);
         contributionDAG = IContributionDAG(_dag);
+        emit ContributionDAGUpdated(prev, _dag);
     }
 
     /// @notice Update RewardLedger address
     function setRewardLedger(address _ledger) external onlyOwner {
         if (_ledger == address(0)) revert ZeroAddress();
+        address prev = address(rewardLedger);
         rewardLedger = IRewardLedger(_ledger);
+        emit RewardLedgerUpdated(prev, _ledger);
     }
 
     // ============ Ingestion Functions ============

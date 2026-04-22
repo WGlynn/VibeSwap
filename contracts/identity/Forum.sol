@@ -12,6 +12,8 @@ import "./SoulboundIdentity.sol";
  * @dev All posts/replies are linked to on-chain identity NFTs
  */
 contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    event PostCooldownUpdated(uint256 previous, uint256 current);
+
 
     // ============ Structs ============
 
@@ -286,7 +288,9 @@ contract Forum is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeabl
     }
 
     function setPostCooldown(uint256 cooldown) external onlyOwner {
+        uint256 prev = postCooldown;
         postCooldown = cooldown;
+        emit PostCooldownUpdated(prev, cooldown);
     }
 
     // ============ View Functions ============

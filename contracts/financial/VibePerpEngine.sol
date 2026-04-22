@@ -27,6 +27,9 @@ contract VibePerpEngine is
 {
     using SafeERC20 for IERC20;
 
+    event PIDGainsUpdated(int256 prevKp, int256 prevKi, int256 prevKd, int256 currentKp, int256 currentKi, int256 currentKd);
+    event AcceptedCollateralUpdated(address indexed token, bool previous, bool current);
+
     // ============ Constants ============
 
     uint256 private constant BPS = 10_000;
@@ -265,9 +268,13 @@ contract VibePerpEngine is
      * @param _kd Derivative gain
      */
     function setPIDGains(int256 _kp, int256 _ki, int256 _kd) external onlyOwner {
+        int256 prevKp = pidKp;
+        int256 prevKi = pidKi;
+        int256 prevKd = pidKd;
         pidKp = _kp;
         pidKi = _ki;
         pidKd = _kd;
+        emit PIDGainsUpdated(prevKp, prevKi, prevKd, _kp, _ki, _kd);
     }
 
     /**
@@ -286,7 +293,9 @@ contract VibePerpEngine is
      * @param accepted Whether to accept
      */
     function setAcceptedCollateral(address token, bool accepted) external onlyOwner {
+        bool prev = acceptedCollateral[token];
         acceptedCollateral[token] = accepted;
+        emit AcceptedCollateralUpdated(token, prev, accepted);
     }
 
     // ============ Core Trading Functions ============

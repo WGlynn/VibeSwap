@@ -24,6 +24,8 @@ import "../compliance/ClawbackRegistry.sol";
  *      regulatory engine and human regulators reference its findings.
  */
 contract AutomatedRegulator is OwnableUpgradeable, UUPSUpgradeable {
+    event AuthorizedMonitorUpdated(address indexed monitor, bool previous, bool current);
+
 
     // ============ Enums ============
 
@@ -417,7 +419,9 @@ contract AutomatedRegulator is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function setAuthorizedMonitor(address monitor, bool authorized) external onlyOwner {
+        bool prev = authorizedMonitors[monitor];
         authorizedMonitors[monitor] = authorized;
+        emit AuthorizedMonitorUpdated(monitor, prev, authorized);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {

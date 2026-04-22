@@ -43,6 +43,11 @@ contract ComputeSubsidyManager is
 {
     using SafeERC20 for IERC20;
 
+    // ============ Admin Observability Events ============
+    event AuthorizedRaterUpdated(address indexed rater, bool previous, bool current);
+    event ReputationOracleUpdated(address indexed previous, address indexed current);
+    event AgentRegistryUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 public constant BPS = 10_000;
@@ -296,15 +301,21 @@ contract ComputeSubsidyManager is
     // ============ Admin ============
 
     function setAuthorizedRater(address rater, bool authorized) external onlyOwner {
+        bool prev = authorizedRaters[rater];
         authorizedRaters[rater] = authorized;
+        emit AuthorizedRaterUpdated(rater, prev, authorized);
     }
 
     function setReputationOracle(address _oracle) external onlyOwner {
+        address prev = reputationOracle;
         reputationOracle = _oracle;
+        emit ReputationOracleUpdated(prev, _oracle);
     }
 
     function setAgentRegistry(address _registry) external onlyOwner {
+        address prev = agentRegistry;
         agentRegistry = _registry;
+        emit AgentRegistryUpdated(prev, _registry);
     }
 
     // ============ View: Subsidy Calculation ============

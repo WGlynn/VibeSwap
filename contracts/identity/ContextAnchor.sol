@@ -20,6 +20,8 @@ import "./interfaces/IAgentRegistry.sol";
  * CRDT-compatible: graphs from different agents can be merged without conflicts.
  */
 contract ContextAnchor is IContextAnchor, OwnableUpgradeable, UUPSUpgradeable {
+    event AgentRegistryUpdated(address indexed previous, address indexed current);
+
 
     // ============ Constants ============
 
@@ -355,7 +357,9 @@ contract ContextAnchor is IContextAnchor, OwnableUpgradeable, UUPSUpgradeable {
     // ============ Admin ============
 
     function setAgentRegistry(address _agentRegistry) external onlyOwner {
+        address prev = address(agentRegistry);
         agentRegistry = IAgentRegistry(_agentRegistry);
+        emit AgentRegistryUpdated(prev, _agentRegistry);
     }
 
     // ============ Internal ============

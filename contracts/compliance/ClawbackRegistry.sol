@@ -128,6 +128,11 @@ contract ClawbackRegistry is
     event ClawbackExecuted(bytes32 indexed caseId, address indexed wallet, uint256 amount, address token);
     event WalletCleared(address indexed wallet, bytes32 indexed caseId);
     event TransactionRecorded(address indexed from, address indexed to, uint256 amount, address token);
+    event AuthorizedTrackerUpdated(address indexed tracker, bool previous, bool current);
+    event VaultUpdated(address indexed previous, address indexed current);
+    event MaxCascadeDepthUpdated(uint256 previous, uint256 current);
+    event MinTaintAmountUpdated(uint256 previous, uint256 current);
+    event ConsensusUpdated(address indexed previous, address indexed current);
 
     // ============ Errors ============
 
@@ -534,35 +539,45 @@ contract ClawbackRegistry is
      * @notice Set authorized tracker (e.g., VibeSwapCore)
      */
     function setAuthorizedTracker(address tracker, bool authorized) external onlyOwner {
+        bool prev = authorizedTrackers[tracker];
         authorizedTrackers[tracker] = authorized;
+        emit AuthorizedTrackerUpdated(tracker, prev, authorized);
     }
 
     /**
      * @notice Set ClawbackVault address
      */
     function setVault(address _vault) external onlyOwner {
+        address prev = vault;
         vault = _vault;
+        emit VaultUpdated(prev, _vault);
     }
 
     /**
      * @notice Update max cascade depth
      */
     function setMaxCascadeDepth(uint256 _maxCascadeDepth) external onlyOwner {
+        uint256 prev = maxCascadeDepth;
         maxCascadeDepth = _maxCascadeDepth;
+        emit MaxCascadeDepthUpdated(prev, _maxCascadeDepth);
     }
 
     /**
      * @notice Update minimum taint amount
      */
     function setMinTaintAmount(uint256 _minTaintAmount) external onlyOwner {
+        uint256 prev = minTaintAmount;
         minTaintAmount = _minTaintAmount;
+        emit MinTaintAmountUpdated(prev, _minTaintAmount);
     }
 
     /**
      * @notice Update consensus contract
      */
     function setConsensus(address _consensus) external onlyOwner {
+        address prev = address(consensus);
         consensus = FederatedConsensus(_consensus);
+        emit ConsensusUpdated(prev, _consensus);
     }
 
     // ============ UUPS ============

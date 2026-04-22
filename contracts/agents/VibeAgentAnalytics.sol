@@ -21,6 +21,9 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
  *      - Revenue attribution (which conversations generate value)
  */
 contract VibeAgentAnalytics is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    event QualityThresholdUpdated(uint256 previous, uint256 current);
+    event LatencyThresholdUpdated(uint256 previous, uint256 current);
+
     // ============ Types ============
 
     struct ConversationMetrics {
@@ -248,8 +251,16 @@ contract VibeAgentAnalytics is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGu
 
     // ============ Admin ============
 
-    function setQualityThreshold(uint256 threshold) external onlyOwner { qualityAlertThreshold = threshold; }
-    function setLatencyThreshold(uint256 threshold) external onlyOwner { latencyAlertThreshold = threshold; }
+    function setQualityThreshold(uint256 threshold) external onlyOwner {
+        uint256 prev = qualityAlertThreshold;
+        qualityAlertThreshold = threshold;
+        emit QualityThresholdUpdated(prev, threshold);
+    }
+    function setLatencyThreshold(uint256 threshold) external onlyOwner {
+        uint256 prev = latencyAlertThreshold;
+        latencyAlertThreshold = threshold;
+        emit LatencyThresholdUpdated(prev, threshold);
+    }
 
     // ============ View ============
 

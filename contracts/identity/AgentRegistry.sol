@@ -20,6 +20,11 @@ import "./interfaces/IContributionDAG.sol";
  * JARVIS is the first registered agent. Every AI co-founder gets one.
  */
 contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
+    event VibeCodeUpdated(address indexed previous, address indexed current);
+    event ContributionDAGUpdated(address indexed previous, address indexed current);
+    event SoulboundIdentityUpdated(address indexed previous, address indexed current);
+    event AuthorizedRecorderUpdated(address indexed recorder, bool previous, bool current);
+
 
     // ============ Genesis — Immutable On-Chain ============
     // This block is permanent. Once deployed to mainnet, it cannot be changed.
@@ -493,19 +498,27 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
     // ============ Admin ============
 
     function setVibeCode(address _vibeCode) external onlyOwner {
+        address prev = address(vibeCode);
         vibeCode = IVibeCode(_vibeCode);
+        emit VibeCodeUpdated(prev, _vibeCode);
     }
 
     function setContributionDAG(address _dag) external onlyOwner {
+        address prev = address(contributionDAG);
         contributionDAG = IContributionDAG(_dag);
+        emit ContributionDAGUpdated(prev, _dag);
     }
 
     function setSoulboundIdentity(address _soulbound) external onlyOwner {
+        address prev = soulboundIdentity;
         soulboundIdentity = _soulbound;
+        emit SoulboundIdentityUpdated(prev, _soulbound);
     }
 
     function setAuthorizedRecorder(address recorder, bool authorized) external onlyOwner {
+        bool prev = authorizedRecorders[recorder];
         authorizedRecorders[recorder] = authorized;
+        emit AuthorizedRecorderUpdated(recorder, prev, authorized);
     }
 
     // ============ Internal ============

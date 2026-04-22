@@ -26,6 +26,12 @@ import "../core/interfaces/IVibeAMM.sol";
 contract VibeIntentRouter is IVibeIntentRouter, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    // ============ Admin Observability Events ============
+    event VibeAMMUpdated(address indexed previous, address indexed current);
+    event AuctionUpdated(address indexed previous, address indexed current);
+    event CrossChainRouterUpdated(address indexed previous, address indexed current);
+    event PoolFactoryUpdated(address indexed previous, address indexed current);
+
     // ============ Constants ============
 
     uint256 private constant AUCTION_ESTIMATE_BPS = 9950; // 99.5% of TWAP (conservative estimate)
@@ -430,19 +436,27 @@ contract VibeIntentRouter is IVibeIntentRouter, Ownable, ReentrancyGuard {
     // ============ Admin ============
 
     function setVibeAMM(address _amm) external onlyOwner {
+        address prev = vibeAMM;
         vibeAMM = _amm;
+        emit VibeAMMUpdated(prev, _amm);
     }
 
     function setAuction(address _auction) external onlyOwner {
+        address prev = auction;
         auction = _auction;
+        emit AuctionUpdated(prev, _auction);
     }
 
     function setCrossChainRouter(address _router) external onlyOwner {
+        address prev = crossChainRouter;
         crossChainRouter = _router;
+        emit CrossChainRouterUpdated(prev, _router);
     }
 
     function setPoolFactory(address _factory) external onlyOwner {
+        address prev = poolFactory;
         poolFactory = _factory;
+        emit PoolFactoryUpdated(prev, _factory);
     }
 
     function setRouteEnabled(ExecutionPath path, bool enabled) external onlyOwner {

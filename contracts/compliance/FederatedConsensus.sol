@@ -112,6 +112,8 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
     event ProposalExpired(bytes32 indexed proposalId);
     event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     event ExecutorUpdated(address indexed oldExecutor, address indexed newExecutor);
+    event GracePeriodUpdated(uint256 previous, uint256 current);
+    event ProposalExpiryUpdated(uint256 previous, uint256 current);
 
     // ============ Errors ============
 
@@ -352,7 +354,9 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
      * @param _gracePeriod New grace period in seconds
      */
     function setGracePeriod(uint256 _gracePeriod) external onlyOwner {
+        uint256 prev = gracePeriod;
         gracePeriod = _gracePeriod;
+        emit GracePeriodUpdated(prev, _gracePeriod);
     }
 
     /**
@@ -360,7 +364,9 @@ contract FederatedConsensus is OwnableUpgradeable, UUPSUpgradeable {
      * @param _proposalExpiry New expiry in seconds
      */
     function setProposalExpiry(uint256 _proposalExpiry) external onlyOwner {
+        uint256 prev = proposalExpiry;
         proposalExpiry = _proposalExpiry;
+        emit ProposalExpiryUpdated(prev, _proposalExpiry);
     }
 
     // ============ UUPS ============

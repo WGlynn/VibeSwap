@@ -47,6 +47,8 @@ contract VibeLiquidStaking is
 {
     using SafeERC20 for IERC20;
 
+    event ValidatorCountUpdated(address indexed operator, uint64 previous, uint64 current);
+
     // ============ Constants ============
 
     uint256 private constant BPS = 10_000;
@@ -431,7 +433,9 @@ contract VibeLiquidStaking is
      */
     function setValidatorCount(address operator, uint64 count) external onlyOwner {
         if (!_isOperator[operator]) revert OperatorNotRegistered();
+        uint64 prev = _operators[operator].validatorCount;
         _operators[operator].validatorCount = count;
+        emit ValidatorCountUpdated(operator, prev, count);
     }
 
     // ============ Insurance ============

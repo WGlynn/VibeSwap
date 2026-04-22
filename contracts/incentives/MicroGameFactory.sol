@@ -37,6 +37,10 @@ interface ILoyaltyRewards {
 /// @dev UtilizationAccumulator (L1) → MicroGameFactory (L2) → EmissionController → ShapleyDistributor
 ///      DISINTERMEDIATION: Grade A — fully permissionless. Outcome is deterministic.
 contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
+    event DrainBpsUpdated(uint256 previous, uint256 current);
+    event MaxParticipantsUpdated(uint256 previous, uint256 current);
+    event MinLiquidityUpdated(uint256 previous, uint256 current);
+
 
     // ============ Constants ============
     uint256 public constant BPS = 10_000;
@@ -199,14 +203,24 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
     /// DISINTERMEDIATION: Grade C → Target Grade B (governance via TimelockController)
     function setDrainBps(uint256 _bps) external onlyOwner {
         if (_bps > BPS) revert InvalidBps();
+        uint256 prev = drainBps;
         drainBps = _bps;
+        emit DrainBpsUpdated(prev, _bps);
     }
 
     /// DISINTERMEDIATION: Grade C → Target Grade B (governance via TimelockController)
-    function setMaxParticipants(uint256 _max) external onlyOwner { maxParticipants = _max; }
+    function setMaxParticipants(uint256 _max) external onlyOwner {
+        uint256 prev = maxParticipants;
+        maxParticipants = _max;
+        emit MaxParticipantsUpdated(prev, _max);
+    }
 
     /// DISINTERMEDIATION: Grade C → Target Grade B (governance via TimelockController)
-    function setMinLiquidity(uint256 _min) external onlyOwner { minLiquidity = _min; }
+    function setMinLiquidity(uint256 _min) external onlyOwner {
+        uint256 prev = minLiquidity;
+        minLiquidity = _min;
+        emit MinLiquidityUpdated(prev, _min);
+    }
 
     // ============ UUPS ============
     /// DISINTERMEDIATION: KEEP during bootstrap. Target Grade B via governance TimelockController.

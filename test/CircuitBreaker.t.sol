@@ -693,4 +693,158 @@ contract CircuitBreakerTest is Test {
         vm.expectRevert("Window must be > 0");
         cb.configureBreaker(vol, 1000 ether, 1 hours, 0);
     }
+
+    // ============ C43: Attested Resume (ETM Build Roadmap Gap #3) ============
+    //
+    // Opt-in per-breaker flag disables wall-clock auto-reset. Cooldown remains a
+    // floor; resume requires M certified attestors to sign off on the safety
+    // evaluation. Parity with biological flinch-then-reassess behavior.
+
+    function _tripVolumeBreaker() internal {
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.configureBreaker(vol, 1000 ether, 1 hours, 10 minutes);
+        cb.updateBreaker(vol, 1500 ether); // trips
+        (, bool tripped,,,) = cb.getBreakerStatus(vol);
+        assertTrue(tripped, "precondition: breaker tripped");
+    }
+
+    function test_C43_default_isAutoReset_backwardsCompat() public {
+        // Default behavior preserved: flag unset, cooldown auto-resets.
+        _tripVolumeBreaker();
+        bytes32 vol = cb.VOLUME_BREAKER();
+
+        vm.warp(block.timestamp + 1 hours + 1);
+        cb.checkBreaker(vol); // modifier path
+
+        (, bool tripped,,,) = cb.getBreakerStatus(vol);
+        assertFalse(tripped, "default-mode breaker auto-resets after cooldown");
+    }
+
+    function test_C43_requiresAttestation_blocksAutoReset() public {
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        _tripVolumeBreaker();
+
+        vm.warp(block.timestamp + 1 hours + 1);
+        // _checkBreaker now reverts (tripped, cooldown past, but attestation required)
+        vm.expectRevert(abi.encodeWithSelector(CircuitBreaker.BreakerTrippedError.selector, vol));
+        cb.checkBreaker(vol);
+
+        (, bool tripped,,,) = cb.getBreakerStatus(vol);
+        assertTrue(tripped, "attested-mode breaker remains tripped past cooldown");
+    }
+
+    function test_C43_attestation_unlocksAtThreshold() public {
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        cb.setResumeAttestationThreshold(2);
+        address att1 = makeAddr("attestor-1");
+        address att2 = makeAddr("attestor-2");
+        cb.setCertifiedAttestor(att1, true);
+        cb.setCertifiedAttestor(att2, true);
+
+        _tripVolumeBreaker();
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        vm.prank(att1);
+        cb.attestResume(vol, keccak256("evidence-1"));
+        (, bool tripped1,,,) = cb.getBreakerStatus(vol);
+        assertTrue(tripped1, "one attestation under threshold - still tripped");
+        assertEq(cb.resumeAttestationCount(vol), 1);
+
+        vm.prank(att2);
+        cb.attestResume(vol, keccak256("evidence-2"));
+        (, bool tripped2,,,) = cb.getBreakerStatus(vol);
+        assertFalse(tripped2, "threshold reached - resumes");
+        assertEq(cb.resumeAttestationCount(vol), 0, "count resets on resume");
+    }
+
+    function test_C43_attestation_beforeCooldownFloor_reverts() public {
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        cb.setResumeAttestationThreshold(1);
+        address att1 = makeAddr("attestor-1");
+        cb.setCertifiedAttestor(att1, true);
+
+        _tripVolumeBreaker();
+        // Still inside cooldown window
+        vm.prank(att1);
+        vm.expectRevert(CircuitBreaker.CooldownActive.selector);
+        cb.attestResume(vol, keccak256("evidence"));
+    }
+
+    function test_C43_nonCertifiedAttestor_reverts() public {
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        _tripVolumeBreaker();
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        address rando = makeAddr("rando");
+        vm.prank(rando);
+        vm.expectRevert(CircuitBreaker.NotCertifiedAttestor.selector);
+        cb.attestResume(vol, keccak256("evidence"));
+    }
+
+    function test_C43_duplicateAttestation_reverts() public {
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        cb.setResumeAttestationThreshold(2);
+        address att1 = makeAddr("attestor-1");
+        cb.setCertifiedAttestor(att1, true);
+
+        _tripVolumeBreaker();
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        vm.prank(att1);
+        cb.attestResume(vol, keccak256("evidence-1"));
+
+        vm.prank(att1);
+        vm.expectRevert(CircuitBreaker.AlreadyAttestedResume.selector);
+        cb.attestResume(vol, keccak256("evidence-2"));
+    }
+
+    function test_C43_staleAttestation_doesNotCarryAcrossTrips() public {
+        // Attestor signs trip N, breaker resumes, breaker re-trips. Attestor must
+        // sign again — the generation bump isolates trips.
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        cb.setResumeAttestationThreshold(1);
+        address att1 = makeAddr("attestor-1");
+        cb.setCertifiedAttestor(att1, true);
+
+        // Trip 1, resume via attestation
+        _tripVolumeBreaker();
+        vm.warp(block.timestamp + 1 hours + 1);
+        vm.prank(att1);
+        cb.attestResume(vol, keccak256("evidence-trip-1"));
+        (, bool trippedAfter,,,) = cb.getBreakerStatus(vol);
+        assertFalse(trippedAfter);
+
+        // Trip 2
+        cb.updateBreaker(vol, 1500 ether);
+        vm.warp(block.timestamp + 1 hours + 1);
+        // att1 must re-attest for trip 2 (new generation)
+        assertEq(cb.resumeAttestationCount(vol), 0, "count fresh for new trip");
+        vm.prank(att1);
+        cb.attestResume(vol, keccak256("evidence-trip-2"));
+        (, bool trippedFinal,,,) = cb.getBreakerStatus(vol);
+        assertFalse(trippedFinal, "second trip resumes on fresh attestation");
+    }
+
+    function test_C43_guardianManualReset_stillWorks() public {
+        // Emergency escape hatch intact: owner/guardian can always force reset.
+        bytes32 vol = cb.VOLUME_BREAKER();
+        cb.setAttestedResumeRequired(vol, true);
+        _tripVolumeBreaker();
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        cb.resetBreaker(vol); // owner path unchanged
+        (, bool tripped,,,) = cb.getBreakerStatus(vol);
+        assertFalse(tripped, "guardian reset still works under attested-mode");
+    }
+
+    function test_C43_setThreshold_zeroReverts() public {
+        vm.expectRevert(CircuitBreaker.ResumeThresholdZero.selector);
+        cb.setResumeAttestationThreshold(0);
+    }
 }

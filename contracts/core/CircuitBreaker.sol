@@ -49,9 +49,49 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     bytes32 public constant LOSS_BREAKER = keccak256("LOSS_BREAKER");
     bytes32 public constant TRUE_PRICE_BREAKER = keccak256("TRUE_PRICE_BREAKER");
 
+    // ============ C43: Attested-Resume State (ETM Build Roadmap Gap #3) ============
+    //
+    // The default resume behavior is wall-clock: once cooldown expires, `_checkBreaker`
+    // and `_updateBreaker` auto-reset state and trading can proceed. That is the
+    // cognitive equivalent of a flinch that relaxes on a timer — the substrate does
+    // NOT do that. Biological flinch relaxation requires an explicit safety evaluation.
+    //
+    // C43 augments (does not replace) the behavior. When `requiresAttestedResume`
+    // is set for a breaker type, cooldown becomes a FLOOR rather than an automatic
+    // trigger: state remains tripped past cooldown expiry until M certified attestors
+    // submit a resume attestation. Defaults remain backwards-compatible — the flag
+    // is opt-in per breaker type.
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @notice Per-breaker flag. When true, cooldown expiry does NOT auto-reset state;
+    ///         resume requires `attestResume` from certified attestors (cooldown floor
+    ///         still enforced). Defaults to false for backwards compatibility.
+    mapping(bytes32 => bool) public requiresAttestedResume;
+
+    /// @notice Registry of governance-certified attestors eligible to sign resume evaluations.
+    mapping(address => bool) public certifiedAttestor;
+
+    /// @notice M in the M-of-N resume threshold. Minimum attestors that must agree a
+    ///         tripped breaker is safe to resume. Defaults to 1; governance-tunable.
+    uint256 public resumeAttestationThreshold;
+
+    /// @notice Monotone counter of distinct resume attestations submitted against the
+    ///         CURRENT tripped state. Reset on resume. Keyed by breakerType.
+    mapping(bytes32 => uint256) public resumeAttestationCount;
+
+    /// @notice Trip generation per breaker type. Increments on each trip transition;
+    ///         used to scope attestation records to the current trip without iterating
+    ///         the attestor set to clear state on reset.
+    mapping(bytes32 => uint256) public tripGeneration;
+
+    /// @notice Per-generation, per-attestor attestation record.
+    ///         Key: (breakerType, tripGeneration, attestor).
+    ///         Old generations are implicitly stale when generation increments.
+    mapping(bytes32 => mapping(uint256 => mapping(address => bool))) private _hasAttestedResume;
+
+    /// @dev Reserved storage gap for future upgrades. Consumed 6 slots for C43:
+    ///      requiresAttestedResume, certifiedAttestor, resumeAttestationThreshold,
+    ///      resumeAttestationCount, tripGeneration, _hasAttestedResume. 44 remain.
+    uint256[44] private __gap;
 
     // ============ Events ============
 
@@ -63,6 +103,12 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     event BreakerReset(bytes32 indexed breakerType, address indexed by);
     event AnomalyDetected(bytes32 indexed anomalyType, uint256 value, string description);
     event BreakerDisabled(bytes32 indexed breakerType);
+    // C43 attested-resume events
+    event AttestedResumeRequirementSet(bytes32 indexed breakerType, bool required);
+    event AttestorCertified(address indexed attestor, bool status);
+    event ResumeAttestationThresholdSet(uint256 threshold);
+    event ResumeAttestationSubmitted(bytes32 indexed breakerType, address indexed attestor, bytes32 evidenceHash, uint256 count);
+    event BreakerResumedByAttestation(bytes32 indexed breakerType, uint256 totalAttestations);
 
     // ============ Errors ============
 
@@ -71,6 +117,11 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     error BreakerTrippedError(bytes32 breakerType);
     error NotGuardian();
     error CooldownActive();
+    // C43 attested-resume errors
+    error NotCertifiedAttestor();
+    error BreakerNotTripped();
+    error AlreadyAttestedResume();
+    error ResumeThresholdZero();
 
     // ============ Modifiers ============
 
@@ -195,6 +246,81 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         emit BreakerDisabled(breakerType);
     }
 
+    // ============ C43: Attested-Resume Admin ============
+
+    /// @notice Opt a breaker type into attested-resume (cooldown floor only; no auto-reset).
+    /// @dev Off by default. Existing consumers keep wall-clock auto-reset semantics
+    ///      unless explicitly opted in.
+    function setAttestedResumeRequired(bytes32 breakerType, bool required) external onlyOwner {
+        requiresAttestedResume[breakerType] = required;
+        emit AttestedResumeRequirementSet(breakerType, required);
+    }
+
+    /// @notice Register or revoke a certified resume-attestor.
+    /// @dev Governance-gated on upgrades. Low-attestor count is the bootstrap assumption;
+    ///      threshold can be raised as the pool matures.
+    function setCertifiedAttestor(address attestor, bool status) external onlyOwner {
+        certifiedAttestor[attestor] = status;
+        emit AttestorCertified(attestor, status);
+    }
+
+    /// @notice Set M in the M-of-N resume threshold. Must be ≥ 1.
+    function setResumeAttestationThreshold(uint256 m) external onlyOwner {
+        if (m == 0) revert ResumeThresholdZero();
+        resumeAttestationThreshold = m;
+        emit ResumeAttestationThresholdSet(m);
+    }
+
+    /// @notice Certified attestor signals that the stress condition is resolved and
+    ///         trading may safely resume on this breaker.
+    /// @dev The cooldown floor is still enforced. M distinct attestations clears state.
+    ///      Duplicate attestations from the same attestor are rejected (not idempotent
+    ///      silently — we revert so the caller learns they already voted).
+    /// @param breakerType Tripped breaker to attest on.
+    /// @param evidenceHash Off-chain artifact hash documenting the safety evaluation.
+    ///                    Opaque to the contract; emitted for auditability.
+    function attestResume(bytes32 breakerType, bytes32 evidenceHash) external {
+        if (!certifiedAttestor[msg.sender]) revert NotCertifiedAttestor();
+
+        BreakerState storage state = breakerStates[breakerType];
+        BreakerConfig storage config = breakerConfigs[breakerType];
+
+        if (!state.tripped) revert BreakerNotTripped();
+        // Cooldown floor still applies. Attestations submitted during cooldown revert.
+        if (block.timestamp < state.trippedAt + config.cooldownPeriod) revert CooldownActive();
+        uint256 gen = tripGeneration[breakerType];
+        if (_hasAttestedResume[breakerType][gen][msg.sender]) revert AlreadyAttestedResume();
+
+        _hasAttestedResume[breakerType][gen][msg.sender] = true;
+        uint256 newCount = resumeAttestationCount[breakerType] + 1;
+        resumeAttestationCount[breakerType] = newCount;
+
+        emit ResumeAttestationSubmitted(breakerType, msg.sender, evidenceHash, newCount);
+
+        uint256 threshold = resumeAttestationThreshold == 0 ? 1 : resumeAttestationThreshold;
+        if (newCount >= threshold) {
+            _resumeAfterAttestation(breakerType);
+        }
+    }
+
+    /// @dev Clear tripped state and bump trip generation so per-attestor flags for
+    ///      this breaker are implicitly stale on the next trip. No iteration required.
+    function _resumeAfterAttestation(bytes32 breakerType) internal {
+        BreakerState storage state = breakerStates[breakerType];
+        uint256 finalCount = resumeAttestationCount[breakerType];
+
+        state.tripped = false;
+        state.trippedAt = 0;
+        state.windowStart = block.timestamp;
+        state.windowValue = 0;
+        resumeAttestationCount[breakerType] = 0;
+        // Bump generation: prior attestations are now in a dead generation and cannot
+        // short-circuit a future trip's threshold.
+        tripGeneration[breakerType] += 1;
+
+        emit BreakerResumedByAttestation(breakerType, finalCount);
+    }
+
     // ============ Internal Functions ============
 
     /**
@@ -217,6 +343,11 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         if (state.tripped) {
             // Check if cooldown has passed
             if (block.timestamp < state.trippedAt + config.cooldownPeriod) {
+                revert BreakerTrippedError(breakerType);
+            }
+            // C43: cooldown expiry auto-resets only when attestation is NOT required.
+            // Opted-in breakers stay tripped past cooldown until `attestResume` clears.
+            if (requiresAttestedResume[breakerType]) {
                 revert BreakerTrippedError(breakerType);
             }
             // Cooldown expired — auto-reset state so windowValue is fresh
@@ -246,15 +377,21 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         // Previously, _updateBreaker returned true permanently after first trip
         // because it never checked cooldown. The tripped flag was only clearable
         // via manual resetBreaker() call.
+        //
+        // C43: opt-in attested-resume breakers skip the auto-reset path entirely
+        // and keep returning `true` (tripped) until `attestResume` clears state.
         if (state.tripped) {
-            if (block.timestamp >= state.trippedAt + config.cooldownPeriod) {
-                // Cooldown expired — auto-reset and continue to accumulation
+            if (
+                block.timestamp >= state.trippedAt + config.cooldownPeriod &&
+                !requiresAttestedResume[breakerType]
+            ) {
+                // Cooldown expired AND attestation not required — auto-reset.
                 state.tripped = false;
                 state.trippedAt = 0;
                 state.windowStart = block.timestamp;
                 state.windowValue = 0;
             } else {
-                return true; // Still in cooldown
+                return true; // Still in cooldown OR awaiting attestation
             }
         }
 
@@ -271,6 +408,9 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         if (state.windowValue >= config.threshold) {
             state.tripped = true;
             state.trippedAt = block.timestamp;
+            // C43: bump generation on every new trip so any stale attestations from
+            // a previous trip cannot leak into this trip's threshold accounting.
+            tripGeneration[breakerType] += 1;
 
             emit BreakerTripped(breakerType, state.windowValue, config.threshold);
             return true;

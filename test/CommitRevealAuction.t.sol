@@ -442,6 +442,20 @@ contract CommitRevealAuctionTest is Test {
         auction.slashUnrevealedCommitment(commitId);
     }
 
+    // ============ C44 Strengthen #1: Attention-Window Aliases ============
+    //
+    // Alias constants surface the substrate-attention-time rationale behind
+    // the 8+2=10s commit/reveal cadence. Tripwire: if someone changes the
+    // underlying durations without updating the aliases (or vice versa),
+    // this test fails and forces the diverger to read the NatSpec rationale.
+
+    function test_C44_attentionWindowAliases_matchPhaseDurations() public view {
+        assertEq(auction.ATTENTION_WINDOW_COMMIT(), auction.COMMIT_DURATION());
+        assertEq(auction.ATTENTION_WINDOW_REVEAL(), auction.REVEAL_DURATION());
+        // Substrate-attention-time total should be ~10s by construction.
+        assertEq(auction.BATCH_DURATION(), 10);
+    }
+
     // ============ Helper Functions ============
 
     function _generateCommitHash(

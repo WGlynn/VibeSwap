@@ -86,14 +86,40 @@ contract CommitRevealAuction is
     // ============ Protocol Constants (Uniform Fairness) ============
     // These are FIXED for all pools - they define HOW trading works
     // Pools can only vary WHO can trade, not the execution rules
+    //
+    // ETM-alignment note (C44, Strengthen #1): the 8 + 2 = 10 second batch
+    // cadence is not arbitrary. It is calibrated to the combined human+bot
+    // substrate's ~10-second characteristic attention-time — the shortest
+    // window over which the marginal trader can meaningfully (a) observe
+    // mempool state, (b) form a commit decision, and (c) ship the reveal.
+    // Shorter windows advantage HFT infra over human LPs; longer windows
+    // advantage adversarial gas-price predictors over honest committers.
+    //
+    // Any proposal to tune these constants must (a) justify against the
+    // attention-time substrate, NOT merely throughput targets; (b) preserve
+    // the 4:1 commit:reveal ratio that keeps commit phase the bulk of the
+    // work; (c) keep total BATCH_DURATION ≈ 10s unless the target substrate
+    // itself has changed (mobile-only cadence, on-device wallets with
+    // hardware signing latency, etc.).
 
-    /// @notice Commit phase duration (PROTOCOL CONSTANT)
-    uint256 public constant COMMIT_DURATION = 8; // 8 seconds
+    /// @notice Commit phase duration (PROTOCOL CONSTANT).
+    /// @dev Commit window = ATTENTION_WINDOW_COMMIT. 8s is the shortest
+    ///      substrate-aligned commit window per the ETM-alignment note above.
+    uint256 public constant COMMIT_DURATION = 8; // 8 seconds (substrate attention-time floor)
 
-    /// @notice Reveal phase duration (PROTOCOL CONSTANT)
-    uint256 public constant REVEAL_DURATION = 2; // 2 seconds
+    /// @notice Reveal phase duration (PROTOCOL CONSTANT).
+    /// @dev Reveal window = ATTENTION_WINDOW_REVEAL. 2s is enough for an
+    ///      attentive committer to transmit the reveal once they see the
+    ///      phase transition; too long enables last-wiggle tactics.
+    uint256 public constant REVEAL_DURATION = 2; // 2 seconds (substrate-aligned reveal window)
 
-    /// @notice Total batch duration
+    /// @notice Alias constants surfacing the ETM-alignment rationale by name.
+    /// @dev ATTENTION_WINDOW_* == the underlying phase durations. Named here so
+    ///      any reader tracing "why 8 and 2" lands on the substrate answer.
+    uint256 public constant ATTENTION_WINDOW_COMMIT = COMMIT_DURATION;
+    uint256 public constant ATTENTION_WINDOW_REVEAL = REVEAL_DURATION;
+
+    /// @notice Total batch duration (≈ substrate attention-time by construction).
     uint256 public constant BATCH_DURATION = COMMIT_DURATION + REVEAL_DURATION;
 
     /// @notice Minimum deposit required (PROTOCOL CONSTANT)

@@ -252,22 +252,22 @@ Retention is a PoW-and-PoM primitive, not a universal weight modifier.
 
 ### Shipped C40 (2026-04-23)
 
-- **Pure primitive landed**: `calculateRetentionWeight(uint256 elapsedSec, uint256 horizonSec)` — returns retention in basis points (0 = fully decayed, 10000 = fresh).
+- **C40a — Pure primitive landed**: `calculateRetentionWeight(uint256 elapsedSec, uint256 horizonSec)` — returns retention in basis points (0 = fully decayed, 10000 = fresh).
 - **α = 1.6 hardcoded** (paper §6.4). Implemented via cubic polynomial approximation `0.1744·x + 1.116·x² − 0.2904·x³`, max error ~3% vs exact `x^1.6` on [0, 1].
+- **C40b — Wired into `vote()`**: per-vote weight now retention-adjusts the PoW+PoM portion (decayable record of historical relevance) while leaving the PoS portion untouched (locked capital is present-tense). Six design decisions from the C40a "deferred" list resolved:
+  1. Decay anchor: `v.lastHeartbeat` (already stored).
+  2. No per-pillar timestamps added.
+  3. Query-time at single call site (`vote()`), not persisted.
+  4. Horizon: `RETENTION_HORIZON_DEFAULT = 365 days`.
+  5. `totalActiveWeight` stays O(1) (base weight); retention only affects accumulated `p.weightFor` / `p.weightAgainst`. Threshold unchanged.
+  6. No migration; lastHeartbeat-as-anchor applies naturally for existing validators.
 - **Governance-tunable α deferred** to C40c. When a real tuning need appears, the polynomial is swapped for a general-α formulation.
 
-### Not yet wired (deferred to C40b)
+### Consensus dynamics after C40b
 
-The pure function is a CORRECTNESS-PROOF primitive. It is not yet called from `_recalculateWeights`. Wiring it into per-pillar weight computation requires six design decisions:
+A stale validator's vote contributes LESS toward supermajority than a fresh one, but the 2/3 threshold denominator (total active weight) stays at base. Practical implication: if enough validators go stale, supermajority becomes structurally harder to reach — the network "wants" fresh heartbeats. This IS the intended ETM alignment; stale work cannot silently retain political weight.
 
-1. Decay anchor — per-validator `lastHeartbeat`, per-PoW-submission timestamp, per-mindScore-refresh timestamp?
-2. Per-pillar timestamp storage (bloats `Validator` struct).
-3. Apply at query-time (view function) or persist during weight recompute?
-4. Horizon T per-pillar or global? (Paper §6.4 suggests 365 days for PoM; PoW unspecified.)
-5. `totalActiveWeight` O(1) invariant interaction — time-varying weight breaks O(1) unless queried-lazily.
-6. Governance migration path — existing validators retroactively subject to decay, or grandfathered?
-
-C40b lands when these six are decided. Until then, the pure primitive is callable (for off-chain analytics and future integration).
+A pure-stake validator (PoM=PoW=0) is unaffected by retention — they vote with constant PoS weight regardless of heartbeat age. Consistent with the principle that locked capital is not a historical record.
 
 ## Relationship to Shapley
 

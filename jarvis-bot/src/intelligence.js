@@ -81,20 +81,20 @@ import { getActivePersonaId as getCurrentPersona } from './persona.js';
 function getEngageCooldownMs() {
   const p = getCurrentPersona?.() || 'standard';
   switch (p) {
-    case 'degen': return 12 * 1000;    // 12s — impulsive, talks a lot
-    case 'analyst': return 30 * 1000;   // 30s — selective, precision
-    case 'sensei': return 25 * 1000;    // 25s — measured wisdom
-    default: return 20 * 1000;          // 20s — balanced
+    case 'degen': return 8 * 1000;     // 8s — impulsive, talks a lot
+    case 'analyst': return 25 * 1000;  // 25s — selective, precision
+    case 'sensei': return 20 * 1000;   // 20s — measured wisdom
+    default: return 10 * 1000;         // 10s — balanced, participatory
   }
 }
 
 function getMaxEngagementsPerHour() {
   const p = getCurrentPersona?.() || 'standard';
   switch (p) {
-    case 'degen': return 180;   // chatty
-    case 'analyst': return 60;  // selective
-    case 'sensei': return 100;  // balanced
-    default: return 120;
+    case 'degen': return 240;   // chatty
+    case 'analyst': return 80;  // selective
+    case 'sensei': return 140;  // balanced
+    default: return 200;
   }
 }
 
@@ -182,8 +182,12 @@ export async function analyzeMessage(text, userName, recentContext) {
   // Skip only literal noise (single char, emoji-only)
   if (text.length < 3) return { action: 'observe', reason: 'too_short' };
 
-  // Skip if on cooldown for engagement
-  const engageAllowed = canEngage();
+  // Direct-mention bypass: when someone says "Jarvis" or "Diablo" by name,
+  // engage past cooldown/threshold. Ignoring direct address is the worst feel-failure.
+  const mentionsJarvis = /\b(jarvis|diablo)\b/i.test(text);
+
+  // Skip if on cooldown for engagement — unless Jarvis is directly mentioned
+  const engageAllowed = canEngage() || mentionsJarvis;
   const moderateAllowed = canModerate();
 
   if (!engageAllowed && !moderateAllowed) {
@@ -259,7 +263,7 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
     // When engagements produce positive signals → threshold drops (engage more)
     // This breaks the information self-locking loop (Zou et al., 2025)
     const engageThreshold = getAdaptiveThreshold();
-    if (result.action === 'engage' && result.confidence < engageThreshold) {
+    if (result.action === 'engage' && result.confidence < engageThreshold && !mentionsJarvis) {
       return { action: 'observe', reason: 'low_confidence_engage' };
     }
     if (result.action === 'moderate' && result.confidence < 0.8) {

@@ -29,6 +29,7 @@ const TRADING_TOOL_NAMES = TRADING_TOOLS.map(t => t.name);
 import { SOCIAL_TOOLS, SOCIAL_TOOL_NAMES, handleSocialTool } from './social.js';
 import { PANTHEON_TOOLS, PANTHEON_TOOL_NAMES, handlePantheonTool } from './pantheon.js';
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
+import { ARCHIVE_TOOLS, ARCHIVE_TOOL_NAMES, handleArchiveTool } from './tools-archive.js';
 import { runLocalCRPC } from './crpc.js';
 
 const REPO_PATH = config.repo.path;
@@ -989,11 +990,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     wallet: WALLET_TOOL_NAMES,
     social_outbound: SOCIAL_TOOL_NAMES,
     proactive: PROACTIVE_TOOL_NAMES,
+    archive: ARCHIVE_TOOL_NAMES,
   };
 
   function selectTools(msg, allTools) {
     const lc = msg.toLowerCase();
-    const selected = new Set(['knowledge']); // Always include — recall is fundamental
+    // Always-on groups. Retroactive archive access is as fundamental as knowledge
+    // recall — the LLM must be able to ground any identity or history claim
+    // in real chat data rather than inventing from context guess.
+    const selected = new Set(['knowledge', 'archive']);
 
     if (/code|file|script|deploy|build|error|bug|read |write |commit|git|repo/.test(lc)) {
       selected.add('code');
@@ -1673,6 +1678,10 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     ...PROACTIVE_TOOLS,
     // ============ TheAI Pantheon — Agent Consultation ============
     ...PANTHEON_TOOLS,
+    // ============ Chat Archive — Retroactive History Access ============
+    // Ground replies in what was actually said. Closes the Telegram
+    // substrate gap (bots can't fetch history). See src/archive.js.
+    ...ARCHIVE_TOOLS,
   ];
 
   // Select only relevant tools based on message content
@@ -2253,6 +2262,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (PANTHEON_TOOL_NAMES.includes(tb.name)) {
           result = await handlePantheonTool(tb.name, tb.input);
+          console.log(`[claude] Tool: ${tb.name}`);
+        } else if (ARCHIVE_TOOL_NAMES.includes(tb.name)) {
+          // chatId is injected by the dispatcher so the model can never
+          // query an archive for a chat it isn't currently in.
+          result = await handleArchiveTool(tb.name, tb.input, { chatId });
           console.log(`[claude] Tool: ${tb.name}`);
         } else if (tb.name === 'defer_task') {
           const taskResult = createTask({

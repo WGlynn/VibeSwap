@@ -202,11 +202,11 @@ Extract to `memory/primitive_*.md` as respective cycles ship.
 | Cycle | Status | Scope |
 |---|---|---|
 | C40a | SHIPPED 2026-04-23 | Gap #1 — Pure `calculateRetentionWeight` primitive on NCI (α=1.6) |
-| C40b | PENDING | Gap #1 — Wire retention into `_recalculateWeights` (6 design decisions first) |
-| C40c | PENDING | Gap #1 — Governance-tunable α in [1.2, 1.8] |
-| C41 | 2026-04-25 | Gap #2a — Shapley signature + ContributionAttestor query |
-| C42 | 2026-04-28 | Gap #2b — Similarity keeper + commit-reveal |
-| C43 | 2026-04-30 | Gap #3 — Attested circuit-breaker resume |
+| C40b | SHIPPED 2026-04-23 | Gap #1 — Retention wired into `vote()` weight accumulation (PoW+PoM decays, PoS untouched; single call site; threshold unchanged) |
+| C40c | PENDING | Gap #1 — Governance-tunable α in [1.2, 1.8] (ships when a real tuning need appears) |
+| C41 | SHIPPED 2026-04-23 | Gap #2a — Shapley novelty multiplier primitive (per-game, per-participant, BPS-scaled; applied at computeShapleyValues weight step) |
+| C42 | PENDING | Gap #2b — Similarity keeper + commit-reveal (replaces owner setter with attested keeper) |
+| C43 | SHIPPED 2026-04-23 | Gap #3 — Attested circuit-breaker resume (opt-in per-breaker; cooldown floor + M-of-N attestor gate) |
 | C44 | 2026-05-01 | Strengthen #1 — CRA attention-window NatSpec |
 | C45+ | ongoing | Strengthen #2, #3 + primitive extractions |
 

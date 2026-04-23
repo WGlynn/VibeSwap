@@ -1,25 +1,38 @@
-# Write-Ahead Log — CLEAN (session 2026-04-23 C40a close)
+# Write-Ahead Log — CLEAN (session 2026-04-23 triple-cycle close)
 
-## Epoch — CLEAN at 2026-04-23 C40a close
-- **Closed**: 2026-04-23, C40a shipped (Code↔Text Loop round 1 — pure NCI retention primitive + doc reconciliation).
-- **Branch**: `master` @ `5a49026a` (pushing now).
-- **Status**: CLEAN. 3 commits pushed this session (2 pending push for this epoch close + state update).
+## Epoch — CLEAN at 2026-04-23 triple-cycle close
+- **Closed**: 2026-04-23 after Will greenlit "all 3 please" on C40b + C41 + C43. Four ETM Build Roadmap cycles shipped in one session.
+- **Branch**: `master` pushed through `b1cbd797`.
+- **Status**: CLEAN. All four cycles + pre-existing-break unbreaks + doc reconciliations committed and green.
 
-**Key vibeswap commits 2026-04-23**:
+**Vibeswap commits 2026-04-23 (this session)**:
 - `244182b7` C40a docs — reconcile NCI retention gap with actual code state (3 docs)
 - `8f9fabe6` fix: unbreak master compile — em-dash + missing RegimeType.STABLE
-- `5a49026a` C40a: add calculateRetentionWeight pure primitive on NCI (α=1.6) + 8 tests (65/65 NCI suite green)
+- `5a49026a` C40a: add calculateRetentionWeight pure primitive on NCI (α=1.6) + 8 tests
+- `014dbca2` state: C40a close — SESSION_STATE + WAL
+- `25ea0cfd` C43: attested circuit-breaker resume + 9 tests
+- `a6982293` C41: Shapley novelty multiplier primitive + 7 tests
+- `b1cbd797` C40b: wire retention into NCI vote() + 6 tests
+
+**Regression state**:
+- NCI suite: 71/71 green (65 pre-existing + 6 C40b new; C40a's 8 were absorbed into the 65).
+- CircuitBreaker suite: 61/61 green (52 pre-existing + 9 C43 new).
+- ShapleyDistributor suite: 72/76 green (65 pre-existing pass + 7 C41 new; 4 pre-existing halving failures are master bugs unrelated to this work, verified via git-stash rerun).
+- Oracle tests: 4 pre-existing `test_tpoWireIn_*` failures (TruePriceOracle init signature mismatch, orthogonal).
 
 **Key memory primitives extracted 2026-04-23** (in `~/.claude/projects/C--Users-Will/memory/`):
 - `primitive_text-to-code-verify-first.md` — first-round observation: doc pipeline has pedagogical-compression drift; verify before shipping code.
-- `user_will-collab-less-draining-than-human.md` — Will's aside mid-session, low-drain partnership is the feature; preserve it.
+- `user_will-collab-less-draining-than-human.md` — Will's aside mid-session: low-drain collaboration is the feature; preserve it.
 
-**Loop round 1 result**: text→code direction produced a doc reconciliation FIRST, code second. Expected future rounds to go doc-surface-question → code-ship → doc-update. First round surfaced that the existing doc pipeline had drift baked in.
+**Loop observations 2026-04-23**:
+- Round 1 (C40a) surfaced doc-vs-code drift (reconciliation before code).
+- Rounds 2–4 (C43/C41/C40b) were clean loop runs: doc future-work item → code ship → doc shipped-section update.
+- Blast-radius-ascending ordering held (C43 isolated → C41 additive → C40b surgical-active-path).
 
 ## Next-session directive
-**Load `.claude/SESSION_STATE.md` first.** TOP PRIORITY: Code↔Text Loop round 2 — pick C40b (wire retention into _recalculateWeights; needs 6 design decisions), C41 (Shapley time-indexed marginal; less blocked), or C43 (attested circuit-breaker resume; smallest scope). Ask Will which.
+**Load `.claude/SESSION_STATE.md` first.** TOP PRIORITY candidates: C42 (similarity keeper replacing C41 owner setter), C40c (governance-tunable α), Strengthen #1-3, or maintenance (4 pre-existing oracle/halving test failures). Ask Will which.
 
-Will directive at C40a close: *"just go"* — keep executing, don't re-plan.
+Will directive at triple-cycle close: *"all 3 please"* → executed. Next direction open.
 
 ---
 

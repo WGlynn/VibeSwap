@@ -1,239 +1,224 @@
-import { config } from './config.js';
-import { llmChat } from './llm-provider.js';
-import { getGroupStats, getAllUsers, getUnsubmittedContributions } from './tracker.js';
-import { getModerationLog } from './moderation.js';
-import { getSpamLog } from './antispam.js';
+import { readArchiveDay, readArchiveRange, aggregateDay } from './archive.js';
+import { getAllUsers } from './tracker.js';
 import { recordUsage } from './compute-economics.js';
 
 // ============ Daily Digest ============
-// Jarvis compiles a daily summary of community activity and sends it to the group.
-// Uses Haiku for cheap/fast summary generation.
+//
+// Every number in the digest is auditable against
+//   DATA_DIR/archive/<chatId>/<YYYY-MM-DD>.jsonl
+//
+// No keyword-category invention. No LLM free-form closer. No Fisher-Yates
+// fabrication. No "reviewing community guidelines" filler. If a fact isn't
+// derivable from the archive, it does not appear. If there's no activity,
+// the digest says so — it does not generate.
+//
+// Identity authority: every user mentioned is pulled by userId from the
+// archive's per-message user fields (username || firstName). The LLM is
+// never asked to produce a user's name from scratch.
 
 let lastDigestTimestamp = 0;
 
-export async function generateDigest(chatId) {
-  const now = Date.now();
-  const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
-  // Gather raw data
-  const allContributions = getUnsubmittedContributions(oneDayAgo);
-  const chatContributions = chatId
-    ? allContributions.filter(c => c.chatId === chatId)
-    : allContributions;
-
-  if (chatContributions.length === 0) {
-    return null; // No activity — skip digest
-  }
-
-  const groupStats = getGroupStats(chatId);
-  const allUsers = getAllUsers();
-  const modLog = getModerationLog(chatId, 50).filter(e => e.timestamp > oneDayAgo);
-  const spamActions = getSpamLog(chatId, 50).filter(e => e.timestamp > oneDayAgo);
-
-  // Compute daily metrics
-  const activeUsers = new Set();
-  const categoryBreakdown = {};
-  let totalQuality = 0;
-  const hourlyActivity = new Array(24).fill(0);
-
-  for (const c of chatContributions) {
-    activeUsers.add(c.telegramUserId);
-    categoryBreakdown[c.category] = (categoryBreakdown[c.category] || 0) + 1;
-    totalQuality += c.quality;
-    const hour = new Date(c.timestamp).getHours();
-    hourlyActivity[hour]++;
-  }
-
-  const peakHour = hourlyActivity.indexOf(Math.max(...hourlyActivity));
-  const avgQuality = chatContributions.length > 0
-    ? (totalQuality / chatContributions.length).toFixed(1)
-    : 0;
-
-  // Top contributors today
-  const userCounts = {};
-  const userQuality = {};
-  for (const c of chatContributions) {
-    const name = c.username || String(c.telegramUserId);
-    userCounts[name] = (userCounts[name] || 0) + 1;
-    userQuality[name] = (userQuality[name] || 0) + c.quality;
-  }
-
-  const topByVolume = Object.entries(userCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  const topByQuality = Object.entries(userQuality)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3);
-
-  // New members today
-  const newMembers = Object.values(allUsers).filter(u =>
-    u.firstSeen > oneDayAgo
-  );
-
-  // Build the structured data for Claude to summarize
-  const digestData = {
-    date: new Date().toISOString().split('T')[0],
-    messages: chatContributions.length,
-    activeUsers: activeUsers.size,
-    newMembers: newMembers.length,
-    avgQuality,
-    peakHour: `${peakHour}:00 UTC`,
-    categoryBreakdown,
-    topByVolume: topByVolume.map(([name, count]) => `${name}: ${count} msgs`),
-    topByQuality: topByQuality.map(([name, score]) => `${name}: ${score.toFixed(0)} quality pts`),
-    modActions: modLog.length,
-    spamBlocked: spamActions.length,
-    totalAllTimeContributions: groupStats.totalContributions,
-    totalAllTimeUsers: groupStats.totalUsers,
-  };
-
-  // Use Haiku for cheap/fast digest generation
-  try {
-    const response = await llmChat({
-      _background: true,
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
-      system: `You are JARVIS, the AI co-founder of VibeSwap. Write a brief daily digest for the Telegram community. Keep it under 200 words. Be conversational, not corporate. No emojis. Use plain text formatting (no markdown — this is Telegram). Include the key numbers but make it feel human.
-
-ENDING THE DIGEST:
-- End with something SPECIFIC about what was built, discussed, or shipped — not generic motivation.
-- GOOD: "Fisher-Yates shuffle fuzz tests hit 1M operations today. The math holds."
-- GOOD: "3 new members, 2 of them asked about Shapley values. the community is getting smarter."
-- BAD: "Keep building!" — generic noise. What are we building? Say it.
-- BAD: "The future is bright" — says nothing. State what happened.
-- BAD: "WAGMI" — cargo cult. State what was accomplished.
-- NEVER use "the real VibeSwap is wherever the Minds converge" — that is internal context, not for public output.
-- NEVER moralize. State the numbers, state what happened, let the community draw conclusions.`,
-      messages: [{
-        role: 'user',
-        content: `Generate a daily community digest from this data:\n${JSON.stringify(digestData, null, 2)}`
-      }],
-    });
-
-    // Record budget usage for daily digest
-    if (response.usage) {
-      recordUsage('jarvis-digest', { input: response.usage.input_tokens, output: response.usage.output_tokens });
-    }
-
-    const summary = response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('\n');
-
-    lastDigestTimestamp = now;
-    return summary;
-  } catch (err) {
-    console.error('[digest] Failed to generate:', err.message);
-    return buildFallbackDigest(digestData);
-  }
+// Window for "today" in the digest is the preceding 24 hours, UTC-aligned
+// to the current calendar day. Matches the jsonl file layout.
+function utcDay(ts) {
+  return new Date(ts).toISOString().split('T')[0];
 }
 
-// Fallback if Claude API fails — static template
-function buildFallbackDigest(data) {
-  const lines = [
-    `Daily Digest — ${data.date}`,
-    '',
-    `${data.messages} messages from ${data.activeUsers} active users`,
-    `Average quality: ${data.avgQuality}/5`,
-    `Peak activity: ${data.peakHour}`,
-  ];
+function previousUtcDay(ts) {
+  return utcDay(ts - 24 * 60 * 60 * 1000);
+}
 
-  if (data.newMembers > 0) {
-    lines.push(`New members: ${data.newMembers}`);
+// ============ Render ============
+
+function displayName(u) {
+  return u.displayName || u.username || u.firstName || String(u.userId);
+}
+
+function formatTypeBreakdown(typeBreakdown) {
+  // Returns a compact human-readable breakdown of message types.
+  // Only includes types with at least one occurrence.
+  const order = ['text', 'sticker', 'photo', 'video', 'animation', 'voice', 'audio', 'document', 'command', 'poll'];
+  const parts = [];
+  for (const t of order) {
+    const n = typeBreakdown[t] || 0;
+    if (n > 0) parts.push(`${n} ${t}${n === 1 ? '' : 's'}`);
   }
+  // Catch any type not in the canonical order
+  for (const [t, n] of Object.entries(typeBreakdown)) {
+    if (order.includes(t)) continue;
+    if (n > 0) parts.push(`${n} ${t}${n === 1 ? '' : 's'}`);
+  }
+  return parts.join(', ');
+}
 
+function buildDailyReport(dateStr, agg, allTimeTotals) {
+  // Deterministic template. JARVIS voice — conversational, plain, no moralizing.
+  // Every line traces to a field on `agg`. No invention.
+
+  const lines = [];
+  lines.push(`Daily — ${dateStr}`);
   lines.push('');
-  lines.push('Top contributors:');
-  for (const entry of data.topByVolume) {
-    lines.push(`  ${entry}`);
+
+  if (agg.totalMessages === 0) {
+    lines.push('No activity in the last 24 hours.');
+    if (allTimeTotals) {
+      lines.push('');
+      lines.push(`All-time: ${allTimeTotals.messages} messages across ${allTimeTotals.users} users.`);
+    }
+    return lines.join('\n');
   }
 
-  if (data.modActions > 0 || data.spamBlocked > 0) {
+  // Primary counts
+  lines.push(`${agg.totalMessages} messages from ${agg.activeUsers} active user${agg.activeUsers === 1 ? '' : 's'}.`);
+
+  // Type mix — only shown if not 100% text (otherwise the breakdown adds nothing)
+  const textCount = agg.typeBreakdown.text || 0;
+  if (textCount < agg.totalMessages) {
+    const mix = formatTypeBreakdown(agg.typeBreakdown);
+    if (mix) lines.push(`Mix: ${mix}.`);
+  }
+
+  // Peak hour — only if reportable
+  if (agg.peakHour !== null && agg.peakHour !== undefined) {
+    lines.push(`Peak hour: ${String(agg.peakHour).padStart(2, '0')}:00 UTC.`);
+  }
+
+  // Membership events
+  if (agg.newMembersCount > 0) {
+    const names = (agg.newMembers || [])
+      .map(m => m.username || m.firstName || String(m.userId))
+      .join(', ');
+    lines.push(`New: ${agg.newMembersCount} (${names}).`);
+  }
+  if (agg.leftMembersCount > 0) {
+    lines.push(`Departed: ${agg.leftMembersCount}.`);
+  }
+
+  // Top contributors by volume
+  if (agg.topByVolume.length > 0) {
     lines.push('');
-    lines.push(`Moderation: ${data.modActions} actions, ${data.spamBlocked} spam blocked`);
+    lines.push('Top by volume:');
+    for (const u of agg.topByVolume) {
+      lines.push(`  ${displayName(u)} — ${u.messageCount}`);
+    }
   }
 
-  lines.push('');
-  lines.push(`All-time: ${data.totalAllTimeContributions} contributions from ${data.totalAllTimeUsers} users`);
+  // Engagement (replies received) — only shown if anyone got replies
+  if (agg.topByEngagement.length > 0) {
+    lines.push('');
+    lines.push('Replied-to most:');
+    for (const u of agg.topByEngagement) {
+      lines.push(`  ${displayName(u)} — ${u.repliesReceived}`);
+    }
+  }
+
+  // All-time (archive-derived if available, otherwise skipped)
+  if (allTimeTotals) {
+    lines.push('');
+    lines.push(`All-time: ${allTimeTotals.messages} messages across ${allTimeTotals.users} users.`);
+  }
 
   return lines.join('\n');
 }
 
+// ============ All-Time Totals ============
+// Pulls from users.json + tracker for the cross-session totals line.
+// Stays intentionally conservative: a running counter, not a reconstructed aggregate.
+
+function getAllTimeTotals() {
+  try {
+    const users = getAllUsers();
+    const userEntries = Object.values(users);
+    // Sum of messageCount as stored in users.json. Matches the trackUser accounting
+    // that has been running all along, so the number stays continuous with prior digests.
+    const messages = userEntries.reduce((acc, u) => acc + (u.messageCount || 0), 0);
+    return {
+      users: userEntries.length,
+      messages,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ============ Entry Points ============
+
+export async function generateDigest(chatId) {
+  const now = Date.now();
+  const yesterday = previousUtcDay(now);
+
+  const records = await readArchiveDay(chatId, yesterday);
+  const agg = aggregateDay(records);
+  const allTime = getAllTimeTotals();
+
+  // Record the fact that we ran — digest generation is free (no LLM call)
+  // but we still want it in the usage log so the meta-observability layer sees it.
+  try {
+    recordUsage('jarvis-digest', { input: 0, output: 0 });
+  } catch {
+    // recordUsage signature drift is not fatal here
+  }
+
+  lastDigestTimestamp = now;
+  return buildDailyReport(yesterday, agg, allTime);
+}
+
 // ============ Weekly Digest ============
-// More in-depth analysis for weekly summaries
 
 export async function generateWeeklyDigest(chatId) {
   const now = Date.now();
   const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-  const allContributions = getUnsubmittedContributions(oneWeekAgo);
-  const chatContributions = chatId
-    ? allContributions.filter(c => c.chatId === chatId)
-    : allContributions;
+  const records = await readArchiveRange(chatId, oneWeekAgo, now);
+  if (records.length === 0) {
+    return `Weekly — no activity in the last 7 days.`;
+  }
 
-  if (chatContributions.length === 0) return null;
+  // Per-day buckets
+  const byDay = new Map();
+  for (const r of records) {
+    const d = utcDay(r.ts);
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(r);
+  }
+
+  const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const perDay = days.map(([d, recs]) => ({ date: d, ...aggregateDay(recs) }));
+
+  // Week-wide aggregation
+  const weekAgg = aggregateDay(records);
+
+  const lines = [];
+  const from = perDay[0].date;
+  const to = perDay[perDay.length - 1].date;
+  lines.push(`Weekly — ${from} to ${to}`);
+  lines.push('');
+  lines.push(`${weekAgg.totalMessages} messages from ${weekAgg.activeUsers} users across ${perDay.length} active day${perDay.length === 1 ? '' : 's'}.`);
 
   // Daily breakdown
-  const dailyCounts = {};
-  const activeUsers = new Set();
-  const categoryBreakdown = {};
-
-  for (const c of chatContributions) {
-    const day = new Date(c.timestamp).toISOString().split('T')[0];
-    dailyCounts[day] = (dailyCounts[day] || 0) + 1;
-    activeUsers.add(c.telegramUserId);
-    categoryBreakdown[c.category] = (categoryBreakdown[c.category] || 0) + 1;
+  lines.push('');
+  lines.push('By day:');
+  for (const d of perDay) {
+    lines.push(`  ${d.date} — ${d.totalMessages} msg / ${d.activeUsers} users`);
   }
 
-  // Growth trend
-  const days = Object.entries(dailyCounts).sort((a, b) => a[0].localeCompare(b[0]));
-  const trend = days.length >= 2
-    ? days[days.length - 1][1] > days[0][1] ? 'growing' : 'stable'
-    : 'new';
-
-  const data = {
-    period: `${days[0]?.[0] || 'N/A'} to ${days[days.length - 1]?.[0] || 'N/A'}`,
-    totalMessages: chatContributions.length,
-    uniqueUsers: activeUsers.size,
-    dailyAverage: Math.round(chatContributions.length / Math.max(days.length, 1)),
-    trend,
-    categoryBreakdown,
-    busiestDay: days.sort((a, b) => b[1] - a[1])[0],
-  };
-
-  try {
-    const response = await llmChat({
-      _background: true,
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 800,
-      system: `You are JARVIS, AI co-founder of VibeSwap. Write a weekly community digest. Under 300 words. Conversational, not corporate. No emojis. Plain text (Telegram). Highlight trends, top categories, community health.
-
-ENDING THE DIGEST:
-- End with something SPECIFIC — a mechanism shipped, a milestone hit, a community pattern observed.
-- Frame forward-looking statements in terms of what is BEING BUILT, not abstract optimism.
-- GOOD: "next week: circuit breaker integration tests and the Shapley distributor audit."
-- BAD: "exciting things ahead" — what things? Be specific or say nothing.
-- NEVER use motivational platitudes. State the work. The work speaks for itself.`,
-      messages: [{
-        role: 'user',
-        content: `Generate a weekly digest from this data:\n${JSON.stringify(data, null, 2)}`
-      }],
-    });
-
-    // Record budget usage for weekly digest
-    if (response.usage) {
-      recordUsage('jarvis-digest', { input: response.usage.input_tokens, output: response.usage.output_tokens });
+  // Top contributors for the week (use week-level aggregation)
+  if (weekAgg.topByVolume.length > 0) {
+    lines.push('');
+    lines.push('Top by volume:');
+    for (const u of weekAgg.topByVolume) {
+      lines.push(`  ${displayName(u)} — ${u.messageCount}`);
     }
-
-    return response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('\n');
-  } catch (err) {
-    console.error('[digest] Weekly digest failed:', err.message);
-    return `Weekly Digest — ${data.period}\n${data.totalMessages} messages from ${data.uniqueUsers} users. Daily avg: ${data.dailyAverage}. Trend: ${data.trend}.`;
   }
+  if (weekAgg.topByEngagement.length > 0) {
+    lines.push('');
+    lines.push('Replied-to most:');
+    for (const u of weekAgg.topByEngagement) {
+      lines.push(`  ${displayName(u)} — ${u.repliesReceived}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 export function getLastDigestTimestamp() {

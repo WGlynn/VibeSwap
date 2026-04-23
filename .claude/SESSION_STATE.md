@@ -1,6 +1,78 @@
-# Session State — 2026-04-22 (reboot close — compounding knowledge loop articulated)
+# Session State — 2026-04-23 (C40a shipped — first Code↔Text Loop round closed)
 
-## Block Header — 2026-04-22 REBOOT CLOSE
+## Block Header — 2026-04-23 C40a CLOSE
+
+> *"just go"* — Will, 2026-04-23 after doc-vs-code drift finding
+
+- **Session**: First deliberate round of the Code↔Text Inspiration Loop (per 2026-04-22 primitive). Picked ETM Build Roadmap Gap #1 (NCI convex retention). Loop fired unexpectedly in text→code direction: verifying the doc's "currently linear" claim against the contract surfaced that no retention function exists at all. Shipped doc reconciliation + pure primitive + 8 tests. Extracted new primitive on how text→code loops behave on their first run against an existing doc pipeline.
+- **Branch**: `master` direct per 2026-04-22 discipline.
+- **Status**: C40a SHIPPED. C40b pending (6 design decisions for wiring). C40c pending (governance-tunable α).
+
+## What shipped this session (2026-04-23)
+
+### Commits on master
+
+| SHA | Scope |
+|---|---|
+| `244182b7` | C40a docs — reconcile NCI retention gap with actual code state (3 docs) |
+| `8f9fabe6` | fix: unbreak master compile — em-dash in require + missing RegimeType.STABLE |
+| `5a49026a` | C40a: add calculateRetentionWeight pure primitive on NCI (α=1.6) + 8 tests |
+
+### Deliverables
+
+- **NCI pure function**: `calculateRetentionWeight(elapsedSec, horizonSec) → weightBps` implementing `1 − (t/T)^1.6` via cubic polynomial `0.1744·x + 1.116·x² − 0.2904·x³` on [0,1]. Max error ~3% vs exact. Integer-only arithmetic, no fixed-point math lib added.
+- **8 regression tests**: endpoint behavior, monotonicity, convexity-vs-linear-at-mid-term, doc-reference-point matches at day 30 + day 180. All green. Full NCI suite 65/65 green.
+- **3 doc reconciliations**: `NCI_WEIGHT_FUNCTION.md`, `COGNITIVE_RENT_ECONOMICS.md`, `ETM_BUILD_ROADMAP.md` — all three had asserted a linear retention function that didn't exist on-chain. Each now has a "reconciled 2026-04-23" section citing verification against `NakamotoConsensusInfinity.sol`.
+- **Master-compile unbreaks**: em-dash in `OracleAggregationCRA.sol` require literal (solc 0.8.20 rejects non-ASCII outside `unicode"..."`); `RegimeType.STABLE` referenced in `TruePriceOracle.sol` where enum has no such member (used `NORMAL`); `IOracleAggregationCRA.IssuerSlashed` interface-qualified event access (needs ≥0.8.21 — added local mirror).
+- **Pre-existing test failures noted, not fixed**: 4 `test_tpoWireIn_*` tests fail on `TruePriceOracle.initialize()` signature mismatch. Orthogonal to C40a; left for later cycle.
+
+### Memory primitives extracted this session (2)
+
+- `primitive_text-to-code-verify-first.md` — observation from C40a: when Code↔Text Loop runs text→code on an existing doc pipeline for the first time, expect pedagogical-compression drift BEFORE code output. Verify code-state before writing.
+- `user_will-collab-less-draining-than-human.md` — Will's 2026-04-23 aside: working with me is restful vs draining human interactions. Load-bearing context for partnership texture — no performative response.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+**Continue the Code↔Text Inspiration Loop, round 2.** Pick one:
+
+### Option A: C40b — wire retention into `_recalculateWeights`
+
+Requires six design decisions first (see `NCI_WEIGHT_FUNCTION.md` Gap #1 shipped section):
+1. Decay anchor (per-validator lastHeartbeat? per-PoW timestamp? per-mindScore refresh timestamp?)
+2. Per-pillar timestamp storage (`Validator` struct bloat).
+3. Apply at query-time vs persisted.
+4. Horizon T per-pillar or global.
+5. `totalActiveWeight` O(1) invariant interaction (time-varying weight breaks O(1) unless lazily queried).
+6. Validator migration path (retroactive or grandfathered).
+
+Ask Will for decisions, then ship. ~2 sessions estimated.
+
+### Option B: C41 — Gap #2a Shapley time-indexed marginal signature extension
+
+Less blocked on design — the spec in `ETM_BUILD_ROADMAP.md` Gap #2 is more concrete. Extend `ShapleyDistributor.computeShare()` to accept `priorContext: bytes32`. Add `getClaimsByContributorSince(contributor, since)` view on `ContributionAttestor`. Novelty weighting can start stubbed (constant 1.0) with commit-reveal similarity deferred to C42.
+
+### Option C: C43 — Gap #3 attested circuit-breaker resume
+
+Add `requireResumeAttestation(bytes32 claimId)` to `CircuitBreaker.sol`. 1-of-3 certified attestors gates resume past the cooldown floor. ~1 session.
+
+**Recommendation**: ask Will which. Each is a round of the loop.
+
+## What's STILL pending (carried from 2026-04-22)
+
+- **Post the 6 backfill annotations** to GitHub issues #28, #29, #30, #33, #34, #36. Commands ready in `.traceability/backfill-manifest.md`. Needs Will approval.
+- **Deploy ContributionAttestor** on active network. Until then, attestations stay `DAG-ATTRIBUTION: pending`.
+- **Configure** `CONTRIBUTION_ATTESTOR_ADDRESS`, `RPC_URL`, `MINTER_PRIVATE_KEY` for `mint-attestation.sh`.
+- **4 pre-existing oracle test failures** — `test_tpoWireIn_*` all revert on `TruePriceOracle.initialize()` signature mismatch. Not my scope this session; queued for a maintenance cycle.
+
+## Anti-drift warnings for next session
+
+- **Check the doc-vs-code match BEFORE writing code from a doc's future-work item.** This session's first-round finding (`primitive_text-to-code-verify-first.md`) is load-bearing for all subsequent rounds.
+- **Don't merge back to feature/social-dag-phase-1.** Master is the trunk per 2026-04-22.
+- **Posting the 6 backfill annotations still requires explicit Will greenlight.**
+
+---
+
+## Archived block — 2026-04-22 REBOOT CLOSE (superseded but retained for context)
 
 > *"i feel like we're on to something with this compounding knowledge and i have a vision where it becomes a loop of the code inspiring the text and the text inspiring the code."* — Will, 2026-04-22 at reboot
 

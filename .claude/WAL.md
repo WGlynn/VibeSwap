@@ -1,4 +1,29 @@
-# Write-Ahead Log — CLEAN (session 2026-04-21 reboot close)
+# Write-Ahead Log — CLEAN (session 2026-04-23 C40a close)
+
+## Epoch — CLEAN at 2026-04-23 C40a close
+- **Closed**: 2026-04-23, C40a shipped (Code↔Text Loop round 1 — pure NCI retention primitive + doc reconciliation).
+- **Branch**: `master` @ `5a49026a` (pushing now).
+- **Status**: CLEAN. 3 commits pushed this session (2 pending push for this epoch close + state update).
+
+**Key vibeswap commits 2026-04-23**:
+- `244182b7` C40a docs — reconcile NCI retention gap with actual code state (3 docs)
+- `8f9fabe6` fix: unbreak master compile — em-dash + missing RegimeType.STABLE
+- `5a49026a` C40a: add calculateRetentionWeight pure primitive on NCI (α=1.6) + 8 tests (65/65 NCI suite green)
+
+**Key memory primitives extracted 2026-04-23** (in `~/.claude/projects/C--Users-Will/memory/`):
+- `primitive_text-to-code-verify-first.md` — first-round observation: doc pipeline has pedagogical-compression drift; verify before shipping code.
+- `user_will-collab-less-draining-than-human.md` — Will's aside mid-session, low-drain partnership is the feature; preserve it.
+
+**Loop round 1 result**: text→code direction produced a doc reconciliation FIRST, code second. Expected future rounds to go doc-surface-question → code-ship → doc-update. First round surfaced that the existing doc pipeline had drift baked in.
+
+## Next-session directive
+**Load `.claude/SESSION_STATE.md` first.** TOP PRIORITY: Code↔Text Loop round 2 — pick C40b (wire retention into _recalculateWeights; needs 6 design decisions), C41 (Shapley time-indexed marginal; less blocked), or C43 (attested circuit-breaker resume; smallest scope). Ask Will which.
+
+Will directive at C40a close: *"just go"* — keep executing, don't re-plan.
+
+---
+
+# Prior Epoch (2026-04-21) — archived below
 
 ## Epoch — CLEAN at 2026-04-21 reboot
 - **Closed**: 2026-04-21, Will requested session reboot with next-session plan persisted in SESSION_STATE.md.

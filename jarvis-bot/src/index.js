@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats, trimConversationCache } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster, gitPush, gitStatusShort, gitLogOneline } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, getUserWallet, flushTracker } from './tracker.js';
+import { archiveMessage } from './archive.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
@@ -930,6 +931,21 @@ async function checkLastShutdown() {
 //   3. Normal mode → no restrictions
 
 if (!IS_WORKER) {
+  // ============ Archive Middleware ============
+  // Canonical chat archive. Every incoming update is appended to
+  //   DATA_DIR/archive/<chatId>/<YYYY-MM-DD>.jsonl  (UTC)
+  // before any handler runs. This is the source of truth for digest,
+  // stats, and any downstream observability — nothing the bot reports
+  // about chat activity comes from LLM inference over stale state.
+  bot.use(async (ctx, next) => {
+    try {
+      await archiveMessage(ctx);
+    } catch (err) {
+      console.warn(`[archive] middleware error: ${err.message}`);
+    }
+    return next();
+  });
+
   bot.use(async (ctx, next) => {
     const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
     if (!isGroup) return next();

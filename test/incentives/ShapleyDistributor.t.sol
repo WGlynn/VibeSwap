@@ -696,7 +696,10 @@ contract ShapleyDistributorTest is Test {
         bytes32 era1Game = keccak256("era1-game");
         distributor.createGameTyped(era1Game, 100 ether, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, participants);
 
-        // Game value should be halved
+        // TRP-R49-N06: Halving is applied at SETTLEMENT, not creation. Settle the
+        // game first, then assert the stored game.totalValue reflects the halved amount.
+        distributor.computeShapleyValues(era1Game);
+
         (, uint256 totalValue,,,,) = distributor.games(era1Game);
         assertEq(totalValue, 50 ether); // 50% of 100 ether
     }
@@ -720,6 +723,9 @@ contract ShapleyDistributorTest is Test {
         // Create a TOKEN_EMISSION game in Era 2 (halving applies to emissions, not fees)
         bytes32 era2Game = keccak256("era2-game");
         distributor.createGameTyped(era2Game, 100 ether, address(token), ShapleyDistributor.GameType.TOKEN_EMISSION, participants);
+
+        // TRP-R49-N06: Halving applies at SETTLEMENT. Settle before asserting.
+        distributor.computeShapleyValues(era2Game);
 
         // Game value should be 25%
         (, uint256 totalValue,,,,) = distributor.games(era2Game);
@@ -1013,6 +1019,9 @@ contract ShapleyDistributorTest is Test {
             participants
         );
 
+        // TRP-R49-N06: Halving applies at SETTLEMENT.
+        distributor.computeShapleyValues(emissionGameId);
+
         (, uint256 emissionGameValue,,,,) = distributor.games(emissionGameId);
         assertEq(emissionGameValue, 25 ether, "TOKEN_EMISSION must be halved to 25% in Era 2");
     }
@@ -1032,18 +1041,20 @@ contract ShapleyDistributorTest is Test {
 
         assertEq(distributor.getCurrentHalvingEra(), 1);
 
-        // FEE_DISTRIBUTION: full value
+        // FEE_DISTRIBUTION: full value (halving does NOT apply to fee games — time-neutral track)
         bytes32 feeGameId = keccak256("fee-era1");
         distributor.createGame(feeGameId, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(feeGameId);
         (, uint256 feeVal,,,,) = distributor.games(feeGameId);
 
-        // TOKEN_EMISSION: halved
+        // TOKEN_EMISSION: halved (halving applies at SETTLEMENT per TRP-R49-N06)
         bytes32 emissionGameId = keccak256("emission-era1");
         distributor.createGameTyped(
             emissionGameId, 100 ether, address(token),
             ShapleyDistributor.GameType.TOKEN_EMISSION,
             participants
         );
+        distributor.computeShapleyValues(emissionGameId);
         (, uint256 emissionVal,,,,) = distributor.games(emissionGameId);
 
         assertEq(feeVal, 100 ether, "FEE game should be full value in Era 1");

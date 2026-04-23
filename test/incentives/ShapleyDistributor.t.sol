@@ -1267,4 +1267,112 @@ contract ShapleyDistributorTest is Test {
 
         return participants;
     }
+
+    // ============ C41: Novelty Multiplier (ETM Build Roadmap Gap #2a) ============
+    //
+    // Per-game, per-participant novelty multiplier applied in computeShapleyValues.
+    // Default 1.0x (NOVELTY_DEFAULT_BPS) preserves pre-C41 behavior. Bounded
+    // [0.5x, 3.0x] to prevent griefing.
+
+    event NoveltyMultiplierSet(bytes32 indexed gameId, address indexed participant, uint256 multiplierBps);
+
+    function test_C41_defaultMultiplier_preservesBehavior() public {
+        // With no multipliers set, behavior must be identical to pre-C41 expectations.
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        distributor.computeShapleyValues(GAME_ID);
+
+        // Getter returns default 1.0x for unset participants
+        assertEq(distributor.getNoveltyMultiplier(GAME_ID, alice), 10000);
+        assertEq(distributor.getNoveltyMultiplier(GAME_ID, bob), 10000);
+
+        // Efficiency preserved (total distributed == total value)
+        uint256 sum = distributor.shapleyValues(GAME_ID, alice)
+            + distributor.shapleyValues(GAME_ID, bob)
+            + distributor.shapleyValues(GAME_ID, charlie);
+        assertEq(sum, 100 ether);
+    }
+
+    function test_C41_setMultiplier_emitsEvent() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        vm.expectEmit(true, true, false, true);
+        emit NoveltyMultiplierSet(GAME_ID, alice, 20000);
+        distributor.setNoveltyMultiplier(GAME_ID, alice, 20000);
+
+        assertEq(distributor.getNoveltyMultiplier(GAME_ID, alice), 20000);
+    }
+
+    function test_C41_multiplier_shiftsShareTowardHighNovelty() public {
+        // Alice 2.0x, Bob 1.0x (unset), Charlie 0.5x.
+        // Relative to default allocation: Alice's share up, Charlie's down.
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 200 ether);
+
+        // Game 1: default multipliers (baseline)
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+        uint256 aliceBaseline = distributor.shapleyValues(GAME_ID, alice);
+        uint256 charlieBaseline = distributor.shapleyValues(GAME_ID, charlie);
+
+        // Game 2: with multipliers
+        bytes32 g2 = keccak256("test-game-2");
+        distributor.createGame(g2, 100 ether, address(token), participants);
+        distributor.setNoveltyMultiplier(g2, alice, 20000);   // 2.0x
+        distributor.setNoveltyMultiplier(g2, charlie, 5000);  // 0.5x
+        distributor.computeShapleyValues(g2);
+        uint256 aliceBoosted = distributor.shapleyValues(g2, alice);
+        uint256 charlieDampened = distributor.shapleyValues(g2, charlie);
+
+        assertGt(aliceBoosted, aliceBaseline, "Alice with 2x multiplier gets larger share");
+        assertLt(charlieDampened, charlieBaseline, "Charlie with 0.5x multiplier gets smaller share");
+
+        // Efficiency preserved in game 2
+        uint256 sum = aliceBoosted
+            + distributor.shapleyValues(g2, bob)
+            + charlieDampened;
+        assertEq(sum, 100 ether);
+    }
+
+    function test_C41_setMultiplier_revertAfterSettlement() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+        distributor.computeShapleyValues(GAME_ID);
+
+        vm.expectRevert(bytes("Game already settled"));
+        distributor.setNoveltyMultiplier(GAME_ID, alice, 15000);
+    }
+
+    function test_C41_setMultiplier_revertOutOfRange() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        vm.expectRevert(bytes("Multiplier out of range"));
+        distributor.setNoveltyMultiplier(GAME_ID, alice, 4999); // below 0.5x floor
+
+        vm.expectRevert(bytes("Multiplier out of range"));
+        distributor.setNoveltyMultiplier(GAME_ID, alice, 30001); // above 3.0x ceiling
+    }
+
+    function test_C41_setMultiplier_revertNonOwner() public {
+        ShapleyDistributor.Participant[] memory participants = _createParticipants();
+        token.mint(address(distributor), 100 ether);
+        distributor.createGame(GAME_ID, 100 ether, address(token), participants);
+
+        vm.prank(unauthorized);
+        vm.expectRevert(); // Ownable error
+        distributor.setNoveltyMultiplier(GAME_ID, alice, 15000);
+    }
+
+    function test_C41_setMultiplier_revertGameNotFound() public {
+        bytes32 missing = keccak256("does-not-exist");
+        vm.expectRevert(bytes("Game not found"));
+        distributor.setNoveltyMultiplier(missing, alice, 15000);
+    }
 }

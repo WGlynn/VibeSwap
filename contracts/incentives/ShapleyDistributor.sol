@@ -189,6 +189,36 @@ contract ShapleyDistributor is
     // Game ID => Total weighted contribution (stored for pairwise verification tolerance)
     mapping(bytes32 => uint256) public totalWeightedContrib;
 
+    // ============ C41: Time-Indexed Novelty Multiplier (ETM Build Roadmap Gap #2a) ============
+    //
+    // Plain Shapley is permutation-symmetric and under-rewards originators — the
+    // Novelty Bonus Theorem. C41 lands the on-chain PRIMITIVE for applying a
+    // per-game, per-participant novelty multiplier at reward-computation time.
+    //
+    // C41 scope: storage + setter + application in computeShapleyValues. The
+    // multiplier SOURCE (time-indexed similarity to prior contributions) is the
+    // C42 off-chain keeper — this commit leaves setter owner-gated as a
+    // placeholder so the mechanism composes without the keeper yet existing.
+    //
+    // Default multiplier is NOVELTY_DEFAULT_BPS (1.0x), so untouched games behave
+    // exactly as before. Backwards-compatible.
+
+    /// @notice Novelty multiplier in BPS. 10000 = 1.0x (identity, no change).
+    ///         Bounded [NOVELTY_MIN_BPS, NOVELTY_MAX_BPS] to prevent griefing.
+    mapping(bytes32 => mapping(address => uint256)) public noveltyMultiplierBps;
+
+    /// @notice Minimum novelty multiplier (0.5x). Floor prevents zeroing out
+    ///         a participant via multiplier-only.
+    uint256 public constant NOVELTY_MIN_BPS = 5000;
+
+    /// @notice Maximum novelty multiplier (3.0x). Ceiling prevents a single
+    ///         participant dominating share via multiplier-only.
+    uint256 public constant NOVELTY_MAX_BPS = 30000;
+
+    /// @notice Default multiplier when `noveltyMultiplierBps[game][participant]`
+    ///         is unset (maps default to 0). Represents 1.0x.
+    uint256 public constant NOVELTY_DEFAULT_BPS = 10000;
+
     // Participant => Quality weights
     mapping(address => QualityWeight) public qualityWeights;
 
@@ -288,6 +318,8 @@ contract ShapleyDistributor is
     event GameCreated(bytes32 indexed gameId, uint256 totalValue, address token, uint256 participantCount);
     event ShapleyComputed(bytes32 indexed gameId, address indexed participant, uint256 shapleyValue);
     event RewardClaimed(bytes32 indexed gameId, address indexed participant, uint256 amount);
+    // C41: novelty multiplier observability
+    event NoveltyMultiplierSet(bytes32 indexed gameId, address indexed participant, uint256 multiplierBps);
     event QualityWeightUpdated(address indexed participant, uint256 activity, uint256 reputation, uint256 economic);
     event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
     event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
@@ -630,6 +662,12 @@ contract ShapleyDistributor is
             uint256 totalWeight = 0;
             for (uint256 i = 0; i < n; i++) {
                 weights[i] = _calculateWeightedContribution(participants[i], gameId);
+                // C41: apply time-indexed novelty multiplier. Unset defaults to 1.0x
+                // (NOVELTY_DEFAULT_BPS), so games with no keeper / no multiplier set
+                // behave identically to pre-C41 allocation.
+                uint256 mult = noveltyMultiplierBps[gameId][participants[i].participant];
+                if (mult == 0) mult = NOVELTY_DEFAULT_BPS;
+                weights[i] = (weights[i] * mult) / NOVELTY_DEFAULT_BPS;
                 totalWeight += weights[i];
                 weightedContributions[gameId][participants[i].participant] = weights[i];
             }
@@ -1470,6 +1508,45 @@ contract ShapleyDistributor is
     function resetGenesisTimestamp() external onlyOwner {
         genesisTimestamp = block.timestamp;
         emit GenesisTimestampReset(block.timestamp);
+    }
+
+    // ============ C41: Novelty Multiplier Admin ============
+
+    /// @notice Set per-game, per-participant novelty multiplier in BPS.
+    ///         Must be set BEFORE `computeShapleyValues` — locked after settlement.
+    /// @dev DISINTERMEDIATION: Grade C (OWNER) — C41 placeholder. C42 will
+    ///      replace this path with a commit-reveal keeper that derives the
+    ///      multiplier from time-indexed similarity to prior claims. Direct
+    ///      owner-setting is a bootstrap mechanism, not the final design.
+    /// @param gameId Game identifier. Game must exist and not yet be settled.
+    /// @param participant Address whose multiplier is being set.
+    /// @param multiplierBps Multiplier scaled by NOVELTY_DEFAULT_BPS (10000 = 1.0x).
+    ///                     Must fall within [NOVELTY_MIN_BPS, NOVELTY_MAX_BPS].
+    function setNoveltyMultiplier(
+        bytes32 gameId,
+        address participant,
+        uint256 multiplierBps
+    ) external onlyOwner {
+        CooperativeGame storage game = games[gameId];
+        require(game.totalValue > 0, "Game not found");
+        require(!game.settled, "Game already settled");
+        require(
+            multiplierBps >= NOVELTY_MIN_BPS && multiplierBps <= NOVELTY_MAX_BPS,
+            "Multiplier out of range"
+        );
+
+        noveltyMultiplierBps[gameId][participant] = multiplierBps;
+        emit NoveltyMultiplierSet(gameId, participant, multiplierBps);
+    }
+
+    /// @notice Read effective novelty multiplier. Returns default (1.0x) when unset.
+    function getNoveltyMultiplier(bytes32 gameId, address participant)
+        external
+        view
+        returns (uint256)
+    {
+        uint256 stored = noveltyMultiplierBps[gameId][participant];
+        return stored == 0 ? NOVELTY_DEFAULT_BPS : stored;
     }
 
     // ============ Receive ETH ============

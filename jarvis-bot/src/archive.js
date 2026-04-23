@@ -259,6 +259,230 @@ export async function listArchivedDays(chatId) {
   }
 }
 
+// ============ Retroactive Query API ============
+// These functions let the LLM reply path ground itself in real history.
+// Telegram's Bot API won't let us fetch history; this archive IS the history.
+// Every query returns compact records suitable for inclusion in LLM context:
+// no raw file_ids, no entity arrays, no internal bookkeeping.
+
+const MAX_QUERY_WINDOW_DAYS = 60; // Hard ceiling on how far back a single query scans
+const DEFAULT_QUERY_LIMIT = 10;
+const MAX_QUERY_LIMIT = 50;
+const TEXT_PREVIEW_CHARS = 280;
+
+function compactRecord(r) {
+  // Strip the archive record to what an LLM can actually reason over.
+  // Omit every field that's purely storage-layer (fileIds, entityTypes, etc).
+  const out = {
+    ts: r.ts,
+    date: new Date(r.ts).toISOString(),
+    userId: r.userId,
+    username: r.username || r.firstName || String(r.userId || 'unknown'),
+    type: r.type,
+  };
+  if (r.text) {
+    out.text = r.text.length > TEXT_PREVIEW_CHARS
+      ? r.text.slice(0, TEXT_PREVIEW_CHARS) + '…'
+      : r.text;
+  }
+  if (r.stickerEmoji) out.stickerEmoji = r.stickerEmoji;
+  if (r.replyToUserId) {
+    out.replyTo = r.replyToUsername || String(r.replyToUserId);
+    out.replyToMessageId = r.replyToMessageId;
+  }
+  if (r.type === 'new_chat_members') out.newMembers = (r.newMembers || []).map(m => m.username || m.firstName);
+  if (r.type === 'left_chat_member') out.leftMember = r.leftMember?.username || r.leftMember?.firstName;
+  return out;
+}
+
+async function scanBackward(chatId, filterFn, limit, maxDaysBack = MAX_QUERY_WINDOW_DAYS) {
+  // Walk newest → oldest day files until we've collected `limit` matches or hit the window edge.
+  // This is the shared scan primitive for all retroactive queries.
+  const days = await listArchivedDays(chatId);
+  if (days.length === 0) return [];
+  const recentFirst = [...days].reverse().slice(0, maxDaysBack);
+
+  const results = [];
+  for (const day of recentFirst) {
+    const records = await readArchiveDay(chatId, day);
+    // Walk this day's records from newest to oldest
+    for (let i = records.length - 1; i >= 0; i--) {
+      const r = records[i];
+      if (r.isEdit) continue;
+      if (r.isBot) continue;
+      if (filterFn(r)) {
+        results.push(r);
+        if (results.length >= limit) return results;
+      }
+    }
+  }
+  return results;
+}
+
+/**
+ * Get the most recent messages in a chat.
+ * Returned newest-first so the LLM can reason "what just happened".
+ */
+export async function getRecentMessages(chatId, limit = DEFAULT_QUERY_LIMIT) {
+  limit = Math.min(Math.max(1, limit | 0), MAX_QUERY_LIMIT);
+  const hits = await scanBackward(chatId, () => true, limit);
+  return hits.map(compactRecord);
+}
+
+/**
+ * Case-insensitive substring search across the archive.
+ * `query` matches against text and captions. Non-text messages (stickers, photos
+ * without captions) never match — search is about CONTENT, not presence.
+ */
+export async function searchArchive(chatId, query, limit = DEFAULT_QUERY_LIMIT) {
+  limit = Math.min(Math.max(1, limit | 0), MAX_QUERY_LIMIT);
+  if (!query || typeof query !== 'string') return [];
+  const needle = query.toLowerCase().trim();
+  if (!needle) return [];
+  const hits = await scanBackward(
+    chatId,
+    r => typeof r.text === 'string' && r.text.toLowerCase().includes(needle),
+    limit
+  );
+  return hits.map(compactRecord);
+}
+
+/**
+ * All recent messages from a specific user. `userRef` can be either:
+ *  - a Telegram user id (number or numeric string)
+ *  - a username (with or without leading '@')
+ *  - a first_name (case-insensitive exact match)
+ * The first match wins, in that priority order.
+ */
+export async function getUserMessages(chatId, userRef, limit = DEFAULT_QUERY_LIMIT) {
+  limit = Math.min(Math.max(1, limit | 0), MAX_QUERY_LIMIT);
+  if (userRef == null) return [];
+
+  const refStr = String(userRef).trim().replace(/^@/, '');
+  const refNum = /^\d+$/.test(refStr) ? parseInt(refStr, 10) : null;
+  const refLower = refStr.toLowerCase();
+
+  const hits = await scanBackward(chatId, r => {
+    if (refNum !== null && r.userId === refNum) return true;
+    if (r.username && r.username.toLowerCase() === refLower) return true;
+    if (r.firstName && r.firstName.toLowerCase() === refLower) return true;
+    return false;
+  }, limit);
+  return hits.map(compactRecord);
+}
+
+/**
+ * Aggregate profile for a user grounded in the archive.
+ * Fields are derived — none invented. Returns null if no messages found.
+ */
+export async function getUserProfile(chatId, userRef) {
+  if (userRef == null) return null;
+  const refStr = String(userRef).trim().replace(/^@/, '');
+  const refNum = /^\d+$/.test(refStr) ? parseInt(refStr, 10) : null;
+  const refLower = refStr.toLowerCase();
+
+  const days = await listArchivedDays(chatId);
+  if (days.length === 0) return null;
+
+  let firstTs = null;
+  let lastTs = null;
+  let messageCount = 0;
+  const typeCounts = {};
+  let repliesGiven = 0;
+  let repliesReceived = 0;
+  let canonicalUsername = null;
+  let canonicalFirstName = null;
+  let canonicalUserId = null;
+
+  // For repliesReceived we need to know the user's id. Resolve it from first match.
+  let resolvedUserId = refNum;
+
+  for (const day of days) {
+    const records = await readArchiveDay(chatId, day);
+    for (const r of records) {
+      if (r.isEdit) continue;
+      const matches =
+        (refNum !== null && r.userId === refNum) ||
+        (r.username && r.username.toLowerCase() === refLower) ||
+        (r.firstName && r.firstName.toLowerCase() === refLower);
+      if (matches) {
+        messageCount++;
+        typeCounts[r.type] = (typeCounts[r.type] || 0) + 1;
+        if (firstTs === null || r.ts < firstTs) firstTs = r.ts;
+        if (lastTs === null || r.ts > lastTs) lastTs = r.ts;
+        if (r.replyToUserId) repliesGiven++;
+        if (!canonicalUsername && r.username) canonicalUsername = r.username;
+        if (!canonicalFirstName && r.firstName) canonicalFirstName = r.firstName;
+        if (!canonicalUserId && r.userId) canonicalUserId = r.userId;
+        if (!resolvedUserId && r.userId) resolvedUserId = r.userId;
+      }
+      if (resolvedUserId && r.replyToUserId === resolvedUserId) {
+        repliesReceived++;
+      }
+    }
+  }
+
+  if (messageCount === 0) return null;
+  return {
+    userId: canonicalUserId,
+    username: canonicalUsername,
+    firstName: canonicalFirstName,
+    firstSeen: firstTs ? new Date(firstTs).toISOString() : null,
+    lastSeen: lastTs ? new Date(lastTs).toISOString() : null,
+    messageCount,
+    typeBreakdown: typeCounts,
+    repliesGiven,
+    repliesReceived,
+  };
+}
+
+/**
+ * All messages on a given UTC date. Useful for "what happened on X".
+ * Returns compact records sorted oldest-first (chronological).
+ */
+export async function getMessagesByDate(chatId, dateStr, limit = MAX_QUERY_LIMIT) {
+  const records = await readArchiveDay(chatId, dateStr);
+  const usable = records.filter(r => !r.isEdit && !r.isBot);
+  const clamped = usable.slice(0, Math.min(limit | 0 || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT));
+  return clamped.map(compactRecord);
+}
+
+/**
+ * Snapshot of the known-user roster for a chat, derived from the archive.
+ * Used to inject identity authority into the reply path — the LLM gets a list
+ * of real users and the rule "only address someone who is on this list".
+ * Scans the last `days` calendar days (default 7) for anyone who posted.
+ */
+export async function getChatRoster(chatId, days = 7) {
+  const allDays = await listArchivedDays(chatId);
+  if (allDays.length === 0) return [];
+  const recent = allDays.slice(-Math.max(1, days));
+
+  const byUser = new Map();
+  for (const d of recent) {
+    const records = await readArchiveDay(chatId, d);
+    for (const r of records) {
+      if (r.isEdit || r.isBot || !r.userId) continue;
+      if (!byUser.has(r.userId)) {
+        byUser.set(r.userId, {
+          userId: r.userId,
+          username: r.username || null,
+          firstName: r.firstName || null,
+          lastSeen: r.ts,
+          messageCount: 0,
+        });
+      }
+      const u = byUser.get(r.userId);
+      u.messageCount++;
+      if (r.ts > u.lastSeen) u.lastSeen = r.ts;
+      // Prefer the most recent non-null username/firstName we've seen
+      if (r.username) u.username = r.username;
+      if (r.firstName) u.firstName = r.firstName;
+    }
+  }
+  return [...byUser.values()].sort((a, b) => b.messageCount - a.messageCount);
+}
+
 // ============ Derived Aggregations ============
 // All report-facing metrics read from here. No invented fields. If a fact
 // isn't derivable from the archive, it does not appear in output.

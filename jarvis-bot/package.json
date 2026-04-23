@@ -1,7 +1,7 @@
 {
   "name": "jarvis-bot",
-  "version": "1.0.0",
-  "description": "JARVIS Telegram bot — Claude-powered assistant for VibeSwap",
+  "version": "2.0.0",
+  "description": "JARVIS Telegram bot — Claude-powered assistant for VibeSwap. 2.0: grounded replies via canonical chat archive; substrate-level anti-fabrication.",
   "main": "src/index.js",
   "type": "module",
   "scripts": {

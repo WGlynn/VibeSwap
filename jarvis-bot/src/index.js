@@ -4,6 +4,8 @@ import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, r
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster, gitPush, gitStatusShort, gitLogOneline } from './git.js';
 import { initTracker, trackMessage, linkWallet, getUserStats, getGroupStats, getAllUsers, getUserWallet, flushTracker } from './tracker.js';
 import { archiveMessage } from './archive.js';
+import { initArchiveMirror, stopArchiveMirror, getArchiveMirrorStatus, commitAndPushMirror } from './archive-mirror.js';
+import { startReplyPacer } from './reply-pacer.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
@@ -6229,6 +6231,11 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
     ctx.sendChatAction('typing').catch(() => {});
   }, 4000);
 
+  // Reply pacer — if generation runs beyond mean + 2σ of recent replies,
+  // send a visible "thinking" placeholder to show liveliness, then edit it
+  // into the real reply once ready. Short replies never trigger it.
+  const pacer = startReplyPacer(ctx);
+
   try {
     const response = await chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id });
     clearInterval(typingInterval);
@@ -6242,12 +6249,15 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
     const reply = response.text?.trim();
     if (!reply) {
       console.warn('[bot] Empty response from LLM — skipping send');
+      pacer.cancel();
       return;
     }
     if (reply.length <= 4096) {
-      await ctx.reply(reply, { parse_mode: undefined });
+      await pacer.replyWith(reply, { parse_mode: undefined });
     } else {
-      for (let i = 0; i < reply.length; i += 4096) {
+      // First chunk edits the placeholder (if any); remaining chunks go out as normal replies.
+      await pacer.replyWith(reply.slice(0, 4096), { parse_mode: undefined });
+      for (let i = 4096; i < reply.length; i += 4096) {
         await ctx.reply(reply.slice(i, i + 4096), { parse_mode: undefined });
       }
     }
@@ -6287,6 +6297,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
     }
   } catch (error) {
     clearInterval(typingInterval);
+    pacer.cancel();
     console.error('[bot] Media response error:', error.message);
     try {
       await ephemeralReply(ctx, friendlyError(error), { parse_mode: undefined });
@@ -7947,6 +7958,7 @@ async function main() {
   const initStartMs = Date.now();
   await Promise.all([
     initTracker(),
+    initArchiveMirror().catch(err => console.warn(`[jarvis] archive-mirror init failed: ${err.message}`)),
     initModeration(),
     initAntispam(),
     initThreads(),

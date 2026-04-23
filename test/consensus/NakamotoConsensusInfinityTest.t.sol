@@ -123,6 +123,10 @@ contract NakamotoConsensusInfinityTest is Test {
     MockVibeCode public vibeCode;
     MockAgentRep public agentRep;
 
+    // Local mirror of interface event for vm.expectEmit under solc 0.8.20
+    // (interface-qualified event access requires ≥0.8.21).
+    event VoteCast(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
+
     address public owner = address(this);
     address public alice = address(0xA11CE);
     address public bob = address(0xB0B);
@@ -1212,5 +1216,125 @@ contract NakamotoConsensusInfinityTest is Test {
         uint256 wConvex = nci.calculateRetentionWeight(180 days, YEAR);
         uint256 wLinearBps = 10000 - (10000 * 180 days) / YEAR; // 5069 bps
         assertGt(wConvex, wLinearBps, "convex retention must exceed linear at mid-term");
+    }
+
+    // ============ C40b: Retention applied at vote() site ============
+    //
+    // Wires the pure calculateRetentionWeight primitive into per-vote weight
+    // accumulation. PoW+PoM portion decays by retention-since-lastHeartbeat;
+    // PoS portion passes through untouched. Threshold unchanged (base weight).
+
+    function _registerAndProposeFrom(address proposer, uint256 stake) internal returns (uint256 proposalId) {
+        _registerValidator(proposer, stake);
+        vm.prank(proposer);
+        proposalId = nci.propose(keccak256("prop"));
+    }
+
+    function test_C40b_freshVote_fullBaseWeight() public {
+        // Validator votes within seconds of heartbeat → retention ≈ 100% → weight = totalWeight.
+        _registerValidator(alice, STAKE_AMOUNT);
+        uint256 proposalId = _registerAndProposeFrom(bob, STAKE_AMOUNT);
+
+        INakamotoConsensusInfinity.Validator memory va = nci.getValidator(alice);
+        vm.prank(alice);
+        nci.vote(proposalId, true);
+
+        INakamotoConsensusInfinity.Proposal memory p = nci.getProposal(proposalId);
+        // weightFor must equal alice's base totalWeight (retention ~= 1.0x on fresh vote)
+        assertEq(p.weightFor, va.totalWeight, "fresh vote: weight = totalWeight");
+    }
+
+    function test_C40b_staleHeartbeat_decaysPowAndPomKeepsStake() public {
+        // Register alice at t=0 (heartbeat = t=0). Refresh her mindScore so the
+        // decayable portion is non-zero (default registration leaves mindScore=0).
+        // Warp 180 days. Fresh proposer opens proposal. Alice votes from stale state.
+        _registerValidator(alice, STAKE_AMOUNT);
+        vm.prank(alice);
+        nci.refreshMindScore(); // pulls mindScore from the mock setUp() data
+        INakamotoConsensusInfinity.Validator memory va = nci.getValidator(alice);
+        uint256 posPortion = (va.posWeight * 3000) / 10000;
+        uint256 decayablePortion = va.totalWeight - posPortion;
+        assertGt(decayablePortion, 0, "precondition: alice has non-zero PoM after refresh");
+
+        vm.warp(block.timestamp + 180 days);
+        uint256 proposalId = _registerAndProposeFrom(bob, STAKE_AMOUNT);
+
+        vm.prank(alice);
+        nci.vote(proposalId, true);
+
+        INakamotoConsensusInfinity.Proposal memory p = nci.getProposal(proposalId);
+        uint256 retention = nci.calculateRetentionWeight(180 days, 365 days);
+        uint256 expected = posPortion + (decayablePortion * retention) / 10000;
+        assertEq(p.weightFor, expected, "180d stale vote: decays PoW+PoM, keeps PoS");
+        assertLt(p.weightFor, va.totalWeight, "stale weight strictly less than base");
+        assertGe(p.weightFor, posPortion, "stale weight never below PoS floor");
+    }
+
+    function test_C40b_fullyExpired_onlyPosRemains() public {
+        _registerValidator(alice, STAKE_AMOUNT);
+        INakamotoConsensusInfinity.Validator memory va = nci.getValidator(alice);
+        uint256 posPortion = (va.posWeight * 3000) / 10000;
+
+        vm.warp(block.timestamp + 366 days); // past horizon
+        uint256 proposalId = _registerAndProposeFrom(bob, STAKE_AMOUNT);
+
+        vm.prank(alice);
+        nci.vote(proposalId, true);
+
+        INakamotoConsensusInfinity.Proposal memory p = nci.getProposal(proposalId);
+        assertEq(p.weightFor, posPortion, "post-horizon vote: only PoS portion contributes");
+    }
+
+    function test_C40b_heartbeatRefresh_restoresFullWeight() public {
+        _registerValidator(alice, STAKE_AMOUNT);
+        INakamotoConsensusInfinity.Validator memory va = nci.getValidator(alice);
+
+        // Fast-forward, refresh heartbeat (alice), open proposal (bob), vote.
+        vm.warp(block.timestamp + 200 days);
+        vm.prank(alice);
+        nci.heartbeat();
+
+        uint256 proposalId = _registerAndProposeFrom(bob, STAKE_AMOUNT);
+        vm.prank(alice);
+        nci.vote(proposalId, true);
+
+        INakamotoConsensusInfinity.Proposal memory p = nci.getProposal(proposalId);
+        assertEq(p.weightFor, va.totalWeight, "post-heartbeat vote: full weight restored");
+    }
+
+    function test_C40b_pureStakeValidator_unaffectedByRetention() public {
+        // A validator with PoM=0 and PoW=0 has only PoS contribution.
+        _registerValidator(charlie, STAKE_AMOUNT);
+        INakamotoConsensusInfinity.Validator memory vc = nci.getValidator(charlie);
+        uint256 expectedPosOnly = (vc.posWeight * 3000) / 10000;
+        assertEq(vc.totalWeight, expectedPosOnly, "precondition: charlie is pure-stake");
+
+        vm.warp(block.timestamp + 300 days);
+        uint256 proposalId = _registerAndProposeFrom(bob, STAKE_AMOUNT);
+
+        vm.prank(charlie);
+        nci.vote(proposalId, true);
+
+        INakamotoConsensusInfinity.Proposal memory p = nci.getProposal(proposalId);
+        assertEq(p.weightFor, expectedPosOnly, "pure-stake validator: retention doesn't affect them");
+    }
+
+    function test_C40b_voteCastEvent_emitsAdjustedWeight() public {
+        _registerValidator(alice, STAKE_AMOUNT);
+        INakamotoConsensusInfinity.Validator memory va = nci.getValidator(alice);
+        uint256 posPortion = (va.posWeight * 3000) / 10000;
+        uint256 decayablePortion = va.totalWeight - posPortion;
+
+        vm.warp(block.timestamp + 90 days);
+        uint256 proposalId = _registerAndProposeFrom(bob, STAKE_AMOUNT);
+
+        uint256 retention = nci.calculateRetentionWeight(90 days, 365 days);
+        uint256 expectedWeight = posPortion + (decayablePortion * retention) / 10000;
+
+        vm.expectEmit(true, true, false, true);
+        emit VoteCast(proposalId, alice, true, expectedWeight);
+
+        vm.prank(alice);
+        nci.vote(proposalId, true);
     }
 }

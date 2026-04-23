@@ -267,14 +267,17 @@ contract OracleAggregationCRATest is Test {
         issuers[1] = makeAddr("alt2"); prices[1] = 200; nonces[1] = bytes32(uint256(12));
         issuers[2] = makeAddr("alt3"); prices[2] = 300; nonces[2] = bytes32(uint256(13));
         _commitAndAdvanceToReveal(issuers, prices, nonces);
-        // Reveals land in reveal phase — do NOT warp past reveal deadline
+        // Reveals land in reveal phase — do NOT warp past reveal deadline.
+        // Read getCurrentBatchId OUTSIDE the prank — vm.prank applies to the next
+        // external call, and getCurrentBatchId would consume it instead of revealPrice.
+        uint256 currentBatch = agg.getCurrentBatchId();
         for (uint256 i = 0; i < 3; i++) {
             vm.prank(issuers[i]);
-            agg.revealPrice(agg.getCurrentBatchId(), prices[i], nonces[i]);
+            agg.revealPrice(currentBatch, prices[i], nonces[i]);
         }
 
         vm.expectRevert(bytes("Reveal not yet ended"));
-        agg.settleBatch(agg.getCurrentBatchId());
+        agg.settleBatch(currentBatch);
     }
 
     // ============ Slash ============
@@ -329,7 +332,7 @@ contract OracleAggregationCRATest is Test {
         TruePriceOracle tpoImpl = new TruePriceOracle();
         ERC1967Proxy tpoProxy = new ERC1967Proxy(
             address(tpoImpl),
-            abi.encodeWithSelector(TruePriceOracle.initialize.selector)
+            abi.encodeWithSelector(TruePriceOracle.initialize.selector, address(this))
         );
         TruePriceOracle tpo = TruePriceOracle(address(tpoProxy));
         tpo.setOracleAggregator(address(agg));
@@ -355,7 +358,7 @@ contract OracleAggregationCRATest is Test {
         TruePriceOracle tpoImpl = new TruePriceOracle();
         ERC1967Proxy tpoProxy = new ERC1967Proxy(
             address(tpoImpl),
-            abi.encodeWithSelector(TruePriceOracle.initialize.selector)
+            abi.encodeWithSelector(TruePriceOracle.initialize.selector, address(this))
         );
         TruePriceOracle tpo = TruePriceOracle(address(tpoProxy));
         // Don't call setOracleAggregator — should revert
@@ -367,7 +370,7 @@ contract OracleAggregationCRATest is Test {
         TruePriceOracle tpoImpl = new TruePriceOracle();
         ERC1967Proxy tpoProxy = new ERC1967Proxy(
             address(tpoImpl),
-            abi.encodeWithSelector(TruePriceOracle.initialize.selector)
+            abi.encodeWithSelector(TruePriceOracle.initialize.selector, address(this))
         );
         TruePriceOracle tpo = TruePriceOracle(address(tpoProxy));
         tpo.setOracleAggregator(address(agg));

@@ -645,7 +645,15 @@ contract NakamotoConsensusInfinity is
 
         hasVotedOn[proposalId][msg.sender] = true;
 
-        uint256 weight = v.totalWeight;
+        // C40b: retention-adjusted vote weight. PoW + PoM portions decay with
+        // time since last heartbeat (cognitive substrate: work and mind are
+        // historical records whose relevance fades). PoS portion is present-
+        // tense locked capital and is NOT subject to decay — we subtract its
+        // contribution to totalWeight, scale the remainder by retention, then
+        // add PoS back. Threshold (_getTotalActiveWeight) is base weight, so
+        // stale validators effectively contribute less toward supermajority —
+        // the intended ETM alignment per Build Roadmap Gap #1.
+        uint256 weight = _retentionAdjustedVoteWeight(v);
 
         if (support) {
             p.weightFor += weight;
@@ -654,6 +662,27 @@ contract NakamotoConsensusInfinity is
         }
 
         emit VoteCast(proposalId, msg.sender, support, weight);
+    }
+
+    /// @notice Compute retention-adjusted vote weight for a validator.
+    /// @dev Decay applies to PoW + PoM portions only. PoS portion passes through
+    ///      untouched. Anchor is lastHeartbeat; horizon is RETENTION_HORIZON_DEFAULT.
+    ///      Fresh heartbeat → retentionBps = BPS → weight = totalWeight.
+    ///      Expired heartbeat (≥ horizon) → retentionBps = 0 → weight = PoS portion only.
+    /// @param v Validator whose vote weight is being computed.
+    /// @return Retention-adjusted vote weight.
+    function _retentionAdjustedVoteWeight(Validator storage v) internal view returns (uint256) {
+        uint256 elapsed = block.timestamp - v.lastHeartbeat;
+        uint256 retentionBps = calculateRetentionWeight(elapsed, RETENTION_HORIZON_DEFAULT);
+
+        // PoS portion of totalWeight (locked capital; not decay-eligible).
+        uint256 posPortion = (v.posWeight * POS_WEIGHT_BPS) / BPS;
+        // Remaining PoW+PoM portion is decay-eligible.
+        // v.totalWeight ≥ posPortion by construction; `unchecked` would be safe but
+        // we keep checked arithmetic for defense in depth.
+        uint256 decayablePortion = v.totalWeight - posPortion;
+
+        return posPortion + (decayablePortion * retentionBps) / BPS;
     }
 
     /// @inheritdoc INakamotoConsensusInfinity

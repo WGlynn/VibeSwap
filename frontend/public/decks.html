@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>VibeSwap :: Decks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface-1: #080808;
+    --surface-2: #0d0d0d;
+    --surface-3: #181818;
+    --border: #252525;
+    --border-hi: #424242;
+    --matrix: #00ff41;
+    --matrix-dim: #00cc34;
+    --terminal: #00d4ff;
+    --term-dim: #00a8cc;
+    --fg: #e0e0e0;
+    --fg-white: #ffffff;
+    --muted: #808080;
+    --muted-dim: #505050;
+    --danger: #ff3366;
+    --warn: #ffaa00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.4;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+  .matrix { color: var(--matrix); }
+  .terminal { color: var(--terminal); }
+  .muted { color: var(--muted); }
+  .white { color: var(--fg-white); }
+
+  /* ============ Header ============ */
+  .header {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 24px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted-dim);
+  }
+  .brand { color: var(--fg); font-weight: 700; }
+  .brand-accent { color: var(--matrix); }
+  .brand-sep { color: var(--muted-dim); }
+
+  .hero {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 40px 40px 24px;
+  }
+  .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--matrix);
+    font-weight: 600;
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    color: var(--fg-white);
+    line-height: 1;
+  }
+  .hero-sub {
+    font-size: 20px;
+    color: var(--terminal);
+    margin-top: 18px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .hero-hint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 22px;
+  }
+  .hero-hint kbd {
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    padding: 1px 8px;
+    border-radius: 3px;
+    color: var(--fg-white);
+    margin: 0 2px;
+  }
+
+  .gdivider {
+    max-width: 1280px;
+    margin: 20px auto 0;
+    padding: 0 40px;
+  }
+  .gdivider > div {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  }
+
+  /* ============ Rolodex ============ */
+  .rolodex {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 20px 40px 40px;
+    min-height: 560px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .stage {
+    position: relative;
+    width: 100%;
+    height: 460px;
+    perspective: 1400px;
+    perspective-origin: center center;
+    margin-bottom: 30px;
+  }
+
+  .deck-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(560px, 90vw);
+    height: 400px;
+    margin-left: calc(min(560px, 90vw) / -2);
+    margin-top: -200px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 32px;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease, border-color 0.3s, box-shadow 0.3s;
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+  .deck-card.active {
+    border-color: var(--matrix);
+    box-shadow: 0 0 50px -10px rgba(0,255,65,0.28), 0 0 20px -5px rgba(0,255,65,0.15);
+  }
+  .deck-card:hover {
+    border-color: var(--border-hi);
+  }
+  .deck-card.active:hover {
+    border-color: var(--matrix);
+  }
+
+  .deck-card-chrome {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted-dim);
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .deck-card-chrome .title-left { color: var(--fg-white); font-weight: 700; }
+  .deck-card-chrome .accent { color: var(--matrix); }
+
+  .deck-card-body {
+    padding-top: 22px;
+  }
+  .deck-card h2 {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--fg-white);
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+    margin-bottom: 14px;
+  }
+  .deck-card h2 .accent { color: var(--matrix); }
+  .deck-card h2.cyan-accent .accent { color: var(--terminal); }
+  .deck-card .tagline {
+    font-size: 16px;
+    color: var(--terminal);
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 18px;
+    letter-spacing: -0.01em;
+  }
+  .deck-card .summary {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .deck-card .footer-row {
+    position: absolute;
+    bottom: 22px;
+    left: 32px;
+    right: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted-dim);
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .deck-card .open-cta {
+    color: var(--matrix);
+    font-weight: 600;
+  }
+
+  .deck-card.cyan-accent.active {
+    border-color: var(--terminal);
+    box-shadow: 0 0 50px -10px rgba(0,212,255,0.28), 0 0 20px -5px rgba(0,212,255,0.15);
+  }
+  .deck-card.cyan-accent .deck-card-chrome .accent { color: var(--terminal); }
+  .deck-card.cyan-accent .open-cta { color: var(--terminal); }
+
+  /* ============ Nav ============ */
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 8px;
+  }
+  .nav-btn {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    width: 44px;
+    height: 44px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-btn:hover:not(:disabled) {
+    border-color: var(--matrix);
+    color: var(--matrix);
+    box-shadow: 0 0 15px -5px rgba(0,255,65,0.3);
+  }
+  .nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 80px;
+    text-align: center;
+  }
+  .counter .current { color: var(--matrix); font-weight: 700; }
+
+  /* ============ Footer ============ */
+  .site-footer {
+    max-width: 1280px;
+    margin: 40px auto 0;
+    padding: 20px 40px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted-dim);
+  }
+  .site-footer .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--matrix);
+    margin-right: 8px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px rgba(0,255,65,0.4);
+    animation: breathe 2s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+  }
+
+  /* ============ Mobile ============ */
+  @media (max-width: 900px) {
+    .header { padding: 16px 20px; font-size: 10px; }
+    .hero { padding: 20px 20px 16px; }
+    h1 { font-size: 40px; }
+    .hero-sub { font-size: 15px; margin-top: 12px; }
+    .hero-hint { font-size: 10px; margin-top: 16px; }
+    .rolodex { padding: 10px 20px 30px; min-height: auto; }
+    .stage { height: 380px; perspective: 900px; }
+    .deck-card { width: min(340px, 92vw); height: 340px; margin-left: calc(min(340px, 92vw) / -2); margin-top: -170px; padding: 22px 22px; }
+    .deck-card h2 { font-size: 26px; }
+    .deck-card .tagline { font-size: 14px; }
+    .deck-card .summary { font-size: 12px; }
+    .deck-card .footer-row { left: 22px; right: 22px; bottom: 18px; font-size: 10px; }
+    .gdivider { padding: 0 20px; }
+    .site-footer { padding: 16px 20px; font-size: 9px; flex-wrap: wrap; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <span class="brand">VIBESWAP</span>
+    <span class="brand-sep">  ::  </span>
+    <span class="brand-accent">DECKS</span>
+  </div>
+  <span>[ index // 2026 ]</span>
+</div>
+
+<div class="hero">
+  <div class="kicker">&gt; pitch // thesis // sub-projects</div>
+  <h1>Decks.</h1>
+  <div class="hero-sub">Every argument, one tap away.</div>
+  <div class="hero-hint">
+    <kbd>◀</kbd> <kbd>▶</kbd> to rotate · <kbd>Enter</kbd> to open · tap a card to bring it to center · tap the active card to open it
+  </div>
+</div>
+
+<div class="gdivider"><div></div></div>
+
+<section class="rolodex">
+  <div class="stage" id="stage"></div>
+  <div class="nav">
+    <button class="nav-btn prev" id="prev" aria-label="Previous">◀</button>
+    <span class="counter"><span class="current" id="cur">1</span> / <span id="total">3</span></span>
+    <button class="nav-btn next" id="next" aria-label="Next">▶</button>
+  </div>
+</section>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/" style="color: var(--terminal); text-decoration: none;">← vibeswap home</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+  // ============ Decks registry ============
+  // Add new decks here; the rolodex picks them up automatically.
+  const decks = [
+    {
+      title: 'Gitignore',
+      titleAccent: 'v0',
+      accent: 'terminal',
+      status: 'V0',
+      date: '2026-04',
+      tagline: "The tracker won't see you. We will.",
+      summary: 'A discourse platform for ideas the dominant tracking mechanism refuses to index. Prescriptive rubric ([Claim] [Evidence] [Acknowledge] [Push]), Shapley-priced reputation, attestation-challenge on evidence. Every LinkedIn-algorithm reject is a Gitignore signup candidate — the selection filter is self-enforcing.',
+      href: '/gitignore.html',
+    },
+    {
+      title: 'JARVIS',
+      titleAccent: 'Network',
+      accent: 'matrix',
+      status: 'BETA',
+      date: '2026-04',
+      tagline: '~100× cheaper than paid-API wrappers.',
+      summary: 'AI-native community infrastructure. Grounded in files, not tokens. Sharded by function. Triaged by cost. Same output quality — architectural cost reduction, not feature reduction.',
+      href: '/jarvis-network.html',
+    },
+    {
+      title: 'VibeSwap',
+      titleAccent: 'Intent Markets',
+      accent: 'terminal',
+      status: 'SEED',
+      date: '2026-04',
+      tagline: 'A coordination primitive, not a casino.',
+      summary: 'The first memecoin launchpad where extraction is the exception, not the business model. Commit-reveal auctions. Shapley consolidation. 0% protocol fee. 50% slashing on rugs.',
+      href: '/deck.html',
+    },
+    {
+      title: 'Wardenclyffe',
+      titleAccent: 'v3',
+      accent: 'matrix',
+      status: 'LIVE',
+      date: '2026',
+      tagline: '13-provider LLM cascade for zero-downtime AI.',
+      summary: 'Multi-provider fallback orchestration. When one provider rate-limits, slows, or fails, the cascade routes through the next-cheapest adequate option. Built for production AI that cannot go down.',
+      href: '/wardenclyffe.html',
+    },
+  ];
+
+  let currentIndex = 0;
+
+  const stage = document.getElementById('stage');
+  const counterEl = document.getElementById('cur');
+  const totalEl = document.getElementById('total');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+
+  totalEl.textContent = decks.length;
+
+  function getTransform(rel) {
+    const offsetX = rel * 200;
+    const scale = rel === 0 ? 1 : Math.max(0.72, 1 - Math.abs(rel) * 0.14);
+    const rotY = rel * -22;
+    const translateZ = rel === 0 ? 0 : -Math.min(280, Math.abs(rel) * 140);
+    return `translateX(${offsetX}px) translateZ(${translateZ}px) rotateY(${rotY}deg) scale(${scale})`;
+  }
+
+  function render() {
+    stage.innerHTML = '';
+    decks.forEach((deck, i) => {
+      const rel = i - currentIndex;
+      const card = document.createElement('div');
+      const accentClass = deck.accent === 'terminal' ? ' cyan-accent' : '';
+      card.className = 'deck-card' + accentClass + (rel === 0 ? ' active' : '');
+      card.innerHTML = `
+        <div class="deck-card-chrome">
+          <div>
+            <span class="title-left">${deck.title.toUpperCase()}</span>
+            <span>  ::  </span>
+            <span class="accent">${deck.titleAccent.toUpperCase()}</span>
+          </div>
+          <span>[ ${deck.status} // ${deck.date} ]</span>
+        </div>
+        <div class="deck-card-body">
+          <h2 class="${accentClass.trim()}">${deck.title} <span class="accent">${deck.titleAccent}.</span></h2>
+          <div class="tagline">${deck.tagline}</div>
+          <div class="summary">${deck.summary}</div>
+        </div>
+        <div class="footer-row">
+          <span>${deck.href}</span>
+          <span class="open-cta">${rel === 0 ? 'TAP TO OPEN →' : 'bring to center →'}</span>
+        </div>
+      `;
+      card.style.transform = getTransform(rel);
+      const absRel = Math.abs(rel);
+      card.style.opacity = absRel > 2.5 ? '0' : Math.max(0.25, 1 - absRel * 0.3);
+      card.style.zIndex = String(100 - absRel);
+      card.style.pointerEvents = absRel > 2.5 ? 'none' : 'auto';
+      card.addEventListener('click', () => {
+        if (rel === 0) {
+          window.location.href = deck.href;
+        } else {
+          currentIndex = i;
+          render();
+        }
+      });
+      stage.appendChild(card);
+    });
+    counterEl.textContent = currentIndex + 1;
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === decks.length - 1;
+  }
+
+  function next() {
+    if (currentIndex < decks.length - 1) {
+      currentIndex++;
+      render();
+    }
+  }
+  function prev() {
+    if (currentIndex > 0) {
+      currentIndex--;
+      render();
+    }
+  }
+
+  prevBtn.addEventListener('click', prev);
+  nextBtn.addEventListener('click', next);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      window.location.href = decks[currentIndex].href;
+    }
+  });
+
+  // Swipe on mobile
+  let touchStartX = null;
+  stage.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  });
+  stage.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next();
+      else prev();
+    }
+    touchStartX = null;
+  });
+
+  render();
+</script>
+
+</body>
+</html>

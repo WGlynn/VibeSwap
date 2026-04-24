@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Gitignore — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface-1: #080808;
+    --surface-2: #0d0d0d;
+    --surface-3: #181818;
+    --border: #252525;
+    --border-hi: #424242;
+    --matrix: #00ff41;
+    --matrix-dim: #00cc34;
+    --terminal: #00d4ff;
+    --term-dim: #00a8cc;
+    --fg: #e0e0e0;
+    --fg-white: #ffffff;
+    --muted: #808080;
+    --muted-dim: #505050;
+    --danger: #ff3366;
+    --warn: #ffaa00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.4;
+  }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+  .matrix { color: var(--matrix); }
+  .terminal { color: var(--terminal); }
+  .muted { color: var(--muted); }
+  .muted-dim { color: var(--muted-dim); }
+  .danger { color: var(--danger); }
+  .warn { color: var(--warn); }
+  .white { color: var(--fg-white); }
+
+  .deck { max-width: 1280px; margin: 0 auto; padding: 20px; }
+  .slide {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 32px;
+    padding: 40px 56px;
+    overflow: hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .chrome { display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted-dim); }
+  .brand { color: var(--fg); font-weight: 700; }
+  .brand-accent { color: var(--terminal); }
+  .brand-sep { color: var(--muted-dim); }
+  .page { color: var(--muted-dim); }
+
+  .kicker { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--terminal); font-weight: 600; margin-top: 20px; margin-bottom: 16px; }
+  .kicker.matrix { color: var(--matrix); }
+
+  h1.title { font-size: 42px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.08; white-space: pre-line; }
+
+  .footer { position: absolute; bottom: 20px; left: 56px; right: 56px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted-dim); }
+  .footer .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--terminal); margin-right: 8px; vertical-align: middle; box-shadow: 0 0 8px rgba(0,212,255,0.4); animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.15); } }
+
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 20px 24px; }
+  .card.matrix-border { border-color: var(--matrix); box-shadow: 0 0 30px -10px rgba(0,255,65,0.18); }
+  .card.cyan-border { border-color: var(--terminal); box-shadow: 0 0 30px -10px rgba(0,212,255,0.18); }
+  .card.danger-border { border-color: var(--danger); box-shadow: 0 0 30px -10px rgba(255,51,102,0.18); }
+
+  .bracket-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--terminal); letter-spacing: 0.03em; margin-bottom: 10px; }
+  .bracket-label.matrix { color: var(--matrix); }
+  .bracket-label.danger { color: var(--danger); }
+
+  .brackets { position: relative; padding: 24px; }
+  .brackets::before, .brackets::after, .brackets > .bl, .brackets > .br { position: absolute; content: ''; width: 18px; height: 18px; border: 2px solid var(--terminal); }
+  .brackets::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .brackets::after { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .brackets .bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .brackets .br { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+  .mega { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+  .hero-stat { font-size: 42px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.05; }
+
+  .rows { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 40px 1fr 2fr 1fr; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .row:last-child { border-bottom: none; }
+  .row .num { font-family: 'JetBrains Mono', monospace; color: var(--terminal); font-weight: 700; font-size: 18px; }
+  .row .name { color: var(--fg-white); font-weight: 600; font-size: 15px; }
+  .row .desc { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .row .out { color: var(--matrix); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; text-align: right; }
+
+  .code { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--muted); }
+  .code .kw { color: var(--terminal); font-weight: 600; }
+  .code .val { color: var(--matrix); font-weight: 700; }
+  .code .comment { color: var(--muted-dim); }
+
+  .caption { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-style: italic; color: var(--muted); }
+  .caption.hl { color: var(--matrix); font-style: normal; }
+
+  .hero-title { font-size: 96px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; margin-top: 4px; }
+  .hero-title .accent { color: var(--terminal); }
+  .tagline { font-size: 28px; font-weight: 700; color: var(--matrix); letter-spacing: -0.02em; margin-top: 20px; }
+  .subtagline { font-size: 16px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+
+  .arrow-list { list-style: none; }
+  .arrow-list li { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 8px; line-height: 1.45; }
+  .arrow-list li::before { content: '→  '; color: var(--terminal); font-weight: 700; }
+  .arrow-list.matrix li::before { color: var(--matrix); }
+
+  .top-nav { position: fixed; top: 12px; left: 12px; background: rgba(8,8,8,0.9); border: 1px solid var(--border); padding: 8px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); z-index: 1000; border-radius: 4px; }
+  .top-nav a { color: var(--terminal); text-decoration: none; }
+  .top-nav a:hover { color: var(--matrix); }
+
+  @media (max-width: 900px) {
+    .deck { padding: 10px; }
+    .slide { aspect-ratio: auto; min-height: auto; padding: 28px 22px 24px; overflow: visible; background-size: 32px 32px; margin-bottom: 16px; }
+    .chrome { font-size: 9px; }
+    .kicker { font-size: 10px; margin-top: 14px; margin-bottom: 10px; }
+    h1.title { font-size: 24px; line-height: 1.15; }
+    .hero-title { font-size: 44px; }
+    .tagline { font-size: 17px; margin-top: 14px; }
+    .subtagline { font-size: 13px; margin-top: 10px; }
+    .brackets { padding: 28px 22px; }
+    .footer { position: static; margin-top: 20px; padding-top: 10px; font-size: 9px; gap: 10px; flex-wrap: wrap; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 14px; }
+    .mega { font-size: 56px; }
+    .hero-stat { font-size: 28px; }
+    .row { grid-template-columns: 28px 1fr; grid-template-rows: auto auto auto; gap: 2px; padding: 10px 0; }
+    .row .num { grid-row: span 3; font-size: 14px; }
+    .row .name { font-size: 14px; }
+    .row .desc { font-size: 11px; }
+    .row .out { text-align: left; font-size: 11px; }
+    .top-nav { font-size: 9px; padding: 6px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+  <a href="/decks.html">← all decks</a>
+</div>
+
+<div class="deck">
+
+<!-- SLIDE 1 — Title -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div>
+    <span class="page">[ V0 // 2026 ]</span>
+  </div>
+  <div class="brackets" style="margin-top: 60px; padding: 50px 60px;">
+    <div class="bl"></div><div class="br"></div>
+    <div class="kicker" style="margin-top:0">&gt; a congregation for the ignored</div>
+    <h1 class="hero-title">Git<span class="accent">ignore.</span></h1>
+    <div class="tagline">The tracker won't see you. We will.</div>
+    <div class="subtagline">A discourse platform for ideas the dominant tracking mechanism refuses to index.<br>Prescriptive rubric. Shapley-priced reputation. No algorithm to game.</div>
+  </div>
+  <div class="footer">
+    <div><span class="brand">Will Glynn</span><span class="brand-sep">  ·  </span><span class="matrix">vibeswap.org/gitignore</span><span class="brand-sep">  ·  </span>private beta</div>
+    <div>[ 00 / 10 ]</div>
+  </div>
+</section>
+
+<!-- SLIDE 2 — Problem -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 02 / 10 ]</span></div>
+  <div class="kicker">&gt; problem</div>
+  <h1 class="title">Every algorithm ships with a filter.<br>Every filter buries something.</h1>
+  <div class="grid-2" style="margin-top: 40px; align-items: center;">
+    <div>
+      <div class="mega danger">~0</div>
+      <div class="caption" style="margin-top: 14px;">// engagement on thesis-level posts</div>
+      <div style="color: var(--fg); margin-top: 14px; font-size: 16px; line-height: 1.5;">LinkedIn's algorithm rewards tribal signaling + positional dominance. X rewards outrage + virality. Journalism rewards consensus + access.</div>
+      <div class="terminal mono" style="font-size: 13px; margin-top: 14px; font-weight: 600;">Structural arguments don't pattern-match any of those.</div>
+    </div>
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ WHAT GETS BURIED ]</div>
+      <ul class="arrow-list" style="margin-top: 10px;">
+        <li>Positions that require 3+ sentences of reasoning</li>
+        <li>Arguments that concede before sharpening</li>
+        <li>Claims that don't flatter a tribe</li>
+        <li>Novel framings that haven't been pre-validated</li>
+        <li>Ideas whose underlying substrate hasn't matured yet</li>
+      </ul>
+      <div class="danger mono" style="font-size: 12px; font-weight: 700; margin-top: 16px; font-style: italic;">You're not wrong. The tracker just won't index you.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 02 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 3 — Insight -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 03 / 10 ]</span></div>
+  <div class="kicker">&gt; insight</div>
+  <h1 class="title">The thing that makes you unfit for mass platforms<br><span class="terminal">is exactly what makes you fit for this one.</span></h1>
+  <div class="grid-2" style="margin-top: 40px;">
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ MASS PLATFORMS SELECT FOR ]</div>
+      <ul class="arrow-list" style="margin-top: 10px;">
+        <li>Consensus mimicry</li>
+        <li>Emotional valence</li>
+        <li>Short takes with tribal markers</li>
+        <li>Volume over depth</li>
+        <li>Vibe over structure</li>
+      </ul>
+      <div class="mono danger" style="font-size: 12px; margin-top: 14px; font-style: italic;">Their signal gets elevated. Yours gets buried.</div>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label">[ GITIGNORE SELECTS FOR ]</div>
+      <ul class="arrow-list matrix" style="margin-top: 10px;">
+        <li>Structural thinking</li>
+        <li>Concession-before-sharpening</li>
+        <li>Claims grounded in evidence</li>
+        <li>Novelty penalized for restating consensus</li>
+        <li>Persistence of voice over peak engagement</li>
+      </ul>
+      <div class="mono matrix" style="font-size: 12px; margin-top: 14px; font-style: italic;">Your signal was always the payload. Now the substrate matches.</div>
+    </div>
+  </div>
+  <div style="text-align: center; margin-top: 30px; color: var(--fg); font-size: 14px; line-height: 1.45;">If your ideas fit LinkedIn, post them there.<br><span class="white" style="font-weight: 600;">If LinkedIn keeps burying them, you were always a Gitignore user.</span></div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 03 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 4 — Mechanism: the rubric -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 04 / 10 ]</span></div>
+  <div class="kicker">&gt; mechanism :: rubric</div>
+  <h1 class="title">Every post fills four slots.<br>Blank slots reject the submission.</h1>
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card cyan-border">
+      <div class="bracket-label">[ REQUIRED FIELDS ]</div>
+      <div class="code" style="margin-top: 12px; line-height: 1.8;">
+        <span class="kw">[Claim]</span>       <span class="comment">// the specific position being advanced</span><br>
+        <span class="kw">[Evidence]</span>    <span class="comment">// what supports the claim</span><br>
+        <span class="kw">[Acknowledge]</span> <span class="comment">// what prior context already said</span><br>
+        <span class="kw">[Push]</span>        <span class="comment">// what you're advancing or disputing</span>
+      </div>
+      <div class="mono terminal" style="font-size: 12px; margin-top: 14px; font-weight: 600; line-height: 1.5;">Blank required slot → post rejected.<br>Your turn to either think or stay out.</div>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label matrix">[ WHAT THIS KILLS ]</div>
+      <ul class="arrow-list matrix">
+        <li>Drive-by reactions with no argument</li>
+        <li>Restating the thread's consensus as if it were a counter</li>
+        <li>Claiming novelty without saying what's novel</li>
+        <li>Throwing evidence-free takes into technical threads</li>
+        <li>Positional-dominance posturing (Keri-pattern)</li>
+      </ul>
+      <div class="matrix mono" style="font-size: 12px; margin-top: 14px; font-style: italic; font-weight: 700;">The rubric IS the moderation. Math, not manual.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 04 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 5 — Scoring: Shapley + novelty + attestation -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 05 / 10 ]</span></div>
+  <div class="kicker">&gt; mechanism :: scoring</div>
+  <h1 class="title">Reputation compounds on model-advancement.<br>Not on reach.</h1>
+  <div class="rows" style="margin-top: 36px;">
+    <div class="row"><div class="num">01</div><div class="name">Shapley-weighted reputation</div><div class="desc">Contribution to thread quality, not upvotes. Fair share under cooperative-game theory.</div><div class="out">→ signal rewarded</div></div>
+    <div class="row"><div class="num">02</div><div class="name">Novelty multiplier</div><div class="desc">Restating thread consensus scores zero. Every post has to add something.</div><div class="out">→ no echo chamber</div></div>
+    <div class="row"><div class="num">03</div><div class="name">Attestation-challenge on evidence</div><div class="desc">Any reader can tag [Evidence] as <span class="matrix mono">challenged</span>. 24h dispute window. Resolution reputation-weighted.</div><div class="out">→ grounded claims</div></div>
+    <div class="row"><div class="num">04</div><div class="name">Append-only log</div><div class="desc">Posts don't edit. Addenda are new replies. The record is cryptographically permanent.</div><div class="out">→ no revisionism</div></div>
+    <div class="row"><div class="num">05</div><div class="name">Prescriptive-before-retrospective</div><div class="desc">Rubric enforces shape at submission. Scoring applies after. You pass the gate, then you get judged.</div><div class="out">→ structural filter</div></div>
+  </div>
+  <div class="caption" style="margin-top: 22px; text-align: center;">// backend: append-only git repo  ·  <span class="matrix" style="font-weight: 700;">the medium is on-the-nose with the name</span></div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 05 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 6 — Selection filter (founding threads self-referential) -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 06 / 10 ]</span></div>
+  <div class="kicker">&gt; selection filter</div>
+  <h1 class="title">Every LinkedIn-algorithm reject<br>is a Gitignore signup candidate.</h1>
+  <div class="grid-2" style="margin-top: 40px; align-items: center;">
+    <div>
+      <div class="hero-stat white">self-referential<br>by design</div>
+      <div style="color: var(--muted); font-size: 14px; margin-top: 18px; line-height: 1.55;">People who show up via "my idea got zero traction" are <span class="white" style="font-weight: 600;">pre-filtered for structural thinking over consensus mimicking</span>.</div>
+      <div class="terminal" style="font-size: 14px; margin-top: 16px; font-weight: 600;">The thing that makes them unfit for mass platforms is exactly what makes them fit for this one.</div>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label">[ FOUNDING THREADS ]</div>
+      <ul class="arrow-list" style="margin-top: 10px;">
+        <li><span class="white">"APIs as options speculation"</span> — 0 engagement on LinkedIn. Perfect v0 post.</li>
+        <li><span class="white">OSCH thesis</span> — suppressed by mainstream feeds. Belongs here.</li>
+        <li><span class="white">Three-axis vs fourth-axis settlement</span> — the Keri-thread rerun, this time with the rubric enforced.</li>
+        <li><span class="white">"Why I can't lie to your face"</span> — why AI without social-pressure gradients is the better auditor.</li>
+      </ul>
+      <div class="terminal mono" style="font-size: 12px; margin-top: 14px; font-weight: 600; font-style: italic;">The founding threads ARE the proof of concept.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 06 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 7 — Trajectory -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 07 / 10 ]</span></div>
+  <div class="kicker">&gt; trajectory</div>
+  <h1 class="title">Ship today. Price the rubric later.</h1>
+  <div class="rows" style="margin-top: 36px;">
+    <div class="row"><div class="num">v0</div><div class="name">Single-thread, invite-write</div><div class="desc">Rubric enforced client-side. Attestation-challenge simple-majority. Git-repo backend.</div><div class="out">now</div></div>
+    <div class="row"><div class="num">v1</div><div class="name">Shapley-weighted reputation</div><div class="desc">Server-side rubric validation. Reputation compounds on model-advancement. Eth-signature login.</div><div class="out">+ weeks</div></div>
+    <div class="row"><div class="num">v2</div><div class="name">Novelty multiplier + multi-thread</div><div class="desc">C41-shape novelty penalties. Cross-thread reputation. Basic discovery without engagement-maximization.</div><div class="out">+ months</div></div>
+    <div class="row"><div class="num">v3</div><div class="name">Full ETM substrate</div><div class="desc">State-rent on stale posts. DAO governance within augmented-governance bounds. Federation.</div><div class="out">+ year</div></div>
+  </div>
+  <div class="caption hl" style="text-align: center; margin-top: 28px;">// Incremental progressive manifestation. The prototype teaches the design.</div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 07 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 8 — Substrate family -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 08 / 10 ]</span></div>
+  <div class="kicker">&gt; substrate family</div>
+  <h1 class="title">Three substrates. Same extraction.<br>Same response.</h1>
+  <div class="grid-3" style="margin-top: 36px;">
+    <div class="card matrix-border">
+      <div class="bracket-label matrix">[ FINANCIAL LAYER ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 10px 0;">VibeSwap</div>
+      <div class="mono muted" style="font-size: 12px; line-height: 1.5;">MEV. Sandwich attacks. Sniping. Rent-seeking middlemen.<br><br>Fix: commit-reveal batch auctions. Uniform clearing price. 0% protocol fee.</div>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label">[ AI LAYER ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 10px 0;">JARVIS Network</div>
+      <div class="mono muted" style="font-size: 12px; line-height: 1.5;">API rent. Paid-wrapper margins. Options speculation against vanished scarcity.<br><br>Fix: shard + triage + ground + template + route. 100× cheaper.</div>
+    </div>
+    <div class="card" style="border-color: var(--warn); box-shadow: 0 0 30px -10px rgba(255,170,0,0.18);">
+      <div class="bracket-label" style="color: var(--warn);">[ ATTENTION LAYER ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 10px 0;">Gitignore</div>
+      <div class="mono muted" style="font-size: 12px; line-height: 1.5;">Algorithmic suppression of structural work. Engagement-maximization burying signal.<br><br>Fix: rubric + Shapley + attestation. The medium IS the moderation.</div>
+    </div>
+  </div>
+  <div class="caption hl" style="text-align: center; margin-top: 28px; line-height: 1.6;">// Same cooperative-capitalism thesis. Same GEV-resistance architecture.<br><span class="matrix" style="font-weight: 700;">Three different substrates because the extraction shows up in three different layers.</span></div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 08 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 9 — Why the name -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 09 / 10 ]</span></div>
+  <div class="kicker">&gt; why the name</div>
+  <h1 class="title">Every dev knows <span class="terminal mono">.gitignore</span>.<br>The name encodes the thesis.</h1>
+  <div class="grid-2" style="margin-top: 40px; align-items: center;">
+    <div class="card cyan-border">
+      <div class="bracket-label">[ ETYMOLOGY ]</div>
+      <div class="code" style="margin-top: 12px;">
+        <span class="comment"># .gitignore</span><br>
+        node_modules/<br>
+        <span class="kw">*.log</span><br>
+        <span class="kw">.env</span><br>
+        <span class="val">your_best_idea.md</span> <span class="comment"># ← the platform is for this line</span>
+      </div>
+      <div class="mono muted" style="font-size: 13px; margin-top: 16px; line-height: 1.55;">The `.gitignore` file tells the tracker what to <span class="white">exclude</span>.<br>Every mass platform has one. Ours is a mirror image.</div>
+    </div>
+    <div>
+      <div style="font-size: 28px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.2;">What they discard,<br><span class="matrix">we index.</span></div>
+      <div style="color: var(--muted); font-size: 14px; margin-top: 20px; line-height: 1.55;">The selection filter is self-enforcing: people arrive because their ideas got ignored elsewhere. That's the signup funnel AND the quality filter in one step.</div>
+      <div class="terminal" style="font-size: 14px; margin-top: 20px; font-weight: 600; line-height: 1.45;">The name reads as a joke. Then you sit with it for a minute and it's the whole pitch in one word.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div>[ 09 / 10 ]</div></div>
+</section>
+
+<!-- SLIDE 10 — Ask / CTA -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">GIT</span><span class="brand-accent" style="font-weight: 700;">ignore</span></div><span class="page">[ 10 / 10 ]</span></div>
+  <div class="kicker">&gt; v0 cohort</div>
+  <h1 class="title">First 10–20 seats.<br>Invitation-only.</h1>
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card cyan-border">
+      <div class="bracket-label">[ WHO FITS ]</div>
+      <ul class="arrow-list" style="margin-top: 10px;">
+        <li>Builders with structural ideas and low reach</li>
+        <li>Researchers tired of summarization-by-journalist</li>
+        <li>Engineers whose best arguments don't pattern-match LinkedIn shapes</li>
+        <li>Anyone who's watched a correct take get buried and kept working anyway</li>
+      </ul>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label matrix">[ HOW v0 WORKS ]</div>
+      <ul class="arrow-list matrix" style="margin-top: 10px;">
+        <li>Post with <span class="matrix mono">[Claim] [Evidence] [Acknowledge] [Push]</span> filled in</li>
+        <li>Attestation-challenge any <span class="matrix mono">[Evidence]</span> line</li>
+        <li>Reply structure enforced on every chain</li>
+        <li>Append-only. Your post stays as posted, forever.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brackets" style="margin-top: 32px; padding: 22px 28px;">
+    <div class="bl"></div><div class="br"></div>
+    <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em;">Seat request: <span class="terminal">DM Will</span> on Telegram, or email <span class="terminal mono">TBD@gitignore.forum</span></div>
+    <div class="caption" style="margin-top: 8px;">// sibling substrate to VibeSwap + JARVIS Network · same cryptographic-verification thesis · different extraction layer</div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>V0 // 2026</div><div><span class="matrix">the tracker won't see you. we will.</span></div></div>
+</section>
+
+</div>
+</body>
+</html>

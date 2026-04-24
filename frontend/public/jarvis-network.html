@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>JARVIS Network — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface-1: #080808;
+    --surface-2: #0d0d0d;
+    --surface-3: #181818;
+    --border: #252525;
+    --border-hi: #424242;
+    --matrix: #00ff41;
+    --matrix-dim: #00cc34;
+    --terminal: #00d4ff;
+    --term-dim: #00a8cc;
+    --fg: #e0e0e0;
+    --fg-white: #ffffff;
+    --muted: #808080;
+    --muted-dim: #505050;
+    --danger: #ff3366;
+    --warn: #ffaa00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.4;
+  }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+  .matrix { color: var(--matrix); }
+  .terminal { color: var(--terminal); }
+  .muted { color: var(--muted); }
+  .muted-dim { color: var(--muted-dim); }
+  .danger { color: var(--danger); }
+  .warn { color: var(--warn); }
+  .white { color: var(--fg-white); }
+
+  .deck { max-width: 1280px; margin: 0 auto; padding: 20px; }
+  .slide {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 32px;
+    padding: 40px 56px;
+    overflow: hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .chrome { display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted-dim); }
+  .brand { color: var(--fg); font-weight: 700; }
+  .brand-accent { color: var(--matrix); }
+  .brand-sep { color: var(--muted-dim); }
+  .page { color: var(--muted-dim); }
+
+  .kicker { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--matrix); font-weight: 600; margin-top: 20px; margin-bottom: 16px; }
+  .kicker.cyan { color: var(--terminal); }
+
+  h1.title { font-size: 42px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.08; white-space: pre-line; }
+
+  .footer { position: absolute; bottom: 20px; left: 56px; right: 56px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted-dim); }
+  .footer .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--matrix); margin-right: 8px; vertical-align: middle; box-shadow: 0 0 8px rgba(0,255,65,0.4); animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.15); } }
+
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 20px 24px; }
+  .card.matrix-border { border-color: var(--matrix); box-shadow: 0 0 30px -10px rgba(0,255,65,0.18); }
+  .card.cyan-border { border-color: var(--terminal); box-shadow: 0 0 30px -10px rgba(0,212,255,0.18); }
+  .card.danger-border { border-color: var(--danger); box-shadow: 0 0 30px -10px rgba(255,51,102,0.18); }
+
+  .bracket-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--matrix); letter-spacing: 0.03em; margin-bottom: 10px; }
+  .bracket-label.cyan { color: var(--terminal); }
+  .bracket-label.danger { color: var(--danger); }
+
+  .brackets { position: relative; padding: 24px; }
+  .brackets::before, .brackets::after, .brackets > .bl, .brackets > .br { position: absolute; content: ''; width: 18px; height: 18px; border: 2px solid var(--matrix); }
+  .brackets::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .brackets::after { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .brackets .bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .brackets .br { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+  .mega { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+  .hero-stat { font-size: 42px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.05; }
+
+  .rows { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 40px 1fr 2fr 1fr; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .row:last-child { border-bottom: none; }
+  .row .num { font-family: 'JetBrains Mono', monospace; color: var(--matrix); font-weight: 700; font-size: 18px; }
+  .row .name { color: var(--fg-white); font-weight: 600; font-size: 15px; }
+  .row .desc { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .row .out { color: var(--terminal); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; text-align: right; }
+
+  .code { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--muted); }
+  .code .kw { color: var(--terminal); font-weight: 600; }
+  .code .val { color: var(--matrix); font-weight: 700; }
+
+  .caption { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-style: italic; color: var(--muted); }
+  .caption.hl { color: var(--terminal); font-style: normal; }
+
+  .hero-title { font-size: 96px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; margin-top: 4px; }
+  .hero-title .accent { color: var(--matrix); }
+  .tagline { font-size: 28px; font-weight: 700; color: var(--terminal); letter-spacing: -0.02em; margin-top: 20px; }
+  .subtagline { font-size: 16px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+
+  .arrow-list { list-style: none; }
+  .arrow-list li { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 8px; line-height: 1.45; }
+  .arrow-list li::before { content: '→  '; color: var(--matrix); font-weight: 700; }
+  .arrow-list.cyan li::before { color: var(--terminal); }
+
+  .top-nav { position: fixed; top: 12px; left: 12px; background: rgba(8,8,8,0.9); border: 1px solid var(--border); padding: 8px 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); z-index: 1000; border-radius: 4px; }
+  .top-nav a { color: var(--terminal); text-decoration: none; }
+  .top-nav a:hover { color: var(--matrix); }
+
+  @media (max-width: 900px) {
+    .deck { padding: 10px; }
+    .slide { aspect-ratio: auto; min-height: auto; padding: 28px 22px 24px; overflow: visible; background-size: 32px 32px; margin-bottom: 16px; }
+    .chrome { font-size: 9px; }
+    .kicker { font-size: 10px; margin-top: 14px; margin-bottom: 10px; }
+    h1.title { font-size: 24px; line-height: 1.15; }
+    .hero-title { font-size: 44px; }
+    .tagline { font-size: 17px; margin-top: 14px; }
+    .subtagline { font-size: 13px; margin-top: 10px; }
+    .brackets { padding: 28px 22px; }
+    .footer { position: static; margin-top: 20px; padding-top: 10px; font-size: 9px; gap: 10px; flex-wrap: wrap; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 14px; }
+    .mega { font-size: 56px; }
+    .hero-stat { font-size: 28px; }
+    .row { grid-template-columns: 28px 1fr; grid-template-rows: auto auto auto; gap: 2px; padding: 10px 0; }
+    .row .num { grid-row: span 3; font-size: 14px; }
+    .row .name { font-size: 14px; }
+    .row .desc { font-size: 11px; }
+    .row .out { text-align: left; font-size: 11px; }
+    .top-nav { font-size: 9px; padding: 6px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+  <a href="/decks.html">← all decks</a>
+</div>
+
+<div class="deck">
+
+<!-- SLIDE 1 — Title -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div>
+    <span class="page">[ BETA // 2026 ]</span>
+  </div>
+  <div class="brackets" style="margin-top: 60px; padding: 50px 60px;">
+    <div class="bl"></div><div class="br"></div>
+    <div class="kicker" style="margin-top:0">&gt; ai-native community infrastructure</div>
+    <h1 class="hero-title">JARVIS <span class="accent">Network.</span></h1>
+    <div class="tagline">~100× cheaper than paid-API wrappers.</div>
+    <div class="subtagline">Grounded in files, not tokens. Sharded by function. Triaged by cost.<br>Same output quality. Architectural cost reduction, not feature reduction.</div>
+  </div>
+  <div class="footer">
+    <div><span class="brand">Will Glynn</span><span class="brand-sep">  ·  </span><span class="terminal">github.com/WGlynn/jarvis-network</span><span class="brand-sep">  ·  </span>private beta</div>
+    <div>[ 00 / 12 ]</div>
+  </div>
+</section>
+
+<!-- SLIDE 2 — Problem -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 02 / 12 ]</span></div>
+  <div class="kicker">&gt; problem</div>
+  <h1 class="title">The AI wrapper bubble.<br>One giant model call, every time.</h1>
+  <div class="grid-2" style="margin-top: 40px; align-items: center;">
+    <div>
+      <div class="mega danger">$20–$200</div>
+      <div class="caption" style="margin-top: 14px;">// per user per month</div>
+      <div style="color: var(--fg); margin-top: 14px; font-size: 16px; line-height: 1.5;">What the current AI tooling industry<br>charges — ChatGPT Team, Notion AI,<br>enterprise copilots, all the same shape.</div>
+    </div>
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ WHERE THE MONEY GOES ]</div>
+      <ul class="arrow-list" style="margin-top: 10px;">
+        <li>Full model call on every message</li>
+        <li>All context loaded, every turn</li>
+        <li>Structured output generated, not templated</li>
+        <li>Locked-in to one expensive API</li>
+        <li>Customer rents the OpenAI / Anthropic margin</li>
+      </ul>
+      <div class="danger mono" style="font-size: 12px; font-weight: 700; margin-top: 16px; font-style: italic;">You're paying for architectural laziness — not intelligence.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 02 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 3 — Insight -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 03 / 12 ]</span></div>
+  <div class="kicker">&gt; insight</div>
+  <h1 class="title">Throwing infinite compute at something<br>doesn't make it intelligent.<br><span class="matrix">Efficiency per byte does.</span></h1>
+  <div class="grid-2" style="margin-top: 40px;">
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ OLD PATH ]</div>
+      <div class="mono" style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">scale = more tokens</div>
+      <div class="mono muted" style="font-size: 13px; line-height: 1.6;">→ Bigger context window<br>→ More tokens per call<br>→ More expensive inference<br>→ Higher API bill</div>
+      <div class="mono danger" style="font-size: 12px; margin-top: 14px; font-style: italic;">Capital-intensive. Plateaus at the API margin.</div>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label">[ OUR PATH ]</div>
+      <div class="mono" style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">scale = denser bytes</div>
+      <div class="mono muted" style="font-size: 13px; line-height: 1.6;">→ Scoped prompts per call<br>→ Haiku triage before big model<br>→ Templates where nothing is generated<br>→ Route across providers by task</div>
+      <div class="mono matrix" style="font-size: 12px; margin-top: 14px; font-style: italic;">Constraint-driven. Wins over time.</div>
+    </div>
+  </div>
+  <div style="text-align: center; margin-top: 30px; color: var(--fg); font-size: 14px; line-height: 1.45;">Same model. Same output quality.<br><span class="white" style="font-weight: 600;">Drop the architectural laziness — drop the bill 100×.</span></div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 03 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 4 — Five moves -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 04 / 12 ]</span></div>
+  <div class="kicker">&gt; mechanism</div>
+  <h1 class="title">Five architectural moves.<br>All in code.</h1>
+  <div class="rows" style="margin-top: 36px;">
+    <div class="row"><div class="num">01</div><div class="name">Shard by function</div><div class="desc">Each call's prompt scoped to intent; no monolithic context.</div><div class="out">→ lean calls</div></div>
+    <div class="row"><div class="num">02</div><div class="name">Triage by cost</div><div class="desc">Haiku classifies every message; only ~15% hit the full model.</div><div class="out">→ 85% saved</div></div>
+    <div class="row"><div class="num">03</div><div class="name">Ground in files</div><div class="desc">LLM queries archive via tools instead of re-ingesting history.</div><div class="out">→ no stale context</div></div>
+    <div class="row"><div class="num">04</div><div class="name">Template deterministic output</div><div class="desc">Digests / stats render from aggregated data. Zero generated tokens.</div><div class="out">→ 0 inference cost</div></div>
+    <div class="row"><div class="num">05</div><div class="name">Route across providers</div><div class="desc">Claude, OpenRouter, Ollama. Cheapest adequate per task.</div><div class="out">→ no lock-in</div></div>
+  </div>
+  <div class="caption" style="margin-top: 22px; text-align: center;">// ships in <span class="terminal">src/triage.js · src/archive.js · src/commands.js · src/claude-client.js</span>  ·  <span class="matrix" style="font-weight: 700;">15 green tests</span></div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 04 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 5 — 100× moat -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 05 / 12 ]</span></div>
+  <div class="kicker">&gt; wedge</div>
+  <h1 class="title">The 100× claim is the moat.</h1>
+  <div class="grid-2" style="margin-top: 40px; align-items: center; gap: 40px;">
+    <div style="text-align: center;">
+      <div class="matrix" style="font-size: 220px; font-weight: 800; line-height: 1; letter-spacing: -0.06em; text-shadow: 0 0 40px rgba(0,255,65,0.25);">100×</div>
+      <div class="caption" style="text-align: center; margin-top: 10px;">// cheaper than paid-API wrappers</div>
+    </div>
+    <div>
+      <div style="font-size: 26px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.25;">Not cheaper.<br>Structurally different.</div>
+      <div style="color: var(--muted); font-size: 14px; margin-top: 18px; line-height: 1.55;">Every premium-API wrapper pays for one giant model call, every time, with all context loaded.</div>
+      <div class="terminal" style="font-size: 14px; margin-top: 18px; font-weight: 600; line-height: 1.45;">We shard by function, triage by cost, ground in files, and template anything deterministic.</div>
+      <div style="color: var(--fg-white); font-size: 14px; margin-top: 18px; font-weight: 600; line-height: 1.5;">Incumbents can't undercut without rebuilding from the substrate.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 05 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 6 — Sharding -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 06 / 12 ]</span></div>
+  <div class="kicker">&gt; move 01 :: sharding</div>
+  <h1 class="title">Two kinds of sharding.<br>No monolithic bot.</h1>
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card matrix-border">
+      <div class="bracket-label">[ CHAT-LEVEL ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 10px 0 16px 0;">Router → N workers by chat ID.</div>
+      <ul class="arrow-list">
+        <li>Each worker holds state only for its assigned chats.</li>
+        <li>TG updates dispatch to the right shard, no cross-talk.</li>
+        <li>Add a customer → no scale hit on existing communities.</li>
+      </ul>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label cyan">[ FUNCTION-LEVEL ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 10px 0 16px 0;">Tool bundles per domain.</div>
+      <ul class="arrow-list cyan">
+        <li>trading · social · security · memehunter · portfolio</li>
+        <li>Workflow router picks the smallest relevant bundle per intent.</li>
+        <li>Smaller prompt = fewer tokens per call.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="caption hl" style="text-align: center; margin-top: 28px;">// No giant monolithic bot loading every conversation's state on every turn.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 06 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 7 — Triage -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 07 / 12 ]</span></div>
+  <div class="kicker">&gt; move 02 :: triage</div>
+  <h1 class="title">Haiku classifies every message.<br>Only <span class="matrix">~15%</span> hit the full model.</h1>
+  <div class="grid-2" style="margin-top: 40px; align-items: center; gap: 32px;">
+    <div>
+      <div class="hero-stat white">engage / observe</div>
+      <div style="color: var(--muted); font-size: 14px; margin-top: 14px; line-height: 1.55;">Every incoming message is scored for "worth a reply" by a Haiku classifier — 5–10× cheaper than Sonnet, ~50× cheaper than Opus.</div>
+      <div class="terminal" style="font-size: 14px; margin-top: 16px; font-weight: 600;">We pay big-model prices only when the reply actually earns the spend.</div>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label">[ FILTERS ]</div>
+      <div class="rows" style="margin-top: 8px;">
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px;"><span class="white">Too short / noise</span><span class="matrix mono">observe</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px;"><span class="white">Per-chat cooldown (10s)</span><span class="matrix mono">observe</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px;"><span class="white">Classifier confidence &lt; 0.5</span><span class="matrix mono">observe</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px;"><span class="white">Direct name mention</span><span class="terminal mono">engage (bypass)</span></div>
+        <div style="display:flex; justify-content:space-between; padding: 8px 0; font-size: 14px;"><span class="white">High-signal question</span><span class="terminal mono">engage</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 07 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 8 — Archive + Templates -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 08 / 12 ]</span></div>
+  <div class="kicker">&gt; moves 03 + 04 :: grounded &amp; deterministic</div>
+  <h1 class="title">Ground in files.<br>Template anything deterministic.</h1>
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card matrix-border">
+      <div class="bracket-label">[ ARCHIVE SUBSTRATE ]</div>
+      <div class="code" style="margin-top: 10px;">
+        <span class="muted">// per-chat, per-day jsonl</span><br>
+        <span class="kw">DATA_DIR</span>/archive/&lt;chatId&gt;/<br>
+        &nbsp;&nbsp;<span class="val">2026-04-23.jsonl</span>
+      </div>
+      <ul class="arrow-list" style="margin-top: 16px;">
+        <li>Every message appended on receipt.</li>
+        <li>LLM queries ground truth via tools, not re-ingestion.</li>
+        <li>Append-only = Merkle-tree-natural (v2 verifiability).</li>
+        <li>Grep-able. Human-readable. Rsync-efficient.</li>
+      </ul>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label cyan">[ TEMPLATE DETERMINISTIC ]</div>
+      <div class="code" style="margin-top: 10px;">
+        <span class="muted">// /summary returns:</span><br>
+        <span class="kw">Today</span>: 47 msgs, 12 users<br>
+        <span class="kw">Top</span>: alice(9), bob(7)<br>
+        <span class="kw">Types</span>: text:38 sticker:9
+      </div>
+      <ul class="arrow-list cyan" style="margin-top: 16px;">
+        <li>Digests / stats / profiles: aggregateDay() + template.</li>
+        <li>Zero generated tokens. Zero hallucination slot.</li>
+        <li>Every field traces to a record.</li>
+        <li>Provable via Merkle replay in v2.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 08 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 9 — Provider routing -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 09 / 12 ]</span></div>
+  <div class="kicker">&gt; move 05 :: provider routing</div>
+  <h1 class="title">Claude. OpenRouter. Ollama.<br>Cheapest adequate per task.</h1>
+  <div class="grid-3" style="margin-top: 40px;">
+    <div class="card matrix-border">
+      <div class="bracket-label">[ ANTHROPIC ]</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); margin: 10px 0;">Production quality.</div>
+      <div class="mono muted" style="font-size: 12px; line-height: 1.5;">Haiku for triage + default.<br>Sonnet/Opus for heavy lift.<br>~$0.80 / $3 / $15 per MTok.</div>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label cyan">[ OPENROUTER ]</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); margin: 10px 0;">Free-tier + open-weights.</div>
+      <div class="mono muted" style="font-size: 12px; line-height: 1.5;">Llama / Mistral / DeepSeek.<br>Free tier available.<br>OpenAI-compatible API.</div>
+    </div>
+    <div class="card" style="border-color: var(--warn);">
+      <div class="bracket-label" style="color: var(--warn);">[ OLLAMA ]</div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); margin: 10px 0;">Self-hosted local.</div>
+      <div class="mono muted" style="font-size: 12px; line-height: 1.5;">Run on your own GPU.<br>Zero API spend.<br>Latency-trade, sovereignty-win.</div>
+    </div>
+  </div>
+  <div class="caption hl" style="text-align: center; margin-top: 30px;">// Single <span class="terminal mono">chat()</span> interface. Dispatch by <span class="terminal mono">LLM_PROVIDER</span> env. Rest of the codebase is provider-agnostic.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 09 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 10 — Tiers -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 10 / 12 ]</span></div>
+  <div class="kicker">&gt; tiers &amp; circular economy</div>
+  <h1 class="title">Pay with USDC. Earn credits by contributing.<br>Surplus returns to contributors.</h1>
+  <div class="rows" style="margin-top: 36px;">
+    <div class="row"><div class="num">01</div><div class="name">Community Free</div><div class="desc">Hosted baseline (~1K msg/day). Cross-subsidized.</div><div class="out">$0</div></div>
+    <div class="row"><div class="num">02</div><div class="name">Credit-Earning</div><div class="desc">Archive data, federated shards, modules → credits offset bandwidth.</div><div class="out">Contribute</div></div>
+    <div class="row"><div class="num">03</div><div class="name">Crypto-Paid</div><div class="desc">Higher throughput, bigger-model routing, private deployments.</div><div class="out">29 USDC / mo</div></div>
+    <div class="row"><div class="num">04</div><div class="name">OSS Self-Host</div><div class="desc">Activates at source-available milestone. Bring your own keys.</div><div class="out">post-milestone</div></div>
+  </div>
+  <div class="caption" style="margin-top: 24px; text-align: center; line-height: 1.6;">// Surplus (Tier 3 revenue − infra costs) returns to contributors via <span class="terminal">Shapley-weighted</span> distribution.<br><span class="matrix" style="font-weight: 700;">No equity-holder extraction layer — surplus is a substrate property, not a margin.</span></div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 10 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 11 — Verifiable claims -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 11 / 12 ]</span></div>
+  <div class="kicker">&gt; verifiability</div>
+  <h1 class="title">Closed-source beta.<br>Every claim cryptographically auditable.</h1>
+  <div class="rows" style="margin-top: 30px;">
+    <div class="row"><div class="num">v0</div><div class="name">Binary hash commitment</div><div class="desc">SHA-256 of source bundle at launch. Future reveals prove no backsliding.</div><div class="out">hash</div></div>
+    <div class="row"><div class="num">v1</div><div class="name">Cost-per-message proof</div><div class="desc">ZK proof from signed LLM-provider receipts. "100× cheaper" becomes audit-verifiable.</div><div class="out">zkVM</div></div>
+    <div class="row"><div class="num">v2</div><div class="name">Grounding replay</div><div class="desc">Merkle proof from archive state to digest. Mismatch = fabrication detected.</div><div class="out">merkle</div></div>
+    <div class="row"><div class="num">v3</div><div class="name">Federated shard integrity</div><div class="desc">TEE attestation that running binary matches committed hash.</div><div class="out">sgx / sev</div></div>
+  </div>
+  <div class="caption hl" style="text-align: center; margin-top: 28px; line-height: 1.6;">// Closed-source during bootstrap. Source-available at milestone: <span class="terminal">2× infra margin for 3 months</span> OR <span class="terminal">12 months from first paying customer</span>, whichever first.<br><span class="matrix" style="font-weight: 700;">Binding. Public. Not hedgeable.</span></div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div>[ 11 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 12 — Ask / CTA -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">JARVIS</span><span class="brand-sep">  ::  </span><span class="brand-accent">NETWORK</span></div><span class="page">[ 12 / 12 ]</span></div>
+  <div class="kicker">&gt; beta cohort</div>
+  <h1 class="title">Opening to first customers.<br>Invitation-only.</h1>
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card matrix-border">
+      <div class="bracket-label">[ WHO FITS ]</div>
+      <ul class="arrow-list" style="margin-top: 10px;">
+        <li>Crypto community owners</li>
+        <li>DAO operators</li>
+        <li>Technical Telegram groups</li>
+        <li>Builders running grounded AI workflows</li>
+      </ul>
+    </div>
+    <div class="card cyan-border">
+      <div class="bracket-label cyan">[ HOW IT WORKS ]</div>
+      <ul class="arrow-list cyan" style="margin-top: 10px;">
+        <li>Add the bot to your group</li>
+        <li>Run <span class="terminal mono">/subscribe</span> — payment instructions appear</li>
+        <li>Send 29 USDC on Base</li>
+        <li><span class="terminal mono">/paid &lt;tx&gt; &lt;chat_id&gt;</span> — verified on-chain, instant activation</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brackets" style="margin-top: 32px; padding: 22px 28px;">
+    <div class="bl"></div><div class="br"></div>
+    <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em;">Feedback + early cohort: <span class="terminal">DM Will</span> on Telegram, or email <span class="terminal mono">TBD@jarvis.network</span></div>
+    <div class="caption" style="margin-top: 8px;">// sibling substrate to VibeSwap · same cryptographic-verification thesis · different layer</div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // 2026 beta</div><div><span class="matrix">github.com/WGlynn/jarvis-network</span></div></div>
+</section>
+
+</div>
+</body>
+</html>

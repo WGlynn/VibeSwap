@@ -7,7 +7,6 @@ import "../../contracts/libraries/FibonacciScaling.sol";
 contract FibFuzzWrapper {
     function fibonacci(uint8 n) external pure returns (uint256) { return FibonacciScaling.fibonacci(n); }
     function fibonacciSum(uint8 n) external pure returns (uint256) { return FibonacciScaling.fibonacciSum(n); }
-    function isFibonacci(uint256 n) external pure returns (bool) { return FibonacciScaling.isFibonacci(n); }
     function goldenRatioMean(uint256 a, uint256 b) external pure returns (uint256)
     { return FibonacciScaling.goldenRatioMean(a, b); }
     function calculateRetracementLevels(uint256 high, uint256 low) external pure returns (FibonacciScaling.FibRetracementLevels memory)
@@ -36,34 +35,6 @@ contract FibonacciScalingFuzzTest is Test {
     function testFuzz_fibSum_geFibonacci(uint8 n) public view {
         n = uint8(bound(n, 1, 90));
         assertGe(lib.fibonacciSum(n), lib.fibonacci(n), "Sum should be >= individual fib");
-    }
-
-    // ============ Fuzz: known fibonacci numbers are detected ============
-    function testFuzz_isFibonacci_knownValues() public view {
-        assertTrue(lib.isFibonacci(0));
-        assertTrue(lib.isFibonacci(1));
-        assertTrue(lib.isFibonacci(2));
-        assertTrue(lib.isFibonacci(3));
-        assertTrue(lib.isFibonacci(5));
-        assertTrue(lib.isFibonacci(8));
-        assertTrue(lib.isFibonacci(13));
-        assertTrue(lib.isFibonacci(21));
-        assertTrue(lib.isFibonacci(55));
-        assertTrue(lib.isFibonacci(144));
-    }
-
-    // ============ Fuzz: non-fibonacci numbers are rejected ============
-    function testFuzz_isFibonacci_rejects(uint256 n) public view {
-        // Numbers that are definitely not Fibonacci: 4, 6, 7, 9, 10, etc.
-        n = bound(n, 4, 1e18);
-        // Skip if it happens to be Fibonacci
-        if (n == 5 || n == 8 || n == 13 || n == 21 || n == 34 || n == 55 || n == 89 ||
-            n == 144 || n == 233 || n == 377 || n == 610 || n == 987 || n == 1597) return;
-        // Most large random numbers aren't Fibonacci
-        // Only assert for small known non-fib numbers
-        if (n == 4 || n == 6 || n == 7 || n == 9 || n == 10) {
-            assertFalse(lib.isFibonacci(n), "Should not be fibonacci");
-        }
     }
 
     // ============ Fuzz: golden ratio mean is between a and b ============

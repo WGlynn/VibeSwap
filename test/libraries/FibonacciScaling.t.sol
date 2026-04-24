@@ -37,26 +37,6 @@ contract FibonacciScalingTest is Test {
         assertEq(FibonacciScaling.fibonacciSum(5), 12); // 1 + 1 + 2 + 3 + 5
     }
 
-    function test_isFibonacci() public pure {
-        // Fibonacci numbers
-        assertTrue(FibonacciScaling.isFibonacci(0));
-        assertTrue(FibonacciScaling.isFibonacci(1));
-        assertTrue(FibonacciScaling.isFibonacci(2));
-        assertTrue(FibonacciScaling.isFibonacci(3));
-        assertTrue(FibonacciScaling.isFibonacci(5));
-        assertTrue(FibonacciScaling.isFibonacci(8));
-        assertTrue(FibonacciScaling.isFibonacci(13));
-        assertTrue(FibonacciScaling.isFibonacci(21));
-        assertTrue(FibonacciScaling.isFibonacci(55));
-
-        // Non-Fibonacci numbers
-        assertFalse(FibonacciScaling.isFibonacci(4));
-        assertFalse(FibonacciScaling.isFibonacci(6));
-        assertFalse(FibonacciScaling.isFibonacci(7));
-        assertFalse(FibonacciScaling.isFibonacci(9));
-        assertFalse(FibonacciScaling.isFibonacci(10));
-    }
-
     // ============ Throughput Tier Tests ============
 
     function test_getThroughputTier_firstTier() public pure {
@@ -93,18 +73,18 @@ contract FibonacciScalingTest is Test {
         assertEq(tier4, 4);
     }
 
-    function test_getFibonacciFeeMultiplier() public pure {
+    function test_getTierFeeMultiplier() public pure {
         uint256 baseFee = 30; // 0.3%
 
         // Tier 0: base fee
-        assertEq(FibonacciScaling.getFibonacciFeeMultiplier(0, baseFee), 30);
+        assertEq(FibonacciScaling.getTierFeeMultiplier(0, baseFee), 30);
 
         // Higher tiers have higher fees (golden ratio scaling)
-        uint256 tier5Fee = FibonacciScaling.getFibonacciFeeMultiplier(5, baseFee);
+        uint256 tier5Fee = FibonacciScaling.getTierFeeMultiplier(5, baseFee);
         assertGt(tier5Fee, baseFee);
         assertLe(tier5Fee, baseFee * 3); // Max 3x
 
-        uint256 tier10Fee = FibonacciScaling.getFibonacciFeeMultiplier(10, baseFee);
+        uint256 tier10Fee = FibonacciScaling.getTierFeeMultiplier(10, baseFee);
         assertGt(tier10Fee, tier5Fee);
         assertLe(tier10Fee, baseFee * 3);
     }
@@ -233,32 +213,6 @@ contract FibonacciScalingTest is Test {
         // Reversed order should give same result
         uint256 mean2 = FibonacciScaling.goldenRatioMean(price2, price1);
         assertEq(mean, mean2);
-    }
-
-    function test_fibonacciWeightedPrice() public pure {
-        uint256[] memory prices = new uint256[](3);
-        uint256[] memory volumes = new uint256[](3);
-
-        prices[0] = 1000 * PRECISION;
-        prices[1] = 1100 * PRECISION;
-        prices[2] = 1200 * PRECISION;
-
-        volumes[0] = 10 ether;
-        volumes[1] = 20 ether;
-        volumes[2] = 30 ether;
-
-        uint256 weightedPrice = FibonacciScaling.fibonacciWeightedPrice(prices, volumes);
-
-        // Fibonacci weights: 1, 1, 2 (for first 3)
-        // Weight 1: 10 * 1 = 10
-        // Weight 2: 20 * 1 = 20
-        // Weight 3: 30 * 2 = 60
-        // Total weight: 90
-        // Weighted sum: 1000*10 + 1100*20 + 1200*60 = 10000 + 22000 + 72000 = 104000
-        // Weighted avg: 104000 / 90 = ~1155.56
-
-        assertGt(weightedPrice, 1100 * PRECISION);
-        assertLt(weightedPrice, 1200 * PRECISION);
     }
 
     // ============ Liquidity Score Tests ============

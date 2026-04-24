@@ -46,9 +46,9 @@ contract BatchMathWrapper {
         return BatchMath.sqrt(x);
     }
 
-    function applyGoldenRatioDamping(uint256 currentPrice, uint256 proposedPrice, uint256 maxDeviationBps)
+    function applyDeviationCap(uint256 currentPrice, uint256 proposedPrice, uint256 maxDeviationBps)
         external pure returns (uint256) {
-        return BatchMath.applyGoldenRatioDamping(currentPrice, proposedPrice, maxDeviationBps);
+        return BatchMath.applyDeviationCap(currentPrice, proposedPrice, maxDeviationBps);
     }
 
     function calculateAMMCapacity(uint256 reserve0, uint256 reserve1, uint256 targetPrice)
@@ -274,15 +274,15 @@ contract BatchMathTest is Test {
         assertGt(vol, 0);
     }
 
-    // ============ applyGoldenRatioDamping ============
+    // ============ applyDeviationCap ============
 
     function test_goldenDamping_withinRange() public view {
-        uint256 adjusted = math.applyGoldenRatioDamping(1e18, 1.01e18, 500); // 5% max deviation
+        uint256 adjusted = math.applyDeviationCap(1e18, 1.01e18, 500); // 5% max deviation
         assertEq(adjusted, 1.01e18); // Within range, no damping
     }
 
     function test_goldenDamping_exceedsRange_up() public view {
-        uint256 adjusted = math.applyGoldenRatioDamping(1e18, 2e18, 500); // 5% max, proposed +100%
+        uint256 adjusted = math.applyDeviationCap(1e18, 2e18, 500); // 5% max, proposed +100%
         // Should be damped: current + (maxDev * PHI / 1e18), but capped at maxDev
         uint256 maxDev = (1e18 * 500) / 10000; // 0.05e18
         assertLe(adjusted, 1e18 + maxDev);
@@ -290,7 +290,7 @@ contract BatchMathTest is Test {
     }
 
     function test_goldenDamping_exceedsRange_down() public view {
-        uint256 adjusted = math.applyGoldenRatioDamping(1e18, 0.5e18, 500); // 5% max, proposed -50%
+        uint256 adjusted = math.applyDeviationCap(1e18, 0.5e18, 500); // 5% max, proposed -50%
         uint256 maxDev = (1e18 * 500) / 10000;
         assertGe(adjusted, 1e18 - maxDev);
         assertLt(adjusted, 1e18);

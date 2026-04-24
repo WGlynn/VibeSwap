@@ -37,9 +37,9 @@ contract BatchMathWrapper {
         return BatchMath.sqrt(x);
     }
 
-    function applyGoldenRatioDamping(uint256 currentPrice, uint256 proposedPrice, uint256 maxDeviationBps)
+    function applyDeviationCap(uint256 currentPrice, uint256 proposedPrice, uint256 maxDeviationBps)
         external pure returns (uint256) {
-        return BatchMath.applyGoldenRatioDamping(currentPrice, proposedPrice, maxDeviationBps);
+        return BatchMath.applyDeviationCap(currentPrice, proposedPrice, maxDeviationBps);
     }
 }
 
@@ -122,7 +122,7 @@ contract BatchMathFuzzTest is Test {
         proposedPrice = bound(proposedPrice, 1e15, 1e24);
         maxBps = bound(maxBps, 1, 5000);
 
-        uint256 adjusted = math.applyGoldenRatioDamping(currentPrice, proposedPrice, maxBps);
+        uint256 adjusted = math.applyDeviationCap(currentPrice, proposedPrice, maxBps);
 
         uint256 maxDev = (currentPrice * maxBps) / 10000;
 

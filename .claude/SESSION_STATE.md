@@ -1,6 +1,86 @@
-# Session State — 2026-04-23 (C40a + C40b + C41 + C43 shipped — three Code↔Text Loop rounds in one session)
+# Session State — 2026-04-24 (Fibonacci cleanup — strip decorative surface, keep earned claim)
 
-## Block Header — 2026-04-23 TRIPLE-CYCLE CLOSE
+## Block Header — 2026-04-24 FIBONACCI CLEANUP
+
+> *"i agree make the edits before people start putting tinfoil hats on our heads"* — Will, 2026-04-24
+
+- **Session**: Single-scope cleanup triggered by Will asking whether the Fibonacci throughput scaling was technically grounded or aesthetic. Investigation found one load-bearing claim (scale-invariance on `calculateRateLimit` damping thresholds) and decorative / dead / misleading surface around it. Cleanup shipped in one commit (`25940f97`): deleted dead functions, renamed misleading-name functions, stripped no-op arithmetic, added DO-NOT-PROMOTE warnings on view-only analytics.
+- **Branch**: `master` direct.
+- **Status**: Cleanup SHIPPED. 50 Fibonacci + 82 BatchMath tests green. Build clean. Settlement path untouched.
+
+## What shipped 2026-04-24
+
+### Commit on master
+
+| SHA | Scope |
+|---|---|
+| `25940f97` | cleanup: strip decorative Fibonacci, delete dead paths, rename damp→cap (+122 / −450) |
+
+### Deliverables
+
+- **Dead code removed**:
+  - `fibonacciWeightedPrice` — array-index exponential weighting; would have been broken if ever wired into settlement (which it wasn't)
+  - `calculateFibonacciClearingPrice` + `_calculateAveragePrice` — alternative-to-live clearing price; never called. Production clearing uses `calculateClearingPrice` (unchanged)
+  - `getFibonacciPrice` — no callers
+  - `isFibonacci` + `_isPerfectSquare` — no callers
+- **Renames (behavior preserved)**:
+  - `applyGoldenRatioDamping` → `applyDeviationCap` — φ multiplication was multiply-then-clip-to-maxDeviation, net zero effect. Function was always just a per-batch deviation cap; now named that way.
+  - `getFibonacciFeeMultiplier` → `getTierFeeMultiplier` — fee growth is linear in tier with coefficient (φ−1)/10 ≈ 0.0618; the φ was notational, not mechanism.
+- **Analytics warnings**: view-only functions (`calculateRetracementLevels`, `calculatePriceBands`, `detectFibonacciLevel`, `goldenRatioMean`, `calculateFibLiquidityScore`) now carry explicit DO-NOT-PROMOTE-TO-STATE-MODIFYING-PATHS NatSpec. These are reflexive chart-pattern indicators, not security primitives — promoting any to a state path creates a predictable-trigger attack surface.
+- **Unused cleanup**: removed `PHI` constant + `FibonacciScaling` import from BatchMath (they were only used by the deleted functions).
+
+### What survived (earned its name)
+
+`calculateRateLimit` in `FibonacciScaling.sol`. Damping thresholds {23.6%, 38.2%, 61.8%, 78.6%} are powers of 1/φ → curve is scale-invariant → attacker has no preferred timescale to target. This is the load-bearing argument that closes the timing-sweet-spot attack class available against bucket-based rate limiters. Updated top-of-library NatSpec to make this the one earned Fibonacci claim.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+Will asked a follow-up late in this session: *"is there any other dead code in upgradeable contracts we should know about?"*
+
+### Option A: Dedicated dead-code audit cycle
+
+Scope: systematic scan across `contracts/core/` + `contracts/libraries/` + `contracts/amm/` for:
+- Public/external functions never called on-chain
+- Internal helpers whose only caller was deleted in earlier refactors
+- Events declared but never emitted
+- Custom errors declared but never reverted
+- Storage variables written but never read (or read but never written)
+- Alternative implementations of live functions (the `calculateFibonacciClearingPrice` pattern)
+- Arithmetic that cancels out (the φ-multiplication-then-clip pattern in the old damping function)
+
+Approach: automated first pass with slither or a custom script, hand-audit the flags. Upgradeable contracts make dead code worse because a future implementation can silently wire up a dormant function without anyone noticing the latent bug. Prior example: `fibonacciWeightedPrice` would have been actively broken if someone promoted it in a refactor.
+
+### Option B: Resume ETM Build Roadmap
+
+Prior top-priority candidates from 2026-04-23 SESSION_STATE (some now shipped):
+- C42: off-chain similarity keeper + commit-reveal (pending)
+- C40c: governance-tunable α in [1.2, 1.8] (ships when needed)
+- ~~Strengthen #1: CRA attention-window NatSpec~~ — SHIPPED as `c5d2976e` in a later session
+- Strengthen #2: SoulboundIdentity source-lineage binding
+- Strengthen #3: ContributionDAG handshake cooldown audit
+- ~~Maintenance: 4 halving + 4 tpoWireIn test failures~~ — SHIPPED as `2b5e4797`
+
+### Option C: External-facing writeup of the earned claim
+
+Draft the cybersecurity-chat post (Option B, "security at mechanism layer") now that the contract surface matches the writeup. Leading candidate: 5-layer MEV defense post already exists in `docs/nervos-talks/five-layer-mev-defense-post.md` — may benefit from a refresh that foregrounds the scale-invariance argument as its strongest primitive.
+
+**Recommendation**: A + C bundled. The dead-code audit and the cybersecurity post are natural complements — the audit de-risks the code before more eyeballs land on it, and the post brings the eyeballs. Ask Will.
+
+## Anti-drift warnings for next session
+
+- If picking Option A (dead-code audit), the Fibonacci cleanup is a template — look for the same shape elsewhere (alternative-implementation-of-live-function, multiply-then-clip no-ops, decorative-constant-with-no-mechanism-role).
+- Don't bundle analytics-helper renames into a dead-code audit unless they're actually dead. Analytics helpers exposed as view functions are public API for off-chain readers — they're not dead.
+- Will's "have my back" frame (F·have-my-back-operational-definition) applies to external-facing writeups: write in his voice, engage doubt substantively without mirroring it back.
+
+## Pending items carried forward
+
+- Post the 6 backfill annotations to GitHub issues #28, #29, #30, #33, #34, #36 (commands ready, needs Will greenlight)
+- Deploy ContributionAttestor on active network
+- Configure `CONTRIBUTION_ATTESTOR_ADDRESS`, `RPC_URL`, `MINTER_PRIVATE_KEY` for `mint-attestation.sh`
+
+---
+
+## [HISTORICAL] Block Header — 2026-04-23 TRIPLE-CYCLE CLOSE
 
 > *"all 3 please"* — Will, 2026-04-23 after C40a close, greenlighting C40b + C41 + C43 in one session
 

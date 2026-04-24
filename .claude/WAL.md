@@ -1,6 +1,24 @@
-# Write-Ahead Log — CLEAN (session 2026-04-23 triple-cycle close)
+# Write-Ahead Log — CLEAN (session 2026-04-24 Fibonacci cleanup)
 
-## Epoch — CLEAN at 2026-04-23 triple-cycle close
+## Epoch — CLEAN at 2026-04-24 Fibonacci cleanup
+- **Closed**: 2026-04-24 after Will greenlit the strip-decorative-Fibonacci pass ("i agree make the edits before people start putting tinfoil hats on our heads"). Triggered by a Will question about whether the Fibonacci price functions in contracts were grounded or decorative. Investigation found one load-bearing argument (scale-invariance on the damping thresholds) and a pile of decorative / dead / misleading surface around it.
+- **Branch**: `master` pushed through `25940f97`.
+- **Status**: CLEAN. Cleanup shipped, 50 Fibonacci + 82 BatchMath tests green, build clean, settlement path untouched.
+
+**Vibeswap commit 2026-04-24**:
+- `25940f97` cleanup: strip decorative Fibonacci, delete dead paths, rename damp→cap (11 files, +122/-450)
+
+**What was stripped**:
+- Dead functions: `fibonacciWeightedPrice` (array-index exponential weighting, would be broken if wired), `calculateFibonacciClearingPrice` + `_calculateAveragePrice` (alternative-to-live clearing-price, never called), `getFibonacciPrice` (no callers), `isFibonacci` + `_isPerfectSquare` (no callers).
+- Renames: `applyGoldenRatioDamping` → `applyDeviationCap` (φ multiplication was multiply-then-clip, net zero effect — function was always just a deviation cap). `getFibonacciFeeMultiplier` → `getTierFeeMultiplier` (fee scaling is linear in tier with a decorative coefficient).
+- Warnings added: view-only analytics functions now carry explicit DO-NOT-PROMOTE-TO-STATE-PATH NatSpec — they're reflexive chart-pattern signaling, not security primitives.
+- Removed unused `PHI` constant and `FibonacciScaling` import from BatchMath.
+
+**Load-bearing claim that survived**: `calculateRateLimit` damping curve. Thresholds {23.6, 38.2, 61.8, 78.6}% are powers of 1/φ → scale-invariant damper → denies attackers a preferred timescale. The one Fibonacci claim that earns its name.
+
+**Trigger**: Will questioned whether the Fibonacci throughput was grounded ("it was my idea but on a whim"). First pass identified grounding at the damping curve, flagged everything else as decorative. Will asked about the price functions specifically ("those are contracts"). Deeper pass found fibonacciWeightedPrice would be actively buggy if live (exponential weighting by array index) but was dead code. Findings prompted his "make the edits" call. Also prompted a follow-up question about broader dead-code risk in upgradeable contracts — answered partially, proposed dedicated audit cycle.
+
+## [HISTORICAL] Epoch — CLEAN at 2026-04-23 triple-cycle close
 - **Closed**: 2026-04-23 after Will greenlit "all 3 please" on C40b + C41 + C43. Four ETM Build Roadmap cycles shipped in one session.
 - **Branch**: `master` pushed through `b1cbd797`.
 - **Status**: CLEAN. All four cycles + pre-existing-break unbreaks + doc reconciliations committed and green.

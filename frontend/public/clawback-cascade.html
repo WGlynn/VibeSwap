@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Clawback Cascade — Pitch Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000;
+    --surface-1: #080808;
+    --surface-2: #0d0d0d;
+    --surface-3: #181818;
+    --border: #252525;
+    --border-hi: #424242;
+    --matrix: #00ff41;
+    --matrix-dim: #00cc34;
+    --terminal: #00d4ff;
+    --term-dim: #00a8cc;
+    --fg: #e0e0e0;
+    --fg-white: #ffffff;
+    --muted: #808080;
+    --muted-dim: #505050;
+    --danger: #ff3366;
+    --danger-dim: #cc2952;
+    --warn: #ffaa00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.4;
+  }
+  .mono { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; }
+  .matrix { color: var(--matrix); }
+  .terminal { color: var(--terminal); }
+  .muted { color: var(--muted); }
+  .muted-dim { color: var(--muted-dim); }
+  .danger { color: var(--danger); }
+  .warn { color: var(--warn); }
+  .white { color: var(--fg-white); }
+
+  .top-nav {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 16px 20px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .top-nav a { color: var(--terminal); text-decoration: none; }
+  .top-nav a:hover { color: var(--matrix); }
+
+  .deck { max-width: 1280px; margin: 0 auto; padding: 20px; }
+  .slide {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin-bottom: 32px;
+    padding: 40px 56px;
+    overflow: hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .chrome { display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted-dim); }
+  .brand { color: var(--fg); font-weight: 700; }
+  .brand-accent { color: var(--matrix); }
+  .brand-sep { color: var(--muted-dim); }
+  .page { color: var(--muted-dim); }
+
+  .kicker { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--matrix); font-weight: 600; margin-top: 20px; margin-bottom: 16px; }
+  .kicker.cyan { color: var(--terminal); }
+  .kicker.danger { color: var(--danger); }
+
+  h1.title { font-size: 42px; font-weight: 700; color: var(--fg-white); letter-spacing: -0.02em; line-height: 1.08; white-space: pre-line; }
+
+  .footer { position: absolute; bottom: 20px; left: 56px; right: 56px; border-top: 1px solid var(--border); padding-top: 10px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted-dim); }
+  .footer .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--matrix); margin-right: 8px; vertical-align: middle; box-shadow: 0 0 8px rgba(0,255,65,0.4); animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.15); } }
+
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 20px 24px; }
+  .card.matrix-border { border-color: var(--matrix); box-shadow: 0 0 30px -10px rgba(0,255,65,0.18); }
+  .card.cyan-border { border-color: var(--terminal); box-shadow: 0 0 30px -10px rgba(0,212,255,0.18); }
+  .card.danger-border { border-color: var(--danger); box-shadow: 0 0 30px -10px rgba(255,51,102,0.18); }
+  .card.warn-border { border-color: var(--warn); box-shadow: 0 0 30px -10px rgba(255,170,0,0.18); }
+
+  .bracket-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--matrix); letter-spacing: 0.03em; margin-bottom: 10px; }
+  .bracket-label.cyan { color: var(--terminal); }
+  .bracket-label.danger { color: var(--danger); }
+  .bracket-label.warn { color: var(--warn); }
+
+  .brackets { position: relative; padding: 24px; }
+  .brackets::before, .brackets::after, .brackets > .bl, .brackets > .br { position: absolute; content: ''; width: 18px; height: 18px; border: 2px solid var(--matrix); }
+  .brackets::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+  .brackets::after { top: 0; right: 0; border-left: none; border-bottom: none; }
+  .brackets .bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+  .brackets .br { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+  .mega { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+  .hero-stat { font-size: 42px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.05; }
+
+  .rows { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 40px 1fr 2fr 1fr; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .row:last-child { border-bottom: none; }
+  .row .num { font-family: 'JetBrains Mono', monospace; color: var(--matrix); font-weight: 700; font-size: 18px; }
+  .row .name { color: var(--fg-white); font-weight: 600; font-size: 15px; }
+  .row .desc { color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .row .out { color: var(--terminal); font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 12px; text-align: right; }
+
+  .code { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 16px 20px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--muted); line-height: 1.7; }
+  .code .kw { color: var(--terminal); font-weight: 600; }
+  .code .val { color: var(--matrix); font-weight: 700; }
+  .code .bad { color: var(--danger); font-weight: 700; }
+
+  .caption { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-style: italic; color: var(--muted); }
+  .caption.hl { color: var(--terminal); font-style: normal; }
+  .caption.matrix { color: var(--matrix); font-style: normal; font-weight: 600; }
+
+  .hero-title { font-size: 96px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; margin-top: 4px; }
+  .hero-title .accent { color: var(--matrix); }
+  .tagline { font-size: 28px; font-weight: 700; color: var(--terminal); letter-spacing: -0.02em; margin-top: 20px; }
+  .subtagline { font-size: 16px; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+
+  .arrow-list { list-style: none; padding: 0; margin: 0; }
+  .arrow-list li { position: relative; padding-left: 20px; padding-top: 6px; padding-bottom: 6px; color: var(--fg); font-size: 14px; line-height: 1.45; }
+  .arrow-list li::before { content: '→'; position: absolute; left: 0; color: var(--matrix); font-weight: 700; }
+  .arrow-list.cyan li::before { color: var(--terminal); }
+  .arrow-list.danger li::before { color: var(--danger); }
+
+  /* Taint level badges */
+  .taint-level {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
+  }
+  .taint-0 { background: rgba(0,255,65,0.08); border: 1px solid var(--matrix-dim); color: var(--matrix); }
+  .taint-1 { background: rgba(255,170,0,0.08); border: 1px solid var(--warn); color: var(--warn); }
+  .taint-2 { background: rgba(255,140,50,0.10); border: 1px solid #ff8c32; color: #ff8c32; }
+  .taint-3 { background: rgba(255,51,102,0.10); border: 1px solid var(--danger); color: var(--danger); }
+  .taint-4 { background: rgba(150,20,50,0.20); border: 1px solid var(--danger-dim); color: #ff6688; }
+
+  .flow-step {
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 18px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  }
+  .flow-step .step-num { color: var(--matrix); font-weight: 700; font-size: 16px; min-width: 24px; }
+  .flow-step .step-label { color: var(--fg-white); font-weight: 600; }
+  .flow-step .step-meta { color: var(--muted); margin-left: auto; }
+
+  .arrow-down { text-align: center; color: var(--matrix); font-size: 20px; margin: 4px 0; }
+
+  .math-block {
+    background: var(--surface-1); border: 1px solid var(--matrix-dim); border-radius: 4px;
+    padding: 20px 24px; font-family: 'JetBrains Mono', monospace; font-size: 15px; line-height: 2.1;
+    color: var(--fg-white);
+  }
+  .math-block .op { color: var(--matrix); font-weight: 700; }
+  .math-block .var { color: var(--terminal); }
+  .math-block .note { color: var(--muted); font-size: 12px; font-style: italic; font-family: 'JetBrains Mono', monospace; }
+
+  /* ============ Mobile ============ */
+  @media (max-width: 900px) {
+    .deck { padding: 10px; }
+    .slide { padding: 20px 24px; aspect-ratio: auto; min-height: 420px; margin-bottom: 16px; }
+    .chrome { font-size: 9px; }
+    .kicker { font-size: 10px; margin-top: 12px; margin-bottom: 10px; }
+    h1.title { font-size: 22px; }
+    .hero-title { font-size: 44px; }
+    .tagline { font-size: 16px; margin-top: 12px; }
+    .subtagline { font-size: 13px; margin-top: 10px; }
+    .grid-2 { grid-template-columns: 1fr; gap: 14px; }
+    .grid-3 { grid-template-columns: 1fr; gap: 12px; }
+    .mega { font-size: 48px; }
+    .hero-stat { font-size: 22px; }
+    .row { grid-template-columns: 32px 1.2fr 2fr 1fr; font-size: 11px; padding: 8px 0; }
+    .row .num { font-size: 14px; }
+    .row .name { font-size: 12px; }
+    .row .desc { font-size: 10px; }
+    .row .out { font-size: 10px; }
+    .footer { position: static; left: auto; right: auto; margin-top: 16px; font-size: 9px; }
+    .card { padding: 14px 16px; }
+    .bracket-label { font-size: 10px; }
+    .math-block { font-size: 12px; padding: 14px 16px; line-height: 1.9; }
+    .taint-level { font-size: 11px; padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+  <a href="/decks.html">← all decks</a>
+</div>
+
+<div class="deck">
+
+<!-- SLIDE 1 — Title -->
+<section class="slide">
+  <div class="chrome">
+    <div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div>
+    <span class="page">[ LIVE // 2026 ]</span>
+  </div>
+  <div class="brackets" style="margin-top: 60px; padding: 50px 60px;">
+    <div class="bl"></div><div class="br"></div>
+    <div class="kicker" style="margin-top:0">&gt; retroactive security // enforcement as topology</div>
+    <h1 class="hero-title">Clawback <span class="accent">Cascade.</span></h1>
+    <div class="tagline">Every stolen dollar, economically isolated.</div>
+    <div class="subtagline">Topological taint propagation. Proportional attribution. 7-day contest windows.<br>Compliance emerges from rational avoidance — not mandate.</div>
+  </div>
+  <div class="footer">
+    <div><span class="brand">Will Glynn</span><span class="brand-sep">  ·  </span><span class="terminal">github.com/WGlynn/vibeswap</span><span class="brand-sep">  ·  </span>live in contracts</div>
+    <div>[ 00 / 12 ]</div>
+  </div>
+</section>
+
+<!-- SLIDE 2 — The Problem -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 02 / 12 ]</span></div>
+  <div class="kicker danger">&gt; the enforcement gap</div>
+  <h1 class="title">DeFi has an enforcement gap.<br>Address-based freezing loses to Sybil rotation.</h1>
+  <div class="grid-2" style="margin-top: 36px;">
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ 2021 : $100M DEX HACK ]</div>
+      <ul class="arrow-list danger" style="margin-top: 10px;">
+        <li>Attacker drains protocol, withdraws to their wallet</li>
+        <li>Routes funds through CEX deposit + withdrawal (laundered)</li>
+        <li>Decentralized mixer</li>
+        <li>Multiple pass-through wallets</li>
+        <li>AMM swaps for other tokens</li>
+        <li>By the end: dirty + clean commingled in hundreds of wallets</li>
+      </ul>
+    </div>
+    <div>
+      <div style="font-size: 20px; font-weight: 700; color: var(--fg-white); margin-bottom: 16px; line-height: 1.3;">The industry has two bad options:</div>
+      <div class="rows">
+        <div class="row" style="grid-template-columns: 1fr 2fr;"><div class="name danger">Freeze everyone</div><div class="desc">Legitimate holders lose funds because a tiny fraction passed through attacker flow. Unfair. Unfeasible at scale.</div></div>
+        <div class="row" style="grid-template-columns: 1fr 2fr;"><div class="name danger">Freeze no one</div><div class="desc">Give up on recovery. Attacker keeps proceeds. The incentive to attack stays positive.</div></div>
+      </div>
+      <div class="caption hl" style="margin-top: 22px; font-size: 13px;">// The question: how do you make consequences real on-chain — without centralized enforcement?</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 02 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 3 — The Insight -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 03 / 12 ]</span></div>
+  <div class="kicker">&gt; the move</div>
+  <h1 class="title">Don't blacklist addresses.<br><span class="matrix">Propagate TAINT through the graph.</span></h1>
+  <div class="grid-2" style="margin-top: 40px;">
+    <div class="card danger-border">
+      <div class="bracket-label danger">[ OLD PATH ]</div>
+      <div class="mono" style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">address-based freezing</div>
+      <div class="mono muted" style="font-size: 13px; line-height: 1.6;">→ Freeze address A<br>→ Attacker moves to address B<br>→ Freeze B, attacker moves to C<br>→ By the time you freeze 100, funds are in 1000</div>
+      <div class="mono danger" style="font-size: 12px; margin-top: 14px; font-style: italic;">Defeated by Sybil rotation. Always a step behind.</div>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label">[ OUR PATH ]</div>
+      <div class="mono" style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">topological propagation</div>
+      <div class="mono muted" style="font-size: 13px; line-height: 1.6;">→ Follows the graph automatically<br>→ Moving through intermediaries doesn't escape<br>→ Each hop inherits proportional taint<br>→ Propagation is simultaneous across reachable subgraph</div>
+      <div class="mono matrix" style="font-size: 12px; margin-top: 14px; font-style: italic;">Attacker can't outrun math. Propagation happens at graph-speed.</div>
+    </div>
+  </div>
+  <div style="text-align: center; margin-top: 28px; color: var(--fg-white); font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Taint is <span class="matrix">proportional</span>. Not all-or-nothing. <span class="muted" style="font-weight: 400;">Fungibility preserved.</span></div>
+  <div class="caption" style="text-align: center; margin-top: 12px; font-size: 12px;">// Augmented Mechanism Design: we don't replace markets or governance — we <span class="terminal mono" style="font-weight: 700;">augment</span> them with math-enforced invariants.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 03 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 4 — 5-Stage Mechanism -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 04 / 12 ]</span></div>
+  <div class="kicker">&gt; mechanism</div>
+  <h1 class="title">Five stages.<br>Mathematical propagation.</h1>
+  <div class="rows" style="margin-top: 36px;">
+    <div class="row"><div class="num">01</div><div class="name">Flagging</div><div class="desc">Permissionless. 1 ETH stake bond + evidence hash + incident ID. Frivolous flags slashed.</div><div class="out">→ 8 authorities</div></div>
+    <div class="row"><div class="num">02</div><div class="name">Taint propagation</div><div class="desc">Topological + proportional. 10% tainted balance = 10% of every outgoing tx becomes tainted.</div><div class="out">→ graph-speed</div></div>
+    <div class="row"><div class="num">03</div><div class="name">Transaction risk</div><div class="desc">Interacting with tainted wallets risks your own clawback. Disputed funds escrow in ClawbackVault.</div><div class="out">→ vaulted</div></div>
+    <div class="row"><div class="num">04</div><div class="name">Rational avoidance</div><div class="desc">E[value of tainted interaction] &lt; E[value of clean]. Rational agents refuse to transact.</div><div class="out">→ dominant strategy</div></div>
+    <div class="row"><div class="num">05</div><div class="name">Economic isolation</div><div class="desc">Bad actors quarantined by network topology itself. No central enforcer required.</div><div class="out">→ emergent</div></div>
+  </div>
+  <div class="caption hl" style="margin-top: 22px; text-align: center;">// Enforcement is not imposed. It's what rational agents do <span class="matrix mono" style="font-weight: 700;">of their own accord</span> once the incentive landscape has the right shape.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 04 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 5 — Proportionality (arithmetic) -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 05 / 12 ]</span></div>
+  <div class="kicker">&gt; proportionality :: the arithmetic</div>
+  <h1 class="title">10% tainted balance =<br><span class="matrix">10% of every outgoing tx becomes tainted.</span></h1>
+  <div class="grid-2" style="margin-top: 32px; gap: 32px;">
+    <div>
+      <div class="bracket-label" style="margin-bottom: 14px;">[ WALKED SCENARIO ]</div>
+      <div class="flow-step"><span class="step-num">A</span><span class="step-label">100 tainted units</span><span class="step-meta">stolen funds, source</span></div>
+      <div class="arrow-down">↓ A sends 10 to B</div>
+      <div class="flow-step"><span class="step-num">B</span><span class="step-label">10 tainted + 90 clean = 100</span><span class="step-meta">B now 10% tainted</span></div>
+      <div class="arrow-down">↓ B sends 50 to C</div>
+      <div class="flow-step"><span class="step-num">C</span><span class="step-label">5 tainted + 95 clean = 100</span><span class="step-meta">50 × (10/100) = 5</span></div>
+      <div class="arrow-down">↓ C sends 10 to D</div>
+      <div class="flow-step"><span class="step-num">D</span><span class="step-label">0.5 tainted + 99.5 clean = 100</span><span class="step-meta">10 × (5/100) = 0.5</span></div>
+    </div>
+    <div>
+      <div class="card matrix-border">
+        <div class="bracket-label">[ PROPERTIES ]</div>
+        <ul class="arrow-list" style="margin-top: 12px;">
+          <li><span class="white" style="font-weight: 600;">Proportional</span> — 10% taint sent distributes 10% taint</li>
+          <li><span class="white" style="font-weight: 600;">Transitive</span> — taint propagates through multiple hops</li>
+          <li><span class="white" style="font-weight: 600;">Conservation</span> — total taint across reachable subgraph = original V</li>
+          <li><span class="white" style="font-weight: 600;">Topological</span> — depends on tx graph only, not address identity</li>
+          <li><span class="white" style="font-weight: 600;">Fungibility preserved</span> — clean funds stay with owner</li>
+        </ul>
+      </div>
+      <div class="caption matrix" style="margin-top: 18px; text-align: center; font-size: 13px;">// A legitimate user who receives 5% taint from an innocent transaction keeps 95% cleanly.<br>Address-based freezing would take their entire balance. We take the 5%.</div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 05 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 6 — Taint Levels -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 06 / 12 ]</span></div>
+  <div class="kicker">&gt; states :: ux-legible at every tier</div>
+  <h1 class="title">Five taint levels.<br>Graduated consequence.</h1>
+  <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 36px;">
+    <div style="display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: center;">
+      <span class="taint-0">◆ 0 :: CLEAN</span>
+      <span style="color: var(--fg); font-size: 14px;"><span class="white" style="font-weight: 600;">Green check.</span> Safe to interact. Default state of every wallet.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: center;">
+      <span class="taint-1">◈ 1 :: UNDER_OBSERVATION</span>
+      <span style="color: var(--fg); font-size: 14px;"><span class="white" style="font-weight: 600;">Yellow warning.</span> Caution advised. Pattern detection flagged — under investigation.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: center;">
+      <span class="taint-2">⚠ 2 :: TAINTED</span>
+      <span style="color: var(--fg); font-size: 14px;"><span class="white" style="font-weight: 600;">Orange alert.</span> Proportional taint propagating. Interactions carry cascade risk.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: center;">
+      <span class="taint-3">■ 3 :: FLAGGED</span>
+      <span style="color: var(--fg); font-size: 14px;"><span class="white" style="font-weight: 600;">Red block.</span> Blocked from protocol interaction. Confirmed bad actor via tribunal.</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: center;">
+      <span class="taint-4">🔒 4 :: FROZEN</span>
+      <span style="color: var(--fg); font-size: 14px;"><span class="white" style="font-weight: 600;">Dark red lock.</span> Clawback pending. Funds held in ClawbackVault awaiting resolution.</span>
+    </div>
+  </div>
+  <div class="caption hl" style="margin-top: 26px; text-align: center; font-size: 13px;">// State transitions follow evidence. Each level has a distinct UX surface, so users see risk <span class="matrix mono" style="font-weight: 700;">before</span> they commit a transaction.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 06 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 7 — Contest Window -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 07 / 12 ]</span></div>
+  <div class="kicker">&gt; due process // topological</div>
+  <h1 class="title">7-day contest window.<br>Legitimate users defend with evidence.</h1>
+  <div class="grid-2" style="margin-top: 32px; gap: 32px;">
+    <div>
+      <div class="bracket-label" style="margin-bottom: 14px;">[ DISPUTE PIPELINE ]</div>
+      <div class="code">
+        <span class="val">Filing</span>         <span class="muted">→ anti-spam fee</span><br>
+        <span class="kw">Response</span>       <span class="muted">→ deadline or default</span><br>
+        <span class="val">Arbitration</span>    <span class="muted">→ round-robin staked arbs</span><br>
+        <span class="kw">Resolution</span>     <span class="muted">→ automatic execution</span><br>
+        <span class="val">Appeal</span>         <span class="muted">→ decentralized tribunal</span>
+      </div>
+      <div class="caption" style="margin-top: 14px;">// Arbitrators are reputation-tracked. Suspended below 50% accuracy after 5+ cases.</div>
+    </div>
+    <div>
+      <div class="card matrix-border">
+        <div class="bracket-label">[ HONEST RECIPIENT ]</div>
+        <div style="color: var(--fg); font-size: 14px; margin-top: 10px; line-height: 1.55;">
+          D received 0.5 tainted units via Uniswap arbitrage.<br><br>
+          Files contest within 7 days. Tribunal reviews:<br>
+          → Purchase was genuine arbitrage, not coordinated<br>
+          → D had no knowledge of C's laundering<br>
+        </div>
+        <div class="matrix mono" style="font-size: 13px; font-weight: 700; margin-top: 14px;">Verdict: good faith. Taint cleared.</div>
+      </div>
+      <div class="card danger-border" style="margin-top: 14px;">
+        <div class="bracket-label danger">[ LAUNDERER ]</div>
+        <div style="color: var(--fg); font-size: 14px; margin-top: 10px; line-height: 1.55;">
+          E received 20 tainted units. No good-faith evidence.<br>
+          Never contests (or contest rejected).<br>
+          Window expires → clawback executes.
+        </div>
+        <div class="danger mono" style="font-size: 13px; font-weight: 700; margin-top: 14px;">Funds reverted to recovery destination.</div>
+      </div>
+    </div>
+  </div>
+  <div class="caption hl" style="margin-top: 22px; text-align: center; font-size: 13px;">// The contest window IS the honest-vs-launderer filter. Evidence clears taint. No evidence = clawback.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 07 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 8 — Game-Theoretic Proof -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 08 / 12 ]</span></div>
+  <div class="kicker">&gt; equilibrium // formal proof</div>
+  <h1 class="title"><span class="terminal">E[clean] &gt; E[tainted]</span>.<br>For every rational agent. Always.</h1>
+  <div class="grid-2" style="margin-top: 32px; gap: 32px;">
+    <div>
+      <div class="math-block">
+        <span class="var">P(clawback | tainted)</span> <span class="op">&gt;</span> 0<br>
+        <span class="var">P(clawback | clean)</span> <span class="op">=</span> 0<br>
+        <span class="note">// therefore</span><br>
+        <span class="var">E[V | clean]</span> <span class="op">&gt;</span> <span class="var">E[V | tainted]</span>
+      </div>
+      <div class="math-block" style="margin-top: 14px;">
+        <span class="note">// rational agents never transact with tainted</span><br>
+        ∀ <span class="var">A</span> ∈ rational: <span class="var">A</span> avoids tainted<br>
+        <span class="op">⇒</span> tainted wallets have no counterparties<br>
+        <span class="op">⇒</span> bad actions produce economic isolation<br>
+        <span class="op">⇒</span> compliance <span class="op">=</span> dominant strategy
+      </div>
+    </div>
+    <div>
+      <div class="card matrix-border" style="padding: 24px 28px;">
+        <div class="bracket-label">[ THE TOPOLOGICAL GRADIENT ]</div>
+        <div style="color: var(--fg-white); font-size: 20px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.25; margin: 14px 0;">
+          Rule-following is not a constraint imposed on agents.
+        </div>
+        <div style="color: var(--matrix); font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin: 14px 0;">
+          It's the lowest-energy state of the terrain.
+        </div>
+        <div style="color: var(--muted); font-size: 13px; line-height: 1.55; margin-top: 16px;">
+          Each compliant agent deepens the channel. Each non-compliant agent is isolated by the cascade. The system converges toward universal compliance through the accumulated topological weight of individual rational decisions.
+        </div>
+        <div class="caption matrix" style="margin-top: 16px; font-size: 12px; font-style: italic;">// Governance as landscape architecture, not law enforcement.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 08 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 9 — 8-Contract Stack -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 09 / 12 ]</span></div>
+  <div class="kicker">&gt; architecture</div>
+  <h1 class="title">Eight contracts.<br>Federated authority. No central enforcer.</h1>
+  <div class="rows" style="margin-top: 30px;">
+    <div class="row"><div class="num">01</div><div class="name">FederatedConsensus.sol</div><div class="desc">Hybrid authority bridge. 4 off-chain roles (courts, regulators, law enforcement, lawyers) + 4 on-chain equivalents (DAO, tribunal, regulator, disputes). Same voting interface. No privileged side.</div><div class="out">→ 8 roles</div></div>
+    <div class="row"><div class="num">02</div><div class="name">ClawbackRegistry.sol</div><div class="desc">Taint tracking + propagation engine. Proportional attribution across the transaction graph.</div><div class="out">→ core</div></div>
+    <div class="row"><div class="num">03</div><div class="name">ClawbackVault.sol</div><div class="desc">Escrow for disputed / clawed-back funds. Permissionless executeClaw after window-end.</div><div class="out">→ vault</div></div>
+    <div class="row"><div class="num">04</div><div class="name">DecentralizedTribunal.sol</div><div class="desc">On-chain court with staked jurors. Handles routine taint adjudication.</div><div class="out">→ tribunal</div></div>
+    <div class="row"><div class="num">05</div><div class="name">AutomatedRegulator.sol</div><div class="desc">Real-time pattern detection: wash trading, manipulation, layering, spoofing, sanctions evasion.</div><div class="out">→ detection</div></div>
+    <div class="row"><div class="num">06</div><div class="name">DisputeResolver.sol</div><div class="desc">On-chain arbitration. Escalates complex / gray-area cases to tribunal.</div><div class="out">→ arbitration</div></div>
+    <div class="row"><div class="num">07</div><div class="name">ComplianceRegistry.sol</div><div class="desc">Tiered KYC/AML access control. Protocol-level, not asset-level.</div><div class="out">→ gating</div></div>
+    <div class="row"><div class="num">08</div><div class="name">SoulboundIdentity.sol</div><div class="desc">Non-transferable identity + persistent reputation layer.</div><div class="out">→ reputation</div></div>
+  </div>
+  <div class="caption hl" style="margin-top: 14px; text-align: center; font-size: 12px;">// Composes with the broader VibeSwap security stack:<br><span class="matrix mono" style="font-weight: 700;">Commit-Reveal Auctions</span> (MEV-resistance) · <span class="matrix mono" style="font-weight: 700;">CircuitBreaker</span> (attested resume) · <span class="matrix mono" style="font-weight: 700;">Fibonacci damping</span> (scale-invariant rate limiting) · <span class="matrix mono" style="font-weight: 700;">TruePrice Oracle</span> (Bayesian regime-aware validation)</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 09 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 10 — Anti-Fragile Economics -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 10 / 12 ]</span></div>
+  <div class="kicker">&gt; anti-fragility</div>
+  <h1 class="title">System becomes <span class="matrix">stronger</span><br>after each attack.</h1>
+  <div class="grid-2" style="margin-top: 36px; gap: 32px;">
+    <div>
+      <div class="bracket-label" style="margin-bottom: 14px;">[ SLASHED STAKE DISTRIBUTION ]</div>
+      <div class="grid-3" style="gap: 12px;">
+        <div class="card matrix-border" style="padding: 18px 16px; text-align: center;">
+          <div class="matrix" style="font-size: 38px; font-weight: 800; letter-spacing: -0.03em;">50%</div>
+          <div class="caption hl" style="margin-top: 6px; font-size: 11px;">treasury</div>
+          <div class="muted mono" style="font-size: 10px; margin-top: 4px;">public goods</div>
+        </div>
+        <div class="card cyan-border" style="padding: 18px 16px; text-align: center;">
+          <div class="terminal" style="font-size: 38px; font-weight: 800; letter-spacing: -0.03em;">30%</div>
+          <div class="caption hl" style="margin-top: 6px; font-size: 11px;">bug bounty</div>
+          <div class="muted mono" style="font-size: 10px; margin-top: 4px;">white-hat pool</div>
+        </div>
+        <div class="card warn-border" style="padding: 18px 16px; text-align: center;">
+          <div class="warn" style="font-size: 38px; font-weight: 800; letter-spacing: -0.03em;">20%</div>
+          <div class="caption" style="color: var(--warn); margin-top: 6px; font-size: 11px;">burned</div>
+          <div class="muted mono" style="font-size: 10px; margin-top: 4px;">removed from supply</div>
+        </div>
+      </div>
+      <div style="margin-top: 20px;">
+        <div style="color: var(--fg); font-size: 14px; line-height: 1.6;">
+          <div>+ Attacker's soulbound identity <span class="danger">permanently marked</span></div>
+          <div>+ Attacker's entire wallet network <span class="danger">tainted</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="math-block">
+        <span class="note">// anti-fragility invariant</span><br>
+        <span class="var">SystemValue</span>(post)<br>
+        <span class="op">=</span> <span class="var">SystemValue</span>(pre)<br>
+        <span class="op">+</span> <span class="var">SlashedStake</span><br>
+        <span class="op">−</span> <span class="var">AttackCost</span><br><br>
+        <span class="note">// SlashedStake &gt; AttackCost by design</span><br>
+        <span class="op">⇒</span> <span class="var">ΔValue</span> <span class="op">&gt;</span> 0
+      </div>
+      <div class="card matrix-border" style="margin-top: 18px;">
+        <div class="bracket-label">[ WHITE-HAT ECONOMY ]</div>
+        <div style="color: var(--fg-white); font-size: 15px; font-weight: 600; line-height: 1.4; margin-top: 10px;">
+          30% of every slashed attacker stake funds the bounty pool that <span class="terminal">finds the next attacker first</span>.
+        </div>
+        <div class="caption matrix" style="margin-top: 12px; font-size: 12px; font-style: italic;">// Bounty distribution is <span class="terminal mono" style="font-weight: 700;">Shapley-weighted</span> across detectors by contribution — not first-past-the-post. Defense compounds.</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 10 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 11 — Pairs with Siren -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 11 / 12 ]</span></div>
+  <div class="kicker">&gt; defense-in-depth</div>
+  <h1 class="title">Siren deters.<br>Clawback recovers.</h1>
+  <div class="grid-2" style="margin-top: 36px; gap: 32px; align-items: start;">
+    <div class="card cyan-border">
+      <div class="bracket-label cyan">[ LAYER 1 :: SIREN PROTOCOL ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">Deterrence.</div>
+      <ul class="arrow-list cyan">
+        <li>Attacker engages protocol → signal-score rises</li>
+        <li>Rising score = rising rent for each interaction</li>
+        <li>Attacker pays attack cost <span class="white">before</span> the exploit fires</li>
+        <li>Many attacks become unprofitable before attempt</li>
+      </ul>
+      <div class="caption hl" style="margin-top: 14px; font-size: 12px;">// First line of defense. Economic friction against malicious intent.</div>
+    </div>
+    <div class="card matrix-border">
+      <div class="bracket-label">[ LAYER 2 :: CLAWBACK CASCADE ]</div>
+      <div style="font-size: 22px; font-weight: 700; color: var(--fg-white); margin: 12px 0;">Recovery.</div>
+      <ul class="arrow-list">
+        <li>Siren-rent insufficient → attacker proceeds, succeeds</li>
+        <li>Detection community flags tainted source</li>
+        <li>Cascade propagates through attacker's flow</li>
+        <li>Funds recovered proportional to on-chain reachable + within window</li>
+      </ul>
+      <div class="caption matrix" style="margin-top: 14px; font-size: 12px;">// When deterrence fails, recovery picks up. Every dollar reachable is recoverable.</div>
+    </div>
+  </div>
+  <div class="caption hl" style="margin-top: 28px; text-align: center; font-size: 14px;">// Not either-or. <span class="matrix mono" style="font-weight: 700;">Deter first, recover second.</span> Stacked layers narrow the attacker's viable strategy to zero.</div>
+  <div class="footer"><div><span class="dot"></span>LIVE // contracts deployed</div><div>[ 11 / 12 ]</div></div>
+</section>
+
+<!-- SLIDE 12 — The Close -->
+<section class="slide">
+  <div class="chrome"><div><span class="brand">CLAWBACK</span><span class="brand-sep">  ::  </span><span class="brand-accent">CASCADE</span></div><span class="page">[ 12 / 12 ]</span></div>
+  <div class="kicker">&gt; the enforcement layer</div>
+  <h1 class="title">The white-hat economy<br>has a mechanism layer now.</h1>
+  <div class="brackets" style="margin-top: 40px; padding: 36px 44px;">
+    <div class="bl"></div><div class="br"></div>
+    <div style="color: var(--fg-white); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2;">
+      Compliance is not enforced.<br>
+      <span class="matrix">It's the lowest-energy state of the incentive landscape.</span>
+    </div>
+    <div style="color: var(--muted); font-size: 15px; margin-top: 18px; line-height: 1.55;">
+      Rule-following is the shape of the terrain. Not a constraint imposed on top. Every rational participant flows toward compliance for the same reason water flows downhill — the alternative requires energy against the gradient.
+    </div>
+  </div>
+  <div class="grid-3" style="margin-top: 28px;">
+    <div class="card matrix-border" style="padding: 16px 18px;">
+      <div class="bracket-label" style="font-size: 10px;">[ STATUS ]</div>
+      <div style="color: var(--fg-white); font-size: 15px; font-weight: 700; margin-top: 6px;">Live in contracts.</div>
+      <div class="muted mono" style="font-size: 11px; margin-top: 4px;">Production-ready.</div>
+    </div>
+    <div class="card cyan-border" style="padding: 16px 18px;">
+      <div class="bracket-label cyan" style="font-size: 10px;">[ READING ]</div>
+      <div style="color: var(--fg-white); font-size: 15px; font-weight: 700; margin-top: 6px;">Whitepaper + Mechanics.</div>
+      <div class="muted mono" style="font-size: 11px; margin-top: 4px;">DOCUMENTATION/CLAWBACK_CASCADE.md</div>
+    </div>
+    <div class="card warn-border" style="padding: 16px 18px;">
+      <div class="bracket-label warn" style="font-size: 10px;">[ OPEN TO ]</div>
+      <div style="color: var(--fg-white); font-size: 15px; font-weight: 700; margin-top: 6px;">Collaboration.</div>
+      <div class="muted mono" style="font-size: 11px; margin-top: 4px;">White-hat bounty integration.</div>
+    </div>
+  </div>
+  <div class="caption hl" style="text-align: center; margin-top: 20px; font-size: 13px;">// VibeSwap: <span class="matrix mono" style="font-weight: 700;">a coordination primitive, not a casino</span>. Clawback Cascade is one primitive in a stack built on <span class="terminal mono" style="font-weight: 700;">P-001 No Extraction Ever</span> — the axiom the math enforces.</div>
+  <div class="footer">
+    <div><span class="brand">Will Glynn</span><span class="brand-sep">  ·  </span><span class="terminal">github.com/WGlynn/vibeswap</span></div>
+    <div>[ 12 / 12 ]</div>
+  </div>
+</section>
+
+</div>
+
+</body>
+</html>

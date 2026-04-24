@@ -271,7 +271,7 @@ contract TruePriceValidationFuzzTest is Test {
         proposedPrice = bound(proposedPrice, 1e15, 1e24);
         maxDeviationBps = bound(maxDeviationBps, 10, 5000);
 
-        uint256 damped = BatchMath.applyGoldenRatioDamping(currentPrice, proposedPrice, maxDeviationBps);
+        uint256 damped = BatchMath.applyDeviationCap(currentPrice, proposedPrice, maxDeviationBps);
 
         uint256 maxDev = (currentPrice * maxDeviationBps) / 10000;
 

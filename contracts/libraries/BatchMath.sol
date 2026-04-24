@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./FibonacciScaling.sol";
-
 /**
  * @title BatchMath
  * @notice Mathematical utilities for batch swap clearing price calculation
- * @dev Implements uniform clearing price for MEV-resistant execution
- *      Enhanced with Fibonacci-weighted price determination
+ * @dev Implements uniform clearing price for MEV-resistant execution.
+ *      Production settlement uses `calculateClearingPrice` (binary-search,
+ *      volume-matching). `applyDeviationCap` caps per-batch price movement
+ *      against a reference anchor (TWAP / True Price / baseline).
  */
 library BatchMath {
     // ============ Custom Errors ============
@@ -20,9 +20,6 @@ library BatchMath {
     uint256 constant PRECISION = 1e18;
     uint256 constant MAX_ITERATIONS = 100;
     uint256 constant CONVERGENCE_THRESHOLD = 1e6; // 0.0001% precision
-
-    /// @notice Golden ratio for price interpolation
-    uint256 constant PHI = 1618033988749895000; // 1.618... with 18 decimals
 
     /**
      * @notice Calculate uniform clearing price for batch swaps
@@ -338,119 +335,25 @@ library BatchMath {
         lpFee = totalFee - protocolFee;
     }
 
-    // ============ Fibonacci-Enhanced Price Functions ============
+    // ============ Deviation Cap ============
 
     /**
-     * @notice Calculate clearing price with Fibonacci-weighted order aggregation
-     * @dev Weights orders by Fibonacci sequence to prioritize recent/larger orders
-     * @param buyOrders Array of (amountIn, maxPrice) for buy orders
-     * @param sellOrders Array of (amountIn, minPrice) for sell orders
-     * @param reserve0 Current reserve of token0
-     * @param reserve1 Current reserve of token1
-     * @return clearingPrice Fibonacci-weighted clearing price
-     * @return confidence Confidence score (0-100) based on order distribution
+     * @notice Cap a proposed price movement against an anchor
+     * @dev If the proposed move exceeds `maxDeviationBps` of `currentPrice`,
+     *      the result is clipped to exactly `currentPrice ± maxDeviation`.
+     *      Otherwise the proposed price passes through unchanged.
+     *
+     *      This is a plain per-batch deviation cap. Prior versions multiplied
+     *      the cap by φ and then re-clipped to `maxDeviation`, producing no
+     *      net effect — that arithmetic was removed 2026-04-24. The security
+     *      property (bounded per-batch movement away from an anchor) is
+     *      unchanged; the misleading "golden ratio damping" framing is not.
+     * @param currentPrice Anchor price (TWAP / True Price / baseline snapshot)
+     * @param proposedPrice Candidate price from the auction
+     * @param maxDeviationBps Maximum allowed deviation in basis points
+     * @return adjustedPrice Either `proposedPrice` or the anchor ± maxDeviation
      */
-    function calculateFibonacciClearingPrice(
-        uint256[] memory buyOrders,
-        uint256[] memory sellOrders,
-        uint256 reserve0,
-        uint256 reserve1
-    ) internal pure returns (uint256 clearingPrice, uint256 confidence) {
-        if (reserve0 == 0 || reserve1 == 0) revert InvalidReserves();
-
-        uint256 spotPrice = (reserve1 * PRECISION) / reserve0;
-
-        // If no orders, return spot with low confidence
-        if (buyOrders.length == 0 && sellOrders.length == 0) {
-            return (spotPrice, 50);
-        }
-
-        // Extract prices and volumes for Fibonacci weighting
-        uint256 buyCount = buyOrders.length / 2;
-        uint256 sellCount = sellOrders.length / 2;
-
-        if (buyCount == 0 || sellCount == 0) {
-            // One-sided market - use golden ratio blend with spot
-            if (buyCount > 0) {
-                uint256 avgBuyPrice = _calculateAveragePrice(buyOrders);
-                clearingPrice = FibonacciScaling.goldenRatioMean(avgBuyPrice, spotPrice);
-                confidence = 60;
-            } else {
-                uint256 avgSellPrice = _calculateAveragePrice(sellOrders);
-                clearingPrice = FibonacciScaling.goldenRatioMean(spotPrice, avgSellPrice);
-                confidence = 60;
-            }
-            return (clearingPrice, confidence);
-        }
-
-        // Two-sided market - use Fibonacci weighted prices
-        uint256[] memory buyPrices = new uint256[](buyCount);
-        uint256[] memory buyVolumes = new uint256[](buyCount);
-        uint256[] memory sellPrices = new uint256[](sellCount);
-        uint256[] memory sellVolumes = new uint256[](sellCount);
-
-        for (uint256 i = 0; i < buyCount; i++) {
-            buyVolumes[i] = buyOrders[i * 2];
-            buyPrices[i] = buyOrders[i * 2 + 1];
-        }
-
-        for (uint256 i = 0; i < sellCount; i++) {
-            sellVolumes[i] = sellOrders[i * 2];
-            sellPrices[i] = sellOrders[i * 2 + 1];
-        }
-
-        // Calculate Fibonacci-weighted average for each side
-        uint256 fibBuyPrice = FibonacciScaling.fibonacciWeightedPrice(buyPrices, buyVolumes);
-        uint256 fibSellPrice = FibonacciScaling.fibonacciWeightedPrice(sellPrices, sellVolumes);
-
-        // Clearing price is golden ratio mean between bid and ask
-        clearingPrice = FibonacciScaling.goldenRatioMean(fibBuyPrice, fibSellPrice);
-
-        // Confidence based on spread (tighter = higher confidence)
-        uint256 spread = fibBuyPrice > fibSellPrice
-            ? ((fibBuyPrice - fibSellPrice) * 10000) / fibBuyPrice
-            : ((fibSellPrice - fibBuyPrice) * 10000) / fibSellPrice;
-
-        if (spread <= 50) {        // 0.5% spread
-            confidence = 95;
-        } else if (spread <= 100) { // 1% spread
-            confidence = 85;
-        } else if (spread <= 200) { // 2% spread
-            confidence = 75;
-        } else if (spread <= 500) { // 5% spread
-            confidence = 60;
-        } else {
-            confidence = 40;
-        }
-    }
-
-    /**
-     * @notice Calculate average price from order array
-     */
-    function _calculateAveragePrice(uint256[] memory orders) private pure returns (uint256) {
-        uint256 totalVolume = 0;
-        uint256 totalValue = 0;
-
-        for (uint256 i = 0; i < orders.length / 2; i++) {
-            uint256 volume = orders[i * 2];
-            uint256 price = orders[i * 2 + 1];
-            totalVolume += volume;
-            totalValue += volume * price;
-        }
-
-        if (totalVolume == 0) return 0;
-        return totalValue / totalVolume;
-    }
-
-    /**
-     * @notice Apply golden ratio damping to price movement
-     * @dev Limits price change per batch to prevent manipulation
-     * @param currentPrice Current AMM price
-     * @param proposedPrice Proposed clearing price
-     * @param maxDeviationBps Maximum deviation in basis points
-     * @return adjustedPrice Damped price using golden ratio
-     */
-    function applyGoldenRatioDamping(
+    function applyDeviationCap(
         uint256 currentPrice,
         uint256 proposedPrice,
         uint256 maxDeviationBps
@@ -460,55 +363,17 @@ library BatchMath {
         if (proposedPrice > currentPrice) {
             uint256 increase = proposedPrice - currentPrice;
             if (increase > maxDeviation) {
-                // Damp using golden ratio
-                uint256 dampedIncrease = (maxDeviation * PHI) / PRECISION;
-                if (dampedIncrease > maxDeviation) dampedIncrease = maxDeviation;
-                adjustedPrice = currentPrice + dampedIncrease;
+                adjustedPrice = currentPrice + maxDeviation;
             } else {
                 adjustedPrice = proposedPrice;
             }
         } else {
             uint256 decrease = currentPrice - proposedPrice;
             if (decrease > maxDeviation) {
-                // Damp using golden ratio
-                uint256 dampedDecrease = (maxDeviation * PHI) / PRECISION;
-                if (dampedDecrease > maxDeviation) dampedDecrease = maxDeviation;
-                adjustedPrice = currentPrice - dampedDecrease;
+                adjustedPrice = currentPrice - maxDeviation;
             } else {
                 adjustedPrice = proposedPrice;
             }
-        }
-    }
-
-    /**
-     * @notice Calculate price at Fibonacci extension level
-     * @param basePrice Base price
-     * @param range Price range
-     * @param fibLevel Fibonacci level (236, 382, 500, 618, 786, 1000)
-     * @param isExtension True for extension above, false for retracement
-     * @return targetPrice Price at Fibonacci level
-     */
-    function getFibonacciPrice(
-        uint256 basePrice,
-        uint256 range,
-        uint256 fibLevel,
-        bool isExtension
-    ) internal pure returns (uint256 targetPrice) {
-        uint256 fibRatio;
-
-        if (fibLevel == 236) fibRatio = FibonacciScaling.FIB_236;
-        else if (fibLevel == 382) fibRatio = FibonacciScaling.FIB_382;
-        else if (fibLevel == 500) fibRatio = FibonacciScaling.FIB_500;
-        else if (fibLevel == 618) fibRatio = FibonacciScaling.FIB_618;
-        else if (fibLevel == 786) fibRatio = FibonacciScaling.FIB_786;
-        else fibRatio = PRECISION;
-
-        uint256 adjustment = (range * fibRatio) / PRECISION;
-
-        if (isExtension) {
-            targetPrice = basePrice + adjustment;
-        } else {
-            targetPrice = basePrice > adjustment ? basePrice - adjustment : 0;
         }
     }
 }

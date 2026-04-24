@@ -708,7 +708,7 @@ contract TruePriceValidationTest is Test {
     function test_goldenRatioDamping_caps_increase() public pure {
         // Price tries to go from 1e18 to 2e18 (100% increase)
         // maxDev = 500 bps = 5%
-        uint256 damped = BatchMath.applyGoldenRatioDamping(1e18, 2e18, 500);
+        uint256 damped = BatchMath.applyDeviationCap(1e18, 2e18, 500);
 
         // Should be capped much lower than 2e18
         assertLt(damped, 1.06e18, "Should be capped near max deviation");
@@ -717,7 +717,7 @@ contract TruePriceValidationTest is Test {
 
     function test_goldenRatioDamping_caps_decrease() public pure {
         // Price tries to go from 1e18 to 0.5e18 (50% decrease)
-        uint256 damped = BatchMath.applyGoldenRatioDamping(1e18, 0.5e18, 500);
+        uint256 damped = BatchMath.applyDeviationCap(1e18, 0.5e18, 500);
 
         assertGt(damped, 0.94e18, "Should be capped near max deviation");
         assertLt(damped, 1e18, "Should still allow some decrease");
@@ -725,7 +725,7 @@ contract TruePriceValidationTest is Test {
 
     function test_goldenRatioDamping_withinBounds_passThrough() public pure {
         // Small move: 1e18 to 1.02e18 (2% increase, within 5% bounds)
-        uint256 damped = BatchMath.applyGoldenRatioDamping(1e18, 1.02e18, 500);
+        uint256 damped = BatchMath.applyDeviationCap(1e18, 1.02e18, 500);
 
         // Should pass through unchanged
         assertEq(damped, 1.02e18, "Within-bounds move should pass through");

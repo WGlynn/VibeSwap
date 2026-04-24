@@ -13,20 +13,16 @@ contract FibWrapper {
         return FibonacciScaling.fibonacciSum(n);
     }
 
-    function isFibonacci(uint256 n) external pure returns (bool) {
-        return FibonacciScaling.isFibonacci(n);
-    }
-
     function getThroughputTier(uint256 volume, uint256 baseUnit)
         external pure returns (uint8, uint256, uint256)
     {
         return FibonacciScaling.getThroughputTier(volume, baseUnit);
     }
 
-    function getFibonacciFeeMultiplier(uint8 tier, uint256 baseFee)
+    function getTierFeeMultiplier(uint8 tier, uint256 baseFee)
         external pure returns (uint256)
     {
-        return FibonacciScaling.getFibonacciFeeMultiplier(tier, baseFee);
+        return FibonacciScaling.getTierFeeMultiplier(tier, baseFee);
     }
 
     function calculateRateLimit(uint256 usage, uint256 maxBw, uint256 windowSec)
@@ -51,12 +47,6 @@ contract FibWrapper {
         external pure returns (uint256, bool)
     {
         return FibonacciScaling.detectFibonacciLevel(price, high, low, toleranceBps);
-    }
-
-    function fibonacciWeightedPrice(uint256[] memory prices, uint256[] memory volumes)
-        external pure returns (uint256)
-    {
-        return FibonacciScaling.fibonacciWeightedPrice(prices, volumes);
     }
 
     function goldenRatioMean(uint256 p1, uint256 p2) external pure returns (uint256) {
@@ -106,28 +96,6 @@ contract FibonacciScalingTest is Test {
         assertEq(lib.fibonacciSum(5), 12); // Fib(7) - 1 = 13 - 1
     }
 
-    // ============ isFibonacci() ============
-
-    function test_isFibonacci_true() public view {
-        assertTrue(lib.isFibonacci(0));
-        assertTrue(lib.isFibonacci(1));
-        assertTrue(lib.isFibonacci(2));
-        assertTrue(lib.isFibonacci(3));
-        assertTrue(lib.isFibonacci(5));
-        assertTrue(lib.isFibonacci(8));
-        assertTrue(lib.isFibonacci(13));
-        assertTrue(lib.isFibonacci(21));
-        assertTrue(lib.isFibonacci(55));
-    }
-
-    function test_isFibonacci_false() public view {
-        assertFalse(lib.isFibonacci(4));
-        assertFalse(lib.isFibonacci(6));
-        assertFalse(lib.isFibonacci(7));
-        assertFalse(lib.isFibonacci(9));
-        assertFalse(lib.isFibonacci(10));
-    }
-
     // ============ getThroughputTier() ============
 
     function test_throughputTier_firstTier() public view {
@@ -143,22 +111,22 @@ contract FibonacciScalingTest is Test {
         assertEq(tier, 1);
     }
 
-    // ============ getFibonacciFeeMultiplier() ============
+    // ============ getTierFeeMultiplier() ============
 
     function test_feeMultiplier_tierZero() public view {
-        assertEq(lib.getFibonacciFeeMultiplier(0, 30), 30);
+        assertEq(lib.getTierFeeMultiplier(0, 30), 30);
     }
 
     function test_feeMultiplier_tierOne() public view {
         // multiplier = 1e18 + (PHI - 1e18) * 1 / 10 = 1e18 + 0.0618...e18
-        uint256 fee = lib.getFibonacciFeeMultiplier(1, 30);
+        uint256 fee = lib.getTierFeeMultiplier(1, 30);
         assertGt(fee, 30);
         assertLt(fee, 60);
     }
 
     function test_feeMultiplier_capped() public view {
         // Very high tier → capped at 3x
-        uint256 fee = lib.getFibonacciFeeMultiplier(100, 30);
+        uint256 fee = lib.getTierFeeMultiplier(100, 30);
         assertEq(fee, 90); // 3 * 30
     }
 
@@ -242,25 +210,6 @@ contract FibonacciScalingTest is Test {
         assertEq(level, 9999);
     }
 
-    // ============ fibonacciWeightedPrice() ============
-
-    function test_fibWeightedPrice_singleElement() public view {
-        uint256[] memory prices = new uint256[](1);
-        uint256[] memory volumes = new uint256[](1);
-        prices[0] = 100;
-        volumes[0] = 10;
-        assertEq(lib.fibonacciWeightedPrice(prices, volumes), 100);
-    }
-
-    function test_fibWeightedPrice_twoElements() public view {
-        uint256[] memory prices = new uint256[](2);
-        uint256[] memory volumes = new uint256[](2);
-        prices[0] = 100; volumes[0] = 10;
-        prices[1] = 200; volumes[1] = 10;
-        // Fib(1)=1 for first, Fib(2)=1 for second → equal weights
-        // Weighted avg = (100*10 + 200*10) / (10 + 10) = 150
-        assertEq(lib.fibonacciWeightedPrice(prices, volumes), 150);
-    }
 
     // ============ goldenRatioMean() ============
 

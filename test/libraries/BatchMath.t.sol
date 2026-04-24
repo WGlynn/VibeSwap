@@ -371,11 +371,11 @@ contract BatchMathTest is Test {
         assertGt(price, 0);
     }
 
-    // ============ applyGoldenRatioDamping ============
+    // ============ applyDeviationCap ============
 
     function test_goldenRatioDamping_noChange_withinBounds() public pure {
         // Proposed price within maxDeviation → no damping
-        uint256 result = BatchMath.applyGoldenRatioDamping(1000e18, 1050e18, 1000); // 10% max
+        uint256 result = BatchMath.applyDeviationCap(1000e18, 1050e18, 1000); // 10% max
         assertEq(result, 1050e18);
     }
 
@@ -384,7 +384,7 @@ contract BatchMathTest is Test {
         uint256 current = 1000e18;
         uint256 proposed = 1500e18; // 50% increase
         uint256 maxBps = 1000; // 10%
-        uint256 result = BatchMath.applyGoldenRatioDamping(current, proposed, maxBps);
+        uint256 result = BatchMath.applyDeviationCap(current, proposed, maxBps);
         // maxDeviation = 100e18, dampedIncrease = 100e18 * PHI / 1e18
         // PHI = 1.618e18 => dampedIncrease = ~161.8e18, capped at 100e18
         assertEq(result, current + 100e18);
@@ -394,49 +394,13 @@ contract BatchMathTest is Test {
         uint256 current = 1000e18;
         uint256 proposed = 500e18; // 50% decrease
         uint256 maxBps = 1000; // 10%
-        uint256 result = BatchMath.applyGoldenRatioDamping(current, proposed, maxBps);
+        uint256 result = BatchMath.applyDeviationCap(current, proposed, maxBps);
         assertEq(result, current - 100e18);
     }
 
     function test_goldenRatioDamping_equalPrices() public pure {
-        uint256 result = BatchMath.applyGoldenRatioDamping(1000e18, 1000e18, 500);
+        uint256 result = BatchMath.applyDeviationCap(1000e18, 1000e18, 500);
         assertEq(result, 1000e18);
     }
 
-    // ============ getFibonacciPrice ============
-
-    function test_getFibonacciPrice_extension() public pure {
-        uint256 basePrice = 1000e18;
-        uint256 range = 1000e18;
-
-        // 38.2% extension above base
-        uint256 target = BatchMath.getFibonacciPrice(basePrice, range, 382, true);
-        // FIB_382 = 382000000000000000 = 0.382e18
-        // adjustment = 1000e18 * 0.382e18 / 1e18 = 382e18
-        assertEq(target, basePrice + 382e18);
-    }
-
-    function test_getFibonacciPrice_retracement() public pure {
-        uint256 basePrice = 1000e18;
-        uint256 range = 1000e18;
-
-        // 61.8% retracement below base
-        uint256 target = BatchMath.getFibonacciPrice(basePrice, range, 618, false);
-        // adjustment = 1000e18 * 0.618e18 / 1e18 = 618e18
-        assertEq(target, basePrice - 618e18);
-    }
-
-    function test_getFibonacciPrice_retracementFloorZero() public pure {
-        // When adjustment > basePrice, floor at 0
-        uint256 target = BatchMath.getFibonacciPrice(100e18, 1000e18, 618, false);
-        // adjustment = 1000e18 * 618/1000 = 618e18 > 100e18 → 0
-        assertEq(target, 0);
-    }
-
-    function test_getFibonacciPrice_unknownLevel_defaultsPrecision() public pure {
-        // Unknown fibLevel → fibRatio = PRECISION (1.0)
-        uint256 target = BatchMath.getFibonacciPrice(500e18, 200e18, 999, true);
-        // adjustment = 200e18 * 1e18 / 1e18 = 200e18
-        assertEq(target, 700e18);
-    }
 }

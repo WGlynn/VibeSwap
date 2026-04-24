@@ -1651,10 +1651,10 @@ contract VibeAMM is
 
         if (driftBps > MAX_TWAP_DRIFT_BPS) {
             emit TWAPDriftDetected(poolId, snapshot, currentTwap, driftBps);
-            // Damp the price back toward the snapshot using golden-ratio blending
-            // This makes gradual manipulation expensive: attacker must fight the damper
+            // Cap the price back toward the snapshot.
+            // This makes gradual manipulation expensive: attacker must fight the cap
             // every swap rather than walking unchallenged across windows.
-            dampedPrice = BatchMath.applyGoldenRatioDamping(snapshot, price, MAX_TWAP_DRIFT_BPS);
+            dampedPrice = BatchMath.applyDeviationCap(snapshot, price, MAX_TWAP_DRIFT_BPS);
         } else {
             dampedPrice = price;
         }
@@ -1711,8 +1711,8 @@ contract VibeAMM is
             revert FibonacciRateLimitExceeded(amountIn, allowedAmount, cooldownSeconds);
         }
 
-        // Apply Fibonacci fee multiplier based on tier
-        adjustedFee = FibonacciScaling.getFibonacciFeeMultiplier(tier, currentFee);
+        // Apply tier-based fee multiplier
+        adjustedFee = FibonacciScaling.getTierFeeMultiplier(tier, currentFee);
 
         // Update user volume
         userPoolVolume[user][poolId] = currentVolume + amountIn;
@@ -2219,7 +2219,7 @@ contract VibeAMM is
         // ── Layer 1: spot deviation from current TWAP (existing check) ──────────────────────
         uint256 dampedPrice = clearingPrice;
         if (!SecurityLib.checkPriceDeviation(clearingPrice, twapPrice, MAX_PRICE_DEVIATION_BPS)) {
-            dampedPrice = BatchMath.applyGoldenRatioDamping(
+            dampedPrice = BatchMath.applyDeviationCap(
                 twapPrice, clearingPrice, MAX_PRICE_DEVIATION_BPS
             );
         }
@@ -2258,7 +2258,7 @@ contract VibeAMM is
             emit TWAPDriftDetected(poolId, baseline, twapPrice, driftBps);
             // Anchor the effective price back toward the baseline (not the drifted TWAP).
             // This prevents the attacker from using a manipulated TWAP as the "safe" reference.
-            dampedPrice = BatchMath.applyGoldenRatioDamping(
+            dampedPrice = BatchMath.applyDeviationCap(
                 baseline, dampedPrice, MAX_TWAP_DRIFT_BPS
             );
         }
@@ -2267,7 +2267,7 @@ contract VibeAMM is
     }
 
     /**
-     * @notice Validate clearing price against True Price Oracle and apply golden ratio damping
+     * @notice Validate clearing price against True Price Oracle and cap deviation
      * @param poolId Pool identifier
      * @param clearingPrice Raw clearing price from BatchMath
      * @param reserve0 Current reserve0 (for spot price reference)
@@ -2338,9 +2338,9 @@ contract VibeAMM is
                 return clearingPrice;
             }
 
-            // Price deviates beyond bounds — apply golden ratio damping
-            // Use True Price as the anchor (not TWAP), with regime-adjusted bounds
-            dampedPrice = BatchMath.applyGoldenRatioDamping(
+            // Price deviates beyond bounds — cap against the True Price anchor
+            // (not TWAP), with regime-adjusted bounds
+            dampedPrice = BatchMath.applyDeviationCap(
                 truePrice, clearingPrice, adjustedMaxDeviation
             );
 

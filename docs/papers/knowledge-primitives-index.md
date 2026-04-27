@@ -1650,3 +1650,27 @@ drip() → EmissionController holds VIBE →
 **Generalization**: Multi-contract economic flows require end-to-end integration tests, not just unit tests of each contract. A system where every contract passes its unit tests can still fail systemically if contracts disagree on amounts, timing, or state. The economic coherence test is: "can a user who contributes actually receive VIBE, and does the total distributed equal the total emitted?"
 
 **Cross-references**: P-107 (Supply Conservation — the end-to-end identity), P-110 (Three-Sink Invariant — sinks must actually receive their share), P-098 (As Above, So Below — each hop mirrors the same pattern: receive, hold, distribute)
+
+---
+
+### P-114: Anti-Fragility Under Persistent Damage — A Substrate-Independent Primitive (April 2026)
+
+**Source**: Clawback Cascade §5 (cryptoeconomic instance) + Cotten 2024, Persistent Stochastic Ablation (ML instance)
+**Paper**: [Anti-Fragility Under Persistent Damage](anti-fragility.md)
+
+> Systems exposed to persistent stochastic damage, when paired with proper accounting, evolve toward higher-value configurations than systems shielded from damage entirely. The substrate doesn't matter. The mechanism does.
+
+**Two convergent instances:**
+
+- **Cryptoeconomic**: `SystemValue(post-attack) = SystemValue(pre-attack) + SlashedStake − AttackCost`. Slashed stakes feed insurance pools, bug bounties, and burned supply. Anti-fragility proven game-theoretically (rational agents converge on compliance because non-compliance is the higher-energy state).
+- **Neural network training** (Cotten 2024): networks trained under *persistent* (not transient like dropout) stochastic ablation fall into four regimes; in two of them — *Beneficial Regularization* and *Chaotic Optimization* — the ablated network meets or *exceeds* pristine baselines. Anti-fragility shown empirically via parameter sweep on MNIST.
+
+**Necessary conditions for the primitive to fire:**
+1. Damage is **persistent** (transient damage like dropout doesn't qualify)
+2. Damage is **stochastic** (system can't anticipate what gets damaged)
+3. System has **structural support** to evolve around damage (architectural redundancy in PSA; insurance pools + topological taint propagation in Cascade)
+4. **Accounting** routes the cost of damage into system value (slashed stakes → pool; ablated weights → re-explored space)
+
+**Generalization**: Two convergent observations from independent domains is suggestive evidence; three would graduate this from "co-occurrence" to "primitive." Candidates for the third instance: chaos engineering in distributed systems, directed evolution under selective pressure, immune system V(D)J recombination. Any system meeting (1)–(4) above is predicted to admit an anti-fragile regime — and any system actively trying to avoid all damage is predicted to be more brittle than necessary, because it never reaches configurations only damage-survival can find.
+
+**Cross-references**: P-039 (Slashing Creates Credible Commitment — the cost-injection mechanism), P-098 (As Above, So Below — substrate-independent fractal property), P-017 (Three Independent Paths Converge on the Same Architecture — convergence as primitive evidence)

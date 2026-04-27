@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USD8 — A Stablecoin That Pays Its Holders</title>
+<style>
+:root {
+  --bg: #fafaf7;
+  --fg: #0e1a1f;
+  --muted: #5a6770;
+  --accent: #0a6e6e;
+  --accent-soft: #0a6e6e1a;
+  --rule: #d8d4c8;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--serif);
+  font-size: clamp(18px, 1.6vw, 24px);
+  line-height: 1.55;
+  overflow: hidden;
+}
+.deck { position: relative; width: 100vw; height: 100vh; }
+.slide {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  padding: 5vh 8vw;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.slide.active { display: flex; opacity: 1; }
+.slide h1 {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 5vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.4em;
+  color: var(--fg);
+}
+.slide h2 {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: clamp(1.8rem, 3.6vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.8em;
+  color: var(--accent);
+}
+.slide h3 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: clamp(1.3rem, 2.4vw, 2rem);
+  margin-bottom: 0.5em;
+  color: var(--muted);
+}
+.slide p { margin-bottom: 1em; max-width: 60ch; }
+.slide ul { list-style: none; max-width: 65ch; }
+.slide ul li {
+  padding-left: 1.5em;
+  position: relative;
+  margin-bottom: 0.8em;
+}
+.slide ul li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+.slide blockquote {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+  line-height: 1.3;
+  border-left: 4px solid var(--accent);
+  padding-left: 1.2em;
+  max-width: 26ch;
+  color: var(--fg);
+}
+.eyebrow {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.2em;
+}
+.subtitle {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.2rem, 2vw, 1.8rem);
+  color: var(--muted);
+  max-width: 50ch;
+}
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3vw;
+  margin-top: 1em;
+  max-width: 100%;
+}
+.compare > div {
+  border-top: 3px solid var(--rule);
+  padding-top: 1em;
+}
+.compare > div.highlight { border-top-color: var(--accent); }
+.compare h3 { font-family: var(--sans); font-size: clamp(1rem, 1.6vw, 1.4rem); margin-bottom: 0.6em; }
+.compare p { font-size: clamp(1rem, 1.5vw, 1.3rem); }
+.bignum {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: clamp(4rem, 10vw, 9rem);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--accent);
+  margin-bottom: 0.2em;
+}
+.tagline {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: clamp(1.2rem, 2vw, 1.7rem);
+  color: var(--muted);
+}
+.props {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2vw;
+  margin-top: 1.5em;
+}
+.props > div {
+  background: var(--accent-soft);
+  padding: 1.2em 1.5em;
+  border-radius: 8px;
+}
+.props h3 {
+  font-family: var(--sans);
+  font-size: clamp(1.1rem, 1.7vw, 1.4rem);
+  color: var(--accent);
+  margin-bottom: 0.4em;
+}
+.props p { font-size: clamp(0.95rem, 1.3vw, 1.1rem); }
+.nav {
+  position: fixed;
+  bottom: 1.5vh;
+  right: 2vw;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--muted);
+  user-select: none;
+}
+.nav .counter { font-weight: 600; color: var(--fg); }
+.brand {
+  position: fixed;
+  bottom: 1.5vh;
+  left: 2vw;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.hint {
+  position: fixed;
+  top: 1.5vh;
+  right: 2vw;
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.6;
+}
+.links {
+  margin-top: 1.5em;
+  font-family: var(--sans);
+  font-size: clamp(0.95rem, 1.4vw, 1.2rem);
+}
+.links li::before { content: '→'; }
+.bright { color: var(--accent); font-weight: 700; }
+
+@media (max-width: 720px) {
+  .slide { padding: 4vh 5vw; }
+  .compare, .props { grid-template-columns: 1fr; }
+}
+@media print {
+  body, html { overflow: visible; height: auto; }
+  .deck { display: block; height: auto; }
+  .slide {
+    display: flex !important;
+    opacity: 1 !important;
+    position: relative;
+    inset: auto;
+    page-break-after: always;
+    height: 100vh;
+    min-height: 720px;
+  }
+  .nav, .hint { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide active" data-slide="1">
+  <div class="eyebrow">USD8 · Local Talk · 15 min</div>
+  <h1>A Stablecoin That<br>Pays Its Holders</h1>
+  <p class="subtitle">How structural fairness changes what a stablecoin can be.</p>
+</section>
+
+<section class="slide" data-slide="2">
+  <div class="eyebrow">The question</div>
+  <h2>What is a stablecoin actually <em>for</em>?</h2>
+  <p>Most of us use them. Almost none of us ask what's happening with our dollar while it sits inside one.</p>
+  <p>This talk shows what's hidden inside today's stablecoins — and what changes when you fix it.</p>
+</section>
+
+<section class="slide" data-slide="3">
+  <div class="eyebrow">The market</div>
+  <h2>Stablecoins are the rails of crypto.</h2>
+  <div class="bignum">$200B+</div>
+  <p class="tagline">In circulating supply. Lending, trading, payments, savings — almost every crypto activity routes through one.</p>
+  <p style="margin-top: 1.5em;">They're the most successful crypto product to date. Boring. Load-bearing. <strong>And economically one-sided.</strong></p>
+</section>
+
+<section class="slide" data-slide="4">
+  <div class="eyebrow">The hidden trade</div>
+  <h2>You hand Circle a dollar.<br>Circle keeps the yield.</h2>
+  <p>When you hold USDC, Circle invests your dollar in U.S. Treasuries. At today's rates, that yield is roughly 4–5%.</p>
+  <p>You see none of it. The issuer keeps it.</p>
+  <p>USDT works the same way. So does PYUSD. So does almost every fully-collateralized stablecoin you've used.</p>
+</section>
+
+<section class="slide" data-slide="5">
+  <div class="eyebrow">By design, not by accident</div>
+  <h2>This isn't a bug.<br>It's the business model.</h2>
+  <p>Issue a stablecoin → scale it to a brand → capture the yield permanently. The holders take peg risk and counterparty risk. The issuer takes the upside.</p>
+  <p>It's legal. It's profitable. And it's <span class="bright">structurally one-sided</span>.</p>
+</section>
+
+<section class="slide" data-slide="6">
+  <div class="eyebrow">A different question</div>
+  <h2>What if the yield went back?</h2>
+  <p>Same dollar. Same collateral. Same redemption guarantee. Same auditability.</p>
+  <p>But the yield the reserves earn — flows back to the people holding the stablecoin. Not by issuer generosity. By the protocol's own math.</p>
+  <p style="margin-top: 1.5em;"><strong>That's USD8.</strong></p>
+</section>
+
+<section class="slide" data-slide="7">
+  <div class="eyebrow">The mechanism</div>
+  <h2>The Cover Pool.</h2>
+  <div class="compare">
+    <div>
+      <h3>Traditional stablecoin</h3>
+      <p>Reserves held by issuer. Yield held by issuer. Holders earn nothing.</p>
+    </div>
+    <div class="highlight">
+      <h3>USD8 Cover Pool</h3>
+      <p>Reserves held in a transparent, auditable structure. Yield distributed to holders by mathematical rule, not by issuer discretion.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-slide="8">
+  <div class="eyebrow">The constraint</div>
+  <h2>By math, not by promise.</h2>
+  <p>The issuer doesn't <em>promise</em> to share the yield.</p>
+  <p>The protocol <strong>enforces</strong> the distribution. There is no governance vote that can flip the deal. There is no executive decision that can claw it back.</p>
+  <p>The math is the constitutional court.</p>
+</section>
+
+<section class="slide" data-slide="9">
+  <div class="eyebrow">The fairness rule</div>
+  <h2>Shapley value.</h2>
+  <p>Nobel-prize-winning game theory, 1953.</p>
+  <p>Shapley answers a precise question: <em>given a group that produces value together, what's each member's mathematically fair share?</em></p>
+  <p style="margin-top: 1em;">It is the unique distribution rule that satisfies four basic fairness axioms simultaneously. Other rules break at least one.</p>
+</section>
+
+<section class="slide" data-slide="10">
+  <div class="eyebrow">In plain English</div>
+  <h2>Three fairness properties.</h2>
+  <div class="props">
+    <div>
+      <h3>Efficiency</h3>
+      <p>Every dollar of yield is distributed. Nothing leaks to the issuer.</p>
+    </div>
+    <div>
+      <h3>Symmetry</h3>
+      <p>Holders who contributed equally receive equal shares. No favoritism.</p>
+    </div>
+    <div>
+      <h3>Null player</h3>
+      <p>Holders who contributed nothing receive nothing. No free riders.</p>
+    </div>
+  </div>
+  <p style="margin-top: 1.5em;">If you held more USD8 longer, you earned more. <strong>Math, not policy.</strong></p>
+</section>
+
+<section class="slide" data-slide="11">
+  <div class="eyebrow">The proof</div>
+  <h2>Anyone can verify it.</h2>
+  <p>USD8's distribution is Brevis-verifiable: cryptographic proofs anyone can check, without trusting the issuer's books.</p>
+  <p>You don't have to take our word for it. You don't have to trust the audit firm. The math is publicly checkable, every distribution, every block.</p>
+  <p style="margin-top: 1em;"><strong>Trust the verification, not the verifier.</strong></p>
+</section>
+
+<section class="slide" data-slide="12">
+  <div class="eyebrow">For users</div>
+  <h2>Hold it. Earn from it. That's it.</h2>
+  <p>No staking. No locking. No yield farming. No active management.</p>
+  <p>You hold USD8. The protocol's earnings flow to you proportionally. The longer and more you hold, the more you earn — by structural rule.</p>
+  <p style="margin-top: 1em;">It works the same way the dollar in your pocket would, <em>if your dollar earned T-bill yield.</em></p>
+</section>
+
+<section class="slide" data-slide="13">
+  <div class="eyebrow">For developers</div>
+  <h2>A substrate, not a brand.</h2>
+  <p>USD8 is a stablecoin other protocols can build on, with structural fairness already baked in.</p>
+  <p>If your protocol pays users in USD8, your users get a second layer of yield from USD8 itself — without you having to engineer it.</p>
+  <p style="margin-top: 1em;"><strong>The math composes.</strong></p>
+</section>
+
+<section class="slide" data-slide="14">
+  <div class="eyebrow">The whole story in one sentence</div>
+  <blockquote>A stablecoin where the protocol's earnings flow to the people holding it — by math, not by promise.</blockquote>
+</section>
+
+<section class="slide" data-slide="15">
+  <div class="eyebrow">Closing</div>
+  <h2>Most stablecoins ask you to trust the issuer.<br>USD8 asks you to verify the math.</h2>
+  <p style="margin-top: 1.5em;">Specs, audits, and deeper reading available on request.</p>
+  <p style="font-family: var(--sans); margin-top: 2em; color: var(--muted);">Questions?</p>
+</section>
+
+</div>
+
+<div class="brand">USD8</div>
+<div class="nav"><span class="counter">1</span> / 15</div>
+<div class="hint">← → arrow keys to navigate</div>
+
+<script>
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const counter = document.querySelector('.counter');
+  let current = 0;
+
+  function show(i) {
+    if (i < 0 || i >= slides.length) return;
+    slides[current].classList.remove('active');
+    current = i;
+    slides[current].classList.add('active');
+    counter.textContent = current + 1;
+    history.replaceState(null, '', '#' + (current + 1));
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault();
+      show(current + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault();
+      show(current - 1);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      show(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      show(slides.length - 1);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('a')) return;
+    const x = e.clientX / window.innerWidth;
+    if (x > 0.5) show(current + 1);
+    else show(current - 1);
+  });
+
+  const initial = parseInt(window.location.hash.slice(1)) - 1;
+  if (!isNaN(initial) && initial >= 0 && initial < slides.length) {
+    show(initial);
+  }
+})();
+</script>
+</body>
+</html>

@@ -173,6 +173,12 @@ $$\text{SystemValue}(\text{post-attack}) = \text{SystemValue}(\text{pre-attack})
 
 The system becomes *stronger* after each attack. This is anti-fragility by design.
 
+## 5.1 Cross-Domain Validation
+
+Anti-fragility under persistent damage is not specific to cryptoeconomic mechanism design. **Persistent Stochastic Ablation** ([Cotten, 2024](https://github.com/tcotten-scrypted/persistent-stochastic-ablation-mlp)) demonstrates the empirical analog in neural network training: networks evolved under persistent ablation outperform pristine baselines in two of four classified training regimes (*Beneficial Regularization* and *Chaotic Optimization*).
+
+The convergence is structural. Whether the substrate is a transaction graph (Cascade) or a high-dimensional weight space (PSA), systems exposed to persistent stochastic damage with proper accounting evolve toward higher-value configurations than systems shielded from damage entirely. The anti-fragility primitive is substrate-independent. See [P-114](../docs/papers/knowledge-primitives-index.md) and [Anti-Fragility Under Persistent Damage](../docs/papers/anti-fragility.md) for the generalization.
+
 ---
 
 # 6. The Fungibility Question

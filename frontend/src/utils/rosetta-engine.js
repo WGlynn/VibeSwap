@@ -2881,8 +2881,31 @@ export function getDomainOverlap(domainA, domainB) {
 // persistence, callers can serialize via getCKGLog() and rehydrate on reload.
 // ============
 
+const CKG_LOG_KEY = 'rosetta-ckg-log-v1'
 const _ckgLog = []
 let _ckgPrevHash = '0'.repeat(8) // genesis prev-hash (djb2 zero)
+
+// Hydrate from localStorage if available (browser-only; safely no-ops in Node).
+try {
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem(CKG_LOG_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        _ckgLog.push(...parsed)
+        _ckgPrevHash = parsed[parsed.length - 1].hash
+      }
+    }
+  }
+} catch { /* localStorage disabled or quota / json failure — start fresh */ }
+
+function _persistCKGLog() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CKG_LOG_KEY, JSON.stringify(_ckgLog))
+    }
+  } catch { /* quota exceeded — log keeps running in-memory */ }
+}
 
 function _logCKG(op, payload = {}) {
   const seq = _ckgLog.length
@@ -2892,7 +2915,20 @@ function _logCKG(op, payload = {}) {
   const entry = { seq, prevHash: _ckgPrevHash, hash, op, payload, timestamp }
   _ckgLog.push(entry)
   _ckgPrevHash = hash
+  _persistCKGLog()
   return entry
+}
+
+/**
+ * Reset the CKG log to genesis. Returns the cleared length.
+ * Use sparingly — this discards provable history.
+ */
+export function resetCKGLog() {
+  const cleared = _ckgLog.length
+  _ckgLog.length = 0
+  _ckgPrevHash = '0'.repeat(8)
+  _persistCKGLog()
+  return cleared
 }
 
 /**
@@ -3077,6 +3113,56 @@ export function registerUniversal(name, definition) {
  * @param {number} maxLen   - default 7
  * @returns {string}        - glyph candidate (UPPERCASE)
  */
+/**
+ * Shapley value of each lexicon for the "translation coverage" game.
+ *
+ * Value function: v(S) = | union of universals covered by lexicons in S |
+ * For coverage games the closed form is:
+ *
+ *   φ_i = Σ over u ∈ U_i  of  1 / count(u)
+ *
+ * where count(u) = number of lexicons whose terms anchor to universal u.
+ * O(n × m) instead of O(2^n) — the Shapley substrate-match move applied
+ * to its own substrate.
+ *
+ * @returns {{ shapley: Record<string, number>, sorted: Array<{id, value}>, totalUniversals: number, counts: Record<string, number> }}
+ */
+export function lexiconShapley() {
+  // Build per-lexicon universal sets and global counts simultaneously
+  const coverage = {} // lexiconId -> Set<string>
+  const counts = {}   // universal -> int
+
+  for (const [id, lex] of Object.entries(LEXICONS)) {
+    const set = new Set(Object.values(lex.concepts).map(c => c.universal))
+    coverage[id] = set
+    for (const u of set) counts[u] = (counts[u] || 0) + 1
+  }
+  for (const [userId, lex] of USER_LEXICONS.entries()) {
+    const id = `user:${userId}`
+    const set = new Set(Object.values(lex.concepts).map(c => c.universal))
+    coverage[id] = set
+    for (const u of set) counts[u] = (counts[u] || 0) + 1
+  }
+
+  const shapley = {}
+  for (const [id, set] of Object.entries(coverage)) {
+    let phi = 0
+    for (const u of set) phi += 1 / counts[u]
+    shapley[id] = phi
+  }
+
+  const sorted = Object.entries(shapley)
+    .map(([id, value]) => ({ id, value }))
+    .sort((a, b) => b.value - a.value)
+
+  return {
+    shapley,
+    sorted,
+    totalUniversals: Object.keys(counts).length,
+    counts,
+  }
+}
+
 export function generateGlyph(definition, maxLen = 7) {
   const STOP = new Set([
     'a','an','the','of','to','for','in','on','at','by','with','and','or',

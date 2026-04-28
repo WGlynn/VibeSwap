@@ -28,10 +28,12 @@ import {
   composeLexicon,
   discoverGaps,
   lexiconSimilarity,
+  lexiconShapley,
   registerUniversal,
   generateGlyph,
   getCKGLog,
   verifyCKGLog,
+  resetCKGLog,
 } from '../utils/rosetta-engine'
 
 // ============ Rosetta Stone Protocol — Universal Translation ============
@@ -5195,258 +5197,411 @@ function MobileBottomNav() {
 
 // ============ CKG Lab — Compiled Knowledge Graph Operations ============
 // Visible UI surface for the CKG ops exported from rosetta-engine.js.
-// Three panels: linker (compose) · undef-symbol detector (gaps) · semantic-diff (similarity).
-// Below: append-only mutation log with hash-chain integrity check.
+// Five panels: discoverGaps · composeLexicon · lexiconSimilarity · lexiconShapley · registerUniversal.
+// Plus: append-only mutation log with djb2 hash-chain integrity check.
+// Persisted to localStorage. Survives reload. Provable history of protocol evolution.
 
 function CKGLab() {
+  // ── op state ──
   const [gapsLexId, setGapsLexId] = useState('')
   const [gapsResult, setGapsResult] = useState(null)
-
   const [composeIds, setComposeIds] = useState([])
   const [composePending, setComposePending] = useState('')
   const [composeResult, setComposeResult] = useState(null)
-
   const [simA, setSimA] = useState('')
   const [simB, setSimB] = useState('')
   const [simResult, setSimResult] = useState(null)
-
+  const [shapleyResult, setShapleyResult] = useState(null)
+  const [universalName, setUniversalName] = useState('')
+  const [universalDef, setUniversalDef] = useState('')
+  const [universalGlyph, setUniversalGlyph] = useState('')
+  const [universalStatus, setUniversalStatus] = useState(null)
+  // ── log state ──
   const [showLog, setShowLog] = useState(false)
   const [logTick, setLogTick] = useState(0)
 
   const log = useMemo(() => getCKGLog(), [logTick])
   const verify = useMemo(() => verifyCKGLog(), [logTick])
 
-  function runGaps() {
-    if (!gapsLexId) return
-    setGapsResult(discoverGaps(gapsLexId))
-  }
+  const tick = () => setLogTick(t => t + 1)
 
-  function addCompose() {
+  // Compute Shapley on mount + after any mutation
+  useEffect(() => { setShapleyResult(lexiconShapley()) }, [logTick])
+
+  // Live glyph suggestion
+  useEffect(() => {
+    setUniversalGlyph(universalDef.trim().length > 4 ? generateGlyph(universalDef) : '')
+  }, [universalDef])
+
+  // ── op runners ──
+  const runGaps = () => { if (gapsLexId) setGapsResult(discoverGaps(gapsLexId)) }
+  const addCompose = () => {
     if (!composePending || composeIds.includes(composePending)) return
     setComposeIds([...composeIds, composePending])
     setComposePending('')
   }
-  function removeCompose(id) {
+  const removeCompose = (id) => {
     setComposeIds(composeIds.filter(i => i !== id))
     if (composeResult) setComposeResult(null)
   }
-  function runCompose() {
+  const runCompose = () => {
     if (composeIds.length < 2) return
-    const r = composeLexicon(composeIds)
-    setComposeResult(r)
-    setLogTick(t => t + 1)
+    setComposeResult(composeLexicon(composeIds))
+    tick()
+  }
+  const runSim = () => { if (simA && simB && simA !== simB) setSimResult(lexiconSimilarity(simA, simB)) }
+  const registerUniv = () => {
+    if (!universalName || !universalDef) return
+    const ok = registerUniversal(universalName.trim(), universalDef.trim())
+    setUniversalStatus({ ok, name: universalName, glyph: universalGlyph })
+    if (ok) {
+      setUniversalName('')
+      setUniversalDef('')
+      tick()
+    }
+  }
+  const clearLog = () => {
+    if (confirm('Clear the CKG log? Discards provable history.')) {
+      resetCKGLog()
+      tick()
+    }
   }
 
-  function runSim() {
-    if (!simA || !simB) return
-    setSimResult(lexiconSimilarity(simA, simB))
-  }
+  // ── styles ──
+  const panel = 'rounded-lg border border-matrix-900/40 bg-black-900/70 p-4 transition-shadow hover:shadow-[0_0_24px_-12px_rgba(0,255,65,0.4)]'
+  const opSig = 'text-[10px] font-mono font-bold text-matrix-400 uppercase tracking-[0.18em]'
+  const opSub = 'text-[9px] font-mono text-black-500 uppercase tracking-wider mt-0.5 mb-3'
+  const labelCls = 'block text-[9px] font-mono text-black-500 mb-1 uppercase tracking-[0.15em]'
+  const inputCls = 'w-full appearance-none bg-black-700 border border-black-600 rounded-md px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-matrix-500 transition-colors'
+  const btnCls = 'w-full mt-2 px-3 py-1.5 rounded-md text-[11px] font-mono font-bold uppercase tracking-[0.15em] bg-matrix-900/50 border border-matrix-700/60 text-matrix-300 hover:bg-matrix-800/60 hover:border-matrix-500 hover:text-matrix-200 transition-all disabled:opacity-25 disabled:cursor-not-allowed'
 
-  const labelCls = 'block text-[9px] font-mono text-black-500 mb-1 uppercase tracking-wider'
-  const selectCls = 'w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-matrix-600'
-  const btnCls = 'w-full mt-2 px-3 py-1.5 rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider bg-matrix-900/40 border border-matrix-700/50 text-matrix-300 hover:bg-matrix-900/60 hover:border-matrix-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed'
+  const shapleyTop = shapleyResult?.sorted.slice(0, 12) ?? []
+  const shapleyMax = shapleyTop[0]?.value ?? 1
 
   return (
-    <div className="mb-6 rounded-xl border border-matrix-800/40 bg-black-900/40 p-4 sm:p-5">
-      <div className="flex items-baseline gap-3 mb-1">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-matrix-400">
-          CKG Lab
-        </h2>
-        <span className="text-[10px] font-mono text-black-600">
-          Compiler-Level Persistence Operations
-        </span>
+    <div
+      className="mb-6 rounded-2xl border border-matrix-800/40 p-5 sm:p-6"
+      style={{
+        background: 'linear-gradient(180deg, rgba(8,8,8,0.95), rgba(13,13,13,0.95))',
+        boxShadow: '0 0 64px -32px rgba(0,255,65,0.25), inset 0 0 32px -16px rgba(0,255,65,0.06)',
+      }}
+    >
+      {/* Hero header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+        <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-2">
+            <motion.span
+              className="inline-block w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: '#00ff41' }}
+              animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 12px #00ff41cc', '0 0 4px #00ff4166'] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+              aria-hidden="true"
+            />
+            <h2 className="text-[15px] font-mono font-bold text-white tracking-[0.2em] uppercase">
+              CKG <span className="text-matrix-400">LAB</span>
+            </h2>
+          </div>
+          <span className="hidden sm:inline text-[10px] font-mono text-black-500">
+            ::  Compiled Knowledge Graph Operations
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] font-mono">
+          <span className={verify.ok ? 'text-matrix-400' : 'text-amber-400'}>
+            chain {verify.ok ? '✓' : '✗'} {log.length} entries
+          </span>
+          {log.length > 0 && (
+            <button onClick={clearLog} className="text-black-500 hover:text-amber-400 transition-colors uppercase tracking-wider">
+              reset
+            </button>
+          )}
+        </div>
       </div>
-      <p className="text-black-600 text-[10px] font-mono mb-4">
-        compose · discover-gaps · similarity · append-only log
+      <p className="text-[10px] font-mono text-black-500 mb-5 tracking-wider">
+        compose · discover-gaps · similarity · shapley · register-universal · append-only-log
       </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* TOP ROW: 3 panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
-        {/* ── Discover Gaps ── */}
-        <div className="rounded-lg border border-black-800 bg-black-900/60 p-3">
-          <div className="text-[10px] font-mono font-bold text-matrix-400 mb-1 uppercase tracking-wider">
-            discoverGaps
-          </div>
-          <div className="text-[10px] font-mono text-black-500 mb-2">
-            undefined-symbol detector
-          </div>
+        {/* discoverGaps */}
+        <div className={panel}>
+          <div className={opSig}>discoverGaps(id)</div>
+          <div className={opSub}>undefined-symbol detector</div>
           <label className={labelCls}>Lexicon</label>
-          <select
-            value={gapsLexId}
-            onChange={(e) => setGapsLexId(e.target.value)}
-            className={selectCls}
-          >
+          <select value={gapsLexId} onChange={(e) => setGapsLexId(e.target.value)} className={inputCls}>
             <option value="">Select…</option>
-            <optgroup label="Canon">
-              {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-            <optgroup label="AI Agents">
-              {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-            <optgroup label="Human Domains">
-              {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
+            <optgroup label="Canon">{CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+            <optgroup label="AI Agents">{AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+            <optgroup label="Human Domains">{HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
           </select>
-          <button onClick={runGaps} disabled={!gapsLexId} className={btnCls}>
-            Run
-          </button>
+          <button onClick={runGaps} disabled={!gapsLexId} className={btnCls}>Detect →</button>
           {gapsResult && (
-            <div className="mt-3 text-[10px] font-mono">
-              <div className="text-black-400 mb-1">
-                {gapsResult.gaps.length === 0
-                  ? <span className="text-matrix-400">✓ no gaps — all anchors in symtab</span>
-                  : <span className="text-amber-400">{gapsResult.gaps.length} undefined symbol(s)</span>}
+            <div className="mt-3">
+              <div className={`text-[11px] font-mono mb-2 ${gapsResult.gaps.length === 0 ? 'text-matrix-400' : 'text-amber-400'}`}>
+                {gapsResult.gaps.length === 0 ? '✓ all anchors resolved in symtab' : `⚠ ${gapsResult.gaps.length} undefined symbol${gapsResult.gaps.length === 1 ? '' : 's'}`}
               </div>
-              {gapsResult.gaps.slice(0, 8).map((g, i) => (
-                <div key={i} className="border-l-2 border-amber-700/40 pl-2 mb-1.5">
-                  <span className="text-amber-300">{g.term}</span>
-                  <span className="text-black-600"> → </span>
-                  <span className="text-black-400">{g.universal}</span>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {gapsResult.gaps.slice(0, 12).map((g, i) => (
+                  <div key={i} className="text-[10px] font-mono border-l-2 border-amber-700/50 pl-2 py-0.5">
+                    <span className="text-amber-300">{g.term}</span>
+                    <span className="text-black-600"> ⇒ </span>
+                    <span className="text-black-400">{g.universal}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* composeLexicon */}
+        <div className={panel}>
+          <div className={opSig}>composeLexicon(ids[])</div>
+          <div className={opSub}>linker · resolves cross-object symbols</div>
+          <label className={labelCls}>Add lexicon</label>
+          <div className="flex gap-1.5">
+            <select value={composePending} onChange={(e) => setComposePending(e.target.value)} className={inputCls + ' flex-1'}>
+              <option value="">Select…</option>
+              <optgroup label="Canon">{CANON_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+              <optgroup label="AI Agents">{AGENT_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+              <optgroup label="Human Domains">{HUMAN_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+            </select>
+            <button onClick={addCompose} disabled={!composePending}
+              className="px-3 py-1.5 rounded-md text-[11px] font-mono font-bold bg-matrix-900/50 border border-matrix-700/60 text-matrix-300 hover:border-matrix-500 hover:bg-matrix-800/60 disabled:opacity-25 transition-all">+</button>
+          </div>
+          {composeIds.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {composeIds.map(id => {
+                const lex = LEXICON_MAP[id]
+                return (
+                  <motion.span
+                    key={id}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono border"
+                    style={{
+                      backgroundColor: 'rgba(0,255,65,0.06)',
+                      borderColor: lex?.color ? lex.color + '60' : 'rgba(0,255,65,0.3)',
+                      color: lex?.color ?? '#1aff76',
+                    }}
+                  >
+                    {id}
+                    <button onClick={() => removeCompose(id)} className="opacity-50 hover:opacity-100 hover:text-amber-400" aria-label={`Remove ${id}`}>×</button>
+                  </motion.span>
+                )
+              })}
+            </div>
+          )}
+          <button onClick={runCompose} disabled={composeIds.length < 2} className={btnCls}>
+            Link ({composeIds.length}) →
+          </button>
+          {composeResult && (
+            <div className="mt-3">
+              <div className="text-[11px] font-mono text-matrix-400 mb-2">
+                ✓ linked · <span className="text-white">{Object.keys(composeResult.concepts).length}</span> terms
+                {composeResult.conflicts.length > 0 && <span className="text-amber-400"> · {composeResult.conflicts.length} conflicts</span>}
+              </div>
+              {composeResult.conflicts.length > 0 && (
+                <div className="max-h-32 overflow-y-auto space-y-1.5">
+                  {composeResult.conflicts.slice(0, 6).map((c, i) => (
+                    <div key={i} className="text-[10px] font-mono border-l-2 border-amber-700/50 pl-2 py-0.5">
+                      <div className="text-amber-300">{c.term}</div>
+                      <div className="text-black-500 truncate">{c.left.source} → <span className="text-black-300">{c.left.universal}</span></div>
+                      <div className="text-black-500 truncate">{c.right.source} → <span className="text-black-300">{c.right.universal}</span></div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {gapsResult.gaps.length > 8 && (
-                <div className="text-black-600">…and {gapsResult.gaps.length - 8} more</div>
               )}
             </div>
           )}
         </div>
 
-        {/* ── Compose ── */}
-        <div className="rounded-lg border border-black-800 bg-black-900/60 p-3">
-          <div className="text-[10px] font-mono font-bold text-matrix-400 mb-1 uppercase tracking-wider">
-            composeLexicon
-          </div>
-          <div className="text-[10px] font-mono text-black-500 mb-2">
-            linker — multiple objects, one binary
-          </div>
-          <label className={labelCls}>Add lexicon</label>
-          <div className="flex gap-1.5">
-            <select
-              value={composePending}
-              onChange={(e) => setComposePending(e.target.value)}
-              className={selectCls + ' flex-1'}
-            >
-              <option value="">Select…</option>
-              <optgroup label="Canon">
-                {CANON_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </optgroup>
-              <optgroup label="AI Agents">
-                {AGENT_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </optgroup>
-              <optgroup label="Human Domains">
-                {HUMAN_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </optgroup>
-            </select>
-            <button onClick={addCompose} disabled={!composePending} className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold bg-matrix-900/40 border border-matrix-700/50 text-matrix-300 hover:border-matrix-500 disabled:opacity-30">+</button>
-          </div>
-          {composeIds.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {composeIds.map(id => (
-                <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-matrix-900/30 border border-matrix-800 text-[10px] font-mono text-matrix-300">
-                  {id}
-                  <button onClick={() => removeCompose(id)} className="text-black-500 hover:text-amber-400" aria-label={`Remove ${id}`}>×</button>
-                </span>
-              ))}
+        {/* lexiconSimilarity */}
+        <div className={panel}>
+          <div className={opSig}>lexiconSimilarity(a,b)</div>
+          <div className={opSub}>semantic-diff · jaccard on universals</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelCls}>A</label>
+              <select value={simA} onChange={(e) => setSimA(e.target.value)} className={inputCls}>
+                <option value="">…</option>
+                <optgroup label="Canon">{CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+                <optgroup label="AI">{AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+                <optgroup label="Human">{HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+              </select>
             </div>
-          )}
-          <button onClick={runCompose} disabled={composeIds.length < 2} className={btnCls}>
-            Link ({composeIds.length})
-          </button>
-          {composeResult && (
-            <div className="mt-3 text-[10px] font-mono">
-              <div className="text-matrix-400 mb-1">
-                ✓ linked — {Object.keys(composeResult.concepts).length} terms, {composeResult.conflicts.length} conflict(s)
-              </div>
-              {composeResult.conflicts.slice(0, 5).map((c, i) => (
-                <div key={i} className="border-l-2 border-amber-700/40 pl-2 mb-1.5">
-                  <div className="text-amber-300">{c.term}</div>
-                  <div className="text-black-500">{c.left.source}: {c.left.universal}</div>
-                  <div className="text-black-500">{c.right.source}: {c.right.universal}</div>
-                </div>
-              ))}
+            <div>
+              <label className={labelCls}>B</label>
+              <select value={simB} onChange={(e) => setSimB(e.target.value)} className={inputCls}>
+                <option value="">…</option>
+                <optgroup label="Canon">{CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+                <optgroup label="AI">{AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+                <optgroup label="Human">{HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+              </select>
             </div>
-          )}
-        </div>
-
-        {/* ── Similarity ── */}
-        <div className="rounded-lg border border-black-800 bg-black-900/60 p-3">
-          <div className="text-[10px] font-mono font-bold text-matrix-400 mb-1 uppercase tracking-wider">
-            lexiconSimilarity
           </div>
-          <div className="text-[10px] font-mono text-black-500 mb-2">
-            semantic-diff — Jaccard on universals
-          </div>
-          <label className={labelCls}>A</label>
-          <select value={simA} onChange={(e) => setSimA(e.target.value)} className={selectCls}>
-            <option value="">Select…</option>
-            <optgroup label="Canon">
-              {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-            <optgroup label="AI Agents">
-              {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-            <optgroup label="Human Domains">
-              {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-          </select>
-          <label className={labelCls + ' mt-2'}>B</label>
-          <select value={simB} onChange={(e) => setSimB(e.target.value)} className={selectCls}>
-            <option value="">Select…</option>
-            <optgroup label="Canon">
-              {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-            <optgroup label="AI Agents">
-              {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-            <optgroup label="Human Domains">
-              {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </optgroup>
-          </select>
-          <button onClick={runSim} disabled={!simA || !simB || simA === simB} className={btnCls}>
-            Diff
-          </button>
+          <button onClick={runSim} disabled={!simA || !simB || simA === simB} className={btnCls}>Diff →</button>
           {simResult && (
-            <div className="mt-3 text-[10px] font-mono">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-2xl font-bold text-matrix-400">
-                  {(simResult.jaccard * 100).toFixed(1)}%
-                </span>
-                <span className="text-black-500">jaccard</span>
-              </div>
-              <div className="text-black-500 mb-1">
-                {simResult.intersection.length} shared / {simResult.unionSize} total anchors
-              </div>
-              <div className="text-black-600 break-words">
-                {simResult.intersection.slice(0, 6).join(' · ')}
-                {simResult.intersection.length > 6 && ' …'}
+            <div className="mt-3 flex items-center gap-4">
+              <svg className="w-20 h-20 shrink-0" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" stroke="#181818" strokeWidth="6" fill="none" />
+                <motion.circle
+                  cx="50" cy="50" r="42"
+                  stroke="#00ff41" strokeWidth="6" fill="none" strokeLinecap="round"
+                  transform="rotate(-90 50 50)"
+                  initial={{ strokeDasharray: '0 264' }}
+                  animate={{ strokeDasharray: `${simResult.jaccard * 264} 264` }}
+                  transition={{ duration: 0.7, ease: 'easeOut' }}
+                  style={{ filter: 'drop-shadow(0 0 4px #00ff4166)' }}
+                />
+                <text x="50" y="56" textAnchor="middle" fontSize="20" fontWeight="bold" fill="#1aff76" fontFamily="JetBrains Mono, monospace">
+                  {Math.round(simResult.jaccard * 100)}%
+                </text>
+              </svg>
+              <div className="text-[10px] font-mono space-y-1 flex-1 min-w-0">
+                <div className="text-black-400">
+                  <span className="text-matrix-400 font-bold">{simResult.intersection.length}</span> shared
+                  <span className="text-black-600"> / </span>
+                  <span className="text-white">{simResult.unionSize}</span> total
+                </div>
+                <div className="text-black-500 break-words leading-tight">
+                  {simResult.intersection.slice(0, 5).join(' · ') || '—'}
+                  {simResult.intersection.length > 5 && <span className="text-black-700"> …+{simResult.intersection.length - 5}</span>}
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Append-only CKG Log ── */}
-      <div className="mt-4 pt-3 border-t border-black-800">
-        <button
-          onClick={() => setShowLog(v => !v)}
-          className="text-[10px] font-mono text-matrix-400 hover:text-matrix-300 uppercase tracking-wider"
-        >
-          {showLog ? '▼' : '▶'} CKG Log ({log.length}) — chain {verify.ok ? '✓ valid' : `✗ broken at ${verify.brokenAt}`}
+      {/* MID ROW: lexiconShapley bar chart */}
+      <div className={`${panel} mb-4`}>
+        <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+          <div>
+            <div className={opSig}>lexiconShapley()</div>
+            <div className={opSub} style={{ marginBottom: 0 }}>marginal contribution to translation power · top 12</div>
+          </div>
+          {shapleyResult && (
+            <div className="text-[10px] font-mono text-black-500">
+              <span className="text-matrix-400 font-bold">{shapleyResult.sorted.length}</span> lexicons
+              <span className="text-black-700"> · </span>
+              <span className="text-white">{shapleyResult.totalUniversals}</span> universals
+            </div>
+          )}
+        </div>
+        <div className="space-y-1.5 mt-3">
+          {shapleyTop.map(({ id, value }, idx) => {
+            const lex = LEXICON_MAP[id]
+            const pct = (value / shapleyMax) * 100
+            return (
+              <motion.div
+                key={id}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.025 }}
+                className="flex items-center gap-2 text-[11px] font-mono"
+              >
+                <span className="text-black-700 w-5 text-right tabular-nums">{(idx + 1).toString().padStart(2, '0')}</span>
+                <span className="inline-block w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: lex?.color ?? '#94a3b8' }} />
+                <span className="w-24 sm:w-32 truncate" style={{ color: lex?.color ?? '#94a3b8' }}>{id}</span>
+                <div className="flex-1 h-3 rounded-sm overflow-hidden" style={{ background: '#0d0d0d' }}>
+                  <motion.div
+                    className="h-full"
+                    style={{ background: `linear-gradient(90deg, rgba(0,255,65,0.25), ${lex?.color ?? '#00ff41'})` }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.6, delay: idx * 0.025, ease: 'easeOut' }}
+                  />
+                </div>
+                <span className="w-12 text-right font-bold tabular-nums" style={{ color: lex?.color ?? '#1aff76' }}>{value.toFixed(2)}</span>
+              </motion.div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* registerUniversal */}
+      <div className={`${panel} mb-4`}>
+        <div className={opSig}>registerUniversal(name, def)</div>
+        <div className={opSub}>extend the symtab · auto-glyph from definition</div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className={labelCls}>Name (snake_case)</label>
+            <input
+              value={universalName}
+              onChange={(e) => setUniversalName(e.target.value.replace(/[^a-z0-9_]/gi, '_').toLowerCase())}
+              placeholder="e.g. cooperative_elicitation"
+              className={inputCls}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>
+              Definition <span className="text-black-600 ml-2 normal-case tracking-normal">// glyph candidate: <span className="text-matrix-400 font-bold tracking-[0.1em]">{universalGlyph || '—'}</span></span>
+            </label>
+            <input
+              value={universalDef}
+              onChange={(e) => setUniversalDef(e.target.value)}
+              placeholder="One-sentence semantic definition…"
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <button onClick={registerUniv} disabled={!universalName || !universalDef} className={btnCls}>
+          Register →
         </button>
-        {showLog && (
-          <div className="mt-2 max-h-48 overflow-y-auto text-[9.5px] font-mono">
-            {log.length === 0 ? (
-              <div className="text-black-600 italic">no mutations yet — run compose or registerUniversal to extend</div>
-            ) : log.slice().reverse().map(e => (
-              <div key={e.seq} className="flex gap-2 py-0.5 border-b border-black-900">
-                <span className="text-black-600 w-8 shrink-0">#{e.seq}</span>
-                <span className="text-matrix-500 w-20 shrink-0">{e.op}</span>
-                <span className="text-black-500 w-20 shrink-0">{e.hash}</span>
-                <span className="text-black-400 truncate">{JSON.stringify(e.payload)}</span>
-              </div>
-            ))}
+        {universalStatus && (
+          <div className="mt-3 text-[11px] font-mono">
+            {universalStatus.ok ? (
+              <span className="text-matrix-400">
+                ✓ registered · <span className="text-white">{universalStatus.name}</span>
+                <span className="text-black-600"> · glyph </span>
+                <span className="text-matrix-300 font-bold">{universalStatus.glyph}</span>
+              </span>
+            ) : (
+              <span className="text-amber-400">✗ already exists · <span className="text-white">{universalStatus.name}</span></span>
+            )}
           </div>
         )}
+      </div>
+
+      {/* CKG Log */}
+      <div className="rounded-lg border border-black-800 bg-black-900/80 p-3">
+        <button
+          onClick={() => setShowLog(v => !v)}
+          className="w-full flex items-center justify-between text-[10px] font-mono text-matrix-400 hover:text-matrix-300 uppercase tracking-[0.18em]"
+        >
+          <span>{showLog ? '▼' : '▶'} CKG Log · {log.length} {log.length === 1 ? 'entry' : 'entries'}</span>
+          <span className={verify.ok ? 'text-matrix-500' : 'text-amber-400'}>
+            chain {verify.ok ? `✓ valid (head ${log.length > 0 ? log[log.length - 1].hash.slice(0, 6) : 'genesis'})` : `✗ broken @ #${verify.brokenAt}`}
+          </span>
+        </button>
+        <AnimatePresence>
+          {showLog && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 max-h-56 overflow-y-auto"
+            >
+              {log.length === 0 ? (
+                <div className="text-[10px] font-mono text-black-600 italic py-2">
+                  no mutations yet — run compose, register a universal, or extend a lexicon
+                </div>
+              ) : (
+                <div className="font-mono text-[10px] space-y-0.5">
+                  {log.slice().reverse().map(e => (
+                    <div key={e.seq} className="flex gap-3 py-0.5 border-b border-black-800/60 last:border-0">
+                      <span className="text-black-700 w-10 shrink-0 tabular-nums">#{e.seq.toString().padStart(3, '0')}</span>
+                      <span className="text-terminal-400 w-24 shrink-0 truncate">{e.op}</span>
+                      <span className="text-matrix-700 w-16 shrink-0 tabular-nums">{e.hash.slice(0, 8)}</span>
+                      <span className="text-black-400 truncate">{JSON.stringify(e.payload)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

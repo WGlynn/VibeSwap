@@ -3003,7 +3003,7 @@ export function composeLexicon(ids, opts = {}) {
   const conflicts = []
 
   for (const id of ids) {
-    const lex = LEXICONS[id] || USER_LEXICONS.get(id)
+    const lex = LEXICONS[id] || _userLexicons.get(id)
     if (!lex) continue
 
     for (const [term, mapping] of Object.entries(lex.concepts)) {
@@ -3050,7 +3050,7 @@ export function composeLexicon(ids, opts = {}) {
  * @returns {{ lexiconId, gaps: Array<{ term, universal, desc }> }}
  */
 export function discoverGaps(lexiconId) {
-  const lex = LEXICONS[lexiconId] || USER_LEXICONS.get(lexiconId)
+  const lex = LEXICONS[lexiconId] || _userLexicons.get(lexiconId)
   if (!lex) return { lexiconId, gaps: [] }
 
   const gaps = []
@@ -3074,8 +3074,8 @@ export function discoverGaps(lexiconId) {
  * @returns {{ idA, idB, jaccard, intersection, unionSize }}
  */
 export function lexiconSimilarity(idA, idB) {
-  const lexA = LEXICONS[idA] || USER_LEXICONS.get(idA)
-  const lexB = LEXICONS[idB] || USER_LEXICONS.get(idB)
+  const lexA = LEXICONS[idA] || _userLexicons.get(idA)
+  const lexB = LEXICONS[idB] || _userLexicons.get(idB)
   if (!lexA || !lexB) return { idA, idB, jaccard: 0, intersection: [], unionSize: 0 }
 
   const setA = new Set(Object.values(lexA.concepts).map(c => c.universal))
@@ -3137,7 +3137,7 @@ export function lexiconShapley() {
     coverage[id] = set
     for (const u of set) counts[u] = (counts[u] || 0) + 1
   }
-  for (const [userId, lex] of USER_LEXICONS.entries()) {
+  for (const [userId, lex] of _userLexicons.entries()) {
     const id = `user:${userId}`
     const set = new Set(Object.values(lex.concepts).map(c => c.universal))
     coverage[id] = set

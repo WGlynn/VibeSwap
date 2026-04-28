@@ -1,5 +1,52 @@
 # Claude Code — VibeSwap
 
+## Frontend Theme — LOCKED
+
+<always_use_terminal_console_aesthetic>
+All VibeSwap frontend work uses the same locked aesthetic. No ad-hoc design.
+Per the Anthropic Frontend Aesthetics Cookbook pattern: name the aesthetic, apply uniformly.
+
+**Aesthetic**: Retro-Futuristic / Terminal-Console (matrix-green on true black).
+
+**Color palette**:
+- Background: `#000000` true black, with subtle 48px grid (`rgba(255,255,255,0.022)` lines).
+- Primary accent: matrix-green `#00ff41` (Tailwind `matrix-500`). Muted scale `matrix-300..900`.
+- Secondary: terminal-cyan `#00d4ff`, violet `#a855f7`, amber `#f59e0b` — earned, not festive.
+- Text: white-300 (`#646464`) for body, white (`#ffffff`) for emphasis, matrix-400 for accents.
+- Borders: `rgba(0,255,65,0.08–0.40)` depending on state (resting → active).
+
+**Typography**:
+- Body / hero: Inter (`font-display`), tight tracking (`tracking-[-0.04em]`), bold weights for hero.
+- Mono / code / op-signatures / labels: JetBrains Mono (`font-mono`), uppercase, wide tracking (`tracking-[0.18em–0.30em]`).
+- Hero scale: `clamp(2.5rem, 7.5vw, 5.5rem)`. Section labels: `text-[10px]` mono uppercase.
+
+**Layout discipline**:
+- Each major section opens with an op-signature header: `<scope>.<op>(args) → <return>`.
+- Section dividers: animated horizontal gradient line `linear-gradient(90deg, rgba(0,255,65,0.18), transparent)`.
+- Panels: rounded-xl, gradient background `from-black-900/95 to-black-700/95`, matrix-900/40 border, optional `inset 0 0 32px -16px rgba(0,255,65,0.06)` glow.
+- Status indicators: breathing matrix-green dot, framer-motion `boxShadow` keyframes.
+
+**Animation**:
+- Framer Motion only. Stagger reveals (`delay: idx * 0.025`).
+- Subtle, not flashy. Bars/arcs use `ease: 'easeOut'`, duration ~0.6s.
+- Breathing dots: 2.4s loop, `easeInOut`.
+- Reduced-motion respected: framer-motion handles by default; do not override.
+
+**Reference implementations**:
+- `frontend/src/components/RosettaPage.jsx` — CKG Lab section + v2 hero + status strip (canonical).
+- `frontend/public/decks.html` — rolodex hero (matches).
+- `frontend/public/usd8.html` — local-talk deck (matches but lighter, talks audience).
+
+**What NOT to do**:
+- ❌ Festive colored tile grids (purple/pink/cyan/yellow rainbow boxes).
+- ❌ Generic AI-output looks (Inter + purple gradient + rounded white cards).
+- ❌ Mixed aesthetics on the same page. Pick one. This one.
+- ❌ Hardcoded hex colors outside the palette above. Use CSS variables / Tailwind tokens.
+- ❌ Designing a new component without checking if an existing pattern (CKG Lab cards, status strip) already covers it.
+</always_use_terminal_console_aesthetic>
+
+---
+
 ## PROTOCOL CHAIN (auto-triggering — follow the arrows)
 
 ### BOOT

@@ -5970,208 +5970,197 @@ export default function RosettaPage() {
   }, [showHelp, handleEscapeReset])
 
   return (
-    <div className={`max-w-5xl mx-auto px-4 py-6 pb-20 md:pb-6${isDark ? '' : ' rosetta-light'}`}>
+    <div
+      className={`max-w-6xl mx-auto px-4 py-6 pb-20 md:pb-6${isDark ? '' : ' rosetta-light'}`}
+      style={isDark ? {
+        backgroundImage: 'linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)',
+        backgroundSize: '48px 48px',
+        backgroundPosition: 'center top',
+      } : undefined}
+    >
 
-      {/* ============ Hero Section ============ */}
-      <motion.div
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="relative text-center mb-6 overflow-visible"
-      >
-        {/* Theme toggle — top right */}
-        <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
-
-        {/* Glow halo behind title */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2 -top-4 w-96 h-24 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse at center, rgba(0,255,65,0.12) 0%, transparent 70%)',
-            filter: 'blur(20px)',
-          }}
-        />
-        <h1 className="relative text-3xl sm:text-5xl font-bold text-white font-display uppercase tracking-tight">
-          Rosetta Stone{' '}
-          <span
-            className="text-matrix-500"
-            style={{ textShadow: '0 0 30px rgba(0,255,65,0.4)' }}
-          >
-            Protocol
-          </span>
-        </h1>
-        <p className="text-black-300 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
-          Every domain speaks every other domain.{' '}
-          <span className="text-white font-semibold">Live. Client-side. Zero backend.</span>
-        </p>
-
-        {/* One-sentence intro for first-time visitors */}
-        <p className="text-black-400 text-xs sm:text-sm font-mono mt-4 max-w-2xl mx-auto leading-relaxed px-2">
-          Pick any term from your field and instantly see what every other domain calls the same idea &mdash; medicine, engineering, law, music, trading, and more share a hidden universal language.
-        </p>
-
-        {/* Subtitle line */}
-        <p className="text-black-600 text-[10px] font-mono mt-2">
-          AI Agents + Human Domains + User Lexicons — 100% client-side
-        </p>
-      </motion.div>
-
-      {/* ============ Live Stats Dashboard ============ */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
-        className="mb-6"
-      >
-        {/* Dashboard header bar */}
-        <div className="flex items-center gap-2 mb-3">
+      {/* ============ v2 Console Header ============ */}
+      <div className="flex items-center justify-between mb-8 sm:mb-10">
+        <div className="flex items-center gap-2.5 text-[11px] font-mono uppercase tracking-[0.22em]">
           <motion.span
             className="inline-block w-1.5 h-1.5 rounded-full"
             style={{ backgroundColor: '#00ff41' }}
-            animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 10px #00ff41cc', '0 0 4px #00ff4166'] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 12px #00ff41cc', '0 0 4px #00ff4166'] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            aria-hidden="true"
           />
-          <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-matrix-500">
-            Live Protocol Stats
-          </span>
-          <span className="flex-1 h-px" style={{ background: 'rgba(0,255,65,0.12)' }} />
+          <span className="text-white font-bold">ROSETTA</span>
+          <span className="text-matrix-500">::</span>
+          <span className="text-matrix-400">PROTOCOL</span>
         </div>
+        <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+      </div>
 
-        {/* Primary stat tiles — 4-col grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          {[
-            {
-              label: 'Lexicons',
-              value: detailedStats.totalLexicons,
-              color: '#00ff41',
-              glow: 'rgba(0,255,65,0.18)',
-              border: 'rgba(0,255,65,0.22)',
-              bg: 'rgba(0,255,65,0.05)',
-              delay: 0.20,
-            },
-            {
-              label: 'Terms',
-              value: detailedStats.totalTerms,
-              color: '#22d3ee',
-              glow: 'rgba(34,211,238,0.18)',
-              border: 'rgba(34,211,238,0.22)',
-              bg: 'rgba(34,211,238,0.05)',
-              delay: 0.28,
-            },
-            {
-              label: 'Concepts',
-              value: detailedStats.totalUniversalConcepts,
-              color: '#a855f7',
-              glow: 'rgba(168,85,247,0.18)',
-              border: 'rgba(168,85,247,0.22)',
-              bg: 'rgba(168,85,247,0.05)',
-              delay: 0.36,
-            },
-            {
-              label: 'Cross-Domain Bridges',
-              value: detailedStats.crossDomainBridges,
-              color: '#f59e0b',
-              glow: 'rgba(245,158,11,0.18)',
-              border: 'rgba(245,158,11,0.22)',
-              bg: 'rgba(245,158,11,0.05)',
-              delay: 0.44,
-            },
-          ].map((tile) => (
-            <motion.div
-              key={tile.label}
-              initial={{ opacity: 0, scale: 0.88 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.45, delay: tile.delay, ease: 'easeOut' }}
-              className="relative rounded-xl p-4 text-center overflow-hidden"
-              style={{
-                background: tile.bg,
-                border: `1px solid ${tile.border}`,
-              }}
-            >
-              {/* Subtle inner glow pulse */}
-              <motion.div
-                className="absolute inset-0 pointer-events-none rounded-xl"
-                style={{
-                  background: `radial-gradient(ellipse at 50% 0%, ${tile.glow} 0%, transparent 65%)`,
-                }}
-                animate={{ opacity: [0.6, 1, 0.6] }}
-                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: tile.delay }}
-              />
-              <div className="relative z-10">
-                <div
-                  className="text-2xl sm:text-3xl font-bold font-mono leading-none"
-                  style={{ color: tile.color, textShadow: `0 0 18px ${tile.color}55` }}
-                >
-                  <AnimatedCounter target={tile.value} duration={1400} />
-                </div>
-                <div className="text-[10px] font-mono text-black-400 uppercase tracking-wider mt-1.5 leading-tight">
-                  {tile.label}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Most-connected banner + secondary metrics */}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.52, ease: 'easeOut' }}
-          className="rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+      {/* ============ v2 Cinematic Hero ============ */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
+        className="relative mb-12 sm:mb-16 overflow-visible"
+      >
+        {/* Layered background glow */}
+        <div
+          className="absolute -inset-20 sm:-inset-28 pointer-events-none"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,255,65,0.04) 0%, rgba(0,10,5,0.7) 100%)',
-            border: '1px solid rgba(0,255,65,0.14)',
+            background:
+              'radial-gradient(ellipse at 30% 35%, rgba(0,255,65,0.18) 0%, transparent 55%), radial-gradient(ellipse at 80% 65%, rgba(34,211,238,0.10) 0%, transparent 50%)',
+            filter: 'blur(40px)',
+          }}
+        />
+
+        {/* Op signature */}
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="relative text-[10px] font-mono text-matrix-400 uppercase tracking-[0.3em] mb-4 sm:mb-5"
+        >
+          rosetta.protocol(domain, term) → universal → projection
+        </motion.div>
+
+        {/* Title — cinematic */}
+        <motion.h1
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.18 }}
+          className="relative font-display font-bold text-white tracking-[-0.04em] leading-[0.92]"
+          style={{ fontSize: 'clamp(2.5rem, 7.5vw, 5.5rem)' }}
+        >
+          Every domain<br />
+          speaks{' '}
+          <span
+            className="text-matrix-500"
+            style={{ textShadow: '0 0 50px rgba(0,255,65,0.55)' }}
+          >
+            every other<br className="hidden sm:block" /> domain.
+          </span>
+        </motion.h1>
+
+        {/* Subhead */}
+        <motion.p
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="relative text-base sm:text-lg md:text-xl text-black-200 mt-6 sm:mt-7 max-w-2xl leading-relaxed"
+        >
+          A compiler for cross-domain meaning. Pick a term in one field — medicine, engineering, law, music, finance — and instantly see what every other field calls the same idea.
+          <span className="text-matrix-400"> By math, not by mapping.</span>
+        </motion.p>
+
+        {/* Op-signature footer line */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.55 }}
+          className="relative mt-6 flex items-center gap-3 text-[10px] font-mono text-black-500 uppercase tracking-[0.2em]"
+        >
+          <span className="inline-block w-6 h-px bg-matrix-700" />
+          <span>live</span>
+          <span className="text-black-700">·</span>
+          <span>client-side</span>
+          <span className="text-black-700">·</span>
+          <span>zero backend</span>
+          <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.18), transparent)' }} />
+        </motion.div>
+      </motion.div>
+
+      {/* ============ v2 Status Strip ============ */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6, ease: 'easeOut' }}
+        className="mb-12 sm:mb-14"
+      >
+        {/* Section header — op signature pattern */}
+        <div className="flex items-center gap-3 mb-5 text-[10px] font-mono uppercase tracking-[0.22em]">
+          <span className="text-matrix-400 font-bold">protocol.stats()</span>
+          <span className="text-black-700">→</span>
+          <span className="text-black-500">live · client-side</span>
+          <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.18), transparent)' }} />
+        </div>
+
+        {/* Status strip — 4 KPIs, terminal aesthetic */}
+        <div
+          className="rounded-xl border border-matrix-900/40 overflow-hidden"
+          style={{
+            background: 'linear-gradient(180deg, rgba(8,8,8,0.95), rgba(13,13,13,0.95))',
+            boxShadow: 'inset 0 0 32px -16px rgba(0,255,65,0.06)',
           }}
         >
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-matrix-900/30">
+            {[
+              { label: 'lexicons',   value: detailedStats.totalLexicons,          color: '#00ff41', delay: 0.10 },
+              { label: 'terms',      value: detailedStats.totalTerms,             color: '#22d3ee', delay: 0.16 },
+              { label: 'universals', value: detailedStats.totalUniversalConcepts, color: '#a855f7', delay: 0.22 },
+              { label: 'bridges',    value: detailedStats.crossDomainBridges,     color: '#f59e0b', delay: 0.28 },
+            ].map((s) => (
+              <motion.div
+                key={s.label}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: s.delay, ease: 'easeOut' }}
+                className="px-4 py-4 sm:px-5 sm:py-5"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="inline-block w-1 h-1 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-black-500">{s.label}</span>
+                </div>
+                <div
+                  className="text-3xl sm:text-4xl font-bold font-mono leading-none tabular-nums"
+                  style={{ color: s.color, textShadow: `0 0 24px ${s.color}44` }}
+                >
+                  <AnimatedCounter target={s.value} duration={1400} />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+        <div className="h-3" />
+
+        {/* Secondary terminal bar — most-connected + sub-metrics */}
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.5, ease: 'easeOut' }}
+          className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-2.5 rounded-md border border-matrix-900/30"
+          style={{ background: 'rgba(8,8,8,0.6)' }}
+        >
           {/* Most connected concept */}
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <span className="text-[9px] font-mono text-black-500 uppercase tracking-wider whitespace-nowrap">
-              Most connected
-            </span>
-            <span
-              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold truncate max-w-[200px]"
-              style={{
-                backgroundColor: 'rgba(0,255,65,0.10)',
-                border: '1px solid rgba(0,255,65,0.25)',
-                color: '#00ff41',
-              }}
-              title={detailedStats.mostConnected.name}
-            >
+          <div className="flex items-baseline gap-2 min-w-0 flex-wrap text-[10px] font-mono">
+            <span className="text-black-600 uppercase tracking-[0.18em]">most-connected</span>
+            <span className="text-black-700">→</span>
+            <span className="text-matrix-400 font-bold truncate max-w-[200px]" title={detailedStats.mostConnected.name}>
               {detailedStats.mostConnected.name}
             </span>
-            <span className="text-[9px] font-mono text-black-400 whitespace-nowrap">
-              {' — bridges '}
-              <span className="text-white font-bold">
-                {detailedStats.mostConnected.count}
-              </span>
-              {' domains'}
+            <span className="text-black-600">·</span>
+            <span>
+              <span className="text-white font-bold tabular-nums">{detailedStats.mostConnected.count}</span>
+              <span className="text-black-600"> bridges</span>
             </span>
           </div>
 
-          {/* Secondary metrics */}
-          <div className="flex items-center gap-4 flex-wrap">
+          {/* Secondary metrics — inline terminal style */}
+          <div className="flex items-baseline gap-4 sm:gap-5 flex-wrap text-[10px] font-mono">
             {[
-              { label: 'AI Agents', value: AGENT_LEXICONS.length, color: '#22d3ee' },
-              { label: 'Human Domains', value: HUMAN_LEXICONS.length, color: '#10b981' },
-              { label: 'Avg Terms', value: detailedStats.avgTermsPerLexicon, color: '#a855f7' },
+              { label: 'agents',    value: AGENT_LEXICONS.length, color: '#22d3ee' },
+              { label: 'humans',    value: HUMAN_LEXICONS.length, color: '#10b981' },
+              { label: 'avg/lex',   value: detailedStats.avgTermsPerLexicon, color: '#a855f7' },
               {
-                label: 'Covenant Hash',
-                value: stats.covenantHash
-                  ? `0x${stats.covenantHash.slice(0, 6)}…`
-                  : '--',
+                label: 'covenant',
+                value: stats.covenantHash ? `0x${stats.covenantHash.slice(0, 6)}` : '--',
                 color: '#d4aa50',
                 copyable: stats.covenantHash,
               },
             ].map((m) => (
-              <div key={m.label} className="text-center">
-                <div className="flex items-center justify-center gap-1">
-                  <span className="font-mono font-bold text-xs" style={{ color: m.color }}>
-                    {m.value}
-                  </span>
-                  {m.copyable && <CopyButton text={m.copyable} />}
-                </div>
-                <div className="text-[9px] font-mono text-black-600 uppercase tracking-wider whitespace-nowrap">
-                  {m.label}
-                </div>
+              <div key={m.label} className="flex items-center gap-1.5">
+                <span className="text-black-600 uppercase tracking-[0.15em]">{m.label}</span>
+                <span className="font-bold tabular-nums" style={{ color: m.color }}>{m.value}</span>
+                {m.copyable && <CopyButton text={m.copyable} />}
               </div>
             ))}
           </div>
@@ -6414,13 +6403,15 @@ export default function RosettaPage() {
       <CKGLab />
 
       {/* ============ Lexicon Grid — AI Agents ============ */}
-      <div className="mb-4">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">
-          AI Agents
-        </h2>
-        <p className="text-black-600 text-[10px] font-mono">
-          {AGENT_LEXICONS.length} agents — {AGENT_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)} terms
-        </p>
+      <div className="mb-5 flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.22em]">
+        <span className="text-matrix-400 font-bold">lexicons.agents()</span>
+        <span className="text-black-700">→</span>
+        <span className="text-black-500">
+          <span className="text-white tabular-nums">{AGENT_LEXICONS.length}</span> agents
+          <span className="text-black-700"> · </span>
+          <span className="text-white tabular-nums">{AGENT_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)}</span> terms
+        </span>
+        <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.18), transparent)' }} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
@@ -6446,13 +6437,15 @@ export default function RosettaPage() {
       </div>
 
       {/* ============ Lexicon Grid — Human Domains ============ */}
-      <div className="mb-4">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-1">
-          Human Domains
-        </h2>
-        <p className="text-black-600 text-[10px] font-mono">
-          {HUMAN_LEXICONS.length} domains — {HUMAN_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)} terms
-        </p>
+      <div className="mb-5 flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.22em]">
+        <span className="text-matrix-400 font-bold">lexicons.humans()</span>
+        <span className="text-black-700">→</span>
+        <span className="text-black-500">
+          <span className="text-white tabular-nums">{HUMAN_LEXICONS.length}</span> domains
+          <span className="text-black-700"> · </span>
+          <span className="text-white tabular-nums">{HUMAN_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)}</span> terms
+        </span>
+        <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.18), transparent)' }} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -6478,13 +6471,29 @@ export default function RosettaPage() {
       </div>
 
       {/* ============ Footer ============ */}
-      <div className="mt-8 text-center">
-        <p className="text-black-700 text-[10px] font-mono">
-          Rosetta Stone Protocol v2.0 — {ALL_LEXICONS.length} lexicons, {Object.values(agentTermCounts).reduce((a, b) => a + b, 0)} terms across AI Agents + Human Domains + User Lexicons
-        </p>
-        <p className="text-black-800 text-[9px] font-mono mt-0.5">
-          Runs client-side — no backend required
-        </p>
+      <div className="mt-12 pt-6 border-t border-matrix-900/30">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
+          <div className="flex items-center gap-2.5 text-[10px] font-mono uppercase tracking-[0.22em]">
+            <motion.span
+              className="inline-block w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: '#00ff41' }}
+              animate={{ boxShadow: ['0 0 4px #00ff4166', '0 0 12px #00ff41cc', '0 0 4px #00ff4166'] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+              aria-hidden="true"
+            />
+            <span className="text-matrix-400 font-bold">live</span>
+            <span className="text-black-700">·</span>
+            <span className="text-black-500">client-side</span>
+            <span className="text-black-700">·</span>
+            <span className="text-black-500">zero backend</span>
+          </div>
+          <div className="text-[10px] font-mono text-black-600 tabular-nums">
+            <span className="text-white">{ALL_LEXICONS.length}</span> lexicons
+            <span className="text-black-700"> · </span>
+            <span className="text-white">{Object.values(agentTermCounts).reduce((a, b) => a + b, 0)}</span> terms
+          </div>
+        </div>
+        <div className="text-center">
         {/* Keyboard shortcut hint */}
         <button
           onClick={() => setShowHelp(v => !v)}
@@ -6508,6 +6517,7 @@ export default function RosettaPage() {
           </span>
           shortcuts
         </button>
+        </div>
       </div>
 
       {/* ============ Keyboard Shortcut Help Overlay ============ */}

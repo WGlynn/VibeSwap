@@ -87,8 +87,19 @@ DISCRET  No personal details in public repos. Patience with community. Not a bri
 ```
 2LOOP    Every build→code+ideas. Both ship. Papers in docs/. Primitives in memory/.
          Quality bar: readable without the codebase. Knowledge is a DAG, not a list.
+         Round-trip = CKG decompile→edit→recompile. Loop sustains itself via shared symtab.
 SKILL    Mistakes→Skills→SKB. Lazy init. Name-first search. 0x11=test math. Never forge clean.
          Reference: contracts-catalogue.md, solidity-patterns.md, testing-patterns.md
+HIERO    Memory⇒logic-primitive ¬ prose. Density × stability × pointer-deref.
+         Violation: prose × paraphrase-drift × parse-cost > glyph-match-cost.
+         Hieroglyphics. Memes. RISC-CKB 0.99. Eat the cooking. (2026-04-25 cannon)
+         HIERO=density principle. CKG=structural reason it works.
+CKG      Compiled Knowledge Graph. Source⇒universal⇒projection. One meaning, N surfaces.
+         GKB=bytecode of 60+ sessions. SKB=source. Lexicons=languages. Universals=symtab.
+         Rosetta protocol = the compiler/decompiler. Lineage /compile-to = CKG operation.
+         Compiler-Level Persistence: meaning survives substrate; prose decomposes around it.
+         CKB=storage / CKA=architecture / CKG=meaning-layer. Trinity. Growth by accretion ¬ redesign.
+         Justin/Lineage L1/L2 commitment protocol IS CKG-mediated. (2026-04-27 cannon, descends from HIERO)
 ```
 
 ## EXTERNAL VALIDATION — We built it before they published it

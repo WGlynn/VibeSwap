@@ -31,6 +31,13 @@ import {
 
 // ============ Lexicon Registry — built dynamically from LEXICONS export ============
 
+// Colors for the canon lexicons (the substrate itself, treated as a domain language)
+const CANON_COLORS = {
+  vibeswap: '#00ff41', // matrix green — the substrate signature
+  rosetta:  '#fbbf24', // gold — the foundational stone
+}
+const CANON_IDS = Object.keys(CANON_COLORS)
+
 // Colors for the 10 AI agents
 const AGENT_COLORS = {
   nyx:        '#a855f7',
@@ -79,17 +86,25 @@ function toDisplayName(id) {
 const AI_AGENT_IDS = Object.keys(AGENT_COLORS)
 
 const ALL_LEXICONS = Object.entries(LEXICONS).map(([id, lex]) => {
+  const isCanon = CANON_IDS.includes(id)
   const isAgent = AI_AGENT_IDS.includes(id)
+  const group = isCanon ? 'canon' : (isAgent ? 'agent' : 'human')
+  const color = isCanon
+    ? CANON_COLORS[id]
+    : isAgent
+      ? AGENT_COLORS[id]
+      : (HUMAN_DOMAIN_COLORS[id] || '#94a3b8')
   return {
     id,
     name: toDisplayName(id),
     domain: lex.domain,
-    color: isAgent ? AGENT_COLORS[id] : (HUMAN_DOMAIN_COLORS[id] || '#94a3b8'),
-    group: isAgent ? 'agent' : 'human',
+    color,
+    group,
   }
 })
 
 // Separate groups for rendering
+const CANON_LEXICONS  = ALL_LEXICONS.filter(l => l.group === 'canon')
 const AGENT_LEXICONS  = ALL_LEXICONS.filter(l => l.group === 'agent')
 const HUMAN_LEXICONS  = ALL_LEXICONS.filter(l => l.group === 'human')
 
@@ -603,6 +618,13 @@ function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [], s
           className="w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
         >
           <option value="">Select lexicon...</option>
+          <optgroup label="Canon">
+            {CANON_LEXICONS.filter(l => l.id !== excludeId).map(l => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </optgroup>
           <optgroup label="AI Agents">
             {AGENT_LEXICONS.filter(l => l.id !== excludeId).map(l => (
               <option key={l.id} value={l.id}>
@@ -2383,6 +2405,9 @@ function SuggestTermForm({ pendingSuggestions, onAdd }) {
               style={{ paddingLeft: sugDomain ? '2rem' : '0.75rem' }}
             >
               <option value="">Select a domain...</option>
+              <optgroup label="Canon">
+                {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </optgroup>
               <optgroup label="AI Agents">
                 {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </optgroup>
@@ -3242,6 +3267,11 @@ function CompareLexicons({ userLexicons = [] }) {
                   className="appearance-none bg-black-900/80 border border-black-700 rounded-lg pl-3 pr-7 py-1.5 text-[11px] text-white font-mono focus:outline-none focus:border-matrix-600 transition-colors cursor-pointer"
                 >
                   <option value="">+ Add domain…</option>
+                  <optgroup label="Canon">
+                    {CANON_LEXICONS.filter(l => !selectedIds.includes(l.id)).map(l => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </optgroup>
                   <optgroup label="AI Agents">
                     {AGENT_LEXICONS.filter(l => !selectedIds.includes(l.id)).map(l => (
                       <option key={l.id} value={l.id}>{l.name}</option>

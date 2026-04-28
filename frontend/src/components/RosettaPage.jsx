@@ -51,42 +51,48 @@ const CANON_COLORS = {
 }
 const CANON_IDS = Object.keys(CANON_COLORS)
 
-// Colors for the 10 AI agents
-const AGENT_COLORS = {
-  nyx:        '#a855f7',
-  poseidon:   '#3b82f6',
-  athena:     '#f59e0b',
-  hephaestus: '#ef4444',
-  hermes:     '#10b981',
-  apollo:     '#fbbf24',
-  proteus:    '#6366f1',
-  artemis:    '#c084fc',
-  anansi:     '#f97316',
-  jarvis:     '#22d3ee',
-}
+// AI agent pantheon removed 2026-04-28 — non-canonical legacy.
+// Empty maps preserve symbol references in legacy code paths until they're refactored.
+const AGENT_COLORS = {}
 
-// Colors for the 20 human domain lexicons
+// Colors for the human domain lexicons (expanded)
 const HUMAN_DOMAIN_COLORS = {
-  medicine:     '#ef4444',
-  law:          '#6b7280',
-  engineering:  '#f97316',
-  education:    '#22c55e',
-  music:        '#ec4899',
-  agriculture:  '#84cc16',
-  psychology:   '#8b5cf6',
-  philosophy:   '#06b6d4',
-  military:     '#78716c',
-  cooking:      '#f59e0b',
-  sports:       '#14b8a6',
-  architecture: '#a3a3a3',
-  journalism:   '#0ea5e9',
-  trading:      '#eab308',
-  ecology:      '#22c55e',
-  astronomy:    '#818cf8',
-  linguistics:  '#fb923c',
-  cinema:       '#f43f5e',
-  mathematics:  '#60a5fa',
-  sociology:    '#c084fc',
+  medicine:           '#ef4444',
+  law:                '#6b7280',
+  engineering:        '#f97316',
+  education:          '#22c55e',
+  music:              '#ec4899',
+  agriculture:        '#84cc16',
+  psychology:         '#8b5cf6',
+  philosophy:         '#06b6d4',
+  military:           '#78716c',
+  cooking:            '#f59e0b',
+  sports:             '#14b8a6',
+  architecture:       '#a3a3a3',
+  journalism:         '#0ea5e9',
+  trading:            '#eab308',
+  ecology:            '#22c55e',
+  astronomy:          '#818cf8',
+  linguistics:        '#fb923c',
+  cinema:             '#f43f5e',
+  mathematics:        '#60a5fa',
+  sociology:          '#c084fc',
+  // 2026-04-28 expansion
+  chemistry:          '#10b981',
+  biology:            '#22c55e',
+  physics:            '#60a5fa',
+  neuroscience:       '#a855f7',
+  geography:          '#84cc16',
+  theology:           '#fbbf24',
+  economics:          '#eab308',
+  statistics:         '#3b82f6',
+  information_theory: '#22d3ee',
+  cybersecurity:      '#ef4444',
+  photography:        '#f43f5e',
+  negotiation:        '#f97316',
+  buddhism:           '#fb923c',
+  stoicism:           '#a3a3a3',
+  cybernetics:        '#06b6d4',
 }
 
 // Human-readable display names (capitalised) derived from the key
@@ -633,13 +639,6 @@ function LexiconSelect({ value, onChange, label, excludeId, userLexicons = [], s
           <option value="">Select lexicon...</option>
           <optgroup label="Canon">
             {CANON_LEXICONS.filter(l => l.id !== excludeId).map(l => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="AI Agents">
-            {AGENT_LEXICONS.filter(l => l.id !== excludeId).map(l => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>
@@ -2421,9 +2420,6 @@ function SuggestTermForm({ pendingSuggestions, onAdd }) {
               <optgroup label="Canon">
                 {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </optgroup>
-              <optgroup label="AI Agents">
-                {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </optgroup>
               <optgroup label="Human Domains">
                 {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               </optgroup>
@@ -3282,11 +3278,6 @@ function CompareLexicons({ userLexicons = [] }) {
                   <option value="">+ Add domain…</option>
                   <optgroup label="Canon">
                     {CANON_LEXICONS.filter(l => !selectedIds.includes(l.id)).map(l => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="AI Agents">
-                    {AGENT_LEXICONS.filter(l => !selectedIds.includes(l.id)).map(l => (
                       <option key={l.id} value={l.id}>{l.name}</option>
                     ))}
                   </optgroup>
@@ -5331,7 +5322,7 @@ function CKGLab() {
           <select value={gapsLexId} onChange={(e) => setGapsLexId(e.target.value)} className={inputCls}>
             <option value="">Select…</option>
             <optgroup label="Canon">{CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
-            <optgroup label="AI Agents">{AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+            
             <optgroup label="Human Domains">{HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
           </select>
           <button onClick={runGaps} disabled={!gapsLexId} className={btnCls}>Detect →</button>
@@ -5362,7 +5353,7 @@ function CKGLab() {
             <select value={composePending} onChange={(e) => setComposePending(e.target.value)} className={inputCls + ' flex-1'}>
               <option value="">Select…</option>
               <optgroup label="Canon">{CANON_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
-              <optgroup label="AI Agents">{AGENT_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+              
               <optgroup label="Human Domains">{HUMAN_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
             </select>
             <button onClick={addCompose} disabled={!composePending}
@@ -5425,7 +5416,7 @@ function CKGLab() {
               <select value={simA} onChange={(e) => setSimA(e.target.value)} className={inputCls}>
                 <option value="">…</option>
                 <optgroup label="Canon">{CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
-                <optgroup label="AI">{AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+                
                 <optgroup label="Human">{HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
               </select>
             </div>
@@ -5434,7 +5425,7 @@ function CKGLab() {
               <select value={simB} onChange={(e) => setSimB(e.target.value)} className={inputCls}>
                 <option value="">…</option>
                 <optgroup label="Canon">{CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
-                <optgroup label="AI">{AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
+                
                 <optgroup label="Human">{HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>
               </select>
             </div>
@@ -6147,7 +6138,7 @@ export default function RosettaPage() {
           {/* Secondary metrics — inline terminal style */}
           <div className="flex items-baseline gap-4 sm:gap-5 flex-wrap text-[10px] font-mono">
             {[
-              { label: 'agents',    value: AGENT_LEXICONS.length, color: '#22d3ee' },
+              { label: 'canon',     value: CANON_LEXICONS.length, color: '#00ff41' },
               { label: 'humans',    value: HUMAN_LEXICONS.length, color: '#10b981' },
               { label: 'avg/lex',   value: detailedStats.avgTermsPerLexicon, color: '#a855f7' },
               {
@@ -6402,39 +6393,7 @@ export default function RosettaPage() {
       {/* ============ CKG Lab — Compiled Knowledge Graph Operations ============ */}
       <CKGLab />
 
-      {/* ============ Lexicon Grid — AI Agents ============ */}
-      <div className="mb-5 flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.22em]">
-        <span className="text-matrix-400 font-bold">lexicons.agents()</span>
-        <span className="text-black-700">→</span>
-        <span className="text-black-500">
-          <span className="text-white tabular-nums">{AGENT_LEXICONS.length}</span> agents
-          <span className="text-black-700"> · </span>
-          <span className="text-white tabular-nums">{AGENT_LEXICONS.reduce((n, l) => n + (agentTermCounts[l.id] || 0), 0)}</span> terms
-        </span>
-        <span className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.18), transparent)' }} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        {AGENT_LEXICONS.map(lexicon => (
-          <LexiconCard
-            key={lexicon.id}
-            agent={lexicon}
-            termCount={agentTermCounts[lexicon.id] ?? '--'}
-            onSelect={setSelectedAgent}
-            isSelected={selectedAgent === lexicon.id}
-          />
-        ))}
-
-        {/* Expanded panel — only for agent group */}
-        <AnimatePresence>
-          {selectedAgent && AGENT_LEXICONS.some(l => l.id === selectedAgent) && (
-            <LexiconPanel
-              agent={LEXICON_MAP[selectedAgent]}
-              terms={lexiconTerms}
-            />
-          )}
-        </AnimatePresence>
-      </div>
+      {/* AI Agent pantheon removed 2026-04-28 — non-canonical legacy. */}
 
       {/* ============ Lexicon Grid — Human Domains ============ */}
       <div className="mb-5 flex items-center gap-3 text-[10px] font-mono uppercase tracking-[0.22em]">

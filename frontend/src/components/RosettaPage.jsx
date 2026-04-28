@@ -24,6 +24,14 @@ import {
   getConceptChain,
   getRelatedConcepts,
   getDomainOverlap,
+  // CKG ops — Compiled Knowledge Graph (compiler-level persistence)
+  composeLexicon,
+  discoverGaps,
+  lexiconSimilarity,
+  registerUniversal,
+  generateGlyph,
+  getCKGLog,
+  verifyCKGLog,
 } from '../utils/rosetta-engine'
 
 // ============ Rosetta Stone Protocol — Universal Translation ============
@@ -33,8 +41,11 @@ import {
 
 // Colors for the canon lexicons (the substrate itself, treated as a domain language)
 const CANON_COLORS = {
-  vibeswap: '#00ff41', // matrix green — the substrate signature
-  rosetta:  '#fbbf24', // gold — the foundational stone
+  vibeswap: '#00ff41', // matrix green — the JARVIS×Will substrate signature
+  rosetta:  '#fbbf24', // gold — the foundational stone, the compiler describing itself
+  usd8:     '#06b6d4', // cyan — Cover Pool stablecoin liquidity
+  amd:      '#8b5cf6', // violet — Augmented Mechanism Design (math-enforced fairness)
+  agov:     '#dc2626', // red — Augmented Governance (capture-resistant hierarchy)
 }
 const CANON_IDS = Object.keys(CANON_COLORS)
 
@@ -5182,6 +5193,265 @@ function MobileBottomNav() {
   )
 }
 
+// ============ CKG Lab — Compiled Knowledge Graph Operations ============
+// Visible UI surface for the CKG ops exported from rosetta-engine.js.
+// Three panels: linker (compose) · undef-symbol detector (gaps) · semantic-diff (similarity).
+// Below: append-only mutation log with hash-chain integrity check.
+
+function CKGLab() {
+  const [gapsLexId, setGapsLexId] = useState('')
+  const [gapsResult, setGapsResult] = useState(null)
+
+  const [composeIds, setComposeIds] = useState([])
+  const [composePending, setComposePending] = useState('')
+  const [composeResult, setComposeResult] = useState(null)
+
+  const [simA, setSimA] = useState('')
+  const [simB, setSimB] = useState('')
+  const [simResult, setSimResult] = useState(null)
+
+  const [showLog, setShowLog] = useState(false)
+  const [logTick, setLogTick] = useState(0)
+
+  const log = useMemo(() => getCKGLog(), [logTick])
+  const verify = useMemo(() => verifyCKGLog(), [logTick])
+
+  function runGaps() {
+    if (!gapsLexId) return
+    setGapsResult(discoverGaps(gapsLexId))
+  }
+
+  function addCompose() {
+    if (!composePending || composeIds.includes(composePending)) return
+    setComposeIds([...composeIds, composePending])
+    setComposePending('')
+  }
+  function removeCompose(id) {
+    setComposeIds(composeIds.filter(i => i !== id))
+    if (composeResult) setComposeResult(null)
+  }
+  function runCompose() {
+    if (composeIds.length < 2) return
+    const r = composeLexicon(composeIds)
+    setComposeResult(r)
+    setLogTick(t => t + 1)
+  }
+
+  function runSim() {
+    if (!simA || !simB) return
+    setSimResult(lexiconSimilarity(simA, simB))
+  }
+
+  const labelCls = 'block text-[9px] font-mono text-black-500 mb-1 uppercase tracking-wider'
+  const selectCls = 'w-full appearance-none bg-black-900/80 border border-black-700 rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-matrix-600'
+  const btnCls = 'w-full mt-2 px-3 py-1.5 rounded-lg text-[11px] font-mono font-bold uppercase tracking-wider bg-matrix-900/40 border border-matrix-700/50 text-matrix-300 hover:bg-matrix-900/60 hover:border-matrix-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed'
+
+  return (
+    <div className="mb-6 rounded-xl border border-matrix-800/40 bg-black-900/40 p-4 sm:p-5">
+      <div className="flex items-baseline gap-3 mb-1">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-matrix-400">
+          CKG Lab
+        </h2>
+        <span className="text-[10px] font-mono text-black-600">
+          Compiler-Level Persistence Operations
+        </span>
+      </div>
+      <p className="text-black-600 text-[10px] font-mono mb-4">
+        compose · discover-gaps · similarity · append-only log
+      </p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {/* ── Discover Gaps ── */}
+        <div className="rounded-lg border border-black-800 bg-black-900/60 p-3">
+          <div className="text-[10px] font-mono font-bold text-matrix-400 mb-1 uppercase tracking-wider">
+            discoverGaps
+          </div>
+          <div className="text-[10px] font-mono text-black-500 mb-2">
+            undefined-symbol detector
+          </div>
+          <label className={labelCls}>Lexicon</label>
+          <select
+            value={gapsLexId}
+            onChange={(e) => setGapsLexId(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Select…</option>
+            <optgroup label="Canon">
+              {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+            <optgroup label="AI Agents">
+              {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+            <optgroup label="Human Domains">
+              {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+          </select>
+          <button onClick={runGaps} disabled={!gapsLexId} className={btnCls}>
+            Run
+          </button>
+          {gapsResult && (
+            <div className="mt-3 text-[10px] font-mono">
+              <div className="text-black-400 mb-1">
+                {gapsResult.gaps.length === 0
+                  ? <span className="text-matrix-400">✓ no gaps — all anchors in symtab</span>
+                  : <span className="text-amber-400">{gapsResult.gaps.length} undefined symbol(s)</span>}
+              </div>
+              {gapsResult.gaps.slice(0, 8).map((g, i) => (
+                <div key={i} className="border-l-2 border-amber-700/40 pl-2 mb-1.5">
+                  <span className="text-amber-300">{g.term}</span>
+                  <span className="text-black-600"> → </span>
+                  <span className="text-black-400">{g.universal}</span>
+                </div>
+              ))}
+              {gapsResult.gaps.length > 8 && (
+                <div className="text-black-600">…and {gapsResult.gaps.length - 8} more</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Compose ── */}
+        <div className="rounded-lg border border-black-800 bg-black-900/60 p-3">
+          <div className="text-[10px] font-mono font-bold text-matrix-400 mb-1 uppercase tracking-wider">
+            composeLexicon
+          </div>
+          <div className="text-[10px] font-mono text-black-500 mb-2">
+            linker — multiple objects, one binary
+          </div>
+          <label className={labelCls}>Add lexicon</label>
+          <div className="flex gap-1.5">
+            <select
+              value={composePending}
+              onChange={(e) => setComposePending(e.target.value)}
+              className={selectCls + ' flex-1'}
+            >
+              <option value="">Select…</option>
+              <optgroup label="Canon">
+                {CANON_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </optgroup>
+              <optgroup label="AI Agents">
+                {AGENT_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </optgroup>
+              <optgroup label="Human Domains">
+                {HUMAN_LEXICONS.filter(l => !composeIds.includes(l.id)).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </optgroup>
+            </select>
+            <button onClick={addCompose} disabled={!composePending} className="px-2 py-1 rounded-lg text-[11px] font-mono font-bold bg-matrix-900/40 border border-matrix-700/50 text-matrix-300 hover:border-matrix-500 disabled:opacity-30">+</button>
+          </div>
+          {composeIds.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {composeIds.map(id => (
+                <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-matrix-900/30 border border-matrix-800 text-[10px] font-mono text-matrix-300">
+                  {id}
+                  <button onClick={() => removeCompose(id)} className="text-black-500 hover:text-amber-400" aria-label={`Remove ${id}`}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <button onClick={runCompose} disabled={composeIds.length < 2} className={btnCls}>
+            Link ({composeIds.length})
+          </button>
+          {composeResult && (
+            <div className="mt-3 text-[10px] font-mono">
+              <div className="text-matrix-400 mb-1">
+                ✓ linked — {Object.keys(composeResult.concepts).length} terms, {composeResult.conflicts.length} conflict(s)
+              </div>
+              {composeResult.conflicts.slice(0, 5).map((c, i) => (
+                <div key={i} className="border-l-2 border-amber-700/40 pl-2 mb-1.5">
+                  <div className="text-amber-300">{c.term}</div>
+                  <div className="text-black-500">{c.left.source}: {c.left.universal}</div>
+                  <div className="text-black-500">{c.right.source}: {c.right.universal}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Similarity ── */}
+        <div className="rounded-lg border border-black-800 bg-black-900/60 p-3">
+          <div className="text-[10px] font-mono font-bold text-matrix-400 mb-1 uppercase tracking-wider">
+            lexiconSimilarity
+          </div>
+          <div className="text-[10px] font-mono text-black-500 mb-2">
+            semantic-diff — Jaccard on universals
+          </div>
+          <label className={labelCls}>A</label>
+          <select value={simA} onChange={(e) => setSimA(e.target.value)} className={selectCls}>
+            <option value="">Select…</option>
+            <optgroup label="Canon">
+              {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+            <optgroup label="AI Agents">
+              {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+            <optgroup label="Human Domains">
+              {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+          </select>
+          <label className={labelCls + ' mt-2'}>B</label>
+          <select value={simB} onChange={(e) => setSimB(e.target.value)} className={selectCls}>
+            <option value="">Select…</option>
+            <optgroup label="Canon">
+              {CANON_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+            <optgroup label="AI Agents">
+              {AGENT_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+            <optgroup label="Human Domains">
+              {HUMAN_LEXICONS.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </optgroup>
+          </select>
+          <button onClick={runSim} disabled={!simA || !simB || simA === simB} className={btnCls}>
+            Diff
+          </button>
+          {simResult && (
+            <div className="mt-3 text-[10px] font-mono">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-2xl font-bold text-matrix-400">
+                  {(simResult.jaccard * 100).toFixed(1)}%
+                </span>
+                <span className="text-black-500">jaccard</span>
+              </div>
+              <div className="text-black-500 mb-1">
+                {simResult.intersection.length} shared / {simResult.unionSize} total anchors
+              </div>
+              <div className="text-black-600 break-words">
+                {simResult.intersection.slice(0, 6).join(' · ')}
+                {simResult.intersection.length > 6 && ' …'}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Append-only CKG Log ── */}
+      <div className="mt-4 pt-3 border-t border-black-800">
+        <button
+          onClick={() => setShowLog(v => !v)}
+          className="text-[10px] font-mono text-matrix-400 hover:text-matrix-300 uppercase tracking-wider"
+        >
+          {showLog ? '▼' : '▶'} CKG Log ({log.length}) — chain {verify.ok ? '✓ valid' : `✗ broken at ${verify.brokenAt}`}
+        </button>
+        {showLog && (
+          <div className="mt-2 max-h-48 overflow-y-auto text-[9.5px] font-mono">
+            {log.length === 0 ? (
+              <div className="text-black-600 italic">no mutations yet — run compose or registerUniversal to extend</div>
+            ) : log.slice().reverse().map(e => (
+              <div key={e.seq} className="flex gap-2 py-0.5 border-b border-black-900">
+                <span className="text-black-600 w-8 shrink-0">#{e.seq}</span>
+                <span className="text-matrix-500 w-20 shrink-0">{e.op}</span>
+                <span className="text-black-500 w-20 shrink-0">{e.hash}</span>
+                <span className="text-black-400 truncate">{JSON.stringify(e.payload)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ============ Main Page Component ============
 
 export default function RosettaPage() {
@@ -5984,6 +6254,9 @@ export default function RosettaPage() {
       />
 
       {/* Ten Covenants moved to dedicated governance page */}
+
+      {/* ============ CKG Lab — Compiled Knowledge Graph Operations ============ */}
+      <CKGLab />
 
       {/* ============ Lexicon Grid — AI Agents ============ */}
       <div className="mb-4">

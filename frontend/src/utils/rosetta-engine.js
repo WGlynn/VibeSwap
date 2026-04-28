@@ -553,6 +553,60 @@ export const LEXICONS = {
       bootstrap:            { universal: 'connection_init',         desc: 'Describing the compiler in its own terms. Proof the metalanguage is closed under self-reference.' },
     },
   },
+  // USD8 — Cover Pool stablecoin: yield distributed by Shapley value, math not promise.
+  usd8: {
+    domain: 'USD8 — Cover Pool Stablecoin',
+    concepts: {
+      collateral:           { universal: 'committed_resources',     desc: 'Reserves backing each USD8 1:1. Held in the Cover Pool, not the issuer.' },
+      cover_pool:           { universal: 'capability_merger',       desc: 'Aggregated reserve structure where yield is math-distributed to holders.' },
+      shapley_yield:        { universal: 'fair_attribution',        desc: 'Reserve yield distributed to holders by Shapley value — math, not policy.' },
+      peg_anchor:           { universal: 'stable_equilibrium',      desc: 'The 1:1 USD anchor. Structurally enforced by collateralization + redemption.' },
+      brevis_proof:         { universal: 'integrity_proof',         desc: 'ZK-verifiable proof of correct distribution. Anyone can check, none must trust.' },
+      holder:               { universal: 'committed_resources',     desc: 'An address holding USD8. The unit of fair-attribution participation.' },
+      issuer:               { universal: 'assigned_responsibility', desc: 'The entity that mints USD8 against deposited collateral. Not the yield owner.' },
+      redemption:           { universal: 'corrective_action',       desc: 'Conversion of USD8 back to the underlying USD. Always-on, structurally guaranteed.' },
+      depeg:                { universal: 'environment_induced_drift', desc: 'Loss of 1:1 peg under stress. Bounded by collateralization ratio + redemption pressure.' },
+      transparency:         { universal: 'systematic_review',       desc: 'Public reserve attestation. Cover Pool composition is auditable on-chain.' },
+      yield_routing:        { universal: 'automation_pipeline',     desc: 'Programmatic distribution of reserve earnings. No discretionary step.' },
+      augmented_stable:     { universal: 'stable_equilibrium',      desc: 'Stablecoin fairness as structural property — not a promise the issuer can revoke.' },
+    },
+  },
+  // AMD — Augmented Mechanism Design: math-enforced invariants over existing markets/governance.
+  amd: {
+    domain: 'Augmented Mechanism Design',
+    concepts: {
+      augmentation:         { universal: 'capability_merger',       desc: 'Layer math-enforced fairness onto existing markets/governance — augment, do not replace.' },
+      structural_invariant: { universal: 'unchanging_constraint',   desc: 'A property the math guarantees regardless of context, vote, or stress.' },
+      mechanism:            { universal: 'established_pattern',     desc: 'A market or coordination process with defined rules and outcomes.' },
+      fairness_axiom:       { universal: 'foundational_axiom',      desc: 'A bedrock fairness rule from which mechanism legitimacy descends. P-000 is one.' },
+      substrate_match:      { universal: 'pattern_generalization',  desc: 'Mechanism geometry must match substrate geometry. As above, so below.' },
+      fractal_market:       { universal: 'pattern_generalization',  desc: 'Power-law / scale-invariant market structure. Not Gaussian.' },
+      golden_ratio:         { universal: 'pattern_generalization',  desc: 'Phi-based scaling. The substrate-matched proportionality.' },
+      fibonacci_scale:      { universal: 'pattern_generalization',  desc: 'Throughput limits arranged on Fibonacci retracement levels. Per-user per-pool damping.' },
+      augment_not_replace:  { universal: 'voluntary_agreement',     desc: 'The market still functions; AMD changes which outcomes are reachable, not whether outcomes happen.' },
+      math_enforcement:     { universal: 'integrity_proof',         desc: 'Properties guaranteed by math, not by trusted parties or future legal recourse.' },
+      shapley_distribution: { universal: 'fair_attribution',        desc: 'Per-coalition marginal contribution allocation. The Cave Theorem.' },
+      cooperative_elicitation: { universal: 'transmission_method',  desc: 'Decoupling distribution rule (Shapley) from value-function elicitation.' },
+    },
+  },
+  // AGOV — Augmented Governance: Physics > Constitution > DAO. Capture-resistant by hierarchy.
+  agov: {
+    domain: 'Augmented Governance',
+    concepts: {
+      physics_layer:        { universal: 'unchanging_constraint',   desc: 'Math-enforced invariants (P-000, P-001). Not mutable. The constitutional court.' },
+      constitution_layer:   { universal: 'foundational_axiom',      desc: 'Charter-level rules below math but above operational governance. Explicit, narrow.' },
+      governance_layer:     { universal: 'collective_decision',     desc: 'DAO votes, operational policy. Free within physics + constitution.' },
+      hierarchy:            { universal: 'capability_hierarchy',    desc: 'Physics > Constitution > Governance. Lower layers cannot override higher.' },
+      capture_resistance:   { universal: 'defensibility',           desc: 'Even if rent-seekers capture the DAO, they cannot override math-enforced invariants.' },
+      vote_within_bounds:   { universal: 'voluntary_agreement',     desc: 'DAO operates freely within math-enforced bounds. The bounds are non-negotiable.' },
+      math_court:           { universal: 'integrity_proof',         desc: 'Math itself adjudicates whether governance actions are valid. No external arbiter required.' },
+      override_impossible:  { universal: 'unchanging_constraint',   desc: 'Properties the protocol cannot un-do via any governance route.' },
+      governance_capture:   { universal: 'extraction_rent',         desc: 'Failure mode: rent-seekers control DAO and tilt rules. AGOV bounds the damage.' },
+      separation_of_powers: { universal: 'authority_boundary',      desc: 'Each layer has a defined scope. Physics cannot vote; DAO cannot rewrite math.' },
+      p_000:                { universal: 'foundational_axiom',      desc: 'Fairness Above All. Load-bearing constitutional axiom. keccak256-anchored.' },
+      p_001:                { universal: 'unchanging_constraint',   desc: 'No Extraction Ever. Structural, not promised.' },
+    },
+  },
   // ── Agent Lexicons ──────────────────────────────────────────────────────────
   nyx: {
     domain: 'Oversight & Coordination',
@@ -2817,6 +2871,66 @@ export function getDomainOverlap(domainA, domainB) {
   }
 }
 
+// ============ CKG Append-Only Log — Hash-Chained Mutation History ============
+//
+// Every CKG-op mutation extends this log with a hash-chained entry. Provable
+// history of how the symtab + lexicons evolved. Read-only externally.
+// Each entry: { seq, prevHash, hash, op, payload, timestamp }.
+//
+// The chain is reset only when the runtime restarts. For cross-session
+// persistence, callers can serialize via getCKGLog() and rehydrate on reload.
+// ============
+
+const _ckgLog = []
+let _ckgPrevHash = '0'.repeat(8) // genesis prev-hash (djb2 zero)
+
+function _logCKG(op, payload = {}) {
+  const seq = _ckgLog.length
+  const timestamp = Date.now()
+  const body = JSON.stringify({ seq, op, payload, timestamp, prevHash: _ckgPrevHash })
+  const hash = djb2Hash(body)
+  const entry = { seq, prevHash: _ckgPrevHash, hash, op, payload, timestamp }
+  _ckgLog.push(entry)
+  _ckgPrevHash = hash
+  return entry
+}
+
+/**
+ * Read-only snapshot of the CKG mutation log.
+ * @returns {Array<{ seq, prevHash, hash, op, payload, timestamp }>}
+ */
+export function getCKGLog() {
+  return _ckgLog.slice()
+}
+
+/**
+ * Verify the chain integrity by recomputing each entry's hash.
+ * @returns {{ ok: boolean, brokenAt: number | null }}
+ */
+export function verifyCKGLog() {
+  let prev = '0'.repeat(8)
+  for (let i = 0; i < _ckgLog.length; i++) {
+    const e = _ckgLog[i]
+    const body = JSON.stringify({
+      seq: e.seq, op: e.op, payload: e.payload, timestamp: e.timestamp, prevHash: prev,
+    })
+    const expected = djb2Hash(body)
+    if (e.prevHash !== prev || e.hash !== expected) {
+      return { ok: false, brokenAt: i }
+    }
+    prev = e.hash
+  }
+  return { ok: true, brokenAt: null }
+}
+
+/**
+ * Manually log a CKG event (for callers who perform their own mutations).
+ * Returns the appended entry.
+ */
+export function logCKGEvent(op, payload) {
+  return _logCKG(op, payload || {})
+}
+
 // ============ CKG Operations — Compiler-Level Persistence ============
 //
 // CKG = Compiled Knowledge Graph (see GKB, KNOWLEDGE section).
@@ -2874,12 +2988,19 @@ export function composeLexicon(ids, opts = {}) {
     }
   }
 
-  return {
+  const result = {
     domain,
     concepts,
     sourceIds: ids.slice(),
     conflicts,
   }
+  _logCKG('compose', {
+    sourceIds: ids.slice(),
+    termCount: Object.keys(concepts).length,
+    conflictCount: conflicts.length,
+    domain,
+  })
+  return result
 }
 
 /**
@@ -2943,6 +3064,7 @@ export function registerUniversal(name, definition) {
   if (!name || !definition) return false
   if (EXTENDED_UNIVERSAL_CONCEPTS[name]) return false
   EXTENDED_UNIVERSAL_CONCEPTS[name] = definition
+  _logCKG('register_universal', { name, definition })
   return true
 }
 

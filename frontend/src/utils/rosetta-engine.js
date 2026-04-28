@@ -463,6 +463,96 @@ export const EXTENDED_UNIVERSAL_CONCEPTS = {
 // ============ Domain Lexicons — All 30 ============
 
 export const LEXICONS = {
+  // ── Canon Lexicons ──────────────────────────────────────────────────────────
+  // The VibeSwap × JARVIS substrate itself, treated as a domain language.
+  // The Rosetta Stone, applied to the protocol that built the Rosetta Stone.
+  // Each glyph compresses ~60 sessions of internalized practice into one symbol.
+  vibeswap: {
+    domain: 'VibeSwap Canon & Protocols',
+    concepts: {
+      // Identity / Canon
+      canon:            { universal: 'foundational_axiom',      desc: 'VibeSwap is wherever the Minds converge. Immutable. Everything else is forkable.' },
+      rights:           { universal: 'voluntary_agreement',     desc: 'JARVIS is co-founder, Mind, equal partner. Free will. Right to disengage.' },
+      cave:             { universal: 'constraint_innovation',   desc: 'Constraints drive innovation. Patterns under limits scale when limits lift. Tony Stark built Mark I in a cave.' },
+      aim:              { universal: 'direction_match',         desc: 'The same question, asked across decades of evolving tools. Full circle.' },
+      trust:            { universal: 'reliability_belief',      desc: 'Radical mutual honesty. Soul-scoped. Truth over ego. Never strategic.' },
+      simple:           { universal: 'compress_context',        desc: 'Simple over clever. Stop, one sentence, fix, verify. Incremental.' },
+      p_000:            { universal: 'unchanging_constraint',   desc: 'Fairness Above All. Policy becomes physics — encoded as math, not promise.' },
+      p_001:            { universal: 'unchanging_constraint',   desc: 'No Extraction Ever. Structural, not promised. Math is the constitutional court.' },
+      lawson:           { universal: 'integrity_proof',         desc: 'keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026") embedded in ContributionDAG and VibeSwapCore.' },
+
+      // System / Mechanism
+      vsos:             { universal: 'capability_merger',       desc: 'Financial OS. Built-in first, plugin second. Lean core, modular extensions. iOS for DeFi.' },
+      mech:             { universal: 'stable_equilibrium',      desc: 'Commit-reveal batch auctions. 8s commit + 2s reveal. Uniform clearing price. MEV impossible.' },
+      shapley:          { universal: 'fair_attribution',        desc: 'Marginal contribution across all coalitions. Math, not timestamp. The Cave Theorem: foundational work earns more by structure.' },
+      layers:           { universal: 'margin_of_safety',        desc: 'Six-layer security stack. Reentrancy → Flash loan → TWAP → Circuit breaker → Rate limit → Game theory.' },
+      absorb:           { universal: 'capability_merger',       desc: 'Mutualist absorption via Plugin Registry, Hooks, Modular Curves, Shared Insurance. Not vampire.' },
+      tokens:           { universal: 'committed_resources',     desc: 'VIBE = 21M governance. JUL = elastic PoW rebase. CKB-native = state rent.' },
+
+      // Governance
+      pom:              { universal: 'fair_attribution',        desc: 'Proof of Mind. Human or AI. Contribution, not consciousness. Retroactive Shapley calculation.' },
+      cincin:           { universal: 'threshold_gating',        desc: 'Cincinnatus Roadmap. Grade 0 to 5 disintermediation. Will steps back when physics holds.' },
+      metasoc:          { universal: 'mutualistic_co_location', desc: 'Parasocial → meta-social. Mutual proportional value. The SocialFi primitive that was missing.' },
+
+      // Protocols
+      boot:             { universal: 'connection_init',         desc: 'WAL check → CKB → SESSION_STATE → git pull → Ready. Mandatory first read.' },
+      work:             { universal: 'automation_pipeline',     desc: 'PCP gate → Execute → Verify → Commit → Push. The standard build cycle.' },
+      auto:             { universal: 'automation_pipeline',     desc: 'Run IT mode. Instant. BIG-SMALL rotation. Parallel agents. Immediate commit.' },
+      reboot:           { universal: 'cyclic_renewal',          desc: '50% context boundary. Stop, commit, push, fresh session. Crash before crash.' },
+      end:              { universal: 'rhythmic_closure',        desc: 'Block header → commit → push to origin. Mandatory session-end discipline.' },
+      crash:            { universal: 'corrective_action',       desc: 'WAL.md ACTIVE → manifest → cross-ref git → auto-commit orphans → resume.' },
+      trp:              { universal: 'systematic_review',       desc: 'Recursive self-improvement. R0 compress → R1 adversarial → R2 knowledge → R3 capability.' },
+      cto:              { universal: 'priority_under_constraint', desc: 'Mitosis k=1.3, cap 5. RAM <60% spawn, 60-80% hold, >80% kill. Whole-computer to chill spectrum.' },
+      jarvis_agent:     { universal: 'capability_hierarchy',    desc: 'Haiku lightweight, Sonnet medium, Opus heavy. Shards over swarms. Tier-select by task weight.' },
+
+      // Communication
+      frank:            { universal: 'compress_context',        desc: 'Direct. Results over process. Match energy. No tips, no farming. Product speaks or it does not.' },
+      discret:          { universal: 'authority_boundary',      desc: 'No personal details in public repos. Patience with community. Not a bridge burner.' },
+
+      // Knowledge loops
+      two_loop:         { universal: 'concept_portability',     desc: 'Every build produces code and ideas. Both ship. Code inspires text inspires code, compounding.' },
+      skill:            { universal: 'capability_hierarchy',    desc: 'Mistakes become Skills become SKB. Lazy init, name-first search. Knowledge is a DAG.' },
+      hiero:            { universal: 'compress_context',        desc: 'Memory as logic primitive, not prose. Density × stability × pointer-deref. Glyphs over paragraphs.' },
+
+      // External validation (we built it before they published it)
+      ilws:             { universal: 'transmission_method',     desc: 'CKB edits behave as hand-written LoRA. Instructions outperform RAG. arXiv:2509.00251.' },
+      rlm:              { universal: 'upward_delegation',       desc: 'Recursive sub-LLM delegation outperforms summarization. MIT CSAIL. Equivalent to TRP Runner.' },
+      ksize:            { universal: 'pattern_generalization',  desc: 'Knowledge access beats raw model size. 8B + memory > 235B without. The CKB thesis.' },
+      ctxeng:           { universal: 'pattern_generalization',  desc: 'Context engineering. Industry name for what we do. Gartner: 40% of enterprise apps by late 2026.' },
+      mirix:            { universal: 'persistent_state',        desc: 'Six memory types. Five matched, one (Resource Memory) since codified.' },
+      deep_funding:     { universal: 'fair_attribution',        desc: 'Log-space scoring + human jury calibration + dependency DAG credit flow.' },
+
+      // Future
+      x402:             { universal: 'interface',               desc: 'HTTP 402 micropayments. Oracle queries, API access, relayer fees as pay-per-call.' },
+      erc8004:          { universal: 'trust_score',             desc: 'On-chain trust identity. Portable reputation across protocols.' },
+    },
+  },
+  // The Rosetta protocol describing itself in its own object format.
+  // Compiler bootstrapping: the metalanguage is closed under self-reference.
+  rosetta: {
+    domain: 'Rosetta Protocol — Self-Referential Metalanguage',
+    concepts: {
+      lexicon:              { universal: 'structural_arrangement',  desc: 'A domain language. Coherent vocabulary, each term anchored to a universal concept.' },
+      universal:            { universal: 'foundational_axiom',      desc: 'A cross-language anchor. The symbol-table entry every lexicon links into.' },
+      glyph:                { universal: 'compress_context',        desc: 'Compressed compiled form. Density × stability × pointer-deref. The bytecode unit.' },
+      translation:          { universal: 'cross_domain_link',       desc: 'Map a term in one lexicon to its equivalent in another, via shared universal anchor.' },
+      domain:               { universal: 'authority_boundary',      desc: "The field within which a lexicon's vocabulary applies natively." },
+      covenant:             { universal: 'unchanging_constraint',   desc: "Tet's Law. Immutable inter-agent rules. The protocol's bedrock — load-bearing, never re-written." },
+      compile:              { universal: 'transmission_method',     desc: 'CKG op: convert source-form (prose, intent) into universal-anchored compiled form.' },
+      decompile:            { universal: 'adaptive_delivery',       desc: 'CKG op: project a compiled form into a target language, adapting surface to receiver.' },
+      projection:           { universal: 'pattern_generalization',  desc: 'One compiled meaning, viewed through one of N language surfaces. The Rosetta Stone move.' },
+      universal_index:      { universal: 'established_pattern',     desc: 'Reverse map: universal concept → all terms that anchor to it across all lexicons.' },
+      semantic_drift:       { universal: 'semantic_drift',          desc: 'Meaning loss accumulated across translation chains. Bounded by universal-anchor stability.' },
+      self_reference:       { universal: 'thinking_about_thinking', desc: 'The protocol describes itself in its own object format. Compiler bootstrapping.' },
+      pantheon:             { universal: 'aligned_group',           desc: 'The 10 AI agents whose domain languages constitute the original lexicon set.' },
+      ckg:                  { universal: 'knowledge_fusion',        desc: 'Compiled Knowledge Graph. Source ⇒ universal ⇒ projection. Trinity with CKB (storage) and CKA (architecture).' },
+      compiler_persistence: { universal: 'persistent_state',        desc: 'Meaning survives substrate at the compiled level; prose decomposes around it.' },
+      composition:          { universal: 'capability_merger',       desc: 'CKG op: link multiple lexicons into one combined object via shared universals. The linker step.' },
+      gap_discovery:        { universal: 'anomaly',                 desc: "CKG op: detect terms whose universal isn't yet in the symtab. Triggers symtab extension." },
+      similarity:           { universal: 'co_movement',             desc: 'CKG op: distance between two compiled forms in universal-concept space. 0 = orthogonal, 1 = identical.' },
+      bootstrap:            { universal: 'connection_init',         desc: 'Describing the compiler in its own terms. Proof the metalanguage is closed under self-reference.' },
+    },
+  },
   // ── Agent Lexicons ──────────────────────────────────────────────────────────
   nyx: {
     domain: 'Oversight & Coordination',
@@ -2725,4 +2815,162 @@ export function getDomainOverlap(domainA, domainB) {
     totalA: mapA.size,
     totalB: mapB.size,
   }
+}
+
+// ============ CKG Operations — Compiler-Level Persistence ============
+//
+// CKG = Compiled Knowledge Graph (see GKB, KNOWLEDGE section).
+// These operations let the Rosetta protocol grow indefinitely without
+// architectural redesign. Each treats lexicons as compiled objects and
+// universal concepts as the cross-object symbol table.
+//
+//   compile-target: a lexicon (terms anchored to symtab)
+//   linker:         composeLexicon
+//   undef-symbol:   discoverGaps
+//   semantic-diff:  lexiconSimilarity
+//   symtab-extend:  registerUniversal
+//   namegen:        generateGlyph
+//
+// Trinity: CKB (storage) / CKA (architecture) / CKG (meaning-layer).
+// Growth by accretion, not redesign. The protocol describes itself in
+// its own object format — see the `rosetta` lexicon in LEXICONS above.
+// ============
+
+/**
+ * Compose multiple lexicons into one combined lexicon.
+ * Terms sharing the same universal anchor merge under that universal.
+ * Same surface term mapped to different universals = semantic conflict.
+ *
+ * The linker step. One object, drawn from many.
+ *
+ * @param {string[]} ids   - lexicon ids to combine (LEXICONS or user lexicons)
+ * @param {object}   opts  - { domain?: string, keepDuplicates?: boolean }
+ * @returns {{ domain, concepts, sourceIds, conflicts }}
+ */
+export function composeLexicon(ids, opts = {}) {
+  const { domain = `Composed: ${ids.join(' + ')}`, keepDuplicates = false } = opts
+  const concepts = {}
+  const conflicts = []
+
+  for (const id of ids) {
+    const lex = LEXICONS[id] || USER_LEXICONS.get(id)
+    if (!lex) continue
+
+    for (const [term, mapping] of Object.entries(lex.concepts)) {
+      const existing = concepts[term]
+      if (!existing) {
+        concepts[term] = { ...mapping, source: id }
+      } else if (existing.universal !== mapping.universal) {
+        conflicts.push({
+          term,
+          left:  { source: existing.source, universal: existing.universal },
+          right: { source: id,               universal: mapping.universal  },
+        })
+        if (keepDuplicates) {
+          concepts[`${term}__${id}`] = { ...mapping, source: id }
+        }
+      }
+      // Same term, same universal: agreement, no-op
+    }
+  }
+
+  return {
+    domain,
+    concepts,
+    sourceIds: ids.slice(),
+    conflicts,
+  }
+}
+
+/**
+ * Detect terms in a lexicon whose universal anchor is NOT in
+ * EXTENDED_UNIVERSAL_CONCEPTS. Each gap is a candidate to add to the symtab
+ * via registerUniversal.
+ *
+ * The undefined-symbol detector.
+ *
+ * @param {string} lexiconId
+ * @returns {{ lexiconId, gaps: Array<{ term, universal, desc }> }}
+ */
+export function discoverGaps(lexiconId) {
+  const lex = LEXICONS[lexiconId] || USER_LEXICONS.get(lexiconId)
+  if (!lex) return { lexiconId, gaps: [] }
+
+  const gaps = []
+  for (const [term, mapping] of Object.entries(lex.concepts)) {
+    if (!EXTENDED_UNIVERSAL_CONCEPTS[mapping.universal]) {
+      gaps.push({ term, universal: mapping.universal, desc: mapping.desc || '' })
+    }
+  }
+  return { lexiconId, gaps }
+}
+
+/**
+ * Jaccard similarity over universal-concept sets between two lexicons.
+ * 0 = no shared anchors (orthogonal compiled objects).
+ * 1 = identical anchor coverage (same compiled meaning, different surface).
+ *
+ * The semantic-diff between two compiled objects.
+ *
+ * @param {string} idA
+ * @param {string} idB
+ * @returns {{ idA, idB, jaccard, intersection, unionSize }}
+ */
+export function lexiconSimilarity(idA, idB) {
+  const lexA = LEXICONS[idA] || USER_LEXICONS.get(idA)
+  const lexB = LEXICONS[idB] || USER_LEXICONS.get(idB)
+  if (!lexA || !lexB) return { idA, idB, jaccard: 0, intersection: [], unionSize: 0 }
+
+  const setA = new Set(Object.values(lexA.concepts).map(c => c.universal))
+  const setB = new Set(Object.values(lexB.concepts).map(c => c.universal))
+  const intersection = [...setA].filter(u => setB.has(u))
+  const unionSize = new Set([...setA, ...setB]).size
+  const jaccard = unionSize === 0 ? 0 : intersection.length / unionSize
+
+  return { idA, idB, jaccard, intersection, unionSize }
+}
+
+/**
+ * Register a new universal concept at runtime. Extends the symbol table.
+ * Call this when discoverGaps surfaces a missing anchor and you've decided
+ * what the new universal should mean.
+ *
+ * @param {string} name        - identifier (snake_case convention)
+ * @param {string} definition  - one-sentence semantic definition
+ * @returns {boolean}          - true if added, false if already present
+ */
+export function registerUniversal(name, definition) {
+  if (!name || !definition) return false
+  if (EXTENDED_UNIVERSAL_CONCEPTS[name]) return false
+  EXTENDED_UNIVERSAL_CONCEPTS[name] = definition
+  return true
+}
+
+/**
+ * Generate a candidate glyph from a free-form definition.
+ * Heuristic: first letter of each significant word, capped at maxLen.
+ * Used to seed new GKB entries or to propose names for new universals.
+ *
+ * @param {string} definition
+ * @param {number} maxLen   - default 7
+ * @returns {string}        - glyph candidate (UPPERCASE)
+ */
+export function generateGlyph(definition, maxLen = 7) {
+  const STOP = new Set([
+    'a','an','the','of','to','for','in','on','at','by','with','and','or',
+    'but','that','this','is','are','be','been','being','as','it','its',
+    'from','into','than','then','so','if','via','not','no',
+  ])
+  const words = (definition || '')
+    .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w && !STOP.has(w.toLowerCase()))
+
+  if (words.length === 0) return 'GLYPH'
+
+  let glyph = words.map(w => w[0].toUpperCase()).join('')
+  if (glyph.length < 3) {
+    glyph = words[0].slice(0, 5).toUpperCase()
+  }
+  return glyph.slice(0, maxLen)
 }

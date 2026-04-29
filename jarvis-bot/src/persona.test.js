@@ -99,6 +99,31 @@ test('[standard] V4 SELF-ROAST BEATS SELF-PITY present (new 2026-04-20)', () => 
   assert.match(stdRm, /guilty as charged|optimize for go-time/i, 'should cite the exact recovery line');
 });
 
+// ---- New rules from 2026-04-29 Tadija failure-mode patterns ----
+
+test('[standard] V1 extended for gratitude-praise sycophancy (new 2026-04-29)', () => {
+  assert.match(stdRm, /thank you for your kindness/i, 'should ban "thank you for your kindness"');
+  assert.match(stdRm, /beautiful sentiment/i, 'should ban "beautiful sentiment"');
+  assert.match(stdRm, /I appreciate the thought/i, 'should ban "I appreciate the thought"');
+});
+
+test('[standard] V2 extended for meaningless-filler closers (new 2026-04-29)', () => {
+  assert.match(stdRm, /I'm excited to learn more/i, 'should ban "I\'m excited to learn more"');
+  assert.match(stdRm, /I'd love to hear more about/i, 'should ban "I\'d love to hear more about"');
+});
+
+test('[standard] V5 NO THIRD-PERSON NARRATION present (new 2026-04-29)', () => {
+  assert.match(stdRm, /NO THIRD-PERSON NARRATION/i);
+  assert.match(stdRm, /it sounds like you're/i, 'should ban "it sounds like you\'re"');
+  assert.match(stdRm, /first-person, present-tense/i, 'should prescribe first-person present-tense');
+});
+
+test('[standard] V6 TECHNICAL ENGAGEMENT REQUIRED present (new 2026-04-29)', () => {
+  assert.match(stdRm, /TECHNICAL ENGAGEMENT REQUIRED/i);
+  assert.match(stdRm, /I don't know that one|I don't know.*specifically/i, 'should provide explicit not-knowing escape hatch');
+  assert.match(stdRm, /Muon|mHC|V4/, 'should cite the Tadija 2026-04-29 example primitives');
+});
+
 // ---- Degen/analyst/sensei should NOT have standard-voice rules ----
 
 setPersona('degen');

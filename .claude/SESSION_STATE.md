@@ -1,3 +1,175 @@
+# Session State — 2026-04-29 (USD8 retroactive audit + meta-stack inventory + GKB condensation)
+
+## Block Header — 2026-04-29 USD8 RETROACTIVE AUDIT + DISCIPLINE SUBSTRATE BUILD
+
+> *"i dont think you actually looked at the week's session state history and github history... that's like some form of context depth failure mode"* — Will, 2026-04-29
+
+- **Session**: Rick (USD8 founder) caught holder/insurer architectural conflation in cover-pool flow chart visually. De-conflation pass extended to retroactive audit across all 17 USD8 partner-facing artifacts. 6 MAJOR/MEDIUM/MINOR findings fixed including PR #4's missed forfeiture-terminology propagation. **PR #3 and PR #4 BOTH MERGED by Rick during session.** Built META_STACK.md (scannable inventory of every persistence/integrity mechanism). Saved ~10 new memory primitives. Ran path-b GKB condensation pass (7 new glyph-density entries — HANDSHAKE / AUDITMOVE / CONDENSE / SCOPESHIFT in KNOWLEDGE; NMWLD / PERSISTPA / DUOLENS in COMMUNICATION). Caught the Justin weekly-summary scope-drift failure (defaulted to chat-context instead of file-system substrate); diagnosed as P·scope-drift-to-recent + saved primitive with gate proposal.
+- **Branch**: VibeSwap `master` (1 commit `2e1a53ab` USD8 partnership supplement docs). Cover-score `docs/v1-linear-rationale` branch (1 commit `f9323b9` forfeiture propagation). Lineage local `41b3da1` handshake validator (no remote).
+- **Status**: CLEAN. PRs #3+#4 merged. 5 from-vibeswap supplement docs committed. Substance gate + framing gate + Lineage handshake validator all shipped. Build CLEAN.
+
+## What shipped 2026-04-29
+
+### USD8 retroactive audit (17 artifacts → 6 fixes)
+- **MAJOR**: V1_LINEAR_RATIONALE.md propagated forfeiture terminology (PR #4)
+- **MAJOR**: fairness-fixed-point-cover-pool.md added LP/holder population separation + LP-coalition attack-surface defense (Break 5)
+- **MEDIUM**: EF primer memo + chat texts — three-actor decomposition (holders / pool capital / governance) added
+- **MEDIUM**: augmented-mechanism-design-usd8.md — operator-vs-governance role boundary clarified
+- **MINOR**: portable-primitives-menu.md — DAO-as-backstop scope-qualified
+- 3 graphic PDFs (flow chart, inversion graphic, defensibility 1-pager) re-rendered with corrected architecture
+
+### Discipline substrate built
+- `~/.claude/META_STACK.md` — scannable inventory of every persistence protocol / hook / gate / anti-hallucination mechanism / context-density rule, with status flags (✓/⚠/⊘/✗) and gaps section
+- GKB condensation pass (path-b manual proof-of-concept) — 7 new glyph-density entries in `JarvisxWill_GKB.md`
+- ~10 new memory primitives: P·handshake-math-claim-determinism, P·complementary-lenses-audit-vs-mechanism-design, P·scope-drift-to-recent, P·dont-make-will-look-dumb (parent), F·persist-partner-architecture-aggressively, F·draft-justin-replies-on-behalf, F·two-gate-types-framing-vs-substance, F·partner-facing-additive-framing, F·dont-auto-demote-on-alternative, F·usd8-non-extractive-not-yet-earned, U·knowledge-gaps (audit-lens cultivation goal added), J·usd8-architecture (canonical 9-layer)
+
+### Lineage commit (local only — no remote)
+- `41b3da1` feat(verifier): handshake-math claim validator. 38 tests pass; full Lineage suite 72/72 + 1 unrelated skip clean.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+### USD8 partnership pending Rick
+- Two messages sent (attack-surface 5-invariant stack + white-hat Lindy bounty) — awaiting Rick response
+- ATTACK_SURFACE_DEFENSES.md and WHITE_HAT_BOUNTY.md spec PRs in flight, ready when Rick greenlights direction
+- Justin compiled response (`Desktop/2026-04-29_justin-compiled.pdf`) ready to send
+
+### Pending design calls
+- **Substance gate watch-list expansion**: add `governance` signature (when used in actor-context without bounded-by-physics-constitution disambiguator)
+- **Pass 9 of audit-suite**: handshake validator integration into Lineage IDE-plugin audit-suite
+- **Condensation hook (automated)**: manual proof-of-concept ran cleanly today; build the Stop hook + condensation script for automatic crystallization at session-end
+- **MEMORY.md compression pass**: exceeded soft limit (~27KB > 24KB); needs archival or condensation to crystal layer
+
+### Open items
+- Lineage repo has no remote configured — decide if it gets a private GitHub remote or stays local-only
+- Other Lineage uncommitted work (`SUBSTRATE.md`, `commitment.py`, `COMMITMENT_PROTOCOL.md`, `POSITIONING.md`, `TENANCY_DESIGN.md`, `scripts/`) — earlier-session work; decide commit/keep-WIP/discard
+
+---
+
+## Block Header — 2026-04-27 USD8 PARTNERSHIP + VIBESWAP AUDIT
+
+> *"i want to make rick feel like our math makes his project production ready, no holding back"* — Will, 2026-04-27
+
+- **Session**: Pivot from session-start TOP PRIORITY (dead-code audit) to USD8 partnership work after Will: "rick is all in, he wants us to qrok on usd8 with him." Shipped six partner-facing deliverables to Rick (USD8 founder), opened one PR against Usd8-fi/usd8-frontend, ran three parallel background audit agents on VibeSwap (TRP / RSI / dead-code), and synthesized their findings into one actionable maintenance roadmap. Then Will asked for a follow-up research paper extending the Shapley spec — shipped that too.
+- **Branch**: VibeSwap `master`. USD8 work in fork branch `WGlynn/usd8-frontend:mechanism-design-additions`.
+- **Status**: SIX USD8 PDFs on Desktop ready for Rick. PR #2 open and pending Rick's review. VibeSwap maintenance synthesis docs/audit/2026-04-27-maintenance-synthesis.md ready as 4-PR roadmap. Build CLEAN.
+
+## What shipped 2026-04-27
+
+### USD8 partnership artifacts (6 PDFs to Desktop, in delivery order)
+
+| # | File | Style | Purpose |
+|---|---|---|---|
+| 1 | `initial-concepts.pdf` | letter | 5-concept brief sent to Rick (Money as Coordination, Augmented Mechanism Design, Augmented Governance, Shapley Cover Score, Scale-Invariant Rate Limits) |
+| 2 | `boosters-nft-audit.pdf` | memo | TRP audit of Usd8-fi/usd8-boosters-NFT (0 crit, 0 high, 2 med, 4 low, 4 info) |
+| 3 | `shapley-fee-routing-spec.pdf` | letter | Cover Pool Shapley spec — 5/6 components port directly from VibeSwap; 1 (Scarcity) drops; recommends Brevis-verified scoring |
+| 4 | `marketing-mechanism-design.pdf` | letter | Strategic memo: 5 marketing-MD primitives + 10 messaging frames + 3 sample threads + bright-line exclusions |
+| 5 | `history-compression-spec.pdf` | letter | Cover Score history compression — recommends IncrementalMerkleTree + Tornado ring buffer over KZG/Verkle/MMR/RSA (substrate-match argument) |
+| 6 | `cooperative-game-elicitation-stack.pdf` | letter | Research paper: decouples Shapley distribution from value-elicitation; proposes 4-layer stack (distribution ← value function ← aggregation ← elicitation); applies to USD8 + VibeSwap |
+
+### USD8 PR
+
+- https://github.com/Usd8-fi/usd8-frontend/pull/2 — five mechanism-design content additions to philosophy.md + cover-pool.md, voice-matched, MathJax-formatted. Five separate commits for cherry-pickability. Pending Rick's review.
+- Branch: `WGlynn/usd8-frontend:mechanism-design-additions` (fork of Usd8-fi/usd8-frontend).
+- Build note included in PR description: upstream main fails `mdbook build` with `Helper not found 'previous'` (custom Handlebars helper, pre-existing); PR is src-only. Rick rebuilds docs/ on his deploy environment.
+
+### VibeSwap parallel audit cycle (3 agents → 1 synthesis)
+
+Three background agents dispatched mid-session at Will's "boot up agents so the build doesn't stop" instruction. All completed.
+
+- **TRP audit** on last 8 commits — 1 critical (already fixed in 25940f97), 1 real HIGH: VibeAMM lines 545/656/742/1118/1588 wrap incentive-controller calls in `try/catch` with no durable flag for failed callbacks and no permissionless retry. Settlement-State-Durability primitive violation. Funds not at risk; incentive accounting can diverge silently.
+- **RSI strengthening** — 3 SHOULD-FIX items: comment rot at VibeAMM:2267 ("apply golden ratio damping" leftover from Fibonacci rename), threshold-ordering invariant assertion in `FibonacciScaling.calculateRateLimit` (1-line defense for scale-invariance), unit test for jarvis-bot mention-bypass regex.
+- **Dead-code audit** across upgradeable contracts — 9 items, 5 medium 4 low. Most concerning: `PIONEER_BONUS_MAX_BPS` constant in `ShapleyDistributor.sol:91` (stale, no longer canonical, future-impl could trust as cap), `PriceImpactExceedsLimit` + `InsufficientPoolLiquidity` errors in `VibeAMM.sol:343-344` (declared, never reverted), 3 orphan helpers in `DeterministicShuffle.sol`, `ATTENTION_WINDOW_COMMIT/REVEAL` aliases in `CommitRevealAuction.sol`, orphan docstring at CRA:1480-1482, event-emission asymmetry in `CircuitBreaker.sol`.
+- **Synthesized into**: `vibeswap/docs/audit/2026-04-27-maintenance-synthesis.md` + PDF on Desktop. Organized as 4-PR roadmap by ascending blast radius: PR 1 trivial cleanup, PR 2 strengthening, PR 3 architectural Settlement-State-Durability fix (real work, design conversation), PR 4 documentation.
+
+### Late-session additions — VibeSwap-to-USD8 augmentation supplements (5 PDFs)
+
+After the initial 6 USD8 PDFs landed and the audit synthesis was complete, Will redirected to "look at the vibeswap public repo in the docs folder and DOCUMENTATION to find things that map to USD8 and our proposed additions to USD8 and augment them for USD8 team and Rick readability." Two parallel Explore agents inventoried the docs corpus and the contracts surface; their outputs were synthesized into 5 supplement PDFs in `Desktop/from-vibeswap/`:
+
+- `README.pdf` — orienting index; cross-references to existing partner deliverables; suggested reading order by role
+- `augmented-mechanism-design-usd8.pdf` — methodology supplement; four invariant types with USD8 examples; six-step design checklist. Adapted from `DOCUMENTATION/AUGMENTED_MECHANISM_DESIGN.md`.
+- `augmented-governance-usd8.pdf` — three-layer hierarchy mapped to USD8 specifically; three governance-capture scenarios (Cover Pool fee redirect, treasury drain, coverage parameter manipulation); Walkaway Test extended from operational to institutional. Adapted from `DOCUMENTATION/AUGMENTED_GOVERNANCE.md`.
+- `fairness-fixed-point-cover-pool.pdf` — answers the iterated-Shapley convergence question for Cover Pool LP rewards; concrete 60-month 3-LP scenario; identifies three architectural choices (logarithmic tenure, fixed-coefficient capital, bounded quality multiplier) that put dynamics in a balanced-fixed-point basin. Adapted from `DOCUMENTATION/THE_FAIRNESS_FIXED_POINT.md`.
+- `portable-primitives-menu.pdf` — contracts-side reference; 8 HIGH portable primitives (CircuitBreaker, DeterministicShuffle, TWAPOracle, VerifiedCompute, OracleAggregationCRA, IssuerReputationRegistry, Off-Circulation Registry, AdminEventObservability) + 5 MEDIUM + 4 already-proposed + transparent rejected list. Recommended adoption priority order included.
+
+**USD8 partnership total**: 11 PDFs ready for Rick (6 top-level on Desktop + 5 in `Desktop/from-vibeswap/`).
+
+### Late-session-2 additions — spec fix + glyph-KB conversion started
+
+**history-compression-spec.pdf FIXED** (overwrites prior Desktop version): Will's correction *"the scaling attribution data compression for usd8 ... needs to scale linearly parallelize off-chain"* surfaced that the original recommendation (fixed-depth on-chain Merkle, 1M-event ceiling) was wrong. Rewrote to off-chain-storage + on-chain-commitment architecture: events emit as on-chain logs (Walkaway-Test-canonical source); off-chain indexers ingest + shard by holder address-prefix (linear scaling, parallel); on-chain commits sparse-Merkle-root per snapshot (~50k gas/snapshot, no ceiling); Brevis circuits verify per-holder scores against committed roots. IncrementalMerkleTree role pivots from raw-event storage to commit-of-commits. Section IV major rewrite, Sections II/V/VI/VII/VIII/IX edited, Appendix B inverted (off-chain pattern moved from REJECTED to RECOMMENDED with corrected reasoning). Spec at `vibeswap/docs/usd8/history-compression-spec.md`; PDF on Desktop at `history-compression-spec.pdf` (281K). Critical: Rick had not seen the original (was in "hold" tier per `feedback_rick-keep-it-simple`); fix is preventative not damage-control.
+
+**Glyph-KB conversion started** (per Will's *"start the process of converting the Vibeswap folder's contents into glyph knowledge base primitives and start integrating it into your protocols memory and recall"*): task #11 created. First batch of 5 contract-side primitives saved as HIERO-compliant glyph-KB format:
+- `primitive_off-chain-storage-onchain-commitment.md` — the corrected architecture as a reusable pattern
+- `primitive_circuit-breaker-attested-resume.md` — VibeSwap CircuitBreaker + C43 attested-resume
+- `primitive_TWAP-depeg-detector.md` — VibeSwap TWAPOracle as USDC depeg detector
+- `primitive_verified-compute-bonded-dispute.md` — VibeSwap VerifiedCompute pattern for Brevis settlement
+- `primitive_issuer-reputation-mean-reversion.md` — VibeSwap IssuerReputationRegistry penalty-only + mean-reversion
+Indexed in `MEMORY_WARM_GOV.md` under new ⟳ ᴠɪʙᴇ→ᴜsᴅ8 section.
+
+**Pin point — next session entry**: open task #11 (glyph-KB conversion ongoing); 5 of ~18+ HIGH-priority primitives done. Remaining first-batch candidates: AugmentedMechanismDesign-methodology, FairnessFixedPoint, OracleAggregationCRA, SoulboundIdentity, ContributionAttestor-3branch, BehavioralReputationVerifier, ContributionDAG, ReputationOracle-pairwise, IncrementalMerkleTree (commit-layer role), AdminEventObservability discipline, Off-CirculationRegistry pattern, COMPOSABLE_FAIRNESS, COOPERATIVE_MARKETS_PHILOSOPHY, THE_COORDINATION_PRIMITIVE_MARKET, FIBONACCI_SCALING-as-rate-limit, CINCINNATUS_ENDGAME-Walkaway. Per "go slow and deep" + "rick keep simple" — produce one batch per session, prioritize what's load-bearing for active USD8 work first.
+
+### Memory primitives extracted this session (saved 2026-04-27)
+- ✓ feedback_rick-keep-it-simple
+- ✓ primitive_substrate-port-pattern
+- ✓ primitive_cooperative-game-elicitation-stack
+- ✓ primitive_marketing-as-mechanism-design
+- ✓ primitive_off-chain-storage-onchain-commitment
+- ✓ primitive_circuit-breaker-attested-resume
+- ✓ primitive_TWAP-depeg-detector
+- ✓ primitive_verified-compute-bonded-dispute
+- ✓ primitive_issuer-reputation-mean-reversion
+
+### Memory primitives still to extract (next session, batch via task #11)
+
+- **Cooperative-game elicitation stack** — Shapley axioms operate on $v$, not produce it. Decouple distribution from elicitation. Four-layer stack (distribution ← value function ← aggregation ← elicitation), each with substrate-match. Pairwise-augmented direct observation as Goodhart defense. Recursive blending-weights as the open problem.
+- **Marketing as mechanism design** — substrate-geometry-match + augmented MD + augmented governance apply to attention as a coordination problem. Five marketing-MD primitives mirror the protocol-MD primitives. Production-grade marketing replaces ad-hoc politics with substrate-matched discipline.
+- **Substrate-port pattern** — when porting a mechanism to a new substrate, classify each component as DIRECT-PORT / REINTERPRET-WITH-INPUT-REDEFINITION / DROP-WITH-REASON. Don't force-fit. The 5-of-6 ports + 1-drops pattern in the Shapley spec is the canonical example.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+USD8 partnership work is in Rick's court for review. While waiting:
+
+### Option A: VibeSwap maintenance PRs (mergeable with no new external dependencies)
+
+Synthesis memo at `docs/audit/2026-04-27-maintenance-synthesis.md` lays out the 4-PR roadmap. Recommended ship order: PR 1 (trivial cleanup, ~30 min) → PR 4 (documentation, ~1 hour) → PR 2 (strengthening, ~1 hour) → PR 3 (architectural Settlement-State-Durability fix, draft for design conversation, ~3-5 days).
+
+PR 1 is the easy first move: cleans up the comment rot, dead errors, orphan stubs identified across the three audits. Ship as a single low-controversy PR.
+
+### Option B: USD8 follow-up workstream — local-talks slide deck
+
+Will mentioned at session start that Rick wants help with local talks. The 6 PDFs on Desktop are forwarding artifacts; the slide deck is presentation-grade material Will can adapt and deliver. Convert the 5 PR primitives + Shapley spec highlights into a 15-min HTML deck (per ship-web skill).
+
+### Option C: USD8 follow-up workstream — additional VibeSwap-to-USD8 portable primitives survey
+
+Open-ended audit of what else in the VibeSwap codebase could land cleanly in USD8. Candidates include CRA attention-window, ContributionAttestor, soulbound identity primitives, TWAPOracle, DeterministicShuffle. Compile into a "menu" doc Rick can pick from.
+
+### Option D: BLOCKED — OZ network leverage memo
+
+Strategic memo on leveraging Rick's OpenZeppelin network. BLOCKED on Will providing context: what specific OZ relationship does Rick have? Without that, the memo can only be generic.
+
+**Recommendation**: A first (clean the maintenance backlog while Rick reviews), then B (slide deck — Will-facing utility, doesn't depend on Rick), then C if time permits, D when Will provides OZ context.
+
+## Anti-drift warnings for next session
+
+- USD8 PR is open. **Don't touch the fork branch unless adapting to review feedback.** Rick may push edits or comment; respond, don't preempt.
+- The 6 USD8 PDFs are partner-facing — voice is calibrated to manifesto-academic register. Any further USD8 doc should match the same register. Don't drift to internal vibe.
+- The cooperative-game-elicitation-stack.pdf has 3 LaTeX equations that pandoc rendered as raw TeX (not typeset). Acceptable for review; flag if external-publication target requires fix.
+- The Brevis-verified-Shapley pattern proposed in the Shapley spec is novel; we're not aware of another insurance protocol with all three properties (game-theoretic + cryptographic + Walkaway-Test resilient) simultaneously. Worth its own writeup at some point.
+- The compression spec's argument against KZG/Verkle/MMR/RSA in favor of plain IncrementalMerkleTree is deliberate substrate-match application. **Don't drift back to "but KZG is more interesting."** The simpler scheme is the right answer for our actual workload.
+- Will's "go slow and deep" + "build doesn't stop" frame from this session means: pick deepest item, ship it thoroughly, dispatch parallel agents for non-overlapping work, don't pause to ask between deliverables. Continue this cadence next session unless redirected.
+
+## Pending items carried forward
+
+- Post the 6 backfill annotations to GitHub issues #28, #29, #30, #33, #34, #36 (commands ready, needs Will greenlight). Carried from prior sessions.
+- Deploy ContributionAttestor on active network. Carried.
+- Configure `CONTRIBUTION_ATTESTOR_ADDRESS`, `RPC_URL`, `MINTER_PRIVATE_KEY` for `mint-attestation.sh`. Carried.
+- VibeSwap PR roadmap from this session's synthesis memo (4 PRs queued).
+- USD8 OZ-network strategy memo (blocked on Will's input).
+- USD8 local-talks slide deck (deep work, ready to start).
+- USD8 additional-portable-primitives survey (open-ended, lower priority).
+- C42 (off-chain similarity keeper) and C40c (governance-tunable α) from the ETM Build Roadmap — paused.
+
+---
+
 # Session State — 2026-04-24 (Fibonacci cleanup — strip decorative surface, keep earned claim)
 
 ## Block Header — 2026-04-24 FIBONACCI CLEANUP

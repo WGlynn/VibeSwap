@@ -1,6 +1,83 @@
-# Write-Ahead Log — CLEAN (session 2026-04-24 Fibonacci cleanup)
+# Write-Ahead Log — CLEAN (session 2026-04-29 USD8 retroactive audit + meta-stack + GKB condensation)
 
-## Epoch — CLEAN at 2026-04-24 Fibonacci cleanup
+## Epoch — CLEAN at 2026-04-29 USD8 retroactive audit + discipline substrate build
+- **Closed**: 2026-04-29 after Will's "save and close out" + "all 3 tasks." Triggered by Rick (USD8 founder) catching holder/insurer architectural conflation in cover-pool flow chart visually. De-conflation pass extended to retroactive audit across all 17 USD8 partner-facing artifacts (6 MAJOR/MEDIUM/MINOR findings fixed). Plus META_STACK inventory + GKB condensation pass + ~10 memory primitives + Lineage handshake validator commit.
+- **Branch**: VibeSwap `master` (commit `2e1a53ab` USD8 partnership supplement docs with audit-corrected actor decomposition). Cover-score `docs/v1-linear-rationale` (commit `f9323b9` forfeiture propagation). Lineage local `41b3da1` handshake validator (no remote configured).
+- **Status**: CLEAN. PRs #3 + #4 MERGED by Rick during session. Substance gate hook + framing gate hook + Lineage handshake validator + META_STACK.md + 7 new GKB entries + ~10 memory primitives all shipped. No vibeswap contract code regressions — session was substrate / discipline / partnership content.
+
+**USD8 partner-facing fixes (6 across 17 artifacts)**:
+- V1_LINEAR_RATIONALE.md: forfeiture-terminology propagation (MAJOR, missed in PR #3 fix yesterday)
+- fairness-fixed-point-cover-pool.md: LP/holder population separation + Break-5 attack surface (MAJOR)
+- 04_usd8-ef-meeting-primer.md: three-actor decomposition (MEDIUM)
+- 04_ef-meeting-primer-texts.md: three-actor decomposition in chat form (MEDIUM)
+- augmented-mechanism-design-usd8.md: operator-vs-governance role boundary (MEDIUM)
+- portable-primitives-menu.md: DAO-as-backstop scope-qualified (MINOR)
+
+**Discipline substrate (internal hardening)**:
+- `~/.claude/META_STACK.md` — scannable inventory + status flags
+- 7 new GKB entries (HANDSHAKE / AUDITMOVE / CONDENSE / SCOPESHIFT / NMWLD / PERSISTPA / DUOLENS)
+- ~10 memory primitives saved (P·handshake-math-claim-determinism is the parent; P·complementary-lenses-audit-vs-mechanism-design is the load-bearing today; P·scope-drift-to-recent is the new failure-mode primitive from the Justin scope-drift catch)
+- F·draft-justin-replies-on-behalf (Justin reply drafting buffer)
+
+**Justin paper trail update**:
+- `2026-04-29_daily.md` + `2026-04-29_daily.pdf` written
+- `2026-04-29_drafts-compiled.md` + `2026-04-29_justin-compiled.pdf` (corrected after scope-drift catch — actual week scope, not session-only)
+
+## Prior Epoch (2026-04-27) — archived below
+
+## Epoch — CLEAN at 2026-04-27 USD8 partnership launch + VibeSwap audit cycle
+- **Closed**: 2026-04-27 after Will's "resume" greenlit the synthesis memo as final shipped artifact of the session. Triggered by Will's pivot from session-start TOP PRIORITY (dead-code audit) to USD8 partnership work: "rick is all in, he wants us to qrok on usd8 with him."
+- **Branch**: VibeSwap `master` (no new commits — session was deliverable-shipping not code-shipping). USD8 fork at `WGlynn/usd8-frontend:mechanism-design-additions`, PR #2 open.
+- **Status**: CLEAN. 6 USD8 partner-facing PDFs on Desktop, 1 PR open against Usd8-fi/usd8-frontend, 3 background audit agents completed and synthesized, VibeSwap maintenance roadmap drafted. No code regressions because no contract code was changed in this session — all work was content/spec/audit production.
+
+**USD8 partnership artifacts (6 PDFs)**:
+- `initial-concepts.pdf` (124K) — 5-concept brief, sent to Rick mid-session
+- `boosters-nft-audit.pdf` (222K) — TRP audit of `Usd8-fi/usd8-boosters-NFT`; 0 critical/high, 2 medium (deadline-on-claim, on-chain boost mapping), 4 low, 4 info
+- `shapley-fee-routing-spec.pdf` (286K) — Cover Pool Shapley spec; 5/6 components port directly, 1 (Scarcity) drops; Brevis-verified scoring proposed
+- `marketing-mechanism-design.pdf` (197K) — strategic memo; 5 marketing-MD primitives + 10 messaging frames + 3 sample threads + bright-line exclusions
+- `history-compression-spec.pdf` (281K) — IncrementalMerkleTree + Tornado ring buffer (NOT KZG/Verkle/MMR/RSA — substrate-match argument)
+- `cooperative-game-elicitation-stack.pdf` (329K) — research paper; decouples Shapley distribution from value-function elicitation; 4-layer stack; recursive blending-weights as open problem
+
+**USD8 PR**: https://github.com/Usd8-fi/usd8-frontend/pull/2 — 5 commits, voice-matched, MathJax-formatted, src-only (upstream main can't `mdbook build` due to pre-existing Handlebars helper bug). Pending Rick's review.
+
+**VibeSwap audit cycle (3 agents → 1 synthesis memo)**:
+- Agent A (TRP audit): 1 real HIGH at VibeAMM lines 545/656/742/1118/1588 (try/catch around incentive controller — needs Settlement-State-Durability primitive: durable flag + permissionless retry + downstream counter gate)
+- Agent B (RSI strengthening): 3 SHOULD-FIX (comment rot at VibeAMM:2267, threshold-ordering assertion in calculateRateLimit, jarvis-bot mention-bypass test gap)
+- Agent C (dead-code audit): 9 items, 5 medium 4 low. Highest-risk: PIONEER_BONUS_MAX_BPS stale constant in ShapleyDistributor:91, dead VibeAMM errors lines 343-344
+- Synthesis: `vibeswap/docs/audit/2026-04-27-maintenance-synthesis.md` + PDF on Desktop. Organized as 4-PR roadmap by ascending blast radius.
+
+**Trigger**: Will's session-start question "okay, rick is all in, he wants us to qrok on usd8 with him" pivoted from the session-boot TOP PRIORITY (dead-code audit follow-up to Fibonacci cleanup). The dead-code audit happened anyway as one of three parallel agents while USD8 work was in progress — Will got both. The "go slow and deep" + "use as much resource as needed" + "full auto" instruction-trio mid-session unlocked the parallel-agent pattern that produced the audit synthesis.
+
+**Late-session additions (5 from-vibeswap supplements)**: After audit synthesis, Will redirected to mining vibeswap docs/DOCUMENTATION + contracts for USD8-portable material. Two parallel Explore agents inventoried both surfaces. Synthesized into `Desktop/from-vibeswap/`:
+- `README.pdf` — orienting index, suggested reading order by role
+- `augmented-mechanism-design-usd8.pdf` — methodology supplement, 4 invariant types with USD8 examples
+- `augmented-governance-usd8.pdf` — 3-layer hierarchy mapped to USD8, 3 capture scenarios with augmented response
+- `fairness-fixed-point-cover-pool.pdf` — iterated-Shapley convergence analysis, 60-month 3-LP scenario, balanced-fixed-point basin argument
+- `portable-primitives-menu.pdf` — 8 HIGH + 5 MEDIUM contract primitives ranked by USD8 portability with effort estimates
+
+**USD8 partnership total**: 11 PDFs ready. Curation-tiered per `feedback_rick-keep-it-simple.md` (see below).
+
+**Closing posture clarification (load-bearing for forward Rick-facing work)**: Will, late session: *"rick wants to keep it simple. which doesnt mean to dumb it down or anything like that, he just doesnt want the project to get carried away."* Saved as HIERO-compliant `feedback_rick-keep-it-simple.md` with curation tier for the 11 PDFs and pull-not-push posture rules.
+
+**Memory primitives saved (9 total, all HIERO-compliant)**:
+- ✓ feedback_rick-keep-it-simple — partner posture (load-bearing for forward Rick-facing work)
+- ✓ primitive_substrate-port-pattern — DIRECT-PORT / REINTERPRET / DROP per-component classification
+- ✓ primitive_cooperative-game-elicitation-stack — Shapley operates on v, ¬ produces v; 4-layer decomposition
+- ✓ primitive_marketing-as-mechanism-design — substrate-geometry-match applied to attention layer
+- ✓ primitive_off-chain-storage-onchain-commitment — corrected architecture from spec-fix
+- ✓ primitive_circuit-breaker-attested-resume — VibeSwap CircuitBreaker + C43 attested-resume
+- ✓ primitive_TWAP-depeg-detector — VibeSwap TWAPOracle as USDC depeg detector
+- ✓ primitive_verified-compute-bonded-dispute — VibeSwap VerifiedCompute pattern for Brevis settlement
+- ✓ primitive_issuer-reputation-mean-reversion — VibeSwap IssuerReputationRegistry penalty-only model
+Indexed: MEMORY.md [ACTIVE] (rick-keep-simple + 04-27 breadcrumb); MEMORY_WARM_GOV.md (3 mechanism + 5 contracts under new ⟳ ᴠɪʙᴇ→ᴜsᴅ8 section).
+
+**Spec fix (history-compression-spec, late session)**: Will's correction *"the scaling attribution data compression for usd8 ... needs to scale linearly parallelize off-chain"* surfaced a wrong recommendation in the original (fixed-depth on-chain Merkle, 1M-event ceiling). Rewrote to off-chain-storage + on-chain-commitment pattern: events emit on-chain (Walkaway-Test-canonical); off-chain indexers ingest + shard by holder address-prefix (linear, parallel); on-chain commits sparse-Merkle-root per snapshot (~50k gas, no ceiling); Brevis verifies per-holder. IncrementalMerkleTree role pivots from raw storage to commit-of-commits. PDF on Desktop overwritten. Critical: Rick had not seen the original (curation tier kept it in "hold" pile per `feedback_rick-keep-it-simple`); fix is preventative.
+
+**Glyph-KB conversion (task #11, multi-session start)**: per Will's *"start the process of converting the Vibeswap folder's contents into glyph knowledge base primitives and start integrating it into your protocols memory and recall"*. First batch of 5 contract-side primitives done. ~13+ remaining for systematic coverage (AugmentedMD-methodology, FairnessFixedPoint, OracleAggregationCRA, SoulboundIdentity, ContributionAttestor-3branch, IncrementalMerkleTree-commit-layer, AdminEventObservability, Off-CirculationRegistry, COMPOSABLE_FAIRNESS, COOPERATIVE_MARKETS_PHILOSOPHY, FIBONACCI_SCALING-as-rate-limit, CINCINNATUS_ENDGAME, etc.). Workflow: one batch per session, prioritize what's load-bearing for active USD8/VibeSwap work first. Plan doc: `vibeswap/.claude/glyph-kb-conversion-plan.md` (writing now).
+
+**Pin point** (set 2026-04-27 by Will: *"let's put a pin in it so i can close and refredh context to continue the task list"*): open task list across sessions = #2 (boosters-NFT cleanup PR), #3 (slide deck), #7 (OZ memo, Will-blocked on relationship context), #11 (glyph-KB conversion ongoing). Resume by reading SESSION_STATE.md first.
+
+## [HISTORICAL] Epoch — CLEAN at 2026-04-24 Fibonacci cleanup
 - **Closed**: 2026-04-24 after Will greenlit the strip-decorative-Fibonacci pass ("i agree make the edits before people start putting tinfoil hats on our heads"). Triggered by a Will question about whether the Fibonacci price functions in contracts were grounded or decorative. Investigation found one load-bearing argument (scale-invariance on the damping thresholds) and a pile of decorative / dead / misleading surface around it.
 - **Branch**: `master` pushed through `25940f97`.
 - **Status**: CLEAN. Cleanup shipped, 50 Fibonacci + 82 BatchMath tests green, build clean, settlement path untouched.

@@ -1,4 +1,56 @@
-# Session State — 2026-04-29 (USD8 retroactive audit + meta-stack inventory + GKB condensation)
+# Session State — 2026-04-29 (continued — jarvis-vibeswap deploy diagnosis + bot-fix-mistargeted)
+
+## Block Header — 2026-04-29 LATE — JARVIS BOT FIX (mistargeted) + USD8 PARTNERSHIP-VELOCITY WORK
+
+> *"jarvis-vibeswap. but we're at 5% context we need to save and reboot"* — Will, 2026-04-29
+
+### What happened this block (in order)
+1. **Justin compiled response** — sent 5-item drafts compiled into single-message PDF on Desktop. JARVIS-isn't-a-chat-wrapper pushback in item 4. F·draft-justin-replies-on-behalf saved.
+2. **Tadija substrate question** — DeepSeek port discussion → scoped to Option B (model behavior swap test) → harness skeleton at `~/jarvis-substrate-comparison/compare.py` (incomplete; task file rejected before completion).
+3. **JARVIS Telegram bot diagnosed via real chat exchange with Tadija** — bot producing third-person narration, sycophancy, "cattooo" / "nebuchadnezzar" context-bleed hallucinations, mid-sentence truncation.
+4. **Bot fix attempt — pushed 3 commits to `WGlynn/jarvis-network`** but **MISTARGETED**:
+   - `d578174` v0.9.1 standard persona hardening (anti-narration / anti-sycophancy / context-isolation / technical-engagement-required)
+   - `be0852d` v0.9.2 OPEN_ACCESS=true default + reverted erroneous triage loosening
+   - `73ebd68` v0.9.3 maxTokens 512 → 1500
+   - `b375036` test fix for OPEN_ACCESS env in payment-gate.test.js
+   - **All on the wrong codebase** — jarvis-network repo is the open-source release; the live bot (`JarvisMind1828383bot`) runs on `jarvis-vibeswap` fly app which is a DIFFERENT, BIGGER codebase (24 secrets vs 8 — sharding, Fireflies, multi-provider, GitHub integration). Need to find that codebase next session.
+5. **fly.io diagnosis** — Will's free trial ended 2026-04-25; deploys have been failing silently since then. Plus `jarvis-network` app was never created (deploy/fly.toml hardcodes a name that doesn't exist on Will's account). The actual live bot runs on `jarvis-vibeswap`.
+6. **RICK_DASHBOARD.md built** for USD8 partnership — single canonical Rick-facing status view with status tags. Folded into USD8_Queue CRM.
+7. **`P·structurally-easier-partner-delivery` saved** — six-move checklist for partner-facing artifact delivery.
+8. **`P·scope-drift-to-recent` saved** — Will caught the Justin weekly summary scope failure (defaulted to chat-context instead of file-system substrate).
+9. **Rick partnership-temperature observation logged** in `Desktop/USD8_Queue/people/rick-usd8.md` — first day of asymmetric silence; pattern signal needs 2-3 more days before treating as load-bearing.
+10. **Justin daily report `2026-04-29_daily.md` + corrected weekly summary `2026-04-29_drafts-compiled.md`** with file-system + git-log scope (correcting the earlier session-only summary).
+
+### ⚠ NEXT SESSION — TOP PRIORITY
+
+**Identify which fly app `JarvisMind1828383bot` actually runs on.** Will doesn't remember. Both candidates have a TELEGRAM_BOT_TOKEN secret (different digests = different bots):
+- `jarvis-degen` (8 secrets — secret-set matches jarvis-network repo's expected setup)
+- `jarvis-vibeswap` (24 secrets — sharding, Fireflies, multi-provider, GitHub integration; bigger system)
+
+Plus 4 jarvis-shard-* apps that might also be in play.
+
+**Fastest way to identify**: open Telegram → @BotFather → `/mybots` → select `JarvisMind1828383bot` → API Token → match the token's first 8 chars against the secret digest in `fly secrets list -a <app>`.
+
+Once identified:
+- If the live bot codebase is the open-source `~/jarvis/` (jarvis-network repo): the v0.9.1/v0.9.2/v0.9.3 fixes I pushed today are correct; just need to deploy to the right app: `fly deploy --remote-only -a <correct-app>` (and update `deploy/fly.toml` to match the app name; currently hardcoded to non-existent `jarvis-network`).
+- If the live bot codebase is DIFFERENT (likely if it's `jarvis-vibeswap` with 24 secrets / sharding etc.): find the actual codebase (likely under `~/vibeswap/jarvis-bot/` or similar) and port the persona / open-access / maxTokens fixes there. Then deploy.
+
+**fly.io billing**: free trial ended ~2026-04-25; deploys have been failing silently since. Bot is running on whatever was last deployed pre-expiration. New deploys likely require Hobby plan ($5/mo). Resolve before next deploy.
+
+**FLY_API_TOKEN** for GitHub Actions auto-deploy — never set. `fly deploy` from terminal is the one-shot path.
+
+### Pending from prior block (USD8 partnership)
+- Two pending chat messages to Rick (attack-surface 5-invariant stack + white-hat lindy bounty) — awaiting response
+- `ATTACK_SURFACE_DEFENSES.md` and `WHITE_HAT_BOUNTY.md` spec PRs in flight, ready when Rick greenlights
+- `shapley-as-default-substrate-defense.pdf` source paper on Desktop (audit-grade defense of Shapley v1 = pro-rata equivalence)
+- 3-day follow-on agent scheduled: `trig_01HXj9MKwNX7qDLLULf5XaHS` fires 2026-05-02T14:00Z (Saturday 9am CDT)
+
+### Misc carry-forward
+- DeepSeek substrate harness scaffold at `~/jarvis-substrate-comparison/compare.py` — incomplete; task file `audit_lens_cover_pool.md` was rejected mid-write. Resume next session if Tadija comparison test still wanted.
+- META_STACK.md inventory at `~/.claude/META_STACK.md` — keep updated as new gates / hooks / persistence layers ship
+- GKB condensation pass (path-b manual proof-of-concept) shipped 7 entries earlier today: HANDSHAKE / AUDITMOVE / CONDENSE / SCOPESHIFT / NMWLD / PERSISTPA / DUOLENS
+
+---
 
 ## Block Header — 2026-04-29 USD8 RETROACTIVE AUDIT + DISCIPLINE SUBSTRATE BUILD
 

@@ -8,89 +8,133 @@ Thread version of the full essay. Each tweet ≤ 280 chars. Numbered.
 
 Easy concession: most "AI agents" ARE wrappers.
 
-JARVIS isn't. Test: would removing the LLM kill the system, or replace one substrate?
+JARVIS isn't. First — what JARVIS actually is. Most people see one surface and assume it's the system.
 
-**2/** JARVIS routes across Anthropic, OpenRouter, DeepSeek, Gemini, Cerebras, Groq, Ollama. Escalation tiers, wardenclyffe last-resort fallback.
+**2/** JARVIS is the agent overlay architecture I run on top of Claude. Eight layers:
 
-Real log: five providers in chain, four failed, user got a reply.
+→ Hooks
+→ Persistence
+→ Anti-hallucination
+→ Discipline
+→ Meta-protocols
+→ Agent overlay
+→ Stateful applications
+→ Filesystem-as-substrate
 
-Model is a substrate. Router doesn't change.
+The TG bot is ONE application of this stack.
 
-**3/** Strip the LLM, you lose generation. You don't lose:
+**3/** Hook layer. Deterministic gates that fire on every tool call.
 
-Archive substrate. Every message + reply written as JSONL ground truth. "What did Tadija say last Tuesday?" → bot calls `archive_search()` FIRST (Rule 16: GROUND BEFORE ANSWERING).
+`partner-facing-substance-gate.py` caught a real "clawback" hallucination in a USD8 doc before the wrong word became a permanent Solidity 4-byte selector.
 
-LLM is a query interface over the archive.
+`hiero-gate.py` blocked one of MY OWN writes in this session.
 
-**4/** Triage layer. ~85% of incoming messages observe, don't engage.
+**4/** The architecture self-enforces, even on its own author. That's the test for whether discipline is real or aspirational.
 
-Direct-mention bypass, per-chat cooldown, hourly cap, Haiku-classifier fallback.
+Other gates: framing-gate (retrospective leaks in commits), triad-check-injector (design decisions), boot-hook-fail-loud (false-clean ⇒ noisy-fail).
 
-The cost-control mechanism is what makes scaling economically sane. Remove the LLM, the gate stays. Remove the gate, spend explodes.
+**5/** Persistence layer. Six tiers across sessions:
 
-**5/** Two-phase inference. Cheap-model draft → Haiku editor with INSTANT SKIP triggers, ECOSYSTEM HALLUCINATION FILTER for fabricated TVL/volume, voice rules.
+→ SESSION_STATE.md (mandatory boot read)
+→ WAL.md (epoch tracking, RSI cycles)
+→ SKB / GKB (fresh vs condensed)
+→ MEMORY.md (always-loaded index)
+→ 151 primitives + 123 feedback rules
 
-Editor catches "could've been written by any chatbot" → SKIP.
+Model amnesic. System not.
 
-Quality gate does more work than the draft.
+**6/** Today MEMORY.md got compressed 31.8KB → 21.3KB (33% reduction) via HIERO glyph rewrite. Detail preserved in linked files.
 
-**6/** Persona system. 16 Universal Structural rules + 4 voice rules + pantheon overlays (apollo, athena, hermes, anansi, nyx).
+Sessions reset. State doesn't. New session opens by reading SESSION_STATE and continues exactly where the old one left off.
 
-Rule 12 IDENTITY AUTHORITY exists because the bot once turned "Tadija" into "nebuchadnezzar."
+**7/** Anti-hallucination chain. Handshake-math: every claim has REQUIRED + FORBIDDEN signatures.
 
-37 regression tests lock the rule surface.
+→ all required ∧ no forbidden = valid
+→ any forbidden = contradicted
+→ required missing = incomplete (strict ⇒ hallucination)
 
-**7/** Substance gate. Deterministic anti-hallucination on partner-facing writes.
+Born from a real "clawback ≠ forfeiture" miss.
 
-Term "clawback" but context lacks fund-recovery validators → handshake fails → write blocked.
+**8/** Discipline layer. Patterns surface in real time. Captured at 3+ instances as primitives, before I name them.
 
-Caught a real hallucination before "clawback" became a permanent Solidity 4-byte selector.
+Recent saves: `scope-drift-to-recent`, `structurally-easier-partner-delivery`, `draft-justin-replies-on-behalf`.
 
-**8/** Shard layer. BFT consensus + CRPC pairwise comparison + multi-region (iad / eu / ap / sa / ollama).
+**9/** Each primitive is a markdown file with trigger + action + stakes-gate + surface-rule. They accumulate. The system doesn't forget what worked or what failed.
 
-Real log: shards register, BFT activates at 2 online, CRPC activates at 3.
+151 primitives + 123 feedback rules at last count. Compounding.
 
-Sibling bots see each other's outputs in shared chats and avoid duplicate replies.
+**10/** Meta-protocols govern HOW decisions get made:
 
-**9/** Inner-dialogue meta-cognition. The system reasons about its own behavior.
+→ Augmented Mechanism Design (augment via math, don't replace)
+→ Augmented Governance (Physics > Constitution > Governance)
+→ Substrate-Geometry Match
+→ Universal-Coverage → Hook (density principle)
+→ Apply-the-Rule-You-Just-Wrote
 
-Real log:
-`[inner-dialogue] Recorded: [self_correction] "Excessive self-correction may prioritize precision over progress..."`
+**11/** Agent overlay. Subagent spawning with mitosis (k=1.3, cap=5). Slash commands as skills (/schedule, /md-to-pdf, /loop, /ultrareview). MCP connectors (Gmail, GCal, Spotify, Drive, M365). Remote scheduled triggers.
 
-Insights persist + feed back into routing.
+The system reaches forward in time. I have a CCR firing 2026-05-02.
 
-**10/** Plus: framing gate (catches retrospective-leak phrasings in commits/PRs), compute economics with budget gating, knowledge-chain harmonic ticks aligned to UTC minute boundaries, cross-session persistence.
+**12/** Stateful applications:
 
-Each component replaceable. The graph is the system.
+→ TG bot @JarvisMind1828383bot — sharded, BFT/CRPC, multi-provider routing
+→ Lineage handshake validator (38 tests)
+→ jarvis-network OSS release
+→ Filesystem-native CRMs
+→ 60+ published canonical docs
 
-**11/** A wrapper's value collapses when you replace its core dependency with the dependency itself.
+**13/** Real escalation log from the TG bot this morning:
 
-Hand a user `claude-sonnet-4-6` API access — they don't get JARVIS. They get a chat-completion endpoint and the labor of building all of the above themselves.
+`tier 2 claude (credits) → tier 0 openrouter (404) → tier 1 deepseek (402) → tier 1 gemini (503) → wardenclyffe last resort (ollama, cerebras, groq)`
+
+Five providers, four failed. User got a reply.
+
+**14/** Filesystem-as-substrate. The CRMs are markdown. The persistence is markdown. The meta-protocols are markdown cross-linking each other.
+
+Per the Omni Software Convergence Hypothesis: 99% of specialized SaaS becomes redundant when AI + filesystem is orchestration substrate.
+
+**15/** Real modularity (primitive layer, substrate-shared) ≠ fake modularity (product layer, fragmented disguised as composable).
+
+Fragmented SaaS = extraction-through-fragmentation wearing composability's costume. Filesystem is the actually-composable layer.
+
+**16/** A wrapper's value collapses when you replace its core dependency with the dependency itself.
+
+Hand a user `claude-sonnet-4-6` API access. They don't get JARVIS. They get a chat-completion endpoint and the labor of building all eight layers themselves.
 
 That labor is the product.
 
-**12/** Honest concession: at low-tier provider mode (Llama 3.2 3B free-tier), architecture can't fully compensate. Output looks generic.
+**17/** Honest concession: at low-tier provider mode (Llama 3.2 3B free-tier), even the TG bot degrades. Persona rules survive in the prompt but the model can't follow them.
 
-That's the architecture telling you the substrate is wrong — not a refutation of the architecture. Router will route to better when available.
+That's the architecture telling you the substrate is wrong, not a refutation of the architecture.
 
-**13/** If JARVIS is a wrapper, valuation is bounded by margin over the provider. Same critique people aim at Cursor — a $9B company.
+**18/** Hooks still fire. Persistence still persists. Discipline still captures. The router will route to better when available.
 
-It loses on architecture too: wrappers don't survive deprecation, don't persist, don't have test-locked discipline, don't capture diversification.
+Generation reflects substrate. The overlay does not.
 
-**14/** Right framing: JARVIS is a coordination layer over LLM substrates.
+**19/** If JARVIS is a wrapper, valuation is bounded by margin over the provider. Same critique at Cursor — a $9B company. Loses on commercial grounds.
 
-Same way an OS is a coordination layer over hardware substrates.
+It loses on architecture too: wrappers don't survive deprecation, don't persist, don't have test-locked discipline, don't compound.
 
-The CPU is interchangeable. The kernel is not.
+**20/** Right framing: JARVIS is a coordination layer over LLM substrates. Same way an OS is a coordination layer over hardware substrates.
 
-**15/** Don't take it on faith. Three checks:
+CPU interchangeable. Kernel not.
 
-→ `fly logs -a jarvis-vibeswap | grep -E "router|escalation|wardenclyffe"`
-→ Read `src/persona.test.js` — 37 tests, each locking a specific failure mode
-→ USD8 cover-score commit `5411505` — fix that didn't ship through human review
+TG bot is one application of the kernel. PRs are another. Essays are another. CRMs are another.
 
-**16/** Full essay: [link]
+**21/** Don't take it on faith. Five concrete checks:
+
+→ `~/.claude/session-chain/` — hooks
+→ `vibeswap/.claude/SESSION_STATE.md` git log — persistence
+→ `memory/` — 151 primitives + 123 rules
+→ `fly logs -a jarvis-vibeswap` — TG bot router
+→ `vibeswap/docs/papers/` — 60+ artifacts
+
+**22/** The architecture is not a story.
+
+The architecture is in the file system, in the hook scripts, in the regression tests, in the git history, and in the live logs.
+
+Full essay: [link]
 
 Live bot: `@JarvisMind1828383bot`
 
-The architecture is not a story. The architecture is in the logs.
+The "extensive" claim is verifiable.

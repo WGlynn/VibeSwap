@@ -1,4 +1,44 @@
-# Session State — 2026-04-29 (continued — jarvis-vibeswap IDENTIFIED via fly logs + bot-fix-mistargeted confirmed)
+# Session State — 2026-04-29 (continued — jarvis-vibeswap IDENTIFIED via fly logs + bot-fix-PORTED + auto-mode hardening pass)
+
+## Block Header — 2026-04-29 AUTO-MODE — bot-fix port + memory compression + gate hardening
+
+> *"i cant resolve fly.io billing right now so let's continue on other work, full auto go"* — Will, 2026-04-29
+
+### What shipped autonomously
+1. **Bot fix v0.9.1 ported into ~/vibeswap/jarvis-bot/** (commit `c8f3e4c6`):
+   - `src/persona.js`: V1 NO SYCOPHANCY extended (gratitude-praise patterns); V2 NO CORPORATE RETREAT extended (meaningless-filler closers); new V5 NO THIRD-PERSON NARRATION; new V6 TECHNICAL ENGAGEMENT REQUIRED. All four Tadija-2026-04-29 failure modes captured.
+   - `src/intelligence.js`: editor INSTANT SKIP triggers extended for the same patterns (second-line defense when weak draft model leaks through).
+   - `src/persona.test.js`: 4 new regression tests; suite 37 passing (was 33).
+   - **NOT ported**: v0.9.2 OPEN_ACCESS (payment-gate.js exists but isn't wired into index.js — no paywall to lift) + v0.9.3 maxTokens (this codebase uses 400 for draft per Universal Rule 11 BREVITY REFLEX, 8192 elsewhere; 512-truncation symptom was specific to smaller jarvis-network codebase).
+   - **Pending deploy**: blocked on fly.io billing (trial ended ~2026-04-25).
+
+2. **MEMORY.md compressed** (~/.claude/projects/C--Users-Will/memory/MEMORY.md, not git-tracked):
+   - 31.8KB → 21.3KB (33% reduction). Now well under 24.4KB soft limit with headroom.
+   - HIERO glyph-density rewrite of PRE-FLIGHT (13 entries), META-PRINCIPLE (8 entries), ACTIVE (10+ entries). Detail preserved in linked .md files (verified each linked file has 30-139 lines of substance).
+
+3. **Substance gate watch-list expansion** (~/.claude/session-chain/partner-facing-substance-gate.py):
+   - Added governance-authority overclaim signature with handshake-math determinism. Pattern catches both verb-form ("DAO controls X", "governance can adjust Y") and noun-form ("governance has full control"). Required: scope-bounding language (within/bounded-by/Physics-layer/etc) OR cite math-bounds. Forbidden: explicit unbounded claims ("DAO can change all params", "governance has full/complete/unlimited control").
+   - 7/7 test cases pass: unbounded-flagged, bounded-validated, forbidden-contradicted, non-gov-no-hit, bare-governance-no-hit.
+
+4. **Partner-facing-additive-gate coverage extended** (same dir):
+   - Added 4 high-signal retrospective patterns: rectify/rectifies/rectified/rectification, missed-in-PR/commit, should-have-caught, in-retrospect/hindsight. All unambiguously retrospective.
+
+5. **META_STACK.md flags refreshed**:
+   - ⊘ partner-facing-additive-gate → ✓ (full retrospective-marker coverage)
+   - ⚠ MEMORY.md size → ✓ (compressed 2026-04-29)
+
+### Still pending after this auto-mode block
+- **Deploy bot fixes** to jarvis-vibeswap once fly.io billing resolves (Hobby plan $5/mo). v0.9.1 fixes ready and committed; will run on JarvisMind1828383bot.
+- **Token rotation**: bot token pasted in chat history during identification; standard practice to rotate via @BotFather.
+- **Cycle 38 ETM Alignment Audit** (40-70KB direct-write) — still pending, deprioritized in autonomous mode as too large for safe one-shot.
+- **Pass 9 audit-suite integration** (handshake validator) — Lineage `41b3da1` local, no remote.
+- **Condensation hook** (automate manual GKB protocol) — designed not built.
+- **DeepSeek substrate harness** at `~/jarvis-substrate-comparison/compare.py` — incomplete; pending Tadija comparison test if still wanted.
+- **USD8 partnership**: 2 pending chat messages to Rick (attack-surface 5-invariant + white-hat lindy bounty); ATTACK_SURFACE_DEFENSES.md + WHITE_HAT_BOUNTY.md spec PRs ready when greenlit.
+- **3-day follow-on agent**: `trig_01HXj9MKwNX7qDLLULf5XaHS` fires 2026-05-02T14:00Z.
+
+---
+
 
 ## Block Header — 2026-04-29 LATE — JARVIS BOT FIX (mistargeted, codebase identified) + USD8 PARTNERSHIP-VELOCITY WORK
 

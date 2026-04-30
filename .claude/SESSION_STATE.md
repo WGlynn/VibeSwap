@@ -1,4 +1,58 @@
-# Session State — 2026-04-29 (continued — jarvis-vibeswap IDENTIFIED via fly logs + bot-fix-PORTED + auto-mode hardening pass)
+# Session State — 2026-04-30 (rolled over from 2026-04-29 multi-block session — jarvis-not-a-wrapper essay shipped multi-platform)
+
+## Block Header — 2026-04-30 EARLY — jarvis-not-a-wrapper essay (full agent overlay scope) + X-thread + multi-format distribution
+
+> *"i need a 'why JARVIS is not just a wrapper' type essay"* → *"im going to share it on telegram, linkedin, medium, and x"* → *"im tired of people not knowing how exntisve the architecture actually is"* → *"i meant the entire claude agent overlay architecture that we use for claude code not the jarvis tg bots although i coonsider that a part of the stack, just we at least need the doc to reporesent both"* → *"none of the indentation translated when i pasted it from the pdf, can we just it so i can just one shot fix the medium post?"* — Will, 2026-04-29 → 2026-04-30
+
+### What shipped this block
+
+1. **First essay draft, TG-bot-only scope** (commit `9d2eaa5c`):
+   - `vibeswap/docs/papers/jarvis-is-not-a-wrapper.md` (~1500 words, archive substrate / triage / two-phase pipeline / persona system / substance gate / shard layer / inner-dialogue / framing gate / knowledge-chain)
+   - `vibeswap/docs/papers/jarvis-is-not-a-wrapper.x-thread.md` (16 tweets all ≤280 chars)
+   - First Gmail draft (`r3990026163063974771`) — inline content, no attachments
+   - **Superseded by rescoped version below.**
+
+2. **Rescope to full Claude agent overlay** (commit `bc0c3241`, supersedes `9d2eaa5c`):
+   Will's correction: scope was wrong; essay should cover the entire overlay architecture, not just the TG bot. TG bot positioned as ONE stateful application within the stack.
+   - Essay rewritten covering 8 layers: hooks / persistence / anti-hallucination / discipline / meta-protocols / agent overlay / stateful applications / filesystem-as-substrate.
+   - Each layer demonstrated with concrete file paths, real numbers, live events from this session (HIERO gate blocking my own write earlier today as recursive proof; MEMORY.md 31.8KB→21.3KB compression).
+   - Closes with 5 reader-runnable verification checks (was 3).
+   - X-thread expanded 16→22 tweets, all verified ≤280 chars.
+
+3. **Multi-format distribution package** (Desktop):
+   - `jarvis-is-not-a-wrapper.md` (19 KB) + `.pdf` (290 KB, letter style, full essay)
+   - `jarvis-is-not-a-wrapper.x-thread.md` (6 KB) + `.pdf` (91 KB, memo style, thread)
+   - `jarvis-is-not-a-wrapper.html` (26 KB, semantic HTML for one-shot Medium paste — Will posted to Medium and PDF→Medium paste lost all structure; HTML→Medium paste preserves H1/H2/bullets/code/HRs natively).
+   - Second Gmail draft (`r7476855613411645944`) created with attachment instructions (MCP can't attach programmatically; Will attaches manually before send).
+   - First Gmail draft flagged for discard in second draft body.
+
+4. **Desktop cleanup**:
+   - Created `~/Desktop/_Archive/2026-04-29-desktop-cleanup/` (under existing `_Archive/`).
+   - Moved 15 loose top-level files (Justin compiled/drafts PDFs, USD8 partnership PDFs from Apr 27-29, Shapley/compression onepagers, rickaudio recordings, HUDDLE-TODAY.md) into the archive subfolder. Fully reversible.
+   - Top-level Desktop now: 4 jarvis-not-a-wrapper artifacts + shortcuts/desktop.ini + folders only.
+
+### Pending follow-ups
+- **Medium post fix**: Will to open `~/Desktop/jarvis-is-not-a-wrapper.html` in browser, Ctrl+A / Ctrl+C, paste over Medium post content. Should restore H1/H2/bullets/code/HR structure.
+- **X-thread post**: tweet 22 has `[link]` placeholder for Medium URL — fill before posting thread.
+- **Gmail draft attachments**: Will attaches the 4 Desktop files manually when sending the second draft.
+- **Token rotation** (carry-forward from prior block): bot token pasted in chat for identification; rotate via @BotFather as standard practice before next deploy.
+- **Bot deploy** (carry-forward): port committed at `c8f3e4c6` (jarvis-bot/persona.js V1/V2/V5/V6 + intelligence.js editor); blocked on fly.io billing.
+
+### Carry-forward from prior 2026-04-29 blocks (still pending)
+- Cycle 38 ETM Alignment Audit (40-70KB direct-write) — pending; deprioritized as too large for safe one-shot in autonomous mode.
+- Pass 9 audit-suite integration (handshake validator) — Lineage local commit `41b3da1`, no remote.
+- Condensation hook (automate manual GKB protocol) — designed not built.
+- DeepSeek substrate harness at `~/jarvis-substrate-comparison/compare.py` — incomplete.
+- USD8 partnership: 2 pending chat messages to Rick (attack-surface 5-invariant + white-hat lindy bounty); ATTACK_SURFACE_DEFENSES.md + WHITE_HAT_BOUNTY.md spec PRs ready when greenlit. 3-day follow-on agent (`trig_01HXj9MKwNX7qDLLULf5XaHS`) fires 2026-05-02T14:00Z.
+
+### Commit chain this block
+- `9d2eaa5c` — essay v1 (TG-bot scope) [superseded]
+- `bc0c3241` — essay v2 (full overlay scope) [canonical]
+
+### Memory primitives saved this block
+None — this block was deliverable shipping, not architectural learning. The pattern of "scope-correction-on-rescope" is already captured by the existing primitive `pattern-match-drift-on-novelty`.
+
+---
 
 ## Block Header — 2026-04-29 AUTO-MODE — bot-fix port + memory compression + gate hardening
 

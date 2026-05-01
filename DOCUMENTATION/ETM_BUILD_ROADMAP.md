@@ -207,7 +207,7 @@ Extract to `memory/primitive_*.md` as respective cycles ship.
 | C41 | SHIPPED 2026-04-23 | Gap #2a — Shapley novelty multiplier primitive (per-game, per-participant, BPS-scaled; applied at computeShapleyValues weight step) |
 | C42 | PENDING | Gap #2b — Similarity keeper + commit-reveal (replaces owner setter with attested keeper) |
 | C43 | SHIPPED 2026-04-23 | Gap #3 — Attested circuit-breaker resume (opt-in per-breaker; cooldown floor + M-of-N attestor gate) |
-| C44 | 2026-05-01 | Strengthen #1 — CRA attention-window NatSpec |
+| C44 | SHIPPED 2026-04-23 | Strengthen #1 — CRA attention-window NatSpec + alias constants + tripwire test |
 | C45+ | ongoing | Strengthen #2, #3 + primitive extractions |
 
 Estimated total: 1 week for gaps, 2 weeks with strengthens.

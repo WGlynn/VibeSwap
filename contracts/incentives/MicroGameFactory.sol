@@ -47,6 +47,16 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
     uint8 public constant VOLATILITY_HIGH = 2;
     uint8 public constant VOLATILITY_EXTREME = 3;
 
+    /// @notice C48-F1: Hard cap on per-pool LP count processed in a single createMicroGame call.
+    /// @dev    `accumulator.getPoolLPs(poolId)` returns the full unbounded LP set, which is then
+    ///         passed through O(n^2) insertion sort BEFORE `maxParticipants` truncation. Without a
+    ///         cap, a pool that legitimately (or via sybil) accumulates > ~1k LPs makes
+    ///         `createMicroGame` exceed the block gas limit, permanently bricking Shapley
+    ///         settlement for that pool. The cap reverts with TooManyLPs so callers can either
+    ///         shrink the LP set (deregisterLP via authorized incentive controller) or governance
+    ///         can raise the cap if hardware advances. 1000 fits ~30M gas with insertion sort.
+    uint256 public constant MAX_LPS_PER_POOL = 1000;
+
     // ============ External Contracts ============
     IUtilizationAccumulator public accumulator;
     IEmissionController public emissionController;
@@ -73,6 +83,8 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
     error NoQualifiedParticipants();
     error ZeroAddress();
     error InvalidBps();
+    /// @notice C48-F1: Pool LP count exceeds MAX_LPS_PER_POOL — would gas-DoS settlement.
+    error TooManyLPs(uint256 count, uint256 max);
 
     // ============ Initializer ============
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -158,6 +170,10 @@ contract MicroGameFactory is OwnableUpgradeable, UUPSUpgradeable {
         if (lastSettledEpoch[poolId] >= epochId && epochId != 0) revert EpochAlreadySettled();
 
         address[] memory lps = accumulator.getPoolLPs(poolId);
+        // C48-F1: Bound the LP set BEFORE the O(n^2) insertion sort below. Without this,
+        // an unbounded `_poolLPs[poolId]` (grows on every distinct LP that ever provided
+        // liquidity) bricks settlement once it exceeds the block gas limit's reach.
+        if (lps.length > MAX_LPS_PER_POOL) revert TooManyLPs(lps.length, MAX_LPS_PER_POOL);
 
         (uint128[] memory snapshots, uint256 totalPoolLiq, uint256 qualifiedCount) = _gatherSnapshots(poolId, lps);
         if (qualifiedCount == 0 || totalPoolLiq == 0) revert NoQualifiedParticipants();

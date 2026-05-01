@@ -1577,19 +1577,42 @@ contract VibeSwapCore is
         return failedExecutions.length;
     }
 
+    /// @notice C48-F2: Maximum entries scanned per `compactFailedExecutions` invocation.
+    /// @dev With MAX_FAILED_QUEUE=1000, the previous unbounded `compactFailedExecutions`
+    ///      could touch ~1000 storage slots in a single tx (read + conditional write +
+    ///      pop), which exceeds the block gas budget at the upper end. That left the
+    ///      queue stuck full and new failures silently dropped (per INT-R1-INT005).
+    ///      Capping scan-window-per-call to 200 keeps gas under ~5M and lets anyone
+    ///      drive compaction over multiple txs by re-invoking until the queue shrinks.
+    ///      The compact algorithm is idempotent across partial calls — a "valid suffix"
+    ///      of zero-or-live entries is left after early stop, and the next call simply
+    ///      restarts from index 0 against the new (possibly-shorter) length.
+    uint256 public constant MAX_COMPACTION_PER_CALL = 200;
+
     /**
-     * @notice Compact the failedExecutions array by removing zeroed-out (retried) entries
+     * @notice Compact up to `MAX_COMPACTION_PER_CALL` entries of the failedExecutions array
      * @dev INT-R1-INT005: `delete failedExecutions[index]` zeroes the struct but doesn't
      *      shrink the array. Once length hits MAX_FAILED_QUEUE, new failures are silently
      *      dropped even if all entries have been retried. This function compacts the array.
      *
+     *      C48-F2 (gas-griefing): scan window capped at MAX_COMPACTION_PER_CALL. If more
+     *      compaction is needed, the caller (or anyone) re-invokes. The algorithm is
+     *      idempotent: each call shrinks the array by exactly the count of zeroed entries
+     *      seen in this call's scan window. Multiple invocations converge to a fully-
+     *      compacted array.
+     *
      * DISINTERMEDIATION: Grade C -> Target Grade A. Permissionless compaction is safe
      * because it only removes already-deleted entries (trader == address(0)).
+     *
+     * @return scanned Number of entries scanned (≤ MAX_COMPACTION_PER_CALL)
+     * @return removed Number of zeroed entries collapsed and popped this call
      */
-    function compactFailedExecutions() external {
-        uint256 writeIdx = 0;
+    function compactFailedExecutions() external returns (uint256 scanned, uint256 removed) {
         uint256 len = failedExecutions.length;
-        for (uint256 readIdx = 0; readIdx < len;) {
+        uint256 cap = len < MAX_COMPACTION_PER_CALL ? len : MAX_COMPACTION_PER_CALL;
+
+        uint256 writeIdx = 0;
+        for (uint256 readIdx = 0; readIdx < cap;) {
             if (failedExecutions[readIdx].trader != address(0)) {
                 if (writeIdx != readIdx) {
                     failedExecutions[writeIdx] = failedExecutions[readIdx];
@@ -1598,12 +1621,31 @@ contract VibeSwapCore is
             }
             unchecked { ++readIdx; }
         }
-        // Trim the array to only contain live entries
-        uint256 toRemove = len - writeIdx;
+
+        // C48-F2: Tail-shift only the entries WITHIN the scan window.
+        // If we scanned the entire array (cap == len), pop the slack;
+        // otherwise we must shift the unscanned tail down by `(cap - writeIdx)`
+        // to keep the array contiguous before popping.
+        uint256 toRemove;
+        if (cap == len) {
+            toRemove = cap - writeIdx;
+        } else {
+            uint256 shift = cap - writeIdx;
+            if (shift > 0) {
+                // Move unscanned tail [cap, len) down by `shift`
+                for (uint256 i = cap; i < len;) {
+                    failedExecutions[i - shift] = failedExecutions[i];
+                    unchecked { ++i; }
+                }
+            }
+            toRemove = shift;
+        }
         for (uint256 i = 0; i < toRemove;) {
             failedExecutions.pop();
             unchecked { ++i; }
         }
+
+        return (cap, toRemove);
     }
 
     /**

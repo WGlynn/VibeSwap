@@ -452,6 +452,32 @@ contract VibeAMM is
 
         // Configure default circuit breakers
         _configureDefaultBreakers();
+
+        // C39-F1: Engage default-on attested-resume classification for security-load-bearing
+        // breakers (LOSS_BREAKER, TRUE_PRICE_BREAKER) on fresh deploys. No in-flight trips
+        // exist at deploy time, so the migration is purely a "claim the slot" call — but
+        // it MUST be invoked here so subsequent `reinitializer(2)` calls on this proxy
+        // become idempotent no-ops via `c39SecurityDefaultsInitialized`. Without this,
+        // the contract's own NatSpec contract (`CircuitBreaker._initializeC39SecurityDefaults`)
+        // is violated and the audit-flagged HIGH dead-code path is the result.
+        _initializeC39SecurityDefaults();
+    }
+
+    /**
+     * @notice C39-F1 (post-upgrade-initialization-gate): one-shot reinitializer for proxies
+     *         upgraded from a pre-C39 implementation. Runs the C39 in-flight-trip preservation
+     *         migration so existing tripped LOSS_BREAKER / TRUE_PRICE_BREAKER state continues
+     *         on its original wall-clock semantics, while NEW trips get the C39 default-on
+     *         attested-resume behavior.
+     * @dev MUST be packaged into `upgradeToAndCall(newImpl, abi.encodeCall(initializeC39Migration, ()))`.
+     *      Calling `upgradeTo` alone leaves `c39SecurityDefaultsInitialized == false` and any
+     *      in-flight tripped security breaker would surprise-flip semantics on the next read of
+     *      `_isAttestedResumeRequired` — pinning the trip past cooldown until M attestors arrive.
+     *      reinitializer(2) ensures this can be called exactly once per proxy regardless of
+     *      fresh-deploy vs upgrade origin.
+     */
+    function initializeC39Migration() external reinitializer(2) onlyOwner {
+        _initializeC39SecurityDefaults();
     }
 
     /**

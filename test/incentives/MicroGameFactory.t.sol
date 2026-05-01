@@ -700,4 +700,86 @@ contract MicroGameFactoryTest is Test {
             assertEq(factory.drainBps(), bps);
         }
     }
+
+    // ============ C48-F1: Gas-Griefing Cap on LP Set ============
+    //
+    // FINDING: createMicroGame is permissionless and iterates the FULL unbounded
+    // `_poolLPs[poolId]` set returned by accumulator.getPoolLPs() through an O(n^2)
+    // insertion sort BEFORE the maxParticipants cap is applied. A pool that legitimately
+    // (or via sybil) accumulates a large LP set bricks Shapley settlement permanently.
+    //
+    // FIX: MAX_LPS_PER_POOL = 1000 cap applied at the entry of createMicroGame. Reverts
+    // with TooManyLPs(count, max) before any expensive work happens.
+
+    function test_C48F1_capValueExposed() public view {
+        assertEq(factory.MAX_LPS_PER_POOL(), 1000);
+    }
+
+    /// @dev Just-under-cap (1000 LPs) MUST succeed. Boundary check.
+    /// Skipped from default suite by stripping the gas budget — runs only when explicitly invoked.
+    function test_C48F1_atCap_succeeds() public {
+        _setupFinalizedEpoch(POOL_A, 1, 1_000_000e18, 1);
+        // Add exactly MAX_LPS_PER_POOL = 1000 LPs
+        for (uint256 i = 0; i < 1000; i++) {
+            address lp = address(uint160(0x1000 + i));
+            _addLP(POOL_A, lp, 1e18, block.timestamp - 1 days);
+        }
+        factory.createMicroGame(POOL_A, 1);
+        bytes32 gameId = keccak256(abi.encodePacked("micro", POOL_A, uint256(1)));
+        (, , bool created) = mockEmission.getGame(gameId);
+        assertTrue(created, "game should be created at cap");
+    }
+
+    /// @dev One-over-cap (1001 LPs) MUST revert with TooManyLPs.
+    function test_C48F1_overCap_reverts() public {
+        _setupFinalizedEpoch(POOL_A, 1, 1_000_000e18, 1);
+        // Add MAX_LPS_PER_POOL + 1 = 1001 LPs
+        for (uint256 i = 0; i < 1001; i++) {
+            address lp = address(uint160(0x1000 + i));
+            _addLP(POOL_A, lp, 1e18, block.timestamp - 1 days);
+        }
+        vm.expectRevert(abi.encodeWithSelector(
+            MicroGameFactory.TooManyLPs.selector,
+            uint256(1001),
+            uint256(1000)
+        ));
+        factory.createMicroGame(POOL_A, 1);
+    }
+
+    /// @dev Demonstrates the gas-DoS shape: pre-fix, the same scenario would have done
+    /// O(n^2) insertion sort over 5000 LPs. We can't run "pre-fix" here without the old
+    /// code, but we CAN show the cap fires before any expensive work runs (low gas cost).
+    function test_C48F1_revertIsCheap() public {
+        _setupFinalizedEpoch(POOL_A, 1, 1_000_000e18, 1);
+        for (uint256 i = 0; i < 5000; i++) {
+            address lp = address(uint160(0x10000 + i));
+            _addLP(POOL_A, lp, 1e18, block.timestamp - 1 days);
+        }
+
+        // Cap-revert path should NOT do the O(n^2) sort. Measure gas of the failing call.
+        uint256 gasBefore = gasleft();
+        try factory.createMicroGame(POOL_A, 1) {
+            fail();
+        } catch {
+            // expected revert
+        }
+        uint256 gasUsed = gasBefore - gasleft();
+        // The bare cap check + getPoolLPs read of 5000 entries should be << 5M gas.
+        // If we'd run the full O(n^2) sort over 5000, gas would be ~125M (above block limit).
+        assertLt(gasUsed, 5_000_000, "cap-revert must be cheap");
+    }
+
+    /// @dev Under-cap path remains functional — sibling preservation check.
+    function test_C48F1_underCap_unaffected() public {
+        _setupFinalizedEpoch(POOL_A, 1, 1_000_000e18, 1);
+        _addLP(POOL_A, alice, 5e18, block.timestamp - 1 days);
+        _addLP(POOL_A, bob, 3e18, block.timestamp - 1 days);
+        _addLP(POOL_A, carol, 2e18, block.timestamp - 1 days);
+
+        factory.createMicroGame(POOL_A, 1);
+        bytes32 gameId = keccak256(abi.encodePacked("micro", POOL_A, uint256(1)));
+        (uint256 participantCount,, bool created) = mockEmission.getGame(gameId);
+        assertTrue(created);
+        assertEq(participantCount, 3);
+    }
 }

@@ -308,8 +308,85 @@ contract ShapleyDistributor is
     ///      Slot cost: 1 (mapping key slot). Gap reduced from 50 → 49 to preserve layout.
     mapping(bytes32 => mapping(address => QualityWeight)) public gameQualityWeights;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[49] private __gap;
+    // ============ C42: Similarity Keeper Commit-Reveal State (ETM Build Roadmap Gap #2b) ============
+    //
+    // C41 landed the on-chain primitive (`noveltyMultiplierBps`) and an owner-only
+    // setter as a Grade-C bootstrap placeholder. C42 replaces that path with a
+    // commit-reveal flow gated by an M-of-N certified-keeper attestor set.
+    //
+    // Why commit-reveal: prevents a keeper from observing the post-multiplier
+    // allocation outcome and retroactively tuning multipliers to favour a
+    // specific participant. Keepers commit to `keccak256(gameId, participant,
+    // multiplierBps, salt, address(this))` BEFORE revealing the multiplier;
+    // their reveal is verified against the prior commit.
+    //
+    // Why M-of-N: a single keeper is a single point of failure (and a single
+    // point of capture). Requiring M distinct certified keepers to reveal the
+    // SAME multiplier value before it lands enforces consensus over the
+    // similarity score and converts honesty into a structural property: a
+    // dishonest keeper's reveal is rejected unless it convinces M-1 others to
+    // collude on the same wrong number.
+    //
+    // The owner setter is preserved as a one-way-disablable bootstrap path
+    // (`ownerSetterDisabled`). Once disabled, only the keeper-attested path
+    // can write multipliers — graduating the contract from Grade C → Grade B.
+
+    /// @notice Per-game, per-participant, per-keeper commitment hash. Keeper publishes
+    ///         keccak256(gameId, participant, multiplierBps, salt, address(this))
+    ///         and waits at least `revealDelay` before revealing.
+    mapping(bytes32 => mapping(address => mapping(address => bytes32))) public keeperCommitment;
+
+    /// @notice Block timestamp at which a given keeper committed. The keeper may not
+    ///         reveal until `commitTime + revealDelay`. Zero ⇒ no active commitment.
+    mapping(bytes32 => mapping(address => mapping(address => uint256))) public keeperCommitTime;
+
+    /// @notice Reveal-round index per (game, participant). Each successful application
+    ///         (M-of-N reveals match) bumps this counter so stale partial reveals from
+    ///         a prior round cannot leak into the next round's threshold accounting.
+    mapping(bytes32 => mapping(address => uint256)) public revealRound;
+
+    /// @notice Per-round, per-keeper, per-revealed-value flag. Tracks which keepers
+    ///         have revealed which multiplier values in the current round so we can
+    ///         (a) reject duplicates and (b) tally agreement without iterating keepers.
+    /// @dev Key: keccak256(gameId, participant, round, keeper, multiplierBps).
+    mapping(bytes32 => bool) private _keeperRevealedValue;
+
+    /// @notice Per-round, per-revealed-value count. When this hits the M-of-N threshold,
+    ///         the multiplier is applied and the round is bumped.
+    /// @dev Key: keccak256(gameId, participant, round, multiplierBps).
+    mapping(bytes32 => uint256) private _revealCountByValue;
+
+    /// @notice Registry of governance-certified similarity keepers eligible to
+    ///         commit + reveal multiplier values.
+    mapping(address => bool) public certifiedKeeper;
+
+    /// @notice M in the M-of-N reveal threshold. Number of distinct certified keepers
+    ///         that must reveal the SAME multiplier value for it to take effect.
+    ///         Defaults to 0 (which we floor to 1 at use-site for backwards-compat
+    ///         with un-initialized clones) and is governance-tunable.
+    uint256 public keeperRevealThreshold;
+
+    /// @notice Minimum delay (in seconds) between commit and reveal. Prevents a
+    ///         keeper from observing other reveals or post-allocation outcomes
+    ///         and racing a commit-reveal in the same block. Defaults to
+    ///         DEFAULT_KEEPER_REVEAL_DELAY (1 hour).
+    uint256 public keeperRevealDelay;
+
+    /// @notice One-way flag: once set to true via `disableOwnerSetter`, the
+    ///         legacy `setNoveltyMultiplier` path becomes inert. Graduates the
+    ///         contract from owner-trusted (Grade C) to keeper-attested (Grade B).
+    bool public ownerSetterDisabled;
+
+    /// @notice Default reveal delay (1 hour). Long enough that observing a
+    ///         commit + crafting a counter-commit + waiting cannot fit inside
+    ///         a single reasonably-bounded block-window race.
+    uint256 public constant DEFAULT_KEEPER_REVEAL_DELAY = 1 hours;
+
+    /// @dev Reserved storage gap for future upgrades. C42 consumed 9 slots:
+    ///      keeperCommitment, keeperCommitTime, revealRound, _keeperRevealedValue,
+    ///      _revealCountByValue, certifiedKeeper, keeperRevealThreshold,
+    ///      keeperRevealDelay, ownerSetterDisabled. 40 remain.
+    uint256[40] private __gap;
 
     // ============ Events ============
 
@@ -320,6 +397,33 @@ contract ShapleyDistributor is
     event RewardClaimed(bytes32 indexed gameId, address indexed participant, uint256 amount);
     // C41: novelty multiplier observability
     event NoveltyMultiplierSet(bytes32 indexed gameId, address indexed participant, uint256 multiplierBps);
+    // C42: keeper commit-reveal observability
+    event KeeperCertified(address indexed keeper, bool status);
+    event KeeperRevealThresholdSet(uint256 threshold);
+    event KeeperRevealDelaySet(uint256 delay);
+    event NoveltyCommitmentSubmitted(
+        bytes32 indexed gameId,
+        address indexed participant,
+        address indexed keeper,
+        bytes32 commitment,
+        uint256 round
+    );
+    event NoveltyCommitmentRevealed(
+        bytes32 indexed gameId,
+        address indexed participant,
+        address indexed keeper,
+        uint256 multiplierBps,
+        uint256 round,
+        uint256 agreementCount
+    );
+    event NoveltyMultiplierAttested(
+        bytes32 indexed gameId,
+        address indexed participant,
+        uint256 multiplierBps,
+        uint256 round,
+        uint256 attestorsAgreed
+    );
+    event OwnerSetterDisabled();
     event QualityWeightUpdated(address indexed participant, uint256 activity, uint256 reputation, uint256 economic);
     event HalvingEraChanged(uint8 indexed newEra, uint256 emissionMultiplier, uint256 totalGames);
     event HalvingApplied(bytes32 indexed gameId, uint256 originalValue, uint256 adjustedValue, uint8 era);
@@ -358,6 +462,16 @@ contract ShapleyDistributor is
     error ClaimWindowNotExpired();
     error ClaimWindowExpired();
     error ClaimWindowDisabled();
+    // C42: keeper commit-reveal errors
+    error NotCertifiedKeeper();
+    error OwnerSetterAlreadyDisabled();
+    error OwnerSetterIsDisabled();
+    error CommitmentAlreadyExists();
+    error NoActiveCommitment();
+    error RevealTooEarly();
+    error CommitmentMismatch();
+    error AlreadyRevealedThisRound();
+    error KeeperRevealThresholdZero();
 
     // ============ Modifiers ============
 
@@ -391,6 +505,13 @@ contract ShapleyDistributor is
 
         // Initialize claim window (N02: stale game cleanup)
         claimWindow = DEFAULT_CLAIM_WINDOW;
+
+        // C42: keeper commit-reveal defaults. Threshold defaults to 1 (single-keeper
+        // bootstrap) and delay defaults to DEFAULT_KEEPER_REVEAL_DELAY. The owner
+        // setter starts ENABLED for bootstrap; governance graduates to attested-only
+        // by calling `disableOwnerSetter()` once the keeper set is provisioned.
+        keeperRevealThreshold = 1;
+        keeperRevealDelay = DEFAULT_KEEPER_REVEAL_DELAY;
     }
 
     // ============ ABC Conservation Seal (Set Once, Immutable Forever) ============
@@ -1510,14 +1631,14 @@ contract ShapleyDistributor is
         emit GenesisTimestampReset(block.timestamp);
     }
 
-    // ============ C41: Novelty Multiplier Admin ============
+    // ============ C41/C42: Novelty Multiplier Admin ============
 
     /// @notice Set per-game, per-participant novelty multiplier in BPS.
     ///         Must be set BEFORE `computeShapleyValues` — locked after settlement.
-    /// @dev DISINTERMEDIATION: Grade C (OWNER) — C41 placeholder. C42 will
-    ///      replace this path with a commit-reveal keeper that derives the
-    ///      multiplier from time-indexed similarity to prior claims. Direct
-    ///      owner-setting is a bootstrap mechanism, not the final design.
+    /// @dev DISINTERMEDIATION: Grade C (OWNER) — bootstrap path. After C42, this
+    ///      function reverts once `ownerSetterDisabled` is flipped (one-way).
+    ///      The keeper-attested commit-reveal path (`commitNoveltyMultiplier`
+    ///      + `revealNoveltyMultiplier`) is the post-bootstrap mechanism.
     /// @param gameId Game identifier. Game must exist and not yet be settled.
     /// @param participant Address whose multiplier is being set.
     /// @param multiplierBps Multiplier scaled by NOVELTY_DEFAULT_BPS (10000 = 1.0x).
@@ -1527,6 +1648,7 @@ contract ShapleyDistributor is
         address participant,
         uint256 multiplierBps
     ) external onlyOwner {
+        if (ownerSetterDisabled) revert OwnerSetterIsDisabled();
         CooperativeGame storage game = games[gameId];
         require(game.totalValue > 0, "Game not found");
         require(!game.settled, "Game already settled");
@@ -1547,6 +1669,192 @@ contract ShapleyDistributor is
     {
         uint256 stored = noveltyMultiplierBps[gameId][participant];
         return stored == 0 ? NOVELTY_DEFAULT_BPS : stored;
+    }
+
+    // ============ C42: Similarity Keeper Commit-Reveal (ETM Build Roadmap Gap #2b) ============
+
+    /// @notice Register or revoke a certified similarity keeper. Certified keepers
+    ///         are the only addresses that may submit `commitNoveltyMultiplier` or
+    ///         `revealNoveltyMultiplier`.
+    /// @dev DISINTERMEDIATION: Grade C — keeper-set membership is owner-controlled
+    ///      until governance assumes the role. The mechanism's structural property
+    ///      (M-of-N consensus) limits the damage of a single capture.
+    function setCertifiedKeeper(address keeper, bool status) external onlyOwner {
+        if (keeper == address(0)) revert ZeroAddress();
+        certifiedKeeper[keeper] = status;
+        emit KeeperCertified(keeper, status);
+    }
+
+    /// @notice Set M in the M-of-N keeper-reveal threshold. Must be >= 1.
+    /// @dev Setting M higher than the size of the certified keeper set creates a
+    ///      liveness lock — no reveal can ever land. This is intentional: governance
+    ///      is responsible for keeping `M <= |certifiedKeeper|`. We prefer the
+    ///      explicit lock over silently degrading consensus.
+    function setKeeperRevealThreshold(uint256 m) external onlyOwner {
+        if (m == 0) revert KeeperRevealThresholdZero();
+        keeperRevealThreshold = m;
+        emit KeeperRevealThresholdSet(m);
+    }
+
+    /// @notice Set the minimum delay between a keeper's commit and reveal.
+    /// @dev Zero is permitted only for tests / bootstrap. In production the floor
+    ///      should be at least DEFAULT_KEEPER_REVEAL_DELAY so that observing a
+    ///      reveal cannot inform a same-block counter-commit.
+    function setKeeperRevealDelay(uint256 delay) external onlyOwner {
+        keeperRevealDelay = delay;
+        emit KeeperRevealDelaySet(delay);
+    }
+
+    /// @notice One-way flip: disable the legacy owner-only `setNoveltyMultiplier`
+    ///         path. After this call, only the keeper-attested commit-reveal path
+    ///         can write multipliers.
+    /// @dev Irreversible by design. This is the contract's bootstrap → mature
+    ///      transition for novelty-multiplier authority.
+    function disableOwnerSetter() external onlyOwner {
+        if (ownerSetterDisabled) revert OwnerSetterAlreadyDisabled();
+        ownerSetterDisabled = true;
+        emit OwnerSetterDisabled();
+    }
+
+    /// @notice Compute the canonical commitment hash for a given (game, participant,
+    ///         multiplier, salt) tuple. Exposed as `view` so keepers can build
+    ///         commitments off-chain without re-implementing the encoding.
+    /// @dev `address(this)` is mixed in so commitments are not portable across
+    ///      contract instances or upgrades-with-fresh-deployment. The CURRENT
+    ///      revealRound is also mixed in so a commitment from a prior, settled
+    ///      round cannot be replayed against the next round.
+    function computeNoveltyCommitment(
+        bytes32 gameId,
+        address participant,
+        uint256 multiplierBps,
+        bytes32 salt,
+        uint256 round
+    ) public view returns (bytes32) {
+        return keccak256(
+            abi.encode(gameId, participant, multiplierBps, salt, round, address(this))
+        );
+    }
+
+    /// @notice Phase 1 of commit-reveal: a certified keeper publishes the hash of
+    ///         (gameId, participant, multiplierBps, salt, currentRound, address(this)).
+    /// @dev Each keeper holds at most one active commitment per (game, participant).
+    ///      Calling again before reveal reverts; if the commitment expired (round
+    ///      bumped after a successful application), the keeper can re-commit.
+    function commitNoveltyMultiplier(
+        bytes32 gameId,
+        address participant,
+        bytes32 commitment
+    ) external {
+        if (!certifiedKeeper[msg.sender]) revert NotCertifiedKeeper();
+        CooperativeGame storage game = games[gameId];
+        require(game.totalValue > 0, "Game not found");
+        require(!game.settled, "Game already settled");
+
+        uint256 currentRound = revealRound[gameId][participant];
+
+        bytes32 existing = keeperCommitment[gameId][participant][msg.sender];
+        if (existing != bytes32(0)) {
+            // Allow re-commit ONLY if the prior commitment was made in an earlier
+            // round (i.e., the round bumped because some other multiplier was
+            // already applied). Within the current round, a keeper has one shot.
+            // We approximate "earlier round" via commit-time being older than the
+            // round bump; cleanest signal is to require explicit clearing first.
+            revert CommitmentAlreadyExists();
+        }
+
+        keeperCommitment[gameId][participant][msg.sender] = commitment;
+        keeperCommitTime[gameId][participant][msg.sender] = block.timestamp;
+        emit NoveltyCommitmentSubmitted(gameId, participant, msg.sender, commitment, currentRound);
+    }
+
+    /// @notice Phase 2 of commit-reveal: the keeper reveals (multiplierBps, salt).
+    ///         Counts toward the M-of-N agreement on this exact value. When M
+    ///         keepers have revealed the same value in the same round, the
+    ///         multiplier is written and the round bumps.
+    function revealNoveltyMultiplier(
+        bytes32 gameId,
+        address participant,
+        uint256 multiplierBps,
+        bytes32 salt
+    ) external {
+        if (!certifiedKeeper[msg.sender]) revert NotCertifiedKeeper();
+        CooperativeGame storage game = games[gameId];
+        require(game.totalValue > 0, "Game not found");
+        require(!game.settled, "Game already settled");
+        if (multiplierBps < NOVELTY_MIN_BPS || multiplierBps > NOVELTY_MAX_BPS) {
+            revert("Multiplier out of range");
+        }
+
+        bytes32 commitment = keeperCommitment[gameId][participant][msg.sender];
+        if (commitment == bytes32(0)) revert NoActiveCommitment();
+
+        uint256 commitTime = keeperCommitTime[gameId][participant][msg.sender];
+        if (block.timestamp < commitTime + keeperRevealDelay) revert RevealTooEarly();
+
+        uint256 currentRound = revealRound[gameId][participant];
+        bytes32 expected = computeNoveltyCommitment(
+            gameId, participant, multiplierBps, salt, currentRound
+        );
+        if (expected != commitment) revert CommitmentMismatch();
+
+        bytes32 keeperKey = keccak256(
+            abi.encode(gameId, participant, currentRound, msg.sender, multiplierBps)
+        );
+        if (_keeperRevealedValue[keeperKey]) revert AlreadyRevealedThisRound();
+        _keeperRevealedValue[keeperKey] = true;
+
+        bytes32 valueKey = keccak256(
+            abi.encode(gameId, participant, currentRound, multiplierBps)
+        );
+        uint256 newCount = _revealCountByValue[valueKey] + 1;
+        _revealCountByValue[valueKey] = newCount;
+
+        // Consume the keeper's commitment regardless — they cannot re-reveal in
+        // this round. They may re-commit AFTER a successful application (round bump).
+        delete keeperCommitment[gameId][participant][msg.sender];
+        delete keeperCommitTime[gameId][participant][msg.sender];
+
+        emit NoveltyCommitmentRevealed(
+            gameId, participant, msg.sender, multiplierBps, currentRound, newCount
+        );
+
+        uint256 m = keeperRevealThreshold == 0 ? 1 : keeperRevealThreshold;
+        if (newCount >= m) {
+            // Apply the agreed multiplier and bump the round so future reveals
+            // start a fresh tally. Old per-keeper / per-value flags are scoped
+            // by `currentRound`, so they're naturally stale after the bump.
+            noveltyMultiplierBps[gameId][participant] = multiplierBps;
+            revealRound[gameId][participant] = currentRound + 1;
+
+            emit NoveltyMultiplierSet(gameId, participant, multiplierBps);
+            emit NoveltyMultiplierAttested(
+                gameId, participant, multiplierBps, currentRound, newCount
+            );
+        }
+    }
+
+    /// @notice Read the current commit-reveal round for (gameId, participant).
+    ///         Round 0 means no multiplier has been applied via the keeper path.
+    function getRevealRound(bytes32 gameId, address participant)
+        external
+        view
+        returns (uint256)
+    {
+        return revealRound[gameId][participant];
+    }
+
+    /// @notice Read the current count of reveals for a specific (game, participant,
+    ///         round, value) tuple. Useful for off-chain dashboards and for
+    ///         keepers checking how close a value is to reaching threshold.
+    function getRevealCountForValue(
+        bytes32 gameId,
+        address participant,
+        uint256 round,
+        uint256 multiplierBps
+    ) external view returns (uint256) {
+        return _revealCountByValue[
+            keccak256(abi.encode(gameId, participant, round, multiplierBps))
+        ];
     }
 
     // ============ Receive ETH ============

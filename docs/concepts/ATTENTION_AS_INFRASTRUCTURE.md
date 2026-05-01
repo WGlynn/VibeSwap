@@ -143,7 +143,7 @@ VibeSwap's choice: DON'T extract attention. Instead, ATTRACT attention toward co
 This is:
 - **Sustainable** — attention-extractive models collapse when users learn. Attention-attracting-and-returning models build loyalty.
 - **Aligned with P-001** — [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md) prohibits extractive models.
-- **Aligned with cognitive-economic health** — see [Attention Auction Paradox](./THE_ATTENTION_AUCTION_PARADOX.md).
+- **Aligned with cognitive-economic health** — see [Attention Auction Paradox](../research/essays/THE_ATTENTION_AUCTION_PARADOX.md).
 
 ## Attention-infrastructure principles
 

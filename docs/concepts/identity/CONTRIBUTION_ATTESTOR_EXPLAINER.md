@@ -275,7 +275,7 @@ The contract doesn't verify the hash matches claim description. That's an off-ch
 
 `value` is an initial weight hint. It flows downstream:
 
-- [`ShapleyDistributor`](./SHAPLEY_REWARD_SYSTEM.md) reads accepted claims via `getClaimsByContributor(addr)`.
+- [`ShapleyDistributor`](../shapley/SHAPLEY_REWARD_SYSTEM.md) reads accepted claims via `getClaimsByContributor(addr)`.
 - Uses `claim.value` as a marginal-contribution estimate input.
 - Final Shapley value is computed per the distribution math.
 
@@ -290,7 +290,7 @@ Flow:
 3. Threshold → Accepted (or escalation to tribunal → Accepted/Rejected).
 4. Shapley distributor queries accepted claims.
 5. Shapley computation uses claims as input; produces per-contributor rewards.
-6. Rewards distributed (possibly via Optimistic Shapley for scale — see [`OPTIMISTIC_SHAPLEY.md`](./OPTIMISTIC_SHAPLEY.md)).
+6. Rewards distributed (possibly via Optimistic Shapley for scale — see [`OPTIMISTIC_SHAPLEY.md`](../shapley/OPTIMISTIC_SHAPLEY.md)).
 
 Attestor produces the "who contributed what" data. Shapley produces the "how much each gets." Different concerns; clean separation.
 
@@ -337,7 +337,7 @@ This exercise teaches the three-branch flow hands-on.
 
 ## Relationship to other primitives
 
-- **Parent**: [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md) — multi-agent consensus via three-branch heterogeneity.
+- **Parent**: [`ECONOMIC_THEORY_OF_MIND.md`](../etm/ECONOMIC_THEORY_OF_MIND.md) — multi-agent consensus via three-branch heterogeneity.
 - **Uses**: [`ContributionDAG`](./CONTRIBUTION_DAG_EXPLAINER.md) for trust-weights.
 - **Fed by**: [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) — canonical source-to-claim format.
 - **Feeds**: [`ShapleyDistributor`] for rewards, [`QuadraticVoting`] for voting weight.

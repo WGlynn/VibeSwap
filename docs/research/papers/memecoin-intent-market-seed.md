@@ -99,6 +99,6 @@ The meme market doesn't need to be cleaned up. It needs to be **re-channeled**. 
 
 ## See Also
 
-- [Reputation Oracle Whitepaper](../../DOCUMENTATION/v1_REPUTATION_ORACLE_WHITEPAPER.md) — Cryptographic trust scoring via commit-reveal pairwise comparisons
+- [Reputation Oracle Whitepaper](../whitepapers/v1_REPUTATION_ORACLE_WHITEPAPER.md) — Cryptographic trust scoring via commit-reveal pairwise comparisons
 - [Commit-Reveal Batch Auctions (paper)](commit-reveal-batch-auctions.md) — Core mechanism: temporal decoupling for MEV elimination
 - [From MEV to GEV (paper)](from-mev-to-gev.md) — Nine-component GEV resistance architecture

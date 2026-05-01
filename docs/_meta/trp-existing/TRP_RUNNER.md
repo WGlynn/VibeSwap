@@ -333,9 +333,9 @@ This prevents the open items list from growing monotonically. If the same HIGH f
 
 ## See Also
 
-- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification (v1.0)
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification (v1.0)
 - [TRP Explained](TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
-- [TRP Runner Paper](../trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
+- [TRP Runner Paper](../../research/papers/trp-runner/trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
 - [Efficiency Heat Map](efficiency-heatmap.md) — Per-contract discovery yield tracking
 - [Loop 0: Token Density](loop-0-token-density.md) | [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
-- [TRP Verification Report](../TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
+- [TRP Verification Report](../trp/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims

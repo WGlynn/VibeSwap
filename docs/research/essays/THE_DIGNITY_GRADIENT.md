@@ -119,15 +119,15 @@ Quality compounds into quality of product. VibeSwap's work-output should benefit
 
 ### Commitment 1 — Lawson Constant
 
-Attribution is structural, not decorative. Your contributions can't be erased. See [`LAWSON_CONSTANT.md`](./LAWSON_CONSTANT.md).
+Attribution is structural, not decorative. Your contributions can't be erased. See [`LAWSON_CONSTANT.md`](../proofs/LAWSON_CONSTANT.md).
 
 ### Commitment 2 — P-001 No Extraction
 
-No mechanism extracts value disproportionate to creation. See [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md).
+No mechanism extracts value disproportionate to creation. See [`NO_EXTRACTION_AXIOM.md`](../../concepts/NO_EXTRACTION_AXIOM.md).
 
 ### Commitment 3 — Three-branch due process
 
-Accusations go through Executive/Judicial/Legislative. You can contest. You have recourse. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
+Accusations go through Executive/Judicial/Legislative. You can contest. You have recourse. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md).
 
 ### Commitment 4 — Voluntary participation
 

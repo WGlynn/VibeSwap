@@ -2,7 +2,7 @@
 
 **Status**: Live in `contracts/core/HoneypotDefense.sol` + `OmniscientAdversaryDefense.sol`.
 **Audience**: First-encounter OK. Walked attack + exhaustion scenario.
-**Classification**: ETM MIRRORS ([audit](./ETM_ALIGNMENT_AUDIT.md) §5.1).
+**Classification**: ETM MIRRORS ([audit](../etm/ETM_ALIGNMENT_AUDIT.md) §5.1).
 
 ---
 
@@ -128,7 +128,7 @@ function computeSirenRent(address user) external view returns (uint256) {
 
 ## Why this is substrate-geometry-matched
 
-[Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) says mechanisms should match substrate geometry.
+[Substrate-Geometry Match](../SUBSTRATE_GEOMETRY_MATCH.md) says mechanisms should match substrate geometry.
 
 Attacker motivation has specific shape:
 - **Power-law distribution**: most attackers are opportunistic; few are well-resourced.
@@ -144,7 +144,7 @@ Linear alternative would be geometrically wrong — either too soft (attackers u
 
 ## The cognitive parallel
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), biological immune systems implement exactly this pattern:
+Under [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md), biological immune systems implement exactly this pattern:
 
 - Immune system doesn't blacklist specific pathogens; escalates cost against any replicating entity triggering enough signals.
 - Early-low-signal: tolerated (normal flora, non-pathogenic bacteria).
@@ -179,7 +179,7 @@ Each restriction is deliberate. Siren's boundaries keep it narrow and composable
 
 ## Interaction with other defenses
 
-Per [Mechanism Composition Algebra](./MECHANISM_COMPOSITION_ALGEBRA.md):
+Per [Mechanism Composition Algebra](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md):
 
 - **Orthogonal** with most defenses — Siren charges rent on-signal; other defenses apply structural constraints. No state collision.
 - **Serially composable** with [Fibonacci Scaling](./FIBONACCI_SCALING.md) — both rate-limit. Siren is signal-triggered; Fibonacci is volume-triggered. Both fire; honest users hit neither; attackers hit both.

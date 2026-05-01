@@ -35,7 +35,7 @@ That's the whole primitive. Shared surface + finite capacity + convex rent. Ever
 
 The cognitive substrate-of-mind has this shape. Ebbinghaus-curve retention decays convexly (α ≈ 1.6 from paper §6.4). Cognitive "desk occupancy" — carrying a fact forward in working memory — accelerates in cost as the fact ages. The mind rotates its own desks convexly.
 
-If a mechanism wants to faithfully mirror the cognitive substrate (see [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md)), it must scale rent convexly too.
+If a mechanism wants to faithfully mirror the cognitive substrate (see [`ECONOMIC_THEORY_OF_MIND.md`](etm/ECONOMIC_THEORY_OF_MIND.md)), it must scale rent convexly too.
 
 ## Where this shows up in VibeSwap
 
@@ -43,7 +43,7 @@ The primitive is load-bearing in at least four places.
 
 ### Place 1 — NCI retention weight (Gap #1 of the ETM Build Roadmap)
 
-Nakamoto Consensus Infinity (see [`NCI_WEIGHT_FUNCTION.md`](./NCI_WEIGHT_FUNCTION.md)) computes a `retentionWeight(t)` that captures how much a contribution's past value persists.
+Nakamoto Consensus Infinity (see [`NCI_WEIGHT_FUNCTION.md`](identity/NCI_WEIGHT_FUNCTION.md)) computes a `retentionWeight(t)` that captures how much a contribution's past value persists.
 
 Current implementation is **linear**:
 
@@ -75,17 +75,17 @@ This gets fixed in cycle C40 (target 2026-04-23). The code change is ~50 lines. 
 
 ### Place 2 — CKB state-rent economics
 
-The [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md) paper describes CKB state-rent: tokens locked to retain storage slots, rent paid continuously for persistence.
+The [`COGNITIVE_RENT_ECONOMICS.md`](monetary/COGNITIVE_RENT_ECONOMICS.md) paper describes CKB state-rent: tokens locked to retain storage slots, rent paid continuously for persistence.
 
 The rent curve shape is ALSO load-bearing there. If CKB state-rent were linear, a slot held for 6 months would cost exactly 6× the rent of one held for 1 month. No phase transition.
 
 Convex state-rent means: the longer a slot is held, the faster the marginal rent rises. Slot-holders who can't justify the accelerating cost release the slot, and new claimants get access. The shared attention surface rotates.
 
-Current CKB state-rent already has some convexity built into the PoM validator stake-tipping mechanism (see [`ASYMMETRIC_COST_CONSENSUS.md`](./ASYMMETRIC_COST_CONSENSUS.md)), but not with the α=1.6 calibration. A future audit cycle should check whether that calibration aligns with the Attention-Surface primitive.
+Current CKB state-rent already has some convexity built into the PoM validator stake-tipping mechanism (see [`ASYMMETRIC_COST_CONSENSUS.md`](../architecture/ASYMMETRIC_COST_CONSENSUS.md)), but not with the α=1.6 calibration. A future audit cycle should check whether that calibration aligns with the Attention-Surface primitive.
 
 ### Place 3 — Contribution-DAG handshake cooldown
 
-The Contribution-DAG (see [`CONTRIBUTION_DAG_EXPLAINER.md`](./CONTRIBUTION_DAG_EXPLAINER.md)) uses a 1-day cooldown between handshakes. This is the social-layer version of Attention-Surface Scaling.
+The Contribution-DAG (see [`CONTRIBUTION_DAG_EXPLAINER.md`](identity/CONTRIBUTION_DAG_EXPLAINER.md)) uses a 1-day cooldown between handshakes. This is the social-layer version of Attention-Surface Scaling.
 
 Every handshake occupies a contributor's attention surface. Contributors have a finite bandwidth for endorsing other contributors. A 1-day cooldown between handshakes is a flat, non-convex implementation of the primitive — it's a step function. Below 1 day: infinite cost (no handshake allowed). Above 1 day: zero marginal cost.
 
@@ -97,7 +97,7 @@ Whether this is worth implementing depends on handshake-distribution data. Left 
 
 ### Place 4 — Commit-Reveal Auction 10-second window
 
-The [`TRUE_PRICE_ORACLE_DEEP_DIVE.md`](./TRUE_PRICE_ORACLE_DEEP_DIVE.md) describes the 8-second commit + 2-second reveal window in the Commit-Reveal Auction.
+The [`TRUE_PRICE_ORACLE_DEEP_DIVE.md`](oracles/TRUE_PRICE_ORACLE_DEEP_DIVE.md) describes the 8-second commit + 2-second reveal window in the Commit-Reveal Auction.
 
 Why 10 seconds total? Because attention has a characteristic time. Humans can form an intention, commit to an order, and reveal it reliably in ~10 seconds. Bots operate on the same order-of-magnitude timescale when contending with humans. Below ~2 seconds, humans drop out and bots dominate. Above ~30 seconds, the market churns and the clearing price becomes stale.
 
@@ -198,7 +198,7 @@ Attention-Surface Scaling is an **instance** of the [`CORRESPONDENCE_TRIAD.md`](
 
 ### Augmented Mechanism Design
 
-Attention-Surface Scaling is an **augmenting** invariant, not a replacing one (see [`AUGMENTED_MECHANISM_DESIGN.md`](./AUGMENTED_MECHANISM_DESIGN.md)). Markets and governance still set base rents and surface capacities freely. The convex rent *curve* is the math-enforced invariant on top. Fairness is structural without constraining choice.
+Attention-Surface Scaling is an **augmenting** invariant, not a replacing one (see [`AUGMENTED_MECHANISM_DESIGN.md`](../architecture/AUGMENTED_MECHANISM_DESIGN.md)). Markets and governance still set base rents and surface capacities freely. The convex rent *curve* is the math-enforced invariant on top. Fairness is structural without constraining choice.
 
 ### First-Available Trap
 
@@ -206,7 +206,7 @@ The [`FIRST_AVAILABLE_TRAP.md`](./FIRST_AVAILABLE_TRAP.md) pattern describes how
 
 ### Token Mindfulness
 
-[`TOKEN_MINDFULNESS.md`](./TOKEN_MINDFULNESS.md) applies to PROPOSALS involving this primitive. Writing "use convex decay" is cheap; shipping the 50-line Solidity change with correct integer-math approximation of (t/T)^α is the actual deliverable. The primitive is operationalized only when the bytes-on-chain match the curve described.
+[`TOKEN_MINDFULNESS.md`](monetary/TOKEN_MINDFULNESS.md) applies to PROPOSALS involving this primitive. Writing "use convex decay" is cheap; shipping the 50-line Solidity change with correct integer-math approximation of (t/T)^α is the actual deliverable. The primitive is operationalized only when the bytes-on-chain match the curve described.
 
 ## Student exercises
 

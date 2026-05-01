@@ -46,7 +46,7 @@ Different contribution types (Code, Research, Security, etc.) may have different
 
 **Concrete gaming scenario**: Code contributions are highly rewarded. Design contributions are less so. Contributors shift toward Code even when their comparative advantage is in Design. Result: lots of mediocre Code; insufficient Design.
 
-**Counter-move**: the heterogeneity mandate (see [Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md)) — Shannon entropy of contribution types must remain high. Governance can adjust payoff curves per type to restore balance.
+**Counter-move**: the heterogeneity mandate (see [Cooperative Emergence Threshold](../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md)) — Shannon entropy of contribution types must remain high. Governance can adjust payoff curves per type to restore balance.
 
 **Residual gaming possible**: within a single type, contributors still game relative payoffs.
 
@@ -76,7 +76,7 @@ ParentAttestations create lineage. Contributors benefit from being cited as a pa
 
 ## Why no single tool prevents Goodhart
 
-Substrate Incompleteness ([`SUBSTRATE_INCOMPLETENESS.md`](./SUBSTRATE_INCOMPLETENESS.md)) applies. Every mechanism has gaming surfaces. Composing mechanisms doesn't eliminate them; it reduces them.
+Substrate Incompleteness ([`SUBSTRATE_INCOMPLETENESS.md`](../../concepts/SUBSTRATE_INCOMPLETENESS.md)) applies. Every mechanism has gaming surfaces. Composing mechanisms doesn't eliminate them; it reduces them.
 
 The asymmetry VibeSwap aims for: defenders (honest contributors + governance) have structural advantages over attackers (Goodharting actors).
 
@@ -119,7 +119,7 @@ This is honest about limits while maintaining confidence in the overall design.
 
 Goodharting isn't just individual behavior — it can become collective norm. If "building attestation weight" is celebrated as smart participation, more people do it. Culture reinforces Goodharting.
 
-Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize [Lawson Constant](./LAWSON_CONSTANT.md) attribution as THE goal (who really did this?), not Shapley percentage as the goal (who got how much?).
+Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize [Lawson Constant](../proofs/LAWSON_CONSTANT.md) attribution as THE goal (who really did this?), not Shapley percentage as the goal (who got how much?).
 
 This is cultural design, not just mechanism design. Both matter.
 
@@ -154,7 +154,7 @@ This exercise teaches Goodhart detection.
 
 ## Relationship to cognitive economy
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure by productive-hours, you schedule meetings to fill time.
+Under [Economic Theory of Mind](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md), cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure by productive-hours, you schedule meetings to fill time.
 
 Cognition's response: periodically reframe what "productive" means. Introspection updates the measure. This prevents long-term Goodhart drift.
 
@@ -162,8 +162,8 @@ VibeSwap's governance has the same role. Periodic updates to attestation weighti
 
 ## Relationship to other primitives
 
-- **Connected**: [Rational Ignorance as Mechanism](./RATIONAL_IGNORANCE_AS_MECHANISM.md) — attestation-weight gaming is harder when contributors are rationally ignorant about gaming details.
-- **Counter-weights**: [Novelty Bonus](./THE_NOVELTY_BONUS_THEOREM.md), [Quadratic voting](./WHY_THREE_TOKENS_NOT_TWO.md).
+- **Connected**: [Rational Ignorance as Mechanism](../../concepts/RATIONAL_IGNORANCE_AS_MECHANISM.md) — attestation-weight gaming is harder when contributors are rationally ignorant about gaming details.
+- **Counter-weights**: [Novelty Bonus](./THE_NOVELTY_BONUS_THEOREM.md), [Quadratic voting](../../concepts/monetary/WHY_THREE_TOKENS_NOT_TWO.md).
 
 ## One-line summary
 

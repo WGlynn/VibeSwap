@@ -6,7 +6,7 @@ This doc addresses a conceptual question surfaced by the ETM Alignment Audit: **
 
 ## The audit's three verdicts
 
-From [`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md):
+From [`ETM_ALIGNMENT_AUDIT.md`](../etm/ETM_ALIGNMENT_AUDIT.md):
 
 - **MIRRORS**: the mechanism faithfully reflects the cognitive-economic property it's supposed to mirror.
 - **PARTIALLY MIRRORS**: the mechanism mostly mirrors, but with distortion.
@@ -68,7 +68,7 @@ The step captures the GIST (attention is costly, there's a cost boundary) but no
 
 Severity: depends on whether the substrate's gradient matters at the relevant scale. For coarse mechanisms, discretization is fine. For fine-grained ones, it's a problem.
 
-**Example**: DAG handshake cooldown. Step function vs substrate's continuous gradient. Fix: optional future cycle (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md) Place 3).
+**Example**: DAG handshake cooldown. Step function vs substrate's continuous gradient. Fix: optional future cycle (see [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md) Place 3).
 
 ### Type 5: Policy overlay
 
@@ -252,7 +252,7 @@ Governance dashboard should show open PARTIAL items + their severity + their fix
 
 - **ETM Alignment Audit** (the source classification).
 - **ETM Build Roadmap** (where fixes are scheduled).
-- **ETM Mirror Test** (see [`ETM_MIRROR_TEST.md`](./ETM_MIRROR_TEST.md)) — verifies mirror-correctness after fix.
+- **ETM Mirror Test** (see [`ETM_MIRROR_TEST.md`](../etm/ETM_MIRROR_TEST.md)) — verifies mirror-correctness after fix.
 
 ## How this doc feeds the Code↔Text Inspiration Loop
 

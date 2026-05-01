@@ -29,7 +29,7 @@ VibeSwap's token economy has three value sources:
 
 ### Source 1 — Transaction-value fees
 
-VibeSwap captures a small fee (currently 0% per [Zero-Fee Principle](../memory/feedback_zero-fee-principle-enforcement.md)). External projects adopting Chat-to-DAG Traceability may pay license or subscription fees.
+VibeSwap captures a small fee (currently 0% per [Zero-Fee Principle](../memory/feedback_zero-fee-principle-enforcement.md)). External projects adopting Chat-to-DAG Traceability may pay license or subscription fees. <!-- FIXME: ../memory/feedback_zero-fee-principle-enforcement.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 - **Current state**: $0 transaction-fee revenue.
 - **Target 2028**: $5M-$20M annual from 50-200 external integrations.
@@ -63,7 +63,7 @@ At maturity (2030, Scenario A): h ≈ 1; U ~10,000-100,000; integrations ~500-20
 
 ## Three scenarios with probabilities
 
-Using [Why VibeSwap Wins in 2030](./WHY_VIBESWAP_WINS_IN_2030.md):
+Using [Why VibeSwap Wins in 2030](../../research/essays/WHY_VIBESWAP_WINS_IN_2030.md):
 
 ### Scenario A — Dominant winner (~45%)
 
@@ -229,7 +229,7 @@ Mitigation: protocol continues operating; liquid-returns just delayed.
 
 Token classifications change; securities or other regulations.
 
-Mitigation: Augmented Governance designed to be regulatable. See [Regulatory Compliance Deep Dive](./REGULATORY_COMPLIANCE_DEEP_DIVE.md).
+Mitigation: Augmented Governance designed to be regulatable. See [Regulatory Compliance Deep Dive](../../governance/regulatory/REGULATORY_COMPLIANCE_DEEP_DIVE.md).
 
 ### Risk 4 — Competition risk
 
@@ -247,7 +247,7 @@ Mitigation: conservative launch; extensive audits; bug-bounty.
 
 Will or key team member departs.
 
-Mitigation: distributed decision-making; [Mind Persistence Mission](./MIND_PERSISTENCE_MISSION.md) for knowledge continuity.
+Mitigation: distributed decision-making; [Mind Persistence Mission](../ai-native/MIND_PERSISTENCE_MISSION.md) for knowledge continuity.
 
 ### Risk 7 — Category risk
 

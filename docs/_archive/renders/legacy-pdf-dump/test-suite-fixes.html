@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Fixing 34 Failing Solidity Tests</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="data:text/css,body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:20px;line-height:1.6;color:%23333}h1,h2,h3{color:%23111}code{background:%23f4f4f4;padding:2px 6px;border-radius:3px}pre{background:%23f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid %23ddd;padding:8px 12px;text-align:left}th{background:%23f4f4f4}blockquote{border-left:4px solid %23ddd;margin:0;padding-left:16px;color:%23666}" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Fixing 34 Failing Solidity Tests</h1>
+</header>
+<h1
+id="fixing-34-failing-solidity-tests-a-war-story-from-the-vibeswap-test-suite">Fixing
+34 Failing Solidity Tests: A War Story from the VibeSwap Test Suite</h1>
+<p>We recently hit a milestone on VibeSwap — our omnichain DEX built on
+LayerZero V2 — where 379 out of 413 Foundry tests were passing, but 34
+stubbornly refused to go green. Rather than ignoring them or marking
+them as skipped, we systematically diagnosed and fixed every single
+one.</p>
+<p>Here’s what we found, what we learned, and the patterns that might
+save you hours of debugging on your own Solidity projects.</p>
+<hr />
+<h2 id="the-setup">The Setup</h2>
+<p>VibeSwap’s test suite spans unit tests, fuzz tests, integration
+tests, stress tests, and game theory simulations across 27 test files.
+The contracts use OpenZeppelin v5 with UUPS upgradeable proxies, and the
+core mechanism is a commit-reveal batch auction that settles trades at
+uniform clearing prices to eliminate MEV.</p>
+<p>After a major backend hardening sprint, we ran the full suite and
+found 34 failures clustered into four distinct categories. Each category
+had a single root cause that cascaded across multiple test files.</p>
+<hr />
+<h2
+id="category-1-flash-loan-detection-false-positives-8-tests">Category 1:
+Flash Loan Detection False Positives (8 tests)</h2>
+<p><strong>Symptom:</strong> Tests reverting with
+<code>FlashLoanDetected</code> when no flash loan was happening.</p>
+<p><strong>Root cause:</strong> Our <code>CommitRevealAuction</code>
+contract has a flash loan guard:</p>
+<pre class="solidity"><code>if (lastInteractionBlock[msg.sender] == block.number) {
+    revert FlashLoanDetected();
+}
+lastInteractionBlock[msg.sender] = block.number;</code></pre>
+<p>The problem? When multiple commits route through
+<code>VibeSwapCore</code> (the orchestrator), <code>msg.sender</code>
+inside the auction isn’t the individual trader — it’s
+<code>address(core)</code>. Two traders committing in the same block
+both appear as the same sender, triggering the flash loan check.</p>
+<p><strong>The fix seemed simple:</strong> Add
+<code>vm.roll(block.number + 1)</code> between commits in tests. But
+here’s where it got interesting.</p>
+<h3 id="the-foundry-nightly-bug">The Foundry Nightly Bug</h3>
+<p>On our build environment (Foundry nightly on MINGW64/Windows),
+<code>vm.roll(block.number + 1)</code> doesn’t work reliably. Both rolls
+evaluate to <code>vm.roll(2)</code> because <code>block.number</code>
+doesn’t reflect the previous <code>vm.roll</code> call within the same
+test execution context. The trace confirmed it:</p>
+<pre><code>├─ [0] VM::roll(2)    // First roll
+├─ [0] VM::roll(2)    // Second roll — should be 3, but block.number still returns 1</code></pre>
+<p><strong>Actual fix:</strong> Use absolute block numbers instead of
+relative ones:</p>
+<pre class="solidity"><code>vm.roll(10);   // First commit
+// ... commit ...
+vm.roll(20);   // Second commit — guaranteed different block</code></pre>
+<p>For loops with many commits:</p>
+<pre class="solidity"><code>for (uint256 i = 0; i &lt; numTraders; i++) {
+    vm.roll(100 + i * 100);
+    // ... commit ...
+}</code></pre>
+<p><strong>Lesson:</strong> Never trust <code>block.number</code> or
+<code>block.timestamp</code> as inputs to <code>vm.roll()</code> or
+<code>vm.warp()</code> in the same test. Use absolute values. This also
+affects <code>vm.warp(block.timestamp + x)</code> — we hit the exact
+same issue later with timestamp-dependent freshness checks.</p>
+<hr />
+<h2 id="category-2-access-control-mismatch-13-tests">Category 2: Access
+Control Mismatch (13 tests)</h2>
+<p><strong>Symptom:</strong> 13 tests across clawback resistance and
+Sybil resistance suites reverting with
+<code>NotActiveAuthority</code>.</p>
+<p><strong>Root cause:</strong> Our <code>FederatedConsensus</code>
+contract had an <code>onlyActiveAuthority</code> modifier on
+<code>createProposal()</code>:</p>
+<pre class="solidity"><code>function createProposal(...) external onlyActiveAuthority returns (bytes32) {</code></pre>
+<p>But <code>createProposal</code> is called by
+<code>ClawbackRegistry</code> (the executor contract), not directly by
+human authorities. Inside <code>FederatedConsensus</code>,
+<code>msg.sender</code> is <code>address(registry)</code> — which isn’t
+registered as an authority.</p>
+<p>The registry already validates that the caller is an authorized
+authority before forwarding the call. The consensus contract was
+double-checking with the wrong identity.</p>
+<p><strong>Fix:</strong> Replace the modifier with an inline check that
+allows the executor, owner, or active authorities:</p>
+<pre class="solidity"><code>function createProposal(...) external returns (bytes32) {
+    if (msg.sender != executor &amp;&amp; msg.sender != owner() &amp;&amp; !authorities[msg.sender].active) {
+        revert NotActiveAuthority();
+    }
+    // ...
+}</code></pre>
+<p><strong>Bonus bugs in the same test file:</strong></p>
+<ul>
+<li>A test’s <code>setUp()</code> was missing the
+<code>ClawbackVault</code> deployment entirely, causing
+<code>VaultNotSet</code> errors downstream</li>
+<li>A governance vote ordering issue: the SEC’s rejection vote was
+placed <em>after</em> the 3/5 approval threshold was already met,
+meaning the proposal was already <code>APPROVED</code> and the vote
+reverted with <code>ProposalNotPending</code></li>
+</ul>
+<p><strong>Lesson:</strong> When contracts call other contracts, trace
+<code>msg.sender</code> through the entire call chain. The identity at
+each hop matters for access control. And test <code>setUp()</code>
+functions deserve as much scrutiny as the tests themselves.</p>
+<hr />
+<h2
+id="category-3-stale-string-reverts-and-wrong-assertions-6-tests">Category
+3: Stale String Reverts and Wrong Assertions (6 tests)</h2>
+<p><strong>Symptom:</strong> A mix of
+<code>vm.expectRevert("string")</code> failures and incorrect
+balance/fee assertions.</p>
+<p>This category was a grab bag of three sub-issues:</p>
+<h3 id="a-string-reverts-vs-custom-errors">3a: String Reverts vs Custom
+Errors</h3>
+<p>The contracts had been upgraded to Solidity custom errors, but some
+tests still expected string reverts:</p>
+<pre class="solidity"><code>// Old (broken):
+vm.expectRevert(&quot;Wrong batch&quot;);
+vm.expectRevert(&quot;Not slashable&quot;);
+vm.expectRevert(&quot;Activity score exceeds max&quot;);
+
+// Fixed:
+vm.expectRevert(CommitRevealAuction.WrongBatch.selector);
+vm.expectRevert(CommitRevealAuction.NotSlashable.selector);
+vm.expectRevert(ShapleyDistributor.ScoreExceedsMax.selector);</code></pre>
+<h3 id="b-fee-accounting-with-protocol_fee_share-0">3b: Fee Accounting
+with PROTOCOL_FEE_SHARE = 0</h3>
+<p>Our AMM has <code>PROTOCOL_FEE_SHARE = 0</code>, meaning all trading
+fees go to LP reserves (increasing k in the constant product formula)
+rather than to an <code>accumulatedFees</code> mapping. Two tests were
+asserting <code>accumulatedFees &gt; 0</code> after trades.</p>
+<p><strong>Fix:</strong> Check that k increased instead:</p>
+<pre class="solidity"><code>IVibeAMM.Pool memory poolAfter = amm.getPool(poolId);
+uint256 kAfter = poolAfter.reserve0 * poolAfter.reserve1;
+assertGt(kAfter, kBefore, &quot;Fees should increase k&quot;);</code></pre>
+<h3 id="c-slippage-rejection-doesnt-auto-return-tokens">3c: Slippage
+Rejection Doesn’t Auto-Return Tokens</h3>
+<p>A test expected that when a batch fails due to slippage, the trader’s
+tokens would be automatically returned. They aren’t — tokens stay in the
+AMM contract and require explicit withdrawal. The assertion checking
+<code>balanceAfter == balanceBefore + depositAmount</code> was wrong; it
+should check <code>balanceAfter == balanceBefore</code>.</p>
+<p><strong>Lesson:</strong> When protocol parameters change (like fee
+shares), grep for every test that asserts on the old behavior. And
+always verify your mental model of token flow against the actual
+contract logic.</p>
+<hr />
+<h2 id="category-4-oracle-ring-buffer-bug-auth-issues-7-tests">Category
+4: Oracle Ring Buffer Bug + Auth Issues (7 tests)</h2>
+<p>This was the most interesting category because it included an actual
+<strong>contract bug</strong>, not just test issues.</p>
+<h3 id="the-ring-buffer-off-by-one">The Ring Buffer Off-by-One</h3>
+<p>Our <code>StablecoinFlowRegistry</code> tracks a rolling average of
+USDT/USDC flow ratios using a ring buffer:</p>
+<pre class="solidity"><code>uint8 nextIndex = (historyIndex + 1) % HISTORY_SIZE;
+flowRatioHistory[nextIndex] = FlowObservation({...});
+historyIndex = nextIndex;
+if (historyCount &lt; HISTORY_SIZE) historyCount++;</code></pre>
+<p>The <code>_calculateAverage()</code> function iterated from index
+0:</p>
+<pre class="solidity"><code>// BUG: iterates from 0, but first write goes to index 1
+for (uint8 i = 0; i &lt; historyCount; i++) {
+    sum += flowRatioHistory[i].ratio;
+}</code></pre>
+<p>Since <code>historyIndex</code> starts at 0 (Solidity default), the
+first write goes to index 1. But the average calculation reads from
+index 0 — which is still zero-initialized. After three updates (values
+1.0, 2.0, 3.0 stored at indices 1, 2, 3), the average reads indices 0,
+1, 2 and computes <code>(0 + 1.0 + 2.0) / 3 = 1.0</code> instead of the
+correct <code>(1.0 + 2.0 + 3.0) / 3 = 2.0</code>.</p>
+<p><strong>Fix:</strong> Walk backwards from <code>historyIndex</code>
+to read the actually-populated entries:</p>
+<pre class="solidity"><code>for (uint8 i = 0; i &lt; historyCount; i++) {
+    uint8 idx = (historyIndex + HISTORY_SIZE - i) % HISTORY_SIZE;
+    sum += flowRatioHistory[idx].ratio;
+}</code></pre>
+<h3 id="missing-authorization-in-oracle-tests">Missing Authorization in
+Oracle Tests</h3>
+<p>Three tests called <code>registry.updateFlowRatio()</code> without
+<code>vm.prank(signer)</code>. The registry requires authorized
+updaters, and the test contract wasn’t registered as one. Simple fix:
+add <code>vm.prank(signer)</code> before each call.</p>
+<h3 id="registry-override-in-context-test">Registry Override in Context
+Test</h3>
+<p><code>test_updateStablecoinContext</code> updated the oracle’s
+<em>local</em> stablecoin context via a signed message, then called
+<code>getStablecoinContext()</code> expecting to read it back. But
+<code>getStablecoinContext()</code> preferentially reads from the
+connected <code>StablecoinFlowRegistry</code> if one is set — and the
+test setUp connected them. The local update was being ignored.</p>
+<p><strong>Fix:</strong> Disconnect the registry at the start of the
+test:</p>
+<pre class="solidity"><code>oracle.setStablecoinRegistry(address(0));</code></pre>
+<p><strong>Lesson:</strong> Ring buffers are deceptively tricky. The
+write index and read index must be consistent. Always test with at least
+3 values and verify the average manually. And when a contract has
+multiple data sources with priority logic, test each source in
+isolation.</p>
+<hr />
+<h2 id="the-final-score">The Final Score</h2>
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 32%" />
+<col style="width: 38%" />
+</colgroup>
+<thead>
+<tr>
+<th>Category</th>
+<th>Root Cause</th>
+<th>Tests Fixed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Flash loan detection</td>
+<td><code>msg.sender</code> identity through proxy + Foundry vm.roll
+bug</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Access control</td>
+<td>Modifier checked caller identity, not forwarded identity</td>
+<td>13</td>
+</tr>
+<tr>
+<td>String reverts + assertions</td>
+<td>Stale test expectations after contract upgrades</td>
+<td>6</td>
+</tr>
+<tr>
+<td>Oracle ring buffer</td>
+<td>Off-by-one in averaging + missing auth pranks</td>
+<td>7</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Before: 379/413 passing. After: 413/413 passing.</strong></p>
+<p>Four commits. Three test-only fixes. One real contract bug caught and
+fixed before deployment.</p>
+<hr />
+<h2 id="takeaways">Takeaways</h2>
+<ol type="1">
+<li><p><strong>Categorize before you fix.</strong> Grouping 34 failures
+into 4 root causes turned an overwhelming problem into four focused
+debugging sessions.</p></li>
+<li><p><strong>Trace <code>msg.sender</code> through the call
+chain.</strong> In a system with proxy contracts and orchestrators, the
+identity at each hop changes. Access control modifiers need to account
+for this.</p></li>
+<li><p><strong>Use absolute values in Foundry cheatcodes.</strong>
+<code>vm.roll(block.number + 1)</code> and
+<code>vm.warp(block.timestamp + x)</code> can silently fail on certain
+Foundry builds. Absolute values are deterministic and portable.</p></li>
+<li><p><strong>Ring buffers need careful index management.</strong> If
+your write index starts at <code>(default + 1)</code>, your read loop
+starting at <code>default</code> will include uninitialized data. Always
+walk backwards from the most recent write.</p></li>
+<li><p><strong>Tests catch contract bugs, but only if the tests are
+correct.</strong> The ring buffer bug would have shipped to production
+if we hadn’t fixed the test that was (correctly) catching it. Failing
+tests aren’t just noise — sometimes they’re the canary.</p></li>
+</ol>
+<hr />
+<p><em>VibeSwap is an omnichain DEX built on LayerZero V2 that
+eliminates MEV through commit-reveal batch auctions with Shapley
+value-based reward distribution. The full test suite runs 413 tests
+including fuzz tests, invariant tests, and game theory
+simulations.</em></p>
+</body>
+</html>

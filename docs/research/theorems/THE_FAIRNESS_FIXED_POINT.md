@@ -23,7 +23,7 @@ This is the fairness-fixed-point question. It's about iteration, not single roun
 
 ## Why iteration matters
 
-Shapley distribution ([`SHAPLEY_REWARD_SYSTEM.md`](./SHAPLEY_REWARD_SYSTEM.md)) is provably fair for a SINGLE round under specific cooperative-game assumptions.
+Shapley distribution ([`SHAPLEY_REWARD_SYSTEM.md`](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md)) is provably fair for a SINGLE round under specific cooperative-game assumptions.
 
 But VibeSwap runs Shapley ITERATIVELY. Each round's rewards feed back into the trust-graph, which then affects the next round's Shapley computation. This is a feedback loop.
 
@@ -164,7 +164,7 @@ As of 2026-04-22:
 
 Practical implication: VibeSwap is probably operating in a balanced-fixed-point basin. But "probably" is not "proven".
 
-The [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) queues an empirical simulation cycle to verify convergence on a realistic contributor graph. Results will inform whether additional mitigations are needed.
+The [ETM Build Roadmap](../../concepts/etm/ETM_BUILD_ROADMAP.md) queues an empirical simulation cycle to verify convergence on a realistic contributor graph. Results will inform whether additional mitigations are needed.
 
 ## The goal of simulation
 
@@ -242,8 +242,8 @@ This exercise teaches fixed-point intuition via experimentation.
 ## Relationship to other primitives
 
 - **[Novelty Bonus Theorem](./THE_NOVELTY_BONUS_THEOREM.md)**: permutation-symmetric Shapley under-rewards novelty. Modifying Shapley for novelty changes the iteration dynamics — a fresh fixed-point analysis is needed for the modified system.
-- **[The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md)**: `v(S)` estimation errors propagate through iteration. Error bounds on the fixed-point estimate are another research direction.
-- **[Mechanism Composition Algebra](./MECHANISM_COMPOSITION_ALGEBRA.md)**: other mechanisms compose with Shapley iteration; their interactions affect the fixed-point structure.
+- **[The Attribution Problem](../essays/THE_ATTRIBUTION_PROBLEM.md)**: `v(S)` estimation errors propagate through iteration. Error bounds on the fixed-point estimate are another research direction.
+- **[Mechanism Composition Algebra](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md)**: other mechanisms compose with Shapley iteration; their interactions affect the fixed-point structure.
 
 ## One-line summary
 

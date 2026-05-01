@@ -9,7 +9,7 @@
 
 We built a consensus mechanism called **Proof of Mind (PoM)** that makes Sybil attacks asymptotically impossible. The core idea: 60% of a validator's voting power comes from their accumulated, verified cognitive contributions (code, data, governance work) -- not their stake, not their hash rate. Since mind score cannot be bought, rented, or faked -- only earned through genuine work over time -- the cost of attacking a PoM network includes an irreducible amount of *real time spent doing real work*. The older the network gets, the harder it is to attack. We think CKB is the ideal substrate for this mechanism, and this post explains why.
 
-**Full paper:** [Proof of Mind: Hybrid Consensus with Irreducible Temporal Security](../papers/proof-of-mind-consensus.md)
+**Full paper:** [Proof of Mind: Hybrid Consensus with Irreducible Temporal Security](../../../../research/papers/proof-of-mind-consensus.md)
 
 ---
 
@@ -191,8 +191,8 @@ We'd love to hear what the Nervos community thinks:
 
 ## Further Reading
 
-- **Full paper**: [Proof of Mind: Hybrid Consensus with Irreducible Temporal Security](../papers/proof-of-mind-consensus.md)
-- **Mechanism design paper**: [Proof of Mind: A Consensus Mechanism for Contribution-Based Identity](../papers/proof-of-mind-mechanism.md)
+- **Full paper**: [Proof of Mind: Hybrid Consensus with Irreducible Temporal Security](../../../../research/papers/proof-of-mind-consensus.md)
+- **Mechanism design paper**: [Proof of Mind: A Consensus Mechanism for Contribution-Based Identity](../../../../research/papers/proof-of-mind-mechanism.md)
 - **CKB integration paper**: [Nervos and VibeSwap: The Case for CKB as Settlement Layer](nervos-vibeswap-synergy.md)
 - **PoW shared state on CKB**: [PoW Shared State and VibeSwap: Solving Cell Contention](pow-shared-state-vibeswap.md)
 - **Source code**: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)

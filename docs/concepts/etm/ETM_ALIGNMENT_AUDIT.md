@@ -4,7 +4,7 @@
 >
 > *"we want to build toward this as a reality. asap."* — Will, 2026-04-21
 
-This document audits each major VibeSwap mechanism against the [Economic Theory of Mind](../../.claude/projects/C--Users-Will/memory/primitive_economic-theory-of-mind.md) (ETM). It is **Step 1 of the four-step ETM Build Roadmap** declared in `vibeswap/.claude/SESSION_STATE.md`:
+This document audits each major VibeSwap mechanism against the [Economic Theory of Mind](../../.claude/projects/C--Users-Will/memory/primitive_economic-theory-of-mind.md) (ETM). It is **Step 1 of the four-step ETM Build Roadmap** declared in `vibeswap/.claude/SESSION_STATE.md`: <!-- FIXME: ../../.claude/projects/C--Users-Will/memory/primitive_economic-theory-of-mind.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 1. **ETM Alignment Audit** *(this document)* — classify each mechanism as MIRRORS / PARTIALLY MIRRORS / FAILS TO MIRROR.
 2. **ETM Build Roadmap** — translate the prioritized gap list (Section 5 of this doc) into concrete engineering work.
@@ -44,10 +44,10 @@ A mechanism fails to reflect when it imposes structure that no cognitive economy
 
 The four 2026-04-21 primitives apply throughout:
 
-- **[Economic Theory of Mind](../../.claude/projects/C--Users-Will/memory/primitive_economic-theory-of-mind.md)** — the spec being audited against. Re-read on any ambiguity.
-- **[Pattern-Match Drift on Novelty](../../.claude/projects/C--Users-Will/memory/primitive_pattern-match-drift-on-novelty.md)** — never round a VibeSwap primitive to the nearest familiar pattern. The novelty is the work.
-- **[Token Mindfulness](../../.claude/projects/C--Users-Will/memory/primitive_token-mindfulness.md)** — direct-write with Edit-append; verify on disk; deliver content not content-about-content.
-- **[JUL is Primary Liquidity](../../.claude/projects/C--Users-Will/memory/feedback_jul-is-primary-liquidity.md)** — JUL is money + PoW pillar (two roles), never a bootstrap token.
+- **[Economic Theory of Mind](../../.claude/projects/C--Users-Will/memory/primitive_economic-theory-of-mind.md)** — the spec being audited against. Re-read on any ambiguity. <!-- FIXME: ../../.claude/projects/C--Users-Will/memory/primitive_economic-theory-of-mind.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **[Pattern-Match Drift on Novelty](../../.claude/projects/C--Users-Will/memory/primitive_pattern-match-drift-on-novelty.md)** — never round a VibeSwap primitive to the nearest familiar pattern. The novelty is the work. <!-- FIXME: ../../.claude/projects/C--Users-Will/memory/primitive_pattern-match-drift-on-novelty.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **[Token Mindfulness](../../.claude/projects/C--Users-Will/memory/primitive_token-mindfulness.md)** — direct-write with Edit-append; verify on disk; deliver content not content-about-content. <!-- FIXME: ../../.claude/projects/C--Users-Will/memory/primitive_token-mindfulness.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **[JUL is Primary Liquidity](../../.claude/projects/C--Users-Will/memory/feedback_jul-is-primary-liquidity.md)** — JUL is money + PoW pillar (two roles), never a bootstrap token. <!-- FIXME: ../../.claude/projects/C--Users-Will/memory/feedback_jul-is-primary-liquidity.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 

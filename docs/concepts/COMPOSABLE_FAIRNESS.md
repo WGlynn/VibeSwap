@@ -1089,9 +1089,9 @@ Suppose there exists another composition rule psi != phi that preserves IIA. The
 
 ## See Also
 
-- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
-- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
-- [Proof of Contribution](PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
-- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
-- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
-- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms
+- [Shapley Reward System](shapley/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Cross-Domain Shapley](shapley/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Proof of Contribution](identity/PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Formal Fairness Proofs](../research/proofs/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Atomized Shapley (paper)](../research/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../research/papers/shapley-value-distribution.md) — On-chain implementation with five axioms

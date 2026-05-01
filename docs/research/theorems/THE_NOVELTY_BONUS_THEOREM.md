@@ -127,7 +127,7 @@ QED (informally).
 
 Important: the Novelty Bonus doesn't inflate the total pool. It re-distributes within the existing pool. High-novelty contributors get more; low-novelty contributors get less. Total unchanged.
 
-This keeps P-001 ([No Extraction Axiom](./NO_EXTRACTION_AXIOM.md)) satisfied. No new value created; existing value just re-allocated with a novelty-weighted measure.
+This keeps P-001 ([No Extraction Axiom](../../concepts/NO_EXTRACTION_AXIOM.md)) satisfied. No new value created; existing value just re-allocated with a novelty-weighted measure.
 
 ## The similarity function
 
@@ -166,7 +166,7 @@ The aggregation is ETM-aligned: multi-source consensus via weighted aggregation.
 
 ## Why this matters for VibeSwap
 
-The [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #2 specifically identifies this: plain Shapley under-rewards novelty. The fix is to extend `ShapleyDistributor.computeShare` with a novelty bonus.
+The [ETM Build Roadmap](../../concepts/etm/ETM_BUILD_ROADMAP.md) Gap #2 specifically identifies this: plain Shapley under-rewards novelty. The fix is to extend `ShapleyDistributor.computeShare` with a novelty bonus.
 
 This is not a tuning preference. It's a theorem-consequence:
 - Plain Shapley provably fails to distinguish novel from replicated.
@@ -225,9 +225,9 @@ Do the math by hand; verify the reasoning.
 
 ## Relationship to other mechanisms
 
-- **[Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md)**: the underlying fairness. Novelty Bonus is a modifier on top.
-- **[Lawson Floor](./THE_LAWSON_FLOOR_MATHEMATICS.md)**: ensures every attributed contributor gets at least a floor. Composes with Novelty Bonus: floor protects low-novelty contributors from zero-reward; bonus rewards high-novelty above the floor.
-- **[Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md)**: provides the source-timestamps needed to compute novelty.
+- **[Shapley Reward System](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md)**: the underlying fairness. Novelty Bonus is a modifier on top.
+- **[Lawson Floor](../proofs/THE_LAWSON_FLOOR_MATHEMATICS.md)**: ensures every attributed contributor gets at least a floor. Composes with Novelty Bonus: floor protects low-novelty contributors from zero-reward; bonus rewards high-novelty above the floor.
+- **[Contribution Traceability](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md)**: provides the source-timestamps needed to compute novelty.
 
 ## One-line summary
 

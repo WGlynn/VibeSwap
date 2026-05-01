@@ -167,11 +167,11 @@ This is PoM in practice. Non-code work → on-chain credit → economic reward.
 
 ## Relationship to the Lawson Constant
 
-[Lawson Constant](./LAWSON_CONSTANT.md): "the greatest idea cannot be stolen because part of it is admitting who came up with it."
+[Lawson Constant](../research/proofs/LAWSON_CONSTANT.md): "the greatest idea cannot be stolen because part of it is admitting who came up with it."
 
 Applied: non-code provenance is first-class attribution data. An idea attributed to Alice earns her credit; removing the attribution would violate the Lawson Constant (hardcoded in bytecode).
 
-The Constant is the philosophical statement; PoM is its operational mechanism; NCI is its integration into consensus; [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) is its workflow.
+The Constant is the philosophical statement; PoM is its operational mechanism; NCI is its integration into consensus; [Contribution Traceability](identity/CONTRIBUTION_TRACEABILITY.md) is its workflow.
 
 ## For external contributors
 
@@ -185,7 +185,7 @@ Yes. If you:
 
 All of these are computational work. All of these are DAG-creditable. All of these earn rewards proportional to marginal contribution.
 
-[Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) is the workflow that makes your contribution visible. Start there.
+[Contribution Traceability](identity/CONTRIBUTION_TRACEABILITY.md) is the workflow that makes your contribution visible. Start there.
 
 ## For students
 
@@ -205,7 +205,7 @@ Compare the two distributions. Note the ones under-credited by code-only.
 ## Relationship to other primitives
 
 - **Parent**: ETM — cognitive-economic processes are the substrate.
-- **Applied via**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) — how non-code work gets attributed.
+- **Applied via**: [Contribution Traceability](identity/CONTRIBUTION_TRACEABILITY.md) — how non-code work gets attributed.
 - **Counter-evidence for**: "only code counts" frame.
 
 ## One-line summary

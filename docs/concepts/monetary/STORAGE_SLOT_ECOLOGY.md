@@ -2,7 +2,7 @@
 
 **Status**: Pedagogical deep-dive on UUPS upgrade-discipline for long-arc contract durability.
 **Audience**: Smart-contract engineers. First-encounter with UUPS is OK.
-**Related**: [Post-Upgrade Init Gate](../memory/primitive_post-upgrade-initialization-gate.md), [Mechanism Composition Algebra](./MECHANISM_COMPOSITION_ALGEBRA.md), [The Long Now of Contribution](./THE_LONG_NOW_OF_CONTRIBUTION.md).
+**Related**: [Post-Upgrade Init Gate](../memory/primitive_post-upgrade-initialization-gate.md), [Mechanism Composition Algebra](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md), [The Long Now of Contribution](../../research/essays/THE_LONG_NOW_OF_CONTRIBUTION.md). <!-- FIXME: ../memory/primitive_post-upgrade-initialization-gate.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -218,7 +218,7 @@ This is why VibeSwap bothers with NatSpec on every gap-shrink. Long-arc insuranc
 
 ## Relationship to Cincinnatus Test
 
-[Disintermediation Grades](./DISINTERMEDIATION_GRADES.md) Cincinnatus Test: "If Will disappeared tomorrow, does this still work?"
+[Disintermediation Grades](../DISINTERMEDIATION_GRADES.md) Cincinnatus Test: "If Will disappeared tomorrow, does this still work?"
 
 Applied to upgrades: if the upgrade-documentation is only in Will's head, future engineers must re-derive it (at risk of mistakes) or avoid upgrades (stagnation).
 

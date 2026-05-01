@@ -451,8 +451,8 @@ Total coordination-plane code: ~2,300 lines of JavaScript. Total token cost of c
 
 ## See Also
 
-- [Three-Token Economy](../../DOCUMENTATION/THREE_TOKEN_ECONOMY.md) — Token architecture
-- [Economitra](../../DOCUMENTATION/ECONOMITRA.md) — Economic model framework
+- [Three-Token Economy](../../concepts/monetary/THREE_TOKEN_ECONOMY.md) — Token architecture
+- [Economitra](ECONOMITRA.md) — Economic model framework
 - [Economitra (paper)](ECONOMITRA.md) — Academic treatment with formal proofs
-- [Time-Neutral Tokenomics](../../DOCUMENTATION/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness
+- [Time-Neutral Tokenomics](../../concepts/monetary/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness
 - [Cooperative Emission Design](cooperative-emission-design.md) — Emission mechanism design

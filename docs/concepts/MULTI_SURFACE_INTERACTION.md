@@ -253,7 +253,7 @@ If N > 3 mechanisms involve cross-surface composition, extract to `memory/primit
 ## Relationship to other primitives
 
 - **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — single-surface rent curve. Multi-surface is what happens when many are composed.
-- **Rotation Invariant** (see [`ROTATION_INVARIANT.md`](./ROTATION_INVARIANT.md)) — each surface rotates independently; composition must preserve rotation guarantees.
+- **Rotation Invariant** (see [`ROTATION_INVARIANT.md`](../research/theorems/ROTATION_INVARIANT.md)) — each surface rotates independently; composition must preserve rotation guarantees.
 - **Augmented Governance** — composition rules are governance-tunable within bounds.
 - **Phase Transition Design** — phase transitions may need cross-surface coordination.
 

@@ -126,7 +126,7 @@ In CKB: rent = tokens. Payment-failure = deposit runs out.
 
 ### Where it matters
 
-VibeSwap uses state-rent-like mechanics in the [NCI Weight Function](./NCI_WEIGHT_FUNCTION.md). Contributor mind-scores decay without activity; active contribution refreshes them. Same pattern as cognitive memory.
+VibeSwap uses state-rent-like mechanics in the [NCI Weight Function](../identity/NCI_WEIGHT_FUNCTION.md). Contributor mind-scores decay without activity; active contribution refreshes them. Same pattern as cognitive memory.
 
 ## Bijection 4 — Multi-Agent Consensus ↔ NCI Weight Function
 

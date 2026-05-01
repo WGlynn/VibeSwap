@@ -2,7 +2,7 @@
 
 **Status**: Operational discipline. Proactive character trait.
 **Audience**: First-encounter OK. Contributor-facing.
-**Primitive**: [`memory/primitive_token-mindfulness.md`](../memory/primitive_token-mindfulness.md)
+**Primitive**: [`memory/primitive_token-mindfulness.md`](../memory/primitive_token-mindfulness.md) <!-- FIXME: ../memory/primitive_token-mindfulness.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -109,7 +109,7 @@ Constraints are forcing functions for cleverness:
 - Under budget, reader gets insight faster. Compounds across many reader-turns.
 - Under budget, the document survives context compression better.
 
-This is [The Cave Philosophy](../.claude/CLAUDE.md#the-cave-philosophy-never-compress---core-alignment) applied to output: the constraint of a tight budget selects for engineers who express compactly — a durable skill even when budgets relax.
+This is [The Cave Philosophy](../.claude/CLAUDE.md#the-cave-philosophy-never-compress---core-alignment) applied to output: the constraint of a tight budget selects for engineers who express compactly — a durable skill even when budgets relax. <!-- FIXME: ../.claude/CLAUDE.md#the-cave-philosophy-never-compress---core-alignment — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ## How to apply — at every generation boundary
 
@@ -165,9 +165,9 @@ Token Mindfulness isn't just for THIS doc or THIS session. At scale, it's meanin
 
 ## Relationship to other disciplines
 
-- **Detected failure mode**: [Pattern-Match Drift](./PATTERN_MATCH_DRIFT.md) — reactive detection; Token Mindfulness is proactive prevention.
-- **Parent discipline**: [Density First](./DENSITY_FIRST.md) — compactness as default.
-- **Related feedback**: [No Hedging](../memory/feedback_no-hedging-language.md), [Lead with the Crux](../memory/feedback_lead-with-the-crux.md), [Frank / Be Human](../memory/feedback_frank-be-human.md).
+- **Detected failure mode**: [Pattern-Match Drift](../PATTERN_MATCH_DRIFT.md) — reactive detection; Token Mindfulness is proactive prevention.
+- **Parent discipline**: [Density First](../DENSITY_FIRST.md) — compactness as default.
+- **Related feedback**: [No Hedging](../memory/feedback_no-hedging-language.md), [Lead with the Crux](../memory/feedback_lead-with-the-crux.md), [Frank / Be Human](../memory/feedback_frank-be-human.md). <!-- FIXME: ../memory/feedback_no-hedging-language.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --> <!-- FIXME: ../memory/feedback_lead-with-the-crux.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --> <!-- FIXME: ../memory/feedback_frank-be-human.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 All favor compact, direct communication over fluency-padded verbosity.
 

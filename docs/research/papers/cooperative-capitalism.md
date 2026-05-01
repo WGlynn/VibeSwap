@@ -388,6 +388,6 @@ Total: 1,200+ Solidity tests passing. Zero invariant violations across millions 
 
 ## See Also
 
-- [Cooperative Markets Philosophy](../../DOCUMENTATION/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation using multilevel selection theory
-- [Cooperative Intelligence Protocol](../../DOCUMENTATION/COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation and defection resistance
-- [Augmented Governance](../../DOCUMENTATION/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Cooperative Markets Philosophy](../../concepts/ai-native/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation using multilevel selection theory
+- [Cooperative Intelligence Protocol](../../concepts/ai-native/COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation and defection resistance
+- [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory

@@ -82,7 +82,7 @@ State-rent funds the substrate; governance manages the protocol. Under collapse,
 
 Fee levels become a governance parameter set by BENEFICIARIES. Governance can vote to reduce their own state-rent while leaving user-storage-costs high.
 
-This breaks [Augmented Governance](./AUGMENTED_GOVERNANCE.md): state-rent should be Physics (substrate-enforced), not Governance (vote-tuned). Collapsing violates the hierarchy.
+This breaks [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md): state-rent should be Physics (substrate-enforced), not Governance (vote-tuned). Collapsing violates the hierarchy.
 
 ### Collapse 3: Money + State-rent (two tokens: JUL-CKB + VIBE)
 
@@ -137,7 +137,7 @@ Without that context, "three tokens" seems arbitrary. With it, "one token" or "t
 
 ## The cognitive-economy grounding
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognition has three economic layers:
+Under [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md), cognition has three economic layers:
 
 1. **Exchange medium** — tokens of immediate value (pleasure, motivation). Moment-to-moment decisions use this.
 2. **Coordination authority** — shared norms, implicit voting (status, alliances). Social decisions use this.
@@ -172,7 +172,7 @@ Coupling between tokens limited to: economic flows (trades via AMMs) and operati
 
 ## Relationship to Augmented Governance
 
-[Augmented Governance](./AUGMENTED_GOVERNANCE.md) specifies Physics > Constitution > Governance. Three-token separation implements this:
+[Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md) specifies Physics > Constitution > Governance. Three-token separation implements this:
 
 - **Physics** = CKB-native substrate (state-rent, storage economics, mathematical invariants).
 - **Constitution** = JUL (monetary axioms, PoW-objectivity — enforced, not voted).

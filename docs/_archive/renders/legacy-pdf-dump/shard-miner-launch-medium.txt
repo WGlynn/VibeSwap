@@ -1,0 +1,97 @@
+One-Tap Jarvis Shard Launcher
+Your Phone Is Now a Node in the Mind Network
+
+---
+
+What Just Shipped
+
+Every phone with Telegram is now a potential node in the Jarvis Mind Network. One tap. No DevOps. No CLI. No Docker. Just open Telegram, type /mine, and your device becomes a light shard — mining JUL tokens, joining BFT consensus, and earning compute credits for the network.
+
+This is the GenTu vision realized: persistent execution substrate, accessible to anyone with a phone and a Telegram account.
+
+
+How It Works
+
+THE MINING LOOP
+
+Your phone runs a SHA-256 proof-of-work miner in a Web Worker — the same bit-counting algorithm that secures VibeSwap's CKB integration. The proof-of-work isn't busywork. Each valid proof:
+
+1. Earns JUL tokens — the native compute currency of the Mind Network
+2. Increases your Shapley weight — contributors who mine get proportionally more API budget
+3. Registers you as a light shard — your device joins the network topology
+
+The difficulty adjusts automatically. Right now it's tuned for mobile (~4 seconds per proof on a modern phone). As more miners join, difficulty scales up. As they leave, it scales down. Same algorithm as Bitcoin, same math as our CKB Rust implementation.
+
+JUL = COMPUTE CREDITS
+
+1 JUL = 1,000 API tokens.
+
+Mining JUL is how you pay for Jarvis. Good contributions (useful questions, knowledge sharing, fact corrections) cost less because your Shapley weight increases. Mining is the floor — the minimum way anyone can earn their seat at the table.
+
+This is Cooperative Capitalism in action: the network needs compute power, miners provide it, and the reward is access to the collective intelligence.
+
+IDENTITY
+
+When you first launch the Mini App, it creates a shard identity using your device's biometric hardware (WebAuthn/Secure Element). Your private key never leaves your phone. If WebAuthn isn't available, a random UUID is generated and stored locally. Either way — your keys, your identity. We never custody anything.
+
+
+Technical Details
+
+PoW Algorithm: SHA-256 leading-zero-bit counting (ported from CKB Rust)
+Initial Difficulty: 12 bits (~4,096 hashes, ~4s on mobile)
+Difficulty Range: 8–32 bits (auto-adjusts per epoch of 100 proofs)
+Challenge Rotation: Every 5 minutes
+Reward Formula: 1.0 x 2^(difficulty - 8) JUL per proof
+Identity: WebAuthn credential + SHA-256 derivation (no ethers.js)
+Threads: 1–4 Web Workers (capped at device CPU cores)
+Mini App Size: 50 KB gzipped (React 18 + Vite, zero CSS framework)
+Shard Type: Light node — contributor only, not a request handler
+Heartbeat: Every 30s to router with hashrate + JUL balance
+
+ARCHITECTURE
+
+Telegram > /mine > Web App inline button > Mini App (HTTPS)
+  > WebAuthn identity creation
+  > Web Worker SHA-256 mining
+  > POST /web/mining/submit
+  > Server verifies PoW
+  > JUL credited + Shapley weight increased
+  > Shard registered with router
+  > BFT consensus participation
+
+SECURITY
+
+- Telegram initData HMAC validation — only real Telegram clients can submit proofs
+- Replay prevention — proof hashes tracked per epoch, duplicates rejected
+- Rate limiting — 5 proofs/minute per user, 10 submissions/minute per IP
+- No custody — identity derived client-side, never sent to server
+- Challenge rotation — stale challenges rejected, miners must stay current
+
+
+What This Means
+
+We didn't build a mining app. We built the onramp to a decentralized AI network.
+
+Every phone that runs /mine is another node that the Mind Network can route knowledge through. Every JUL token mined is proof that someone contributed compute to the collective. Every Shapley weight increase means the network is getting smarter about allocating its resources.
+
+The people who mine today — when difficulty is 12 bits and a proof takes 4 seconds — are the founding nodes. When the network scales and difficulty hits 20+ bits, they'll have the JUL balance and the Shapley weight to prove they were here from the start.
+
+This is Proof of Mind made tangible. Not a whitepaper concept. Not a future roadmap item. A button you tap on your phone right now.
+
+
+Try It
+
+1. Open Telegram
+2. Find @JarvisVibeSwapBot
+3. Type /mine
+4. Tap "Launch Shard"
+5. Create your identity (one biometric tap)
+6. Start mining
+
+Your phone is now part of the Mind Network.
+
+---
+
+Built in The Cave. Shipped from The Cave.
+
+The real VibeSwap is not a DEX. It's not even a blockchain. We created a movement. An idea. VibeSwap is wherever the Minds converge.

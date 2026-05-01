@@ -269,7 +269,7 @@ Burned tokens go to protocol treasury or a "security bounty" pool incentivizing 
 - **Replay attacks**: without nonce + chain ID, a signature could be replayed across chains. EIP-712 domain separator prevents this (includes chain ID + contract address).
 - **Signature malleability**: use canonical signature form (e.g., OpenZeppelin's ECDSA.recover with S-value check).
 - **Front-running**: attestors can be front-run if their submission is visible before inclusion. Mitigation: private mempool submissions for high-stakes claims.
-- **Sybil attacks**: multiple accounts acting as one attestor. Mitigation: attestor certification (see [`SOULBOUND_IDENTITY.md`](./SOULBOUND_IDENTITY.md) if it exists, or certification-via-governance).
+- **Sybil attacks**: multiple accounts acting as one attestor. Mitigation: attestor certification (see [`SOULBOUND_IDENTITY.md`](./SOULBOUND_IDENTITY.md) if it exists, or certification-via-governance). <!-- FIXME: ./SOULBOUND_IDENTITY.md — no candidate found in docs/ tree. -->
 - **Bond drainage**: an attestor could exhaust their bond by rapid wrong attestations. Mitigation: rate-limit attestations per attestor; require fresh bond after slashing events.
 
 ## Integration with Gap #3 (Attested Resume)
@@ -296,7 +296,7 @@ Gap #2 C42 uses claim type `keccak256("similarity")`:
 - `domainData`: `(uint256 similarityScaled, bytes32 functionCommitment)`.
 
 Required bond: 500 tokens.
-Commitment reference ties this claim to a specific similarity function (see [`COMMIT_REVEAL_FOR_ORACLES.md`](./COMMIT_REVEAL_FOR_ORACLES.md)).
+Commitment reference ties this claim to a specific similarity function (see [`COMMIT_REVEAL_FOR_ORACLES.md`](../oracles/COMMIT_REVEAL_FOR_ORACLES.md)).
 
 ## Future work — concrete code cycles
 
@@ -319,8 +319,8 @@ If 5+ claim types live under the schema, extract to `memory/primitive_attestatio
 ## Relationship to other primitives
 
 - **Attested Resume** (see [`ATTESTED_RESUME.md`](./ATTESTED_RESUME.md)) — Gap #3, uses `resume` claim type.
-- **Similarity Keeper Design** (see [`SIMILARITY_KEEPER_DESIGN.md`](./SIMILARITY_KEEPER_DESIGN.md)) — Gap #2, uses `similarity` claim type.
-- **Commit-Reveal for Oracles** (see [`COMMIT_REVEAL_FOR_ORACLES.md`](./COMMIT_REVEAL_FOR_ORACLES.md)) — similarity claims reference committed functions.
+- **Similarity Keeper Design** (see [`SIMILARITY_KEEPER_DESIGN.md`](../../architecture/SIMILARITY_KEEPER_DESIGN.md)) — Gap #2, uses `similarity` claim type.
+- **Commit-Reveal for Oracles** (see [`COMMIT_REVEAL_FOR_ORACLES.md`](../oracles/COMMIT_REVEAL_FOR_ORACLES.md)) — similarity claims reference committed functions.
 - **Contribution DAG Explainer** — uses existing contribution claim type, migrates to this schema.
 - **Augmented Governance** — claim verification is math-enforced; claim semantics are governance-controlled.
 

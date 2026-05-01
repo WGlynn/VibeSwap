@@ -2,7 +2,7 @@
 
 **Status**: Research direction + design sketch.
 **Depth**: Pedagogical. Assumes first-encounter with zero-knowledge proofs; builds to concrete VibeSwap application.
-**Related**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md), [ContributionAttestor Explainer](./CONTRIBUTION_ATTESTOR_EXPLAINER.md), [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md).
+**Related**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md), [ContributionAttestor Explainer](./CONTRIBUTION_ATTESTOR_EXPLAINER.md), [The Attribution Problem](../../research/essays/THE_ATTRIBUTION_PROBLEM.md).
 
 ---
 

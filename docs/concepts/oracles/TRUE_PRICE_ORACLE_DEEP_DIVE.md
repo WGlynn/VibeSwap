@@ -2,7 +2,7 @@
 
 **Status**: Pedagogical implementation deep-dive.
 **Audience**: Engineers, auditors, curious students. First-encounter with oracle design is OK.
-**Related**: [Kalman Filter Oracle](./KALMAN_FILTER_ORACLE.md), [True Price Oracle](./TRUE_PRICE_ORACLE.md), [GEV Resistance](./GEV_RESISTANCE.md).
+**Related**: [Kalman Filter Oracle](./KALMAN_FILTER_ORACLE.md), [True Price Oracle](./TRUE_PRICE_ORACLE.md), [GEV Resistance](../security/GEV_RESISTANCE.md).
 
 ---
 
@@ -160,11 +160,11 @@ Batch updates: aggregate multiple price feeds in a single commit-reveal cycle. A
 
 ## Why the C39 design is an ETM-alignment win
 
-The original deviation gate used a fixed percentage (5%) which is a arbitrary number. Arbitrary numbers rarely match substrate geometry ([Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) principle).
+The original deviation gate used a fixed percentage (5%) which is a arbitrary number. Arbitrary numbers rarely match substrate geometry ([Substrate-Geometry Match](../SUBSTRATE_GEOMETRY_MATCH.md) principle).
 
 The commit-reveal design has no arbitrary numbers. Manipulation resistance comes from the protocol structure itself — operators can't bias because the protocol structurally prevents bias. Cleaner, more defensible, matches the substrate's geometry (markets are commitment-based, commit-reveal mirrors that).
 
-Classified as ETM MIRRORS in the [ETM Alignment Audit](./ETM_ALIGNMENT_AUDIT.md).
+Classified as ETM MIRRORS in the [ETM Alignment Audit](../etm/ETM_ALIGNMENT_AUDIT.md).
 
 ## How to read the actual code
 

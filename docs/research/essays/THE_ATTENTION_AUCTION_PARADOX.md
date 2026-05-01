@@ -161,7 +161,7 @@ But the trade vs. deeper alternatives (family, rest, physical activity) may NOT 
 
 ## Relationship to cognitive economy
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), healthy cognition routes attention to activities that compound over time. Pathological cognition routes attention to immediate-pleasure activities that degrade over time.
+Under [Economic Theory of Mind](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md), healthy cognition routes attention to activities that compound over time. Pathological cognition routes attention to immediate-pleasure activities that degrade over time.
 
 VibeSwap's positive-sum architecture is the on-chain reflection of healthy-cognition pattern. Compounding outputs over time; value-per-attention-unit optimization; cross-substrate routing.
 
@@ -186,8 +186,8 @@ Observe: most people are NOT routing to positive-sum uses. Routing improvements 
 
 ## Relationship to other primitives
 
-- **Parent**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — attention IS the rival substrate.
-- **Applications**: [Siren Protocol](./SIREN_PROTOCOL.md) (engagement-until-exhaustion for attackers), [Attention as Infrastructure](./ATTENTION_AS_INFRASTRUCTURE.md).
+- **Parent**: [Economic Theory of Mind](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md) — attention IS the rival substrate.
+- **Applications**: [Siren Protocol](../../concepts/security/SIREN_PROTOCOL.md) (engagement-until-exhaustion for attackers), [Attention as Infrastructure](../../concepts/ATTENTION_AS_INFRASTRUCTURE.md).
 - **Positioning**: tagline "coordination primitive, not casino" distinguishes positive-sum trajectory.
 
 ## One-line summary

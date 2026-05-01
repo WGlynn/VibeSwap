@@ -37,7 +37,7 @@ Let's figure out what K(attribution) looks like.
 
 ## The structure of one attribution
 
-Per [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md), each claim has:
+Per [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md), each claim has:
 
 - Contributor address: 20 bytes.
 - ContributionType enum: 1 byte (but really 3-4 bits needed for 9 values).
@@ -202,7 +202,7 @@ There's an ethical dimension to long-arc attribution storage. If the protocol pr
 
 A protocol that collects attributions and then garbage-collects them at 10 years is breaking an implicit commitment.
 
-VibeSwap's three-tier architecture + CKB state-rent model ([Three-Token Economy](./THREE_TOKEN_ECONOMY.md)) provides a sustainable answer:
+VibeSwap's three-tier architecture + CKB state-rent model ([Three-Token Economy](../../concepts/monetary/THREE_TOKEN_ECONOMY.md)) provides a sustainable answer:
 
 - Hot tier claims stay on-chain with state-rent.
 - Warm tier migrated to L2 + Merkle-anchored.

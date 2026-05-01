@@ -9,7 +9,7 @@
 
 DeFi is fragmented. Dozens of protocols each handle one primitive -- Uniswap for AMM, Aave for lending, Synthetix for synths -- and composing them requires brittle integrations that expand attack surface, leak MEV, and create UX nightmares. **VSOS (VibeSwap Operating System)** is a unified financial operating system: 98 contracts organized into 7 composable layers. Built-in apps ship with the OS (AMM, batch auctions, insurance, synths, credit, bonds, streaming, options). A plugin registry enables permissionless third-party extensions. A hook system injects custom logic at six protocol-level points. UUPS upgradeability with opt-in versioning keeps the core lean. The analogy is iOS: built-in apps come first, the app store enables innovation, the lean kernel keeps it secure. We think CKB's cell model provides a superior substrate for this architecture, and this post explains why.
 
-**Full paper:** [VSOS: The Financial Operating System](../papers/vsos-financial-operating-system.md)
+**Full paper:** [VSOS: The Financial Operating System](../../../../research/papers/vsos-financial-operating-system.md)
 
 ---
 
@@ -270,7 +270,7 @@ New curve types: one contract, zero core changes. New hooks: one contract, zero 
 
 ## Further Reading
 
-- **Full paper**: [VSOS: The Financial Operating System](../papers/vsos-financial-operating-system.md)
+- **Full paper**: [VSOS: The Financial Operating System](../../../../research/papers/vsos-financial-operating-system.md)
 - **CKB MEV defense**: [Cell Model MEV Defense](cell-model-mev-defense.md)
 - **Cooperative capitalism**: [Cooperative Capitalism post](cooperative-capitalism-post.md)
 - **Commit-reveal auctions**: [Commit-Reveal Batch Auctions post](commit-reveal-batch-auctions-post.md)

@@ -189,7 +189,7 @@ Applying phase transitions where they don't belong creates artificial instabilit
 
 ## Integration with mirror tests
 
-Mirror tests (see [`ETM_MIRROR_TEST.md`](./ETM_MIRROR_TEST.md)) should assert phase-transition location:
+Mirror tests (see [`ETM_MIRROR_TEST.md`](../concepts/etm/ETM_MIRROR_TEST.md)) should assert phase-transition location:
 
 ```solidity
 function test_NCI_PhaseTransition() public {
@@ -223,11 +223,11 @@ Extract to `memory/primitive_phase-transition-design.md` as a design principle: 
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — α controls phase-transition for convex-rent curves.
-- **Convex Retention Derivation** (see [`CONVEX_RETENTION_DERIVATION.md`](./CONVEX_RETENTION_DERIVATION.md)) — calibrates α based on substrate, thus phase-transition location.
-- **ETM Mirror Test** (see [`ETM_MIRROR_TEST.md`](./ETM_MIRROR_TEST.md)) — phase-transition assertions complement endpoint tests.
-- **Fibonacci Scaling** (see [`FIBONACCI_SCALING.md`](./FIBONACCI_SCALING.md)) — discrete phase transitions at retracement levels.
-- **Circuit Breaker Design** (see [`CIRCUIT_BREAKER_DESIGN.md`](./CIRCUIT_BREAKER_DESIGN.md)) — discrete phase transitions with hysteresis.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../concepts/ATTENTION_SURFACE_SCALING.md)) — α controls phase-transition for convex-rent curves.
+- **Convex Retention Derivation** (see [`CONVEX_RETENTION_DERIVATION.md`](../research/theorems/CONVEX_RETENTION_DERIVATION.md)) — calibrates α based on substrate, thus phase-transition location.
+- **ETM Mirror Test** (see [`ETM_MIRROR_TEST.md`](../concepts/etm/ETM_MIRROR_TEST.md)) — phase-transition assertions complement endpoint tests.
+- **Fibonacci Scaling** (see [`FIBONACCI_SCALING.md`](../concepts/security/FIBONACCI_SCALING.md)) — discrete phase transitions at retracement levels.
+- **Circuit Breaker Design** (see [`CIRCUIT_BREAKER_DESIGN.md`](../concepts/security/CIRCUIT_BREAKER_DESIGN.md)) — discrete phase transitions with hysteresis.
 
 ## How this doc feeds the Code↔Text Inspiration Loop
 

@@ -155,7 +155,7 @@ These primitives are the intellectual DNA of the project. The code can be forked
 ### P-012: Proof of Mind — Contribution Proves Individuality
 
 **Source**: SoulboundIdentity.sol, ContributionDAG.sol, AgentRegistry.sol
-**Paper**: [Proof of Mind Manifesto](../proof-of-mind-manifesto.md)
+**Paper**: [Proof of Mind Manifesto](../essays/proof-of-mind-manifesto/proof-of-mind-manifesto.md)
 
 > Any contributing mind — human or AI — can claim proportional rewards, as long as proof of mind individuality is at consensus. The test is contribution, not consciousness.
 
@@ -214,7 +214,7 @@ When a new primitive emerges from a build session:
 ### P-028: Stability Requires Three Instruments Operating at Different Timescales
 
 **Source**: Trinomial Stability Theorem (wBAR + PI-dampened stable + elastic rebasing token)
-**Paper**: [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM/TRINOMIAL_STABILITY_THEOREM.md)
+**Paper**: [Trinomial Stability Theorem](../theorems/TRINOMIAL_STABILITY_THEOREM.md)
 
 > One monetary instrument cannot achieve stability. Two can dampen but not eliminate volatility. Three instruments — each operating at a different timescale (PoW anchors to physical cost long-term, PI-controller smooths medium-term oscillations, elastic rebase absorbs short-term demand shocks) — converge to a volatility floor bounded by real-world energy costs.
 
@@ -225,7 +225,7 @@ When a new primitive emerges from a build session:
 ### P-029: The Volatile Base is DeFi's Original Sin
 
 **Source**: Trinomial Stability Theorem, VibeCredit.sol, VibeBonds.sol
-**Paper**: [Trinomial Stability Theorem](../TRINOMIAL_STABILITY_THEOREM/TRINOMIAL_STABILITY_THEOREM.md)
+**Paper**: [Trinomial Stability Theorem](../theorems/TRINOMIAL_STABILITY_THEOREM.md)
 
 > Every DeFi lending protocol overcollateralizes because the base collateral is volatile. 150% collateral ratios exist because ETH can lose 50% in days. This is not a parameter to optimize — it is a structural defect. Fix the base layer (stable collateral grounded in physical reality), and overcollateralization, liquidation cascades, and adverse selection disappear.
 
@@ -299,7 +299,7 @@ When a new primitive emerges from a build session:
 ### P-036: Your Keys, Your Bitcoin — Self-Custody as Design Axiom
 
 **Source**: Wallet Security Fundamentals (Will's 2018 Paper), useDeviceWallet.jsx
-**Paper**: [Wallet Security Fundamentals](../wallet-security-fundamentals-2018.md)
+**Paper**: [Wallet Security Fundamentals](../essays/wallet-security-fundamentals-2018.md)
 
 > Users MUST control their own private keys. Not as a best practice — as a design axiom. Any system that custodies keys on centralized servers is a honeypot. VibeSwap's device wallet uses the Secure Element (keys never leave the hardware). Recovery via user-controlled mechanisms (iCloud backup with PIN encryption), not custodial recovery.
 
@@ -699,7 +699,7 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 ### P-024: Every Request Gets a Response — Cascade, Don't Fail
 
 **Source**: Wardenclyffe Protocol (Layer 6 Inference Cascade)
-**Paper**: [Wardenclyffe Protocol](../protocols/wardenclyffe-protocol.md)
+**Paper**: [Wardenclyffe Protocol](../../concepts/protocols/wardenclyffe-protocol.md)
 
 > A system with 9 providers organized in quality tiers will exhaust all options before admitting failure. Cascade through premium → free → local, normalizing output format at every level. Transparent degradation: users always know the quality level. Economic self-correction: quality degradation creates restoration incentive (users tip to fund better models).
 
@@ -731,7 +731,7 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 ### P-027: Normalize the Interface, Not the Implementation
 
 **Source**: Wardenclyffe Protocol (all 9 providers emit Anthropic-format responses)
-**Paper**: [Wardenclyffe Protocol](../protocols/wardenclyffe-protocol.md)
+**Paper**: [Wardenclyffe Protocol](../../concepts/protocols/wardenclyffe-protocol.md)
 
 > Nine different LLM providers with nine different APIs, response formats, and error handling patterns. One normalized output format. The cascade works because the interface is standardized even though the implementations are wildly different.
 
@@ -742,7 +742,7 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 ### P-016: Intelligence and Coordination are Separate Planes
 
 **Source**: JARVIS Mind Network (Near-Zero Token Model)
-**Paper**: [Near-Zero Token Scaling](../../jarvis-bot/docs/near-zero-token-scaling.md)
+**Paper**: [Near-Zero Token Scaling](near-zero-token-scaling.md)
 
 > Intelligence costs tokens. Coordination doesn't. Separate them. User responses, corrections, inner dialogue — these require LLM calls. BFT voting, knowledge chain hashing, heartbeats, routing — these are HTTP POSTs and SHA-256 hashes. Total cost scales with users (T x U x 1.04), independent of shard count.
 
@@ -1011,7 +1011,7 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 ### P-088: Context-Adaptive State Estimation — The Meta-Estimator
 
 **Source**: oracle/kalman/filter.py, oracle/kalman/covariance.py
-**Paper**: [Kalman Filter True Price Discovery](kalman-filter-true-price-discovery.md)
+**Paper**: [Kalman Filter True Price Discovery](kalman-filter-true-price-discovery.md) <!-- FIXME: kalman-filter-true-price-discovery.md — no candidate found in docs/ tree. -->
 
 > The Kalman filter's noise matrices are dynamically recomputed every cycle based on regime signals (stablecoin flows, leverage stress, cascade detection), making the filter automatically skeptical during manipulation and responsive during genuine trends.
 

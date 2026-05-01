@@ -782,4 +782,4 @@ Range: 50% (new) to 150% (max reputation)
 *VibeSwap - Fair Rewards, Protected Returns, Accountable Participants*
 
 **Related Documents**:
-- [Security Mechanism Design](SECURITY_MECHANISM_DESIGN.md) - Deep dive into anti-fragile security architecture
+- [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Deep dive into anti-fragile security architecture

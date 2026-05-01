@@ -44,7 +44,7 @@ Let me walk through specific attacks attackers actually try. For each, the concr
 
 **Traditional defense**: encrypted mempools, private orderflow. Partial.
 
-**VibeSwap's defense**: [commit-reveal batch auction](./TRUE_PRICE_ORACLE_DEEP_DIVE.md). All orders in a batch commit before any reveal. Orders in the same batch clear at the same uniform price. Fisher-Yates shuffle on XORed secrets determines any ordering needed.
+**VibeSwap's defense**: [commit-reveal batch auction](../oracles/TRUE_PRICE_ORACLE_DEEP_DIVE.md). All orders in a batch commit before any reveal. Orders in the same batch clear at the same uniform price. Fisher-Yates shuffle on XORed secrets determines any ordering needed.
 
 Result: the attacker can't see the victim's intent during commit phase. Can't front-run (doesn't know the victim's order). Can't back-run (same batch pricing; no slippage to capture).
 
@@ -56,7 +56,7 @@ Mathematically impossible within a batch. Structural invariant.
 
 **Historical example**: the Mango Markets exploit (Oct 2022) — manipulated MNGO oracle via low-liquidity markets. ~$100M extracted.
 
-**VibeSwap's defense**: commit-reveal oracle aggregation ([`OracleAggregationCRA`](./TRUE_PRICE_ORACLE_DEEP_DIVE.md)). Multiple operators submit hash(price) commitments; reveal; aggregate via median. No single operator can manipulate because they commit before seeing others.
+**VibeSwap's defense**: commit-reveal oracle aggregation ([`OracleAggregationCRA`](../oracles/TRUE_PRICE_ORACLE_DEEP_DIVE.md)). Multiple operators submit hash(price) commitments; reveal; aggregate via median. No single operator can manipulate because they commit before seeing others.
 
 Plus fork-aware EIP-712 domain separator (C37 work): if an attacker gets a signed oracle update from a forked chain, it won't validate on the real chain.
 
@@ -93,7 +93,7 @@ Result: admin drift becomes legible in real-time. Not prevented structurally but
 
 **VibeSwap's defense**: quadratic voting. Diminishes returns for coordinated voting. Plus constitutional axioms (P-000, P-001) that override governance outcomes if they'd violate fairness.
 
-Plus the Constitutional order (Physics > Constitution > Governance per [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md)). Governance can't override mathematical invariants via voting.
+Plus the Constitutional order (Physics > Constitution > Governance per [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md)). Governance can't override mathematical invariants via voting.
 
 Result: proposal-ordering matters less because governance scope is constrained.
 
@@ -114,7 +114,7 @@ Result: challengers price out of frivolous attacks.
 **Attacker intent**: fake contributions to claim disproportionate Shapley share.
 
 **VibeSwap's defense**:
-- Three-branch attestation ([`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md)) requires peer-validation at Executive, adjudication at Judicial, or supreme override at Legislative.
+- Three-branch attestation ([`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](../identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md)) requires peer-validation at Executive, adjudication at Judicial, or supreme override at Legislative.
 - Fractal Shapley preserves fairness axioms even across sub-games.
 - Lawson Constant anchors attribution structurally.
 
@@ -169,13 +169,13 @@ The table is the differentiation.
 
 GEV is value extracted from users by operators with positional advantages. Each extracted dollar is a dollar the user lost to the operator's better information/positioning. Over time, users notice. Protocols that extract repeatedly lose their user base.
 
-VibeSwap's commitment to P-001 ([`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md)) isn't just slogan. It's structural: the architecture has no extraction surfaces to leverage.
+VibeSwap's commitment to P-001 ([`NO_EXTRACTION_AXIOM.md`](../NO_EXTRACTION_AXIOM.md)) isn't just slogan. It's structural: the architecture has no extraction surfaces to leverage.
 
 Users can trust the protocol to not extract from them. That's a competitive advantage over casino-style DeFi.
 
 ## The Composition Algebra connection
 
-Each of these attacks maps to the composition analysis ([`MECHANISM_COMPOSITION_ALGEBRA.md`](./MECHANISM_COMPOSITION_ALGEBRA.md)):
+Each of these attacks maps to the composition analysis ([`MECHANISM_COMPOSITION_ALGEBRA.md`](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md)):
 
 - Structural invariants compose orthogonally (Case A) or serially (Case B).
 - Economic invariants compose additively — multiple defenses stack costs on attacker.
@@ -186,7 +186,7 @@ The layered defense is deliberately multi-invariant. Attackers have to defeat AL
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), GEV is the cognitive-economy analog of *attention capture* — agents extracting resources disproportionate to value created via positional advantage.
+Under [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md), GEV is the cognitive-economy analog of *attention capture* — agents extracting resources disproportionate to value created via positional advantage.
 
 The cognitive substrate has defenses: memory decay of bad actors, trust-score compounding against extractors. VibeSwap implements these defenses at the chain layer.
 
@@ -206,7 +206,7 @@ Compare to VibeSwap's 10-row GEV table. Note: many protocols don't map to all ro
 ## Relationship to other primitives
 
 - **Parent**: ETM — extraction is a cognitive-economy pathology.
-- **Substrate**: [No Extraction Axiom](./NO_EXTRACTION_AXIOM.md) — the constitutional commitment enforced by GEV-resistance.
+- **Substrate**: [No Extraction Axiom](../NO_EXTRACTION_AXIOM.md) — the constitutional commitment enforced by GEV-resistance.
 - **Instances**: specific mechanisms referenced above (CRA, Oracle, Siren, etc.).
 
 ## One-line summary

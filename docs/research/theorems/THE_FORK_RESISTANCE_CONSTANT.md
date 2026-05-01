@@ -176,7 +176,7 @@ This is NOT a permanent state. If VibeSwap stops delivering value, K_fork can dr
 
 Tempting: copyright the code; patent the mechanisms; restrict the license.
 
-**Resist.** Legal fork-resistance runs counter to open-source ethos and [P-001 No Extraction Axiom](./NO_EXTRACTION_AXIOM.md).
+**Resist.** Legal fork-resistance runs counter to open-source ethos and [P-001 No Extraction Axiom](../../concepts/NO_EXTRACTION_AXIOM.md).
 
 Legal defense:
 - Invites legal attack in return.
@@ -214,7 +214,7 @@ Together, the cost of credible VibeSwap fork is measured in MILLIONS OF DOLLARS 
 
 ## The Cincinnatus pattern
 
-[Cincinnatus Endgame](./CINCINNATUS_ENDGAME.md) describes voluntary return to first principles. A protocol durable long-term is one where governance voluntarily constrains itself to constitutional axioms rather than requiring fork-threat to enforce them.
+[Cincinnatus Endgame](../../concepts/CINCINNATUS_ENDGAME.md) describes voluntary return to first principles. A protocol durable long-term is one where governance voluntarily constrains itself to constitutional axioms rather than requiring fork-threat to enforce them.
 
 The Lawson Constant is the architectural reminder. The Cincinnatus pattern is the cultural reminder. Together they keep K_fork high without requiring confrontation.
 

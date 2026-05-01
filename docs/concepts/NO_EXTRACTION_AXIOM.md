@@ -29,7 +29,7 @@ By 2021-2022, many DEXes had fee schedules of 0.3-1.0% with explicit profit-extr
 
 The drift wasn't a single decision. Each incremental fee increase was "justified." Over 3-5 years, extraction became the business model.
 
-VibeSwap's default fee: 0% (explicit in [`ZERO_FEE_PRINCIPLE_ENFORCEMENT.md`](../memory/feedback_zero-fee-principle-enforcement.md)). Fees for specific purposes (gas, oracle compute) are allowed; fees as revenue extraction are constitutional-violations.
+VibeSwap's default fee: 0% (explicit in [`ZERO_FEE_PRINCIPLE_ENFORCEMENT.md`](../memory/feedback_zero-fee-principle-enforcement.md)). Fees for specific purposes (gas, oracle compute) are allowed; fees as revenue extraction are constitutional-violations. <!-- FIXME: ../memory/feedback_zero-fee-principle-enforcement.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ### Case 2 — Terra/Luna (May 2022)
 
@@ -176,7 +176,7 @@ The axiom operationalizes the tagline at the architectural level.
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive extraction (attention-capture, engagement-farming, shame-based addiction loops) is the cognitive-economy pathology.
+Under [Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md), cognitive extraction (attention-capture, engagement-farming, shame-based addiction loops) is the cognitive-economy pathology.
 
 P-001 is the on-chain constitutional commitment that the externalized economy doesn't replicate these pathologies. If VibeSwap allowed extraction, it would be a faithful reflection of the broken attention-economy — which would disprove ETM's generative value. By prohibiting extraction structurally, VibeSwap demonstrates the cognitive economy CAN run without extractive pathologies if re-built with correct invariants.
 
@@ -198,9 +198,9 @@ Classify each transfer as: transaction, ambiguous, or extraction.
 
 ## Relationship to other primitives
 
-- **Sibling axiom**: [Lawson Constant / P-000](./LAWSON_CONSTANT.md) — attribution is structural. Positive statement. P-001 is the negative (no extraction).
-- **Enforcer**: [Augmented Governance](./AUGMENTED_GOVERNANCE.md) — Physics > Constitution > Governance hierarchy. P-001 sits in Constitution layer.
-- **Consequence**: [GEV Resistance](./GEV_RESISTANCE.md) — P-001 applied to the full category of extraction surfaces.
+- **Sibling axiom**: [Lawson Constant / P-000](../research/proofs/LAWSON_CONSTANT.md) — attribution is structural. Positive statement. P-001 is the negative (no extraction).
+- **Enforcer**: [Augmented Governance](../architecture/AUGMENTED_GOVERNANCE.md) — Physics > Constitution > Governance hierarchy. P-001 sits in Constitution layer.
+- **Consequence**: [GEV Resistance](security/GEV_RESISTANCE.md) — P-001 applied to the full category of extraction surfaces.
 
 ## One-line summary
 

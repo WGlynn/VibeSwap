@@ -142,7 +142,7 @@ Together: every legitimate contribution gets meaningful economic credit + no con
 
 ## The attestation-threshold gate
 
-Lawson Floor doesn't give EVERY claim the floor. Only claims ACCEPTED by the [three-branch attestation flow](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
+Lawson Floor doesn't give EVERY claim the floor. Only claims ACCEPTED by the [three-branch attestation flow](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md).
 
 - Pending claims: not eligible.
 - Rejected claims: not eligible.
@@ -187,7 +187,7 @@ Governance CANNOT:
 
 ## Relationship to Novelty Bonus Theorem
 
-[Novelty Bonus Theorem](./THE_NOVELTY_BONUS_THEOREM.md): permutation-symmetric Shapley under-rewards novelty. Novelty Bonus adds super-linear rewards to novel contributions.
+[Novelty Bonus Theorem](../theorems/THE_NOVELTY_BONUS_THEOREM.md): permutation-symmetric Shapley under-rewards novelty. Novelty Bonus adds super-linear rewards to novel contributions.
 
 Composition with Lawson Floor:
 
@@ -215,7 +215,7 @@ Edge case: if `S < N × F`, total pool < sum of floors. In this rare case, every
 
 ## Relationship to cognitive economy
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognition preserves minor contributions from evict-dominance. Even small memory items retain some persistence-weight. Lawson Floor is the on-chain mirror.
+Under [Economic Theory of Mind](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md), cognition preserves minor contributions from evict-dominance. Even small memory items retain some persistence-weight. Lawson Floor is the on-chain mirror.
 
 Diverse-but-small contributions are preserved over pure-marginal-dominance. Matches cognitive substrate geometry.
 

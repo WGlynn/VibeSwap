@@ -70,7 +70,7 @@ A contribution from 2022 that enables a contribution in 2026 — how much credit
 
 Under plain Shapley: equal (permutation symmetric). Ignores temporal priority.
 
-Under Novelty Bonus (see [`THE_NOVELTY_BONUS_THEOREM.md`](./THE_NOVELTY_BONUS_THEOREM.md)): 2022 gets priority bonus. Better.
+Under Novelty Bonus (see [`THE_NOVELTY_BONUS_THEOREM.md`](../theorems/THE_NOVELTY_BONUS_THEOREM.md)): 2022 gets priority bonus. Better.
 
 But even then: if the 2022 contribution is forgotten by 2032, no one is left to credit it. Lineage fades.
 
@@ -138,13 +138,13 @@ VibeSwap learns: mechanize the allocation via Shapley + trust-graph. Groups of a
 
 VibeSwap's attribution stack combines multiple mechanisms:
 
-1. **Chat-to-DAG Traceability** ([doc](./CONTRIBUTION_TRACEABILITY.md)): captures non-code upstream attribution.
-2. **ContributionAttestor** ([doc](./CONTRIBUTION_ATTESTOR_EXPLAINER.md)): substrate for claim-based attestation with three-branch resolution.
-3. **Shapley Distribution** ([doc](./SHAPLEY_REWARD_SYSTEM.md)): axiomatically-fair reward distribution.
-4. **Lawson Constant** ([doc](./LAWSON_CONSTANT.md)): attribution preserved structurally.
-5. **Lawson Floor** ([doc](./THE_LAWSON_FLOOR_MATHEMATICS.md)): low-novelty contributors still receive economic acknowledgment.
-6. **Novelty Bonus** ([doc](./THE_NOVELTY_BONUS_THEOREM.md)): temporal priority is rewarded.
-7. **ContributionDAG** ([doc](./CONTRIBUTION_DAG_EXPLAINER.md)): trust-weighted verification of attestations.
+1. **Chat-to-DAG Traceability** ([doc](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md)): captures non-code upstream attribution.
+2. **ContributionAttestor** ([doc](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md)): substrate for claim-based attestation with three-branch resolution.
+3. **Shapley Distribution** ([doc](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md)): axiomatically-fair reward distribution.
+4. **Lawson Constant** ([doc](../proofs/LAWSON_CONSTANT.md)): attribution preserved structurally.
+5. **Lawson Floor** ([doc](../proofs/THE_LAWSON_FLOOR_MATHEMATICS.md)): low-novelty contributors still receive economic acknowledgment.
+6. **Novelty Bonus** ([doc](../theorems/THE_NOVELTY_BONUS_THEOREM.md)): temporal priority is rewarded.
+7. **ContributionDAG** ([doc](../../concepts/identity/CONTRIBUTION_DAG_EXPLAINER.md)): trust-weighted verification of attestations.
 
 Each addresses part of the attribution problem. Together they're the most complete stack anyone has built.
 
@@ -174,7 +174,7 @@ Habit of attesting preventive work (deferred issues closed, design memos that na
 
 ### Direction 4 — Long-arc lineage preservation
 
-Substrate-independent preservation of attribution. See [`MIND_PERSISTENCE_MISSION.md`](./MIND_PERSISTENCE_MISSION.md) + [`THE_LONG_NOW_OF_CONTRIBUTION.md`](./THE_LONG_NOW_OF_CONTRIBUTION.md).
+Substrate-independent preservation of attribution. See [`MIND_PERSISTENCE_MISSION.md`](../../concepts/ai-native/MIND_PERSISTENCE_MISSION.md) + [`THE_LONG_NOW_OF_CONTRIBUTION.md`](./THE_LONG_NOW_OF_CONTRIBUTION.md).
 
 Each is an open research direction. VibeSwap doesn't solve all of them. It makes honest progress on each and names the unsolved portions clearly.
 
@@ -201,10 +201,10 @@ This exercise teaches that attribution is complex, historical, and genuinely har
 
 ## Relationship to other primitives
 
-- **Root cause**: [Lawson Constant](./LAWSON_CONSTANT.md) — attribution as structural. The axiom this problem exists to satisfy.
-- **Infrastructure**: [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) — workflow capturing attribution at source.
-- **Substrate**: [ContributionAttestor](./CONTRIBUTION_ATTESTOR_EXPLAINER.md) — on-chain ledger of claims.
-- **Distribution**: [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md) + Novelty Bonus + Lawson Floor — fair distribution based on attribution.
+- **Root cause**: [Lawson Constant](../proofs/LAWSON_CONSTANT.md) — attribution as structural. The axiom this problem exists to satisfy.
+- **Infrastructure**: [Chat-to-DAG Traceability](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md) — workflow capturing attribution at source.
+- **Substrate**: [ContributionAttestor](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md) — on-chain ledger of claims.
+- **Distribution**: [Shapley Reward System](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md) + Novelty Bonus + Lawson Floor — fair distribution based on attribution.
 
 ## One-line summary
 

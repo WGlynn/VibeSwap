@@ -3,12 +3,12 @@
 **Status**: Canonical process. Authoritative.
 **Author**: Will Glynn & JARVIS
 **Origin**: Session 2026-04-21 closing insight.
-**Primitive**: [`memory/primitive_chat-to-dag-traceability.md`](../memory/primitive_chat-to-dag-traceability.md)
+**Primitive**: [`memory/primitive_chat-to-dag-traceability.md`](../memory/primitive_chat-to-dag-traceability.md) <!-- FIXME: ../memory/primitive_chat-to-dag-traceability.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 **Related docs**:
-- [MASTER_INDEX](./MASTER_INDEX.md) — repo encyclopedia
+- [MASTER_INDEX](../../INDEX.md) — repo encyclopedia
 - [PROOF_OF_CONTRIBUTION](./PROOF_OF_CONTRIBUTION.md) — PoM weight function fed by this DAG
-- [THE_CONTRIBUTION_COMPACT](./THE_CONTRIBUTION_COMPACT.md) — economic substrate
-- [PRIMITIVE_EXTRACTION_PROTOCOL](./PRIMITIVE_EXTRACTION_PROTOCOL.md) — sibling workflow (JARVIS's internal memory)
+- [THE_CONTRIBUTION_COMPACT](../../research/essays/THE_CONTRIBUTION_COMPACT.md) — economic substrate
+- [PRIMITIVE_EXTRACTION_PROTOCOL](../PRIMITIVE_EXTRACTION_PROTOCOL.md) — sibling workflow (JARVIS's internal memory)
 
 ---
 
@@ -72,7 +72,7 @@ Whatever existed before GitHub: a chat log, a voice memo transcript, a quoted tw
 
 Constraints:
 - The source must be durable enough that an auditor could, in principle, retrieve and verify it. A Telegram link, a screenshot committed to a private archive, or a quoted text-block in the issue body all qualify.
-- If the source is NDA-protected (per [MEMORY.md NDA material](../memory/MEMORY.md)), the issue body carries a redacted marker (`Source: private — NDA-counterparty-X / see off-repo archive`) rather than the raw text. The attribution chain still works because `Contributor` and `Date` are preserved.
+- If the source is NDA-protected (per [MEMORY.md NDA material](../memory/MEMORY.md)), the issue body carries a redacted marker (`Source: private — NDA-counterparty-X / see off-repo archive`) rather than the raw text. The attribution chain still works because `Contributor` and `Date` are preserved. <!-- FIXME: ../memory/MEMORY.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ### Layer 1 — The GitHub issue
 
@@ -324,7 +324,7 @@ V2 (deferred): the workflow could auto-mint for commits by known contributors wh
 
 ### It doesn't replace git or GitHub
 
-Per [Augmented Mechanism Design](../memory/feedback_augmented-mechanism-design-paper.md), this is augmentation, not replacement. Git remains the canonical source of code. GitHub remains the canonical discussion surface. `ContributionAttestor` remains the canonical on-chain DAG. This spec adds structured fields at the boundaries so the three layers compose.
+Per [Augmented Mechanism Design](../memory/feedback_augmented-mechanism-design-paper.md), this is augmentation, not replacement. Git remains the canonical source of code. GitHub remains the canonical discussion surface. `ContributionAttestor` remains the canonical on-chain DAG. This spec adds structured fields at the boundaries so the three layers compose. <!-- FIXME: ../memory/feedback_augmented-mechanism-design-paper.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ### It doesn't require the raw source to be public
 
@@ -351,7 +351,7 @@ This document is the canonical reference; if the primitive's wording drifts in f
 
 ### The Source field is load-bearing
 
-The [Lawson Constant](../memory/primitive_economic-theory-of-mind.md) — *"the greatest idea cannot be stolen, because part of it is admitting who came up with it"* — lives in the contract as `LAWSON_CONSTANT = keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026")`. The Source field is the Lawson Constant applied to the workflow: attribution is a first-class field, not decorative metadata. Issues without a Source field fail the canonical form.
+The [Lawson Constant](../memory/primitive_economic-theory-of-mind.md) — *"the greatest idea cannot be stolen, because part of it is admitting who came up with it"* — lives in the contract as `LAWSON_CONSTANT = keccak256("FAIRNESS_ABOVE_ALL:W.GLYNN:2026")`. The Source field is the Lawson Constant applied to the workflow: attribution is a first-class field, not decorative metadata. Issues without a Source field fail the canonical form. <!-- FIXME: ../memory/primitive_economic-theory-of-mind.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -369,7 +369,7 @@ The loop being closed means an auditor can sit with the on-chain attestations an
 
 ### Relationship to ETM (Economic Theory of Mind)
 
-[ETM](../memory/primitive_economic-theory-of-mind.md) says the mind functions as an economy and blockchain is the legible externalization of that pattern. This spec is the workflow-layer companion to ETM: without canonical traceability, the externalization is incomplete — the chain records only the tail of the process, not the whole pattern. With it, the chain is a faithful mirror.
+[ETM](../memory/primitive_economic-theory-of-mind.md) says the mind functions as an economy and blockchain is the legible externalization of that pattern. This spec is the workflow-layer companion to ETM: without canonical traceability, the externalization is incomplete — the chain records only the tail of the process, not the whole pattern. With it, the chain is a faithful mirror. <!-- FIXME: ../memory/primitive_economic-theory-of-mind.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 The recursion: this document itself was produced via the loop. The closing insight from 2026-04-21 → primitive captured → SESSION_STATE Top Priority → this doc shipped → commit with `DAG-ATTRIBUTION: pending` → backfill mint → `claimId` recorded below. Proving the loop by closing the loop on the loop-closing work.
 

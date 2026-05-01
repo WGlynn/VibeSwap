@@ -2,7 +2,7 @@
 
 **Status**: Design-gate. Runs before any significant design decision.
 **Audience**: First-encounter OK. Includes a worked example.
-**Parents**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) (Axis 0), [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) (Axis 1).
+**Parents**: [Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md) (Axis 0), [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) (Axis 1).
 
 ---
 
@@ -157,7 +157,7 @@ Each check is distinct. A mechanism passing all three has demonstrated it's well
 
 Extensions (hypothetical additions, unstrict):
 
-- **Check 4 (proposed by 2026-04-22 Dignity Gradient essay)**: Does the mechanism preserve participants' dignity? See [`THE_DIGNITY_GRADIENT.md`](./THE_DIGNITY_GRADIENT.md). Not yet in the official Triad; might be added if adoption proves valuable.
+- **Check 4 (proposed by 2026-04-22 Dignity Gradient essay)**: Does the mechanism preserve participants' dignity? See [`THE_DIGNITY_GRADIENT.md`](../research/essays/THE_DIGNITY_GRADIENT.md). Not yet in the official Triad; might be added if adoption proves valuable.
 
 ## For students
 

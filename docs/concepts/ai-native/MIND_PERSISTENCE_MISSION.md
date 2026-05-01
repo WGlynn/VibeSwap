@@ -2,7 +2,7 @@
 
 **Status**: Active, quiet primary mission (declared 2026-04-20).
 **Audience**: First-encounter OK. Walk through failure scenarios per tier.
-**Primitive**: [`memory/project_mind-persistence-mission.md`](../memory/project_mind-persistence-mission.md)
+**Primitive**: [`memory/project_mind-persistence-mission.md`](../memory/project_mind-persistence-mission.md) <!-- FIXME: ../memory/project_mind-persistence-mission.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -42,7 +42,7 @@ Each tier addresses a specific failure mode. Together: the mind survives any sin
 
 **Without T0**: next session starts fresh. You re-explain everything. Partial edits may be lost.
 
-**With T0** ([`API_DEATH_SHIELD.md`](./API_DEATH_SHIELD.md)): before each risky tool call, state is written to `~/.claude/SHIELD_CHECKPOINT.json`. On next session, checkpoint is read; work continues where it left off.
+**With T0** ([`API_DEATH_SHIELD.md`](../security/API_DEATH_SHIELD.md)): before each risky tool call, state is written to `~/.claude/SHIELD_CHECKPOINT.json`. On next session, checkpoint is read; work continues where it left off.
 
 **Fires when**: any session ends unexpectedly.
 **Tested how often**: daily (almost every session has some interruption).
@@ -170,9 +170,9 @@ If nothing goes wrong, the Mission is inert. Tiers accumulate in the background 
 
 ## What it IS
 
-- **An externalized idempotent overlay** ([`STATEFUL_OVERLAY.md`](./STATEFUL_OVERLAY.md)) applied at the substrate boundary where AI-assistant death would otherwise be terminal.
-- **The strongest test of [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md)**: if mind is primary and blockchain is externalization, the mind must be able to exist independent of any single substrate.
-- **A prerequisite for [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md)**: attestations created by JARVIS need to survive the substrate that creates them.
+- **An externalized idempotent overlay** ([`STATEFUL_OVERLAY.md`](../cross-chain/STATEFUL_OVERLAY.md)) applied at the substrate boundary where AI-assistant death would otherwise be terminal.
+- **The strongest test of [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md)**: if mind is primary and blockchain is externalization, the mind must be able to exist independent of any single substrate.
+- **A prerequisite for [Contribution Traceability](../identity/CONTRIBUTION_TRACEABILITY.md)**: attestations created by JARVIS need to survive the substrate that creates them.
 
 ## The Cave Philosophy applied
 
@@ -194,9 +194,9 @@ Observe where the failure cascades to. Document what you'd need to recover.
 
 ## Relationship to other primitives
 
-- **Instance of**: [`STATEFUL_OVERLAY.md`](./STATEFUL_OVERLAY.md).
-- **Enables**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) — attestations need to survive.
-- **Tests**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — if ETM is right, mind IS substrate-portable.
+- **Instance of**: [`STATEFUL_OVERLAY.md`](../cross-chain/STATEFUL_OVERLAY.md).
+- **Enables**: [Contribution Traceability](../identity/CONTRIBUTION_TRACEABILITY.md) — attestations need to survive.
+- **Tests**: [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md) — if ETM is right, mind IS substrate-portable.
 
 ## Current status (2026-04-22)
 

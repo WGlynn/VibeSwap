@@ -2,8 +2,8 @@
 
 **Status**: Live. PreToolUse hook at `~/.claude/hooks/api-death-shield.py`.
 **Audience**: First-encounter OK. Step-by-step scenario walk.
-**Primitive**: [`memory/primitive_api-death-shield.md`](../memory/primitive_api-death-shield.md)
-**Instance of**: [Stateful Overlay](./STATEFUL_OVERLAY.md).
+**Primitive**: [`memory/primitive_api-death-shield.md`](../memory/primitive_api-death-shield.md) <!-- FIXME: ../memory/primitive_api-death-shield.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+**Instance of**: [Stateful Overlay](../cross-chain/STATEFUL_OVERLAY.md).
 
 ---
 
@@ -155,7 +155,7 @@ Separate mitigation: input validation + shield combined.
 
 ## The broader persistence stack
 
-Shield is Tier 0 of the [Mind Persistence Mission](./MIND_PERSISTENCE_MISSION.md) — the innermost tier, most frequently fired.
+Shield is Tier 0 of the [Mind Persistence Mission](../ai-native/MIND_PERSISTENCE_MISSION.md) — the innermost tier, most frequently fired.
 
 | Tier | Mechanism | Target failure |
 |---|---|---|
@@ -209,9 +209,9 @@ Shield is specifically: "did a session die mid-work? if so, resume."
 
 ## Relationship to other primitives
 
-- **Instance of**: [Stateful Overlay](./STATEFUL_OVERLAY.md) — externalized idempotent checkpoint.
-- **Instance of**: [Universal-Coverage → Hook](../memory/primitive_universal-coverage-hook.md) — firing at a tool-call boundary for universal coverage.
-- **Part of**: [Mind Persistence Mission](./MIND_PERSISTENCE_MISSION.md) — Tier 0.
+- **Instance of**: [Stateful Overlay](../cross-chain/STATEFUL_OVERLAY.md) — externalized idempotent checkpoint.
+- **Instance of**: [Universal-Coverage → Hook](../memory/primitive_universal-coverage-hook.md) — firing at a tool-call boundary for universal coverage. <!-- FIXME: ../memory/primitive_universal-coverage-hook.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **Part of**: [Mind Persistence Mission](../ai-native/MIND_PERSISTENCE_MISSION.md) — Tier 0.
 
 ## For users
 

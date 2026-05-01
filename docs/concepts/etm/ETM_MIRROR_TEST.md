@@ -258,9 +258,9 @@ Extract this to `memory/primitive_etm-mirror-test.md` as a review-gate: no ETM-a
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — what shape mechanisms should have.
-- **Convex Retention Derivation** (see [`CONVEX_RETENTION_DERIVATION.md`](./CONVEX_RETENTION_DERIVATION.md)) — where the calibration numbers come from.
-- **Correspondence Triad** (see [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md)) — design-gate that motivates mirror tests.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md)) — what shape mechanisms should have.
+- **Convex Retention Derivation** (see [`CONVEX_RETENTION_DERIVATION.md`](../../research/theorems/CONVEX_RETENTION_DERIVATION.md)) — where the calibration numbers come from.
+- **Correspondence Triad** (see [`CORRESPONDENCE_TRIAD.md`](../CORRESPONDENCE_TRIAD.md)) — design-gate that motivates mirror tests.
 - **Self-Theater Audit Gate** — existing review pattern; mirror tests are the ETM-specific extension.
 
 ## How this doc feeds the Code↔Text Inspiration Loop

@@ -448,9 +448,9 @@ Together   → api.together.xyz/v1       (Llama-3.3-70B-Instruct-Turbo)
 
 ## References
 
-- [Wardenclyffe Paper](../../llm-hashcash/docs/wardenclyffe-paper.md) — Full academic treatment
+- [Wardenclyffe Paper](../../llm-hashcash/docs/wardenclyffe-paper.md) — Full academic treatment <!-- FIXME: ../../llm-hashcash/docs/wardenclyffe-paper.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 - [Sybil Resistance Spec](./wardenclyffe-sybil-resistance.md) — AgentRegistry integration
-- [CKB Synergy](../../../.claude/nervos-intel.md) — PoW shared state + MMR
+- [CKB Synergy](../../../.claude/nervos-intel.md) — PoW shared state + MMR <!-- FIXME: ../../../.claude/nervos-intel.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 - [llm-provider.js](../../jarvis-bot/src/llm-provider.js) — Reference implementation
 - [ergon.ts](../../llm-hashcash/src/services/ergon.ts) — PoW primitives
 - [challenges.ts](../../llm-hashcash/src/services/challenges.ts) — Cognitive challenge types

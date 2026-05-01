@@ -87,7 +87,7 @@ Let me apply each to VibeSwap's current state.
 
 ### Parameter 4 — Institutional fit
 
-**Measure**: degree to which mechanisms match substrate geometry. [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) compliance + [Correspondence Triad](./CORRESPONDENCE_TRIAD.md) compliance.
+**Measure**: degree to which mechanisms match substrate geometry. [Substrate-Geometry Match](../SUBSTRATE_GEOMETRY_MATCH.md) compliance + [Correspondence Triad](../CORRESPONDENCE_TRIAD.md) compliance.
 
 **Critical value**: qualitative — every mechanism passes the Triad gate.
 
@@ -207,7 +207,7 @@ Mitigation: deploy initial liquidity to seed contribution rewards. Use founder a
 
 ## The cognitive parallel
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive intelligence is also a phase-transition phenomenon. Individual neurons don't think; networks of neurons do.
+Under [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md), cognitive intelligence is also a phase-transition phenomenon. Individual neurons don't think; networks of neurons do.
 
 The transition in cognition depends on connectivity, heterogeneity, feedback speed, and institutional fit within the brain substrate. Same 4-parameter framework.
 
@@ -238,9 +238,9 @@ Apply to academic departments, open-source projects, company departments, etc. O
 
 ## Relationship to other primitives
 
-- **Depends on**: [Correspondence Triad](./CORRESPONDENCE_TRIAD.md) (for Parameter 4).
-- **Feeds**: [The Community Bootstrap Playbook](./THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.md) (operational tactics).
-- **Grounded in**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) (cognitive emergence parallel).
+- **Depends on**: [Correspondence Triad](../CORRESPONDENCE_TRIAD.md) (for Parameter 4).
+- **Feeds**: [The Community Bootstrap Playbook](../../research/essays/THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.md) (operational tactics).
+- **Grounded in**: [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md) (cognitive emergence parallel).
 
 ## Open research
 

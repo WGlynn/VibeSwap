@@ -249,7 +249,7 @@ The mechanism occupies a provably optimal point in the design space: it achieves
 
 ## See Also
 
-- [True Price Discovery](../../DOCUMENTATION/TRUE_PRICE_DISCOVERY.md) — Philosophy this proof validates
-- [True Price Oracle](../../DOCUMENTATION/TRUE_PRICE_ORACLE.md) — Oracle engine implementing convergent pricing
-- [Price Intelligence Oracle](../../DOCUMENTATION/PRICE_INTELLIGENCE_ORACLE.md) — Manipulation detection layer
-- [Kalman Filter Oracle](../../DOCUMENTATION/KALMAN_FILTER_ORACLE.md) — The estimation math behind convergence
+- [True Price Discovery](../../concepts/oracles/TRUE_PRICE_DISCOVERY.md) — Philosophy this proof validates
+- [True Price Oracle](../../concepts/oracles/TRUE_PRICE_ORACLE.md) — Oracle engine implementing convergent pricing
+- [Price Intelligence Oracle](../../concepts/oracles/PRICE_INTELLIGENCE_ORACLE.md) — Manipulation detection layer
+- [Kalman Filter Oracle](../../concepts/oracles/KALMAN_FILTER_ORACLE.md) — The estimation math behind convergence

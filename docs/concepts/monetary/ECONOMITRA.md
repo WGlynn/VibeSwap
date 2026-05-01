@@ -663,8 +663,8 @@ True power is restraint. True freedom is self-control. True money is elastic, no
 ## See Also
 
 - [Economitra v1.2](ECONOMITRA_V1.2.md) — Updated version with trinomial stability
-- [Economitra (paper)](../docs/papers/ECONOMITRA.md) — Academic treatment with supplementary proofs
+- [Economitra (paper)](../../research/papers/ECONOMITRA.md) — Academic treatment with supplementary proofs
 - [Three-Token Economy](THREE_TOKEN_ECONOMY.md) — Token architecture implementing this model
 - [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Mathematical fairness across cohorts
-- [Cooperative Emission Design](../docs/papers/cooperative-emission-design.md) — Emission mechanism design
-- [Near-Zero Token Scaling](../docs/papers/near-zero-token-scaling.md) — Minimal-token coordination
+- [Cooperative Emission Design](../../research/papers/cooperative-emission-design.md) — Emission mechanism design
+- [Near-Zero Token Scaling](../../research/papers/near-zero-token-scaling.md) — Minimal-token coordination

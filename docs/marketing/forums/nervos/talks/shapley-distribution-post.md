@@ -248,8 +248,8 @@ The formal paper is available in our repo: `docs/papers/shapley-value-distributi
 
 ## See Also
 
-- [Shapley Value Distribution (paper)](../papers/shapley-value-distribution.md) — Full paper with five axioms and CKB cell model
-- [Shapley Reward System](../../DOCUMENTATION/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution
-- [Cross-Domain Shapley](../../DOCUMENTATION/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
-- [Atomized Shapley (paper)](../papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
-- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Shapley Value Distribution (paper)](../../../../research/papers/shapley-value-distribution.md) — Full paper with five axioms and CKB cell model
+- [Shapley Reward System](../../../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution
+- [Cross-Domain Shapley](../../../../concepts/shapley/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Atomized Shapley (paper)](../../../../research/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Formal Fairness Proofs](../../../../research/proofs/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs

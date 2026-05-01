@@ -147,7 +147,7 @@ Unbonded attestations are costless. Costless attestations are unreliable — the
 
 Magnitude: bond should be large enough that mis-attestation is painful, but small enough that attestors can actually afford it. Initial calibration: bond ≈ median contributor annual reward. Future calibration empirical.
 
-**Related**: the [Lawson Floor](./THE_LAWSON_FLOOR_MATHEMATICS.md) — no zero-credit for replications. Similar spirit: attestors who make a good-faith wrong call shouldn't be bankrupted (floor their slash at some percentage of bond) but shouldn't get off scot-free either (there must be real cost).
+**Related**: the [Lawson Floor](../../research/proofs/THE_LAWSON_FLOOR_MATHEMATICS.md) — no zero-credit for replications. Similar spirit: attestors who make a good-faith wrong call shouldn't be bankrupted (floor their slash at some percentage of bond) but shouldn't get off scot-free either (there must be real cost).
 
 ## Future work — concrete code cycles this primitive surfaces
 
@@ -173,9 +173,9 @@ Magnitude: bond should be large enough that mis-attestation is painful, but smal
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — different primitive; convex rent on finite surfaces. Complementary but orthogonal to Attested Resume.
-- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](./TIME_INDEXED_MARGINAL_CREDIT.md)) — different primitive; novelty-weighted Shapley. Complementary.
-- **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md)) — attestation IS a form of augmented governance: operational decisions delegated to certified attestors (fast), constitutional decisions reserved for governance (slow).
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md)) — different primitive; convex rent on finite surfaces. Complementary but orthogonal to Attested Resume.
+- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](../monetary/TIME_INDEXED_MARGINAL_CREDIT.md)) — different primitive; novelty-weighted Shapley. Complementary.
+- **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md)) — attestation IS a form of augmented governance: operational decisions delegated to certified attestors (fast), constitutional decisions reserved for governance (slow).
 - **Lawson Floor** — bond-slashing with a floor, not bankruptcy. Same floor-pattern as replication credit.
 
 ## How this doc feeds the Code↔Text Inspiration Loop

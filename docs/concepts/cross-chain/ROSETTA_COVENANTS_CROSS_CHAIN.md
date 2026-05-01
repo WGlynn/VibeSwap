@@ -163,7 +163,7 @@ Let's trace a specific cross-chain Shapley distribution.
 
 ### Step 1 — Compute on A
 
-Keeper computes Shapley off-chain (per [Optimistic Shapley](./OPTIMISTIC_SHAPLEY.md)). Commits Merkle root on chain A.
+Keeper computes Shapley off-chain (per [Optimistic Shapley](../shapley/OPTIMISTIC_SHAPLEY.md)). Commits Merkle root on chain A.
 
 ### Step 2 — Cross-chain message
 

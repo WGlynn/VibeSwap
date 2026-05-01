@@ -52,7 +52,7 @@ Tool 5 couldn't exist without Tool 1. Tool 6 couldn't be useful without Tools 1-
 
 ## See Also
 
-- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
 - [Loop 0: Token Density](loop-0-token-density.md) | [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md)
 - [TRP Runner Protocol](TRP_RUNNER.md) — Execution protocol (built by this loop)
 - [Efficiency Heat Map](efficiency-heatmap.md) — Heat map tool (built by this loop)

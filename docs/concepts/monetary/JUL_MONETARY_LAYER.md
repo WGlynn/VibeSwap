@@ -2,7 +2,7 @@
 
 **Status**: Load-bearing tokenomic framing. Never collapse to bootstrap.
 **Audience**: First-encounter OK. Two-role explanation with concrete contrast.
-**Primitive**: [`memory/feedback_jul-is-primary-liquidity.md`](../memory/feedback_jul-is-primary-liquidity.md)
+**Primitive**: [`memory/feedback_jul-is-primary-liquidity.md`](../memory/feedback_jul-is-primary-liquidity.md) <!-- FIXME: ../memory/feedback_jul-is-primary-liquidity.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -44,7 +44,7 @@ This is the "money" role — unit of account, medium of exchange, store of value
 
 ## Role 2 — JUL as PoW pillar of NCI
 
-[Nakamoto Consensus Infinity](./NCI_WEIGHT_FUNCTION.md) combines three pillars:
+[Nakamoto Consensus Infinity](../identity/NCI_WEIGHT_FUNCTION.md) combines three pillars:
 
 ```
 W = 0.10 × log₂(1 + cumulative_PoW) + 0.30 × stake + 0.60 × log₂(1 + mindScore)
@@ -145,7 +145,7 @@ Three tokens keep each role clean.
 
 ## Relationship to cognitive economy
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognition has three economic layers:
+Under [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md), cognition has three economic layers:
 
 1. Medium of exchange (transactional tokens of immediate value) — JUL on-chain.
 2. Coordination instrument (shared norms + voting rights) — VIBE on-chain.

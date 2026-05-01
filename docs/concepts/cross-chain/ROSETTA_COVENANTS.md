@@ -640,4 +640,4 @@ Together, they form the constitutional infrastructure for autonomous multi-agent
 
 ---
 
-*Related papers: [Augmented Governance](AUGMENTED_GOVERNANCE.md), [Convergence Thesis](CONVERGENCE_THESIS.md), [Social Scalability](SOCIAL_SCALABILITY_VIBESWAP.md)*
+*Related papers: [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md), [Convergence Thesis](../../research/essays/CONVERGENCE_THESIS.md), [Social Scalability](../identity/SOCIAL_SCALABILITY_VIBESWAP.md)*

@@ -9,7 +9,7 @@
 
 We built an AI inference router called **Wardenclyffe** that routes requests across 13 LLM providers in three cost tiers. The key insight: **70-80% of all messages don't need a frontier model.** A "hey jarvis" doesn't need Claude. A status check doesn't need GPT-5.4. So instead of starting at the most expensive provider and degrading on failure (cascade-down), we **start at the cheapest adequate provider and escalate only when quality gates fail** (hybrid escalation). The result: ~85% cost reduction, zero downtime over 50K+ requests, and -- critically -- free compute that multiplies linearly with network size. Each shard in the JARVIS Mind Network has its own API keys. N shards = N times the free tier capacity. We think CKB is the right place to anchor the provenance and economics of this system, and this post explains why.
 
-**Full paper:** [Wardenclyffe v3: Hybrid Escalation Router for Zero-Downtime AI Inference](../papers/wardenclyffe-inference-cascade.md)
+**Full paper:** [Wardenclyffe v3: Hybrid Escalation Router for Zero-Downtime AI Inference](../../../../research/papers/wardenclyffe-inference-cascade.md)
 
 ---
 
@@ -261,7 +261,7 @@ Over 50,000 requests served with zero empty responses and zero blackout events. 
 
 ## Further Reading
 
-- **Full paper**: [Wardenclyffe v3: Hybrid Escalation Router](../papers/wardenclyffe-inference-cascade.md)
+- **Full paper**: [Wardenclyffe v3: Hybrid Escalation Router](../../../../research/papers/wardenclyffe-inference-cascade.md)
 - **Proof of Mind**: [PoM consensus post](proof-of-mind-post.md)
 - **CKB integration**: [Nervos and VibeSwap Synergy](nervos-vibeswap-synergy.md)
 - **Agent identity**: [Shards Over Swarms post](shards-over-swarms-post.md)

@@ -22,7 +22,7 @@ Shapley value computation has this same explosion. Let's see why.
 
 ## Shapley's requirement
 
-Per [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md), the Shapley value for contributor `i` is the average over all permutations of their marginal contribution.
+Per [Shapley Reward System](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md), the Shapley value for contributor `i` is the average over all permutations of their marginal contribution.
 
 For N contributors, the number of permutations is N! (N-factorial). The number of subsets is 2^N.
 
@@ -50,7 +50,7 @@ Even if we could enumerate all subsets, evaluating `v(S)` for each is expensive.
 
 `v(S)` = "what value would this coalition S have produced?" This is a counterfactual. Nobody knows what S alone would have produced without running the experiment.
 
-Per [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md) Gap #1, `v(S)` has 10-30% estimation error even when we can estimate it.
+Per [The Attribution Problem](../essays/THE_ATTRIBUTION_PROBLEM.md) Gap #1, `v(S)` has 10-30% estimation error even when we can estimate it.
 
 So: the outer sum is infeasibly large, AND each term requires an expensive counterfactual estimate with substantial error.
 
@@ -119,7 +119,7 @@ More samples = better accuracy but higher gas cost on-chain (or higher compute o
 
 For on-chain Monte Carlo: 100 samples costs ~2M gas. 1,000 samples costs ~20M gas. 10,000 costs ~200M gas. 10,000 exceeds block gas limits on most chains.
 
-Solution: compute off-chain, commit via Optimistic Shapley ([`OPTIMISTIC_SHAPLEY.md`](./OPTIMISTIC_SHAPLEY.md)). Off-chain Monte Carlo runs in seconds or minutes; commit result via Merkle root; challenge window allows verification.
+Solution: compute off-chain, commit via Optimistic Shapley ([`OPTIMISTIC_SHAPLEY.md`](../../concepts/shapley/OPTIMISTIC_SHAPLEY.md)). Off-chain Monte Carlo runs in seconds or minutes; commit result via Merkle root; challenge window allows verification.
 
 ## The v(S) estimation budget
 
@@ -137,7 +137,7 @@ Error: O(sample size of historical data). Usually 20-30% for sparse data.
 
 Have a trusted committee estimate v(S) for key subsets.
 
-Error: subjective. 15-30% cross-observer variation (see [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md)).
+Error: subjective. 15-30% cross-observer variation (see [The Attribution Problem](../essays/THE_ATTRIBUTION_PROBLEM.md)).
 
 ### Approach 3 — Simulation-based
 
@@ -207,9 +207,9 @@ Compare to exact. Observe the trade-off between K and accuracy.
 
 ## Relationship to other primitives
 
-- **Parent**: [Shapley Reward System](./SHAPLEY_REWARD_SYSTEM.md) — the foundation.
-- **Integration**: [Optimistic Shapley](./OPTIMISTIC_SHAPLEY.md) — Monte Carlo off-chain + challenge window on-chain.
-- **Related**: [The Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md) — v(S) estimation is one of five gaps.
+- **Parent**: [Shapley Reward System](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md) — the foundation.
+- **Integration**: [Optimistic Shapley](../../concepts/shapley/OPTIMISTIC_SHAPLEY.md) — Monte Carlo off-chain + challenge window on-chain.
+- **Related**: [The Attribution Problem](../essays/THE_ATTRIBUTION_PROBLEM.md) — v(S) estimation is one of five gaps.
 
 ## One-line summary
 

@@ -145,7 +145,7 @@ If any step fails, iterate. Don't ship broken compositions.
 
 ## The rebase-drop example revisited
 
-Recall the NDA-protected commit in [Path Commitment Protocol](./PATH_COMMITMENT_PROTOCOL.md). Two options:
+Recall the NDA-protected commit in [Path Commitment Protocol](../concepts/security/PATH_COMMITMENT_PROTOCOL.md). Two options:
 
 **Option 1 — Rebase-drop**: Remove the interfering commit from git history.
 
@@ -209,7 +209,7 @@ Understanding invariant types helps diagnose compositions.
 
 ## Cycling through the ETM gaps
 
-The [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1 (NCI convex retention) and Gap #2 (time-indexed Shapley) are non-interfering changes:
+The [ETM Build Roadmap](../concepts/etm/ETM_BUILD_ROADMAP.md) Gap #1 (NCI convex retention) and Gap #2 (time-indexed Shapley) are non-interfering changes:
 
 - Gap #1: NCI's retentionWeight(t) changes shape. Doesn't affect other mechanisms that read cumulative weight.
 - Gap #2: Shapley's value(i) gets novelty modifier. Doesn't affect other mechanisms reading Shapley output.

@@ -220,15 +220,15 @@ This protocol is public domain. Use it, extend it, improve it. If the three loop
 
 ## See Also
 
-- [TRP Explained](trp/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
-- [TRP Runner Protocol](trp/TRP_RUNNER.md) — Execution protocol with crash mitigation
-- [TRP Runner Paper](trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
-- [Loop 0: Token Density](trp/loop-0-token-density.md) — Context compression recursion
-- [Loop 1: Adversarial Verification](trp/loop-1-adversarial-verification.md) — Code review recursion
-- [Loop 2: Common Knowledge](trp/loop-2-common-knowledge.md) — Knowledge extraction recursion
-- [Loop 3: Capability Bootstrap](trp/loop-3-capability-bootstrap.md) — Tool-building recursion
-- [Efficiency Heat Map](trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
-- [TRP Verification Report](TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
-- [TRP Empirical RSI (paper)](papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
-- [TRP Pattern Taxonomy (paper)](papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
-- [TRP (DOCUMENTATION copy)](../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md) — Canonical copy in DOCUMENTATION/
+- [TRP Explained](../../_meta/trp-existing/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
+- [TRP Runner Protocol](../../_meta/trp-existing/TRP_RUNNER.md) — Execution protocol with crash mitigation
+- [TRP Runner Paper](../../research/papers/trp-runner/trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
+- [Loop 0: Token Density](../../_meta/trp-existing/loop-0-token-density.md) — Context compression recursion
+- [Loop 1: Adversarial Verification](../../_meta/trp-existing/loop-1-adversarial-verification.md) — Code review recursion
+- [Loop 2: Common Knowledge](../../_meta/trp-existing/loop-2-common-knowledge.md) — Knowledge extraction recursion
+- [Loop 3: Capability Bootstrap](../../_meta/trp-existing/loop-3-capability-bootstrap.md) — Tool-building recursion
+- [Efficiency Heat Map](../../_meta/trp-existing/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Verification Report](../../_meta/trp/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
+- [TRP Empirical RSI (paper)](../../research/papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
+- [TRP Pattern Taxonomy (paper)](../../research/papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
+- [TRP (DOCUMENTATION copy)](../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md) — Canonical copy in DOCUMENTATION/ <!-- FIXME: ../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md — multiple candidates: docs/concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md, NOTE: auto-repair would self-link -->

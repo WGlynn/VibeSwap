@@ -1,5 +1,59 @@
 # Session State — 2026-04-30 (rolled over from 2026-04-29 multi-block session — jarvis-not-a-wrapper essay shipped multi-platform)
 
+## Block Header — 2026-04-30 LATE — intent-guard fork + Cerron PR engagement + TRP cycle (multi-agent build burst)
+
+> *"FORK IT GO FULL AUTO"* → *"i want him to be like 'holy shit this is a lot'"* → *"yes continue auto be as useful as possible"* → *"okay spryy just keep building... TRP cycle with 2 subagents and +1 subagent every time a subagent stops"* → *"scale down to 3 agents"* → *"please finish soon i want to finish within the hour as he said"* — Will, 2026-04-30 afternoon
+
+### Entry trigger
+
+Will found Uwe Cerron's `intent-guard` repo (1 day old, 1 star) — Solidity reference impl of an on-chain guard for privileged DeFi operations. Forked to `WGlynn/intent-guard` and built out a substantial extension via TRP cycle (multi-agent parallel build).
+
+### What shipped this block (intent-guard fork — `~/intent-guard/`, public `github.com/WGlynn/intent-guard`)
+
+**Fork main contains (~50 commits since fork creation 2026-04-30 ~15:00):**
+- 11 production-shape adapters: UUPSUpgrade, DAOTreasury, CrossChainPeer, RoleGrant, Pausable, OwnershipTransfer, BoundedParameter, MerkleRootSet, ProxyAdmin, BeaconUpgrade, TimelockControllerAdmin, MultiCall, WithdrawalQueue, EmergencyShutdown, OracleSource, SignerSetUpdate
+- Integration tests for every adapter (8 dedicated suites + IntegrationBase helper for ergonomic future addition)
+- Stateful invariant test suite (`test/invariant/IntentGuardInvariants.t.sol`) — 6 invariants, 256-run fuzz, 0 failures
+- Adversarial review test of upstream `IntentGuardModule.sol` itself (`test/IntentGuardModuleAdversarial.t.sol`) — 38 defensive regressions + 1 skipped finding (signature `v` malleability, low/info)
+- TS off-chain helpers (`signer-cli/src/adapters.ts`) for all adapters
+- CI workflow (forge build/test on default + `--via-ir` profiles, slither static analysis)
+- 9 docs (FORK, ADAPTERS, CONTRIBUTING, SECURITY, THREAT_VECTORS, MIGRATION, FAQ, CHANGELOG, contracts/README)
+- Adversarial sweep of 9 fork adapters (TRP-A) — 19 new test cases. Each adapter got `ZeroOwner` constructor revert + 1 finding-specific defense (zero-recipient burn, zero-EID, transfer-to-zero-bypasses-renounce, inverted-bounds, malformed-calldata-bypass, etc.)
+
+**Upstream engagement** (`uwecerron/intent-guard`):
+- Issue #1 filed: `_verifyAttestations` stack-too-deep diagnosis with proposed fix
+- PR #2 opened: implements the fix (refactor `_attestationDigest` + `_verifyAttestation` helpers)
+- **Cerron engaged on PR #2** — agreed refactor is behavior-preserving, requested:
+  - Drop UUPSUpgradeAdapter from PR (move to separate PR B with codehash-binding fix)
+  - Drop FORK.md from PR
+  - Restore defensive `valid >= vault.threshold` recheck (implemented as `attestations.length` recheck — adding stack local breaks the refactor)
+- **PR re-scope shipped**: commit `83ffadd` on `origin/fix/verify-attestations-stack-depth`. PR file list now exactly: `.gitignore`, `.gitmodules`, `contracts/IntentGuardModule.sol`, `foundry.lock`, `lib/forge-std`. Comment posted: https://github.com/uwecerron/intent-guard/pull/2#issuecomment-4356859658
+- **PR A status**: ready for Cerron's merge per his "mergeable in an hour" comment.
+
+**Cerron caught a real vulnerability** in our `UUPSUpgradeAdapter`: codehash was only checked in mutable adapter policy at `validate()` time, not bound in the signed intent. Attack: redeploy impl + update policy ⇒ old signatures still authorize. Fixed in fork main (commit `952f84c`):
+- `expectedCodehash` now in `UPGRADE_INTENT_TYPEHASH`
+- `intentHash()` now `view`, reads policy, fails closed for unallowed proxies/impls
+- `setImplCodehash` rejects `impl.code.length == 0`
+- Adversarial regression test directly reproduces the attack and proves both defense layers reject
+
+### Next-session continuation point (for refresh-immunity)
+
+1. **Open PR B upstream** with the fixed UUPSUpgradeAdapter (commit `952f84c` on fork main has the airtight version). Don't open until Cerron has engaged with PR A — see `F·literal-scope-on-reviewer-feedback` for cadence rule. Frame as: "Per your codehash-binding feedback on PR #2 — here's UUPSUpgradeAdapter as its own PR with the fix applied. Open question: do you want adapters in upstream at all? If yes, want me to align the schema with the attester firmware's UpgradeProgram?"
+2. **Watch Cerron's response to PR A merge + the comment.** If he merges + engages further, queue PR B. If silent for 24h, low-key bump.
+3. **Lessons saved this block** (4 new memory primitives, all load-bearing):
+   - `P·signed-intent-binds-security-property` — bind everything the security claim depends on, mutable post-sign state ¬ load-bearing
+   - `P·literal-scope-on-reviewer-feedback` — act on the literal list, ¬ broaden
+   - `F·no-destructive-git-while-agents-running` — pause destructive git when N>0 agents writing to the working tree
+   - (also: F·full-auto-public-action-gate from earlier — public-facing actions on other-owner surfaces require check-in)
+
+### Pending non-intent-guard work (deferred, all known to be paused)
+
+- USD8 audit pass (we paused it for intent-guard fork work) — all 7 outreach pitches in `~/Desktop/USD8_Queue/outreach_pitches/` need a re-audit pass against the canonical USD8 architecture in `J·usd8-architecture` (the website-verbatim primitive), then the opinion piece (`~/Desktop/usd8-honest-stablecoin.{md,pdf,html}`) needs full rewrite using actual USD8 mechanism (the previous version was Frankenstein-VibeSwap)
+- JARVIS monorepo file-duplication WIP (stashed in `~/jarvis-monorepo/` as `stash@{0}`) — pending USD8 audit completion
+- Cleaned essay HTML on Desktop (`~/Desktop/jarvis-is-not-a-wrapper.html`) ready to paste over Medium post (Will hadn't done this yet last we checked)
+
+---
+
 ## Block Header — 2026-04-30 EARLY — jarvis-not-a-wrapper essay (full agent overlay scope) + X-thread + multi-format distribution
 
 > *"i need a 'why JARVIS is not just a wrapper' type essay"* → *"im going to share it on telegram, linkedin, medium, and x"* → *"im tired of people not knowing how exntisve the architecture actually is"* → *"i meant the entire claude agent overlay architecture that we use for claude code not the jarvis tg bots although i coonsider that a part of the stack, just we at least need the doc to reporesent both"* → *"none of the indentation translated when i pasted it from the pdf, can we just it so i can just one shot fix the medium post?"* — Will, 2026-04-29 → 2026-04-30

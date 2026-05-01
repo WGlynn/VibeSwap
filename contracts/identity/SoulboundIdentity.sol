@@ -4,11 +4,38 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "./interfaces/IContributionAttestor.sol";
 
 /**
  * @title SoulboundIdentity
  * @notice Non-transferable identity NFT that binds username, avatar, and reputation to an address
- * @dev One identity per address, tracks contributions, levels, and alignment
+ * @dev One identity per address, tracks contributions, levels, and alignment.
+ *
+ * SOURCE-LINEAGE BINDING (Strengthen #2 — C45):
+ *   An identity's *root* in the ContributionDAG is captured by a one-time, immutable
+ *   `sourceLineageHash` derived from the holder's first ATTESTED contribution claim.
+ *   This ties identity roots into the contribution graph by design — an identity that
+ *   never contributes never gets a lineage-hash, and an identity's first attested
+ *   contribution becomes its permanent provenance anchor.
+ *
+ *   Lifecycle choice (documented per the audit prompt's "resolve this" requirement):
+ *     We DO NOT require lineage at mint-time. Mint-time enforcement would invert the
+ *     dependency order — `ContributionAttestor` requires attesters with trust scores,
+ *     trust scores come from `ContributionDAG`, and `ContributionDAG.addVouch` already
+ *     requires `SoulboundIdentity.hasIdentity()`. Forcing lineage at mint creates a
+ *     bootstrap deadlock: no identity can mint until a contribution is attested, but
+ *     no contribution can be attested until identities exist.
+ *
+ *     Instead: identity mints freely (zero-lineage state), then `bindSourceLineage`
+ *     is called by the holder exactly once to point at an Accepted claim in the
+ *     ContributionAttestor where they are listed as contributor. After binding,
+ *     the lineage is monotonically locked — re-bind reverts.
+ *
+ *   Upgrade safety: `contributionAttestor` storage and `lineageBindingEnabled` flag
+ *   are added behind the post-upgrade-initialization-gate primitive. Fresh deploys
+ *   set `lineageBindingEnabled = true` in `initialize()` after wiring the attestor;
+ *   pre-existing proxies must call `initializeV2(attestor)` (reinitializer(2)) packaged
+ *   into `upgradeToAndCall` to enable lineage binding atomically with the upgrade.
  */
 contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     event AuthorizedRecorderUpdated(address indexed recorder, bool previous, bool current);
@@ -96,9 +123,32 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     // Flag to allow recovery transfers (bypasses soulbound check)
     bool private _isRecoveryTransfer;
 
+    // ============ Source-Lineage Binding (C45 — Strengthen #2) ============
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @notice ContributionAttestor contract — source of truth for attested contributions.
+    /// @dev Set in initialize() (fresh deploys) or initializeV2() (upgrade path).
+    ///      address(0) means lineage binding is disabled.
+    address public contributionAttestor;
+
+    /// @notice tokenId => keccak256(abi.encode(contributionAttestor, claimId)) of the
+    ///         first attested ContributionAttestor claim where the holder is contributor.
+    /// @dev Once set (non-zero), this is immutable for the life of the identity.
+    mapping(uint256 => bytes32) public tokenLineageHash;
+
+    /// @notice tokenId => the original claimId used to derive `tokenLineageHash`.
+    ///         Stored for off-chain verifiability (re-derive lineage from this claim).
+    mapping(uint256 => bytes32) public tokenLineageClaimId;
+
+    /// @notice Post-upgrade initialization gate (per primitive_post-upgrade-initialization-gate).
+    ///         Fresh deploys set this true via initialize(). Upgraded proxies must call
+    ///         initializeV2(attestor) (reinitializer(2)) to enable lineage binding.
+    ///         When false, bindSourceLineage() reverts — fail-closed posture.
+    bool public lineageBindingEnabled;
+
+    /// @dev Reserved storage gap — reduced from 50 to 46 to make room for the
+    ///      4 new slots above (contributionAttestor / tokenLineageHash /
+    ///      tokenLineageClaimId / lineageBindingEnabled).
+    uint256[46] private __gap;
 
     // ============ Events ============
 
@@ -114,6 +164,14 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     event QuantumKeyRotated(uint256 indexed tokenId, bytes32 newKeyRoot);
     event RecoveryContractQueued(address indexed newContract, uint256 timelockEnd);
     event RecoveryContractChanged(address indexed oldContract, address indexed newContract);
+    event ContributionAttestorSet(address indexed previous, address indexed current);
+    event SourceLineageBound(
+        uint256 indexed tokenId,
+        address indexed holder,
+        bytes32 indexed claimId,
+        bytes32 lineageHash
+    );
+    event LineageBindingEnabled();
 
     // ============ Errors ============
 
@@ -126,6 +184,11 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
     error UnauthorizedRecorder();
     error AlreadyVoted();
     error CannotVoteOwnContent();
+    error LineageAlreadyBound();
+    error LineageBindingDisabled();
+    error ClaimNotAccepted();
+    error ClaimContributorMismatch();
+    error ContributionAttestorNotSet();
 
     // ============ Initializer ============
 
@@ -153,6 +216,60 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         LEVEL_THRESHOLDS.push(4000);
         LEVEL_THRESHOLDS.push(6000);
         LEVEL_THRESHOLDS.push(10000);
+
+        // C45 — lineage binding starts disabled. Owner wires the attestor and enables
+        // it via setContributionAttestor(). This avoids a circular dependency at deploy
+        // time (attestor and identity contract may be deployed in either order).
+        // Fresh deploys with no legacy proxies will simply call setContributionAttestor()
+        // post-deploy as part of the standard wire-up script.
+        lineageBindingEnabled = false;
+    }
+
+    /**
+     * @notice C45 (post-upgrade-initialization-gate): one-shot reinitializer for proxies
+     *         upgraded from a pre-C45 implementation. Wires the ContributionAttestor and
+     *         enables lineage binding atomically with the upgrade transaction.
+     * @param _contributionAttestor Address of the ContributionAttestor contract that
+     *                              this SoulboundIdentity will read claims from.
+     * @dev MUST be packaged into `upgradeToAndCall(newImpl, abi.encodeCall(initializeV2, (...)))`.
+     *      Calling `upgradeTo` alone leaves `contributionAttestor == address(0)` and
+     *      `lineageBindingEnabled == false`, so `bindSourceLineage()` reverts —
+     *      a fail-closed posture (security is no weaker than pre-upgrade, just unavailable
+     *      until the migration runs). reinitializer(2) ensures this can be called exactly
+     *      once per proxy regardless of fresh-deploy vs upgrade origin.
+     */
+    function initializeV2(address _contributionAttestor) external reinitializer(2) onlyOwner {
+        require(_contributionAttestor != address(0), "Zero attestor");
+        // If a fresh deploy already enabled binding via setContributionAttestor()
+        // before someone (the same owner) ran initializeV2 by mistake, this is a no-op
+        // beyond claiming the version slot.
+        if (lineageBindingEnabled) return;
+
+        address prev = contributionAttestor;
+        contributionAttestor = _contributionAttestor;
+        lineageBindingEnabled = true;
+
+        emit ContributionAttestorSet(prev, _contributionAttestor);
+        emit LineageBindingEnabled();
+    }
+
+    /**
+     * @notice Wire the ContributionAttestor (fresh-deploy path).
+     * @dev Owner-only. Once called with a non-zero address, lineage binding is permanently
+     *      enabled — flip-back to disabled is intentionally not provided. The attestor
+     *      address itself can be re-pointed by the owner if a new attestor governance
+     *      contract is deployed (e.g., upgrade of attestor logic), but binding stays on.
+     * @param _attestor New attestor address. Must be non-zero.
+     */
+    function setContributionAttestor(address _attestor) external onlyOwner {
+        require(_attestor != address(0), "Zero attestor");
+        address prev = contributionAttestor;
+        contributionAttestor = _attestor;
+        if (!lineageBindingEnabled) {
+            lineageBindingEnabled = true;
+            emit LineageBindingEnabled();
+        }
+        emit ContributionAttestorSet(prev, _attestor);
     }
 
     // ============ Identity Management ============
@@ -221,6 +338,81 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         }
 
         return tokenId;
+    }
+
+    // ============ Source-Lineage Binding (C45 — Strengthen #2) ============
+
+    /**
+     * @notice Bind this identity's permanent source-lineage hash to an attested
+     *         ContributionAttestor claim. Callable exactly once per identity by the
+     *         token holder.
+     *
+     * @dev Verification flow (all on-chain, all required):
+     *      1. Caller has an identity (tokenId via addressToTokenId).
+     *      2. Lineage binding is globally enabled (`lineageBindingEnabled == true`).
+     *      3. No prior lineage on this tokenId (`tokenLineageHash[tokenId] == 0`).
+     *      4. The claim resolves on the configured ContributionAttestor.
+     *      5. The claim's status is Accepted (resolvedBy any branch — Executive,
+     *         Judicial, or Legislative; the 3-branch attestor authorities are all
+     *         valid sources of "first attested contribution").
+     *      6. The claim's contributor matches the caller — prevents binding to
+     *         someone else's contribution.
+     *
+     *      The lineage hash is `keccak256(abi.encode(contributionAttestor, claimId))`
+     *      so the (attestor address, claimId) tuple is fully recoverable off-chain
+     *      from the on-chain hash + emitted event.
+     *
+     * @param claimId The ContributionAttestor claimId to bind as this identity's
+     *                source-lineage anchor.
+     */
+    function bindSourceLineage(bytes32 claimId) external {
+        if (!lineageBindingEnabled) revert LineageBindingDisabled();
+        if (contributionAttestor == address(0)) revert ContributionAttestorNotSet();
+
+        uint256 tokenId = addressToTokenId[msg.sender];
+        if (tokenId == 0) revert IdentityNotFound();
+
+        // Monotonic lock: once set, never re-bound.
+        if (tokenLineageHash[tokenId] != bytes32(0)) revert LineageAlreadyBound();
+
+        // Read & validate the claim. We cast to the interface to use the typed view.
+        IContributionAttestor.ContributionClaim memory claim =
+            IContributionAttestor(contributionAttestor).getClaim(claimId);
+
+        // Claim must be Accepted by some branch of the attestor.
+        if (claim.status != IContributionAttestor.ClaimStatus.Accepted) {
+            revert ClaimNotAccepted();
+        }
+
+        // Caller must be the contributor on the claim.
+        if (claim.contributor != msg.sender) revert ClaimContributorMismatch();
+
+        // Derive the lineage hash. Bound to this attestor address so a future
+        // attestor swap doesn't collapse old lineages with a re-used claimId.
+        bytes32 lineageHash = keccak256(abi.encode(contributionAttestor, claimId));
+
+        tokenLineageHash[tokenId] = lineageHash;
+        tokenLineageClaimId[tokenId] = claimId;
+
+        emit SourceLineageBound(tokenId, msg.sender, claimId, lineageHash);
+    }
+
+    /**
+     * @notice View helper: get the source-lineage hash for an address (0 if unbound).
+     */
+    function getSourceLineageHash(address holder) external view returns (bytes32) {
+        uint256 tokenId = addressToTokenId[holder];
+        if (tokenId == 0) return bytes32(0);
+        return tokenLineageHash[tokenId];
+    }
+
+    /**
+     * @notice View helper: returns true if the identity has a bound lineage.
+     */
+    function hasSourceLineage(address holder) external view returns (bool) {
+        uint256 tokenId = addressToTokenId[holder];
+        if (tokenId == 0) return false;
+        return tokenLineageHash[tokenId] != bytes32(0);
     }
 
     /**

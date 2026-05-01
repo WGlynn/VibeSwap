@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Time-Neutral Tokenomics</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="data:text/css,body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:20px;line-height:1.6;color:%23333}h1,h2,h3{color:%23111}code{background:%23f4f4f4;padding:2px 6px;border-radius:3px}pre{background:%23f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid %23ddd;padding:8px 12px;text-align:left}th{background:%23f4f4f4}blockquote{border-left:4px solid %23ddd;margin:0;padding-left:16px;color:%23666}" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Time-Neutral Tokenomics</h1>
+</header>
+<h1
+id="time-neutral-tokenomics-how-we-made-defi-rewards-provably-fair">Time-Neutral
+Tokenomics: How We Made DeFi Rewards Provably Fair</h1>
+<p>Everyone in DeFi worries about fairness. Early LPs get outsized
+rewards. Latecomers subsidize incumbents. Yield farming devolves into a
+race where timing matters more than contribution. We decided to fix this
+mathematically — not with governance theater, but with game theory
+proofs that execute on-chain.</p>
+<p>This is the story of how we built provably fair reward distribution
+into VibeSwap using Shapley values, pairwise proportionality
+verification, and an immutable first-to-publish priority registry.</p>
+<hr />
+<h2 id="the-problem-time-bias-in-token-distribution">The Problem: Time
+Bias in Token Distribution</h2>
+<p>Most DeFi protocols reward early participants disproportionately.
+Liquidity mining programs front-load emissions. Yield curves decay. The
+message is clear: <em>be early or be punished</em>.</p>
+<p>This creates a perverse incentive structure. People rush in not
+because they believe in the protocol, but because the math rewards speed
+over substance. The person who provides $10M of liquidity in Year 3 —
+when the protocol actually needs deep markets — earns a fraction of what
+someone who parked $100K in Week 1 collected.</p>
+<p>Bitcoin has this problem too, but Bitcoin is transparent about it.
+Block rewards halve every 210,000 blocks. Everyone knows the schedule.
+Transaction fees, however, are always 100% — miners in 2040 earn the
+same fee percentage as miners in 2009.</p>
+<p>We wanted that same principle for DeFi rewards.</p>
+<hr />
+<h2 id="the-solution-five-shapley-axioms">The Solution: Five Shapley
+Axioms</h2>
+<p>The Shapley value is a concept from cooperative game theory that
+answers a simple question: <em>given a group of people who created value
+together, how should that value be fairly divided?</em></p>
+<p>Lloyd Shapley proved in 1953 that there is exactly one allocation
+method satisfying four axioms: Efficiency, Symmetry, Null Player, and
+Additivity. We added a fifth — <strong>Time Neutrality</strong> — and
+replaced Additivity with <strong>Pairwise Proportionality</strong> for
+on-chain verifiability.</p>
+<h3 id="the-five-axioms">The Five Axioms</h3>
+<p><strong>1. Efficiency</strong> — All value is distributed. No value
+leaks, no treasury rake on fee distribution.</p>
+<pre><code>Σφᵢ = V (sum of all allocations equals total value)</code></pre>
+<p><strong>2. Symmetry</strong> — Equal contributors receive equal
+rewards. If Alice and Bob provide identical liquidity for identical
+durations, they earn identically.</p>
+<p><strong>3. Null Player</strong> — Zero contribution means zero
+reward. No free riders.</p>
+<p><strong>4. Pairwise Proportionality</strong> — For any two
+participants, the ratio of their rewards equals the ratio of their
+weighted contributions.</p>
+<pre><code>φᵢ/φⱼ = wᵢ/wⱼ</code></pre>
+<p>This is verified on-chain via cross-multiplication to avoid
+division:</p>
+<pre><code>|φᵢ × wⱼ - φⱼ × wᵢ| ≤ ε</code></pre>
+<p><strong>5. Time Neutrality</strong> — Identical contributions in
+different epochs yield identical rewards (for fee distribution
+games).</p>
+<p>This is the new axiom. It means: if you provide 10 ETH of liquidity
+for 30 days with identical market conditions in Year 1 and Year 5, your
+fee share is exactly the same. Your work didn’t change. Your reward
+shouldn’t either.</p>
+<hr />
+<h2 id="two-track-distribution">Two-Track Distribution</h2>
+<p>Here’s where it gets interesting. We don’t apply Time Neutrality
+universally — we apply it where it matters.</p>
+<h3 id="track-1-fee-distribution-time-neutral">Track 1: Fee Distribution
+(Time-Neutral)</h3>
+<p>Trading fees generated by the protocol are distributed via pure
+proportional Shapley. No halving. No decay. Same work, same reward,
+forever.</p>
+<p>This is the “transaction fees” analog from Bitcoin. Miners always
+earn 100% of transaction fees regardless of which halving era they’re
+in.</p>
+<h3 id="track-2-token-emissions-scheduled">Track 2: Token Emissions
+(Scheduled)</h3>
+<p>If the protocol ever issues governance tokens, those follow a
+Bitcoin-style halving schedule. Era 0 gets full emissions, Era 1 gets
+50%, Era 2 gets 25%, and so on.</p>
+<p>This is intentionally <em>not</em> time-neutral. It’s a bootstrapping
+incentive — like Bitcoin block rewards. Everyone knows the schedule in
+advance. It’s transparent, predictable, and opt-in.</p>
+<p>The key insight: <strong>fees and emissions are economically
+distinct</strong>. Conflating them — as most DeFi protocols do — is what
+creates unfair time bias.</p>
+<hr />
+<h2 id="the-cave-theorem">The Cave Theorem</h2>
+<blockquote>
+<p><em>“Tony Stark was able to build this in a cave! With a box of
+scraps!”</em></p>
+</blockquote>
+<p>There’s a natural objection: “If early contributors don’t get
+time-based advantages, why would anyone build the hard stuff early?”</p>
+<p>The answer is that Shapley values <em>already</em> reward
+foundational work — not because of when it was done, but because of its
+marginal contribution.</p>
+<p>Consider a protocol with three contributors: -
+<strong>Founder</strong>: Built the core protocol (100 ETH equivalent
+contribution, 365 days, high scarcity and stability scores) -
+<strong>Contributor 1</strong>: Added a feature (10 ETH, 30 days) -
+<strong>Contributor 2</strong>: Minor improvement (5 ETH, 15 days)</p>
+<p>The Shapley value for the Founder dominates because removing them
+collapses the entire value of the coalition. Their <em>marginal
+contribution</em> — what the protocol loses without them — is
+enormous.</p>
+<p><strong>Corollary 4.1:</strong> A foundational contributor with the
+highest marginal contribution earns the most — not because of timing,
+but because of impact.</p>
+<p><strong>Corollary 4.2:</strong> If someone builds something equally
+foundational in a later era, they earn equally. Difficulty is captured
+by impact, not time.</p>
+<p>We proved both on-chain. The tests pass. The math is the proof.</p>
+<hr />
+<h2 id="first-to-publish-priority">First-to-Publish Priority</h2>
+<p>Time neutrality for rewards doesn’t mean we ignore chronological
+priority. Being the first to <em>innovate</em> — to create a new market,
+to bootstrap liquidity for an untested pair, to build infrastructure
+nobody else would build — deserves recognition.</p>
+<p>We built a <strong>PriorityRegistry</strong>: an immutable on-chain
+record of who published what first.</p>
+<h3 id="how-it-works">How It Works</h3>
+<p>The registry tracks four categories of foundational acts:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Weight</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POOL_CREATION</td>
+<td>10000</td>
+<td>First to create a trading pair</td>
+</tr>
+<tr>
+<td>LIQUIDITY_BOOTSTRAP</td>
+<td>7500</td>
+<td>First to provide significant liquidity</td>
+</tr>
+<tr>
+<td>STRATEGY_AUTHOR</td>
+<td>5000</td>
+<td>First to publish a verified strategy</td>
+</tr>
+<tr>
+<td>INFRASTRUCTURE</td>
+<td>5000</td>
+<td>First to deploy supporting infrastructure</td>
+</tr>
+</tbody>
+</table>
+<p>When a pioneer creates a pool, the PriorityRegistry records their
+address, timestamp, and block number. This record is immutable — once
+published, it cannot be overwritten. Only deactivatable by governance
+for proven fraud.</p>
+<h3 id="pioneer-bonus">Pioneer Bonus</h3>
+<p>The pioneer score feeds into the Shapley computation as a
+<strong>weight multiplier</strong>:</p>
+<pre><code>pioneerMultiplier = 1.0 + pioneerScore / 20000</code></pre>
+<p>A pool creator (score 10000) gets a 1.5x multiplier on their weighted
+contribution. Someone who both created the pool AND bootstrapped its
+liquidity (score 17500) gets 1.875x.</p>
+<p>Critically, this bonus is: - <strong>Not time-biased</strong>: A
+pioneer who creates a new pool in Year 5 gets the same bonus as one who
+created a pool in Year 1 - <strong>Proportional</strong>: Higher
+innovation scores yield proportionally higher bonuses -
+<strong>Verifiable</strong>: Anyone can call
+<code>getPioneerScore()</code> on-chain to audit -
+<strong>Opt-in</strong>: Only applies when both the registry and game
+scope are configured</p>
+<h3 id="why-this-is-different">Why This Is Different</h3>
+<p>Most “first mover advantages” in DeFi are implicit — they emerge from
+emission curves and lockup mechanics. Ours is explicit, transparent, and
+mathematically bounded. You know exactly what bonus a pioneer gets, why
+they get it, and you can verify it yourself.</p>
+<hr />
+<h2 id="on-chain-verification">On-Chain Verification</h2>
+<p>Every fairness claim is verifiable on-chain. We built a
+<code>PairwiseFairness</code> library with five verification
+functions:</p>
+<ol type="1">
+<li><strong><code>verifyPairwiseProportionality()</code></strong> —
+Cross-multiplication check that reward ratios match contribution
+ratios</li>
+<li><strong><code>verifyTimeNeutrality()</code></strong> — Confirms
+identical contributions yield identical rewards across games</li>
+<li><strong><code>verifyEfficiency()</code></strong> — Sum of
+allocations equals total value</li>
+<li><strong><code>verifyNullPlayer()</code></strong> — Zero contribution
+means zero reward</li>
+<li><strong><code>verifyAllPairs()</code></strong> — O(n²) full game
+verification for dispute resolution</li>
+</ol>
+<p>These aren’t just theoretical. We wrote 11 proof-by-execution tests
+including fuzz tests that verify the axioms hold for random inputs:</p>
+<pre><code>[PASS] test_axiom1_efficiency
+[PASS] test_axiom2_symmetry
+[PASS] test_axiom3_nullPlayer
+[PASS] test_axiom4_pairwiseProportionality
+[PASS] test_axiom4_pairwiseAllPairs
+[PASS] test_axiom5_timeNeutrality_feeDistribution
+[PASS] test_twoTrack_emissionsHalved_feesNot
+[PASS] testFuzz_pairwiseProportionality (256 runs)
+[PASS] testFuzz_timeNeutrality (256 runs)
+[PASS] test_caveTheorem_marginalContributionDominates
+[PASS] test_caveTheorem_equalFoundationalWorkEqualReward</code></pre>
+<p>Plus 16 PriorityRegistry tests and 7 pioneer integration tests. 447
+total tests, all passing.</p>
+<hr />
+<h2 id="credible-neutrality">Credible Neutrality</h2>
+<p>The governance roadmap for these contracts follows a credible
+neutrality progression:</p>
+<ol type="1">
+<li><strong>Owner-controlled</strong> (development phase) — necessary
+while building</li>
+<li><strong>DAO Governance</strong> — transfer ownership to
+community-controlled treasury with time-locked execution</li>
+<li><strong>Renounce entirely</strong> — parameters become immutable,
+protocol runs autonomously</li>
+</ol>
+<p>Once ownership is renounced, the rules are the rules. No admin keys.
+No multisig overrides. The math executes itself.</p>
+<p>This is what “trustless” actually means — not “trust us, we’re
+decentralized,” but “here are the proofs, verify them yourself, and
+nobody can change them.”</p>
+<hr />
+<h2 id="summary">Summary</h2>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 44%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>Property</th>
+<th>How It’s Achieved</th>
+<th>Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Same work = same reward</td>
+<td>Time-neutral fee distribution (no halving)</td>
+<td><code>verifyTimeNeutrality()</code></td>
+</tr>
+<tr>
+<td>Reward ratio = contribution ratio</td>
+<td>Proportional Shapley allocation</td>
+<td><code>verifyPairwiseProportionality()</code></td>
+</tr>
+<tr>
+<td>All value distributed</td>
+<td>Remainder-to-last-participant pattern</td>
+<td><code>verifyEfficiency()</code></td>
+</tr>
+<tr>
+<td>No free riders</td>
+<td>Zero weight → zero reward</td>
+<td><code>verifyNullPlayer()</code></td>
+</tr>
+<tr>
+<td>Innovation recognized</td>
+<td>PriorityRegistry first-to-publish</td>
+<td><code>getPioneerScore()</code></td>
+</tr>
+<tr>
+<td>Foundational work rewarded</td>
+<td>Marginal contribution dominance</td>
+<td>Cave Theorem (Corollary 4.1)</td>
+</tr>
+<tr>
+<td>Transparent emissions</td>
+<td>Bitcoin-style halving (opt-in track)</td>
+<td><code>getHalvingInfo()</code></td>
+</tr>
+</tbody>
+</table>
+<p>The code is the proof. The proofs are the code. And when we renounce
+ownership, they become immutable law.</p>
+<hr />
+<p><em>Built in a cave. With a box of scraps. For everyone who comes
+after.</em></p>
+</body>
+</html>

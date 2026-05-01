@@ -568,4 +568,4 @@ Each shard runs the same 12-tier framework. Each is populated differently. All c
 
 ## Reference Implementation
 
-The [Jarvis Template](../jarvis-template/) is a ready-to-clone implementation of this framework for Claude Code. It provides working files for tiers 0, 1, 3, 5, 7, 8, 10, and 11 — copy them into any project and start building.
+The [Jarvis Template](../jarvis-template/) is a ready-to-clone implementation of this framework for Claude Code. It provides working files for tiers 0, 1, 3, 5, 7, 8, 10, and 11 — copy them into any project and start building. <!-- FIXME: ../jarvis-template/ — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->

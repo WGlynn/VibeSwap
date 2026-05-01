@@ -34,7 +34,7 @@ Most activity. Highest enforcement risk.
 
 VibeSwap's position summary:
 - **JUL**: likely CFTC commodity (work-anchored). Not SEC security (passive-income/investment-contract prongs of Howey likely fail).
-- **VIBE**: governance token; possible securities classification depending on specifics. [Augmented Governance](./AUGMENTED_GOVERNANCE.md) designed to be regulatable.
+- **VIBE**: governance token; possible securities classification depending on specifics. [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md) designed to be regulatable.
 - **CKB-native**: substrate-layer; likely outside SEC/CFTC scope (utility).
 
 ### European Union
@@ -120,7 +120,7 @@ GDPR requires privacy-preserving architecture from start.
 
 VibeSwap's design:
 - Pseudonymous by default (addresses, not names).
-- Optional [ZK attribution](./ZK_ATTRIBUTION.md) for privacy-sensitive contributions.
+- Optional [ZK attribution](../../concepts/identity/ZK_ATTRIBUTION.md) for privacy-sensitive contributions.
 - Contributor address-identity binding is user-controlled.
 
 Argument: VibeSwap's privacy-by-default exceeds GDPR requirements.
@@ -147,9 +147,9 @@ VibeSwap architecture choice:
 OFAC (US) and similar sanctions lists apply to financial activity. Penalties substantial for serving sanctioned addresses/jurisdictions.
 
 VibeSwap strategy:
-- [Clawback Cascade](./CLAWBACK_CASCADE_MECHANICS.md) enables response to sanctioned-funds flows without blocking protocol itself.
+- [Clawback Cascade](../../concepts/security/CLAWBACK_CASCADE_MECHANICS.md) enables response to sanctioned-funds flows without blocking protocol itself.
 - Frontends for US residents can pre-screen against sanctions.
-- Protocol itself doesn't implement address-level blocklist (consistent with [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md) + GEV-resistance non-censorship commitment).
+- Protocol itself doesn't implement address-level blocklist (consistent with [`NO_EXTRACTION_AXIOM.md`](../../concepts/NO_EXTRACTION_AXIOM.md) + GEV-resistance non-censorship commitment).
 
 ### Tax compliance
 
@@ -174,7 +174,7 @@ VibeSwap's architecture distributes responsibility. Each participant bears their
 
 ## The Augmented Governance regulatory argument
 
-[Augmented Governance](./AUGMENTED_GOVERNANCE.md) hierarchy (Physics > Constitution > Governance) is designed for regulatability:
+[Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md) hierarchy (Physics > Constitution > Governance) is designed for regulatability:
 
 - **Physics layer** (math invariants) — regulators can recognize as stable commitment.
 - **Constitutional layer** (P-000, P-001 axioms) — self-regulating; regulators can trust these are stable.

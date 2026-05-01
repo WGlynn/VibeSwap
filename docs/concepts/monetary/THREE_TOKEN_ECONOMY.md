@@ -505,7 +505,7 @@ Depends on:
 
 - [Economitra](ECONOMITRA.md) — The economic model framework this token system implements
 - [Economitra v1.2](ECONOMITRA_V1.2.md) — Updated version with trinomial stability
-- [Economitra (paper)](../docs/papers/ECONOMITRA.md) — Academic treatment with formal proofs
+- [Economitra (paper)](../../research/papers/ECONOMITRA.md) — Academic treatment with formal proofs
 - [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Mathematical framework ensuring no cohort advantage
-- [Cooperative Emission Design](../docs/papers/cooperative-emission-design.md) — Emission mechanism for cooperative token distribution
-- [Near-Zero Token Scaling](../docs/papers/near-zero-token-scaling.md) — Scaling with minimal token overhead
+- [Cooperative Emission Design](../../research/papers/cooperative-emission-design.md) — Emission mechanism for cooperative token distribution
+- [Near-Zero Token Scaling](../../research/papers/near-zero-token-scaling.md) — Scaling with minimal token overhead

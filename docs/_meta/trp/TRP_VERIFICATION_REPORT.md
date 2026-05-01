@@ -208,7 +208,7 @@ These claims are defensible. Everything else needs the corrections above.
 
 ## See Also
 
-- [TRP Core Spec](TRINITY_RECURSION_PROTOCOL.md) — The document this report audits
-- [TRP Empirical RSI (paper)](papers/trp-empirical-rsi.md) — 53-round empirical evidence
-- [TRP Pattern Taxonomy (paper)](papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
-- [Efficiency Heat Map](trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — The document this report audits
+- [TRP Empirical RSI (paper)](../../research/papers/trp-empirical-rsi.md) — 53-round empirical evidence
+- [TRP Pattern Taxonomy (paper)](../../research/papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
+- [Efficiency Heat Map](../trp-existing/efficiency-heatmap.md) — Per-contract discovery yield tracking

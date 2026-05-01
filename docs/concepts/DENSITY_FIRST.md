@@ -2,7 +2,7 @@
 
 **Status**: Engineering and communication principle.
 **Audience**: First-encounter OK.
-**Primitive**: [`memory/feedback_density-always-priority.md`](../memory/feedback_density-always-priority.md)
+**Primitive**: [`memory/feedback_density-always-priority.md`](../memory/feedback_density-always-priority.md) <!-- FIXME: ../memory/feedback_density-always-priority.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -14,7 +14,7 @@ Compare these two answers to "Does VibeSwap use Shapley distribution?"
 *"Thanks for your question! That's a great question actually. So, VibeSwap does indeed use a distribution method. Specifically, the protocol incorporates what's called Shapley value distribution, which is a cooperative game theory concept that was developed by Lloyd Shapley in 1953. This method has several important properties... [continues for 500 words]"*
 
 **Answer B** (high density):
-*"Yes. Shapley distribution with Lawson Floor + Novelty Bonus modifier. Each accepted claim earns marginal-contribution share. See [SHAPLEY_REWARD_SYSTEM](./SHAPLEY_REWARD_SYSTEM.md) for detail."*
+*"Yes. Shapley distribution with Lawson Floor + Novelty Bonus modifier. Each accepted claim earns marginal-contribution share. See [SHAPLEY_REWARD_SYSTEM](shapley/SHAPLEY_REWARD_SYSTEM.md) for detail."*
 
 Both convey the same fact (VibeSwap uses Shapley). Answer B conveys it in 3% of the tokens.
 
@@ -97,7 +97,7 @@ Choose the register before writing.
 
 ## Density and Token Mindfulness
 
-[Token Mindfulness](./TOKEN_MINDFULNESS.md) is the discipline producing density. Density is the quality metric Mindfulness optimizes for.
+[Token Mindfulness](monetary/TOKEN_MINDFULNESS.md) is the discipline producing density. Density is the quality metric Mindfulness optimizes for.
 
 Related disciplines:
 - **Lead with the crux**: first sentence carries the load-bearing claim.
@@ -118,7 +118,7 @@ Sparse code: ceremony lines (unnecessary wrappers, indirection layers, comments-
 
 ## Density in memory files
 
-[MEMORY.md](../memory/MEMORY.md) is explicitly density-first:
+[MEMORY.md](../memory/MEMORY.md) is explicitly density-first: <!-- FIXME: ../memory/MEMORY.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 - Each line under 150 characters.
 - One-line hooks, not paragraphs.
 - Links to detailed files; summary in the link text.

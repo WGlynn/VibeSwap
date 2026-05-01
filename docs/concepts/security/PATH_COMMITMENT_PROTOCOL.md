@@ -198,7 +198,7 @@ Clean path-commitment means future refactors can replace the full mechanism if n
 
 ## Relationship to Correspondence Triad
 
-Per [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md): the Triad fires BEFORE design decisions. Path Commitment fires AFTER:
+Per [`CORRESPONDENCE_TRIAD.md`](../CORRESPONDENCE_TRIAD.md): the Triad fires BEFORE design decisions. Path Commitment fires AFTER:
 
 1. Triad evaluates candidate paths.
 2. Multiple paths may pass the Triad.
@@ -208,7 +208,7 @@ Both are part of the design discipline. Triad is the quality filter; Path Commit
 
 ## Relationship to First-Available Trap
 
-[`memory/primitive_first-available-trap.md`](../memory/primitive_first-available-trap.md): default to off-the-shelf is often wrong. Reject the default.
+[`memory/primitive_first-available-trap.md`](../memory/primitive_first-available-trap.md): default to off-the-shelf is often wrong. Reject the default. <!-- FIXME: ../memory/primitive_first-available-trap.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 Path Commitment is the opposite failure: having identified two good paths, watering both down into a weaker mix.
 
@@ -229,9 +229,9 @@ Apply to any recent decision — technical, career, relationship. Observe how of
 
 ## Relationship to other primitives
 
-- **Fires after**: [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md) filters candidates.
+- **Fires after**: [`CORRESPONDENCE_TRIAD.md`](../CORRESPONDENCE_TRIAD.md) filters candidates.
 - **Anti-pattern for**: First-Available Trap (opposite failure mode).
-- **Related discipline**: [`DENSITY_FIRST.md`](./DENSITY_FIRST.md) — both favor commitment over hedging.
+- **Related discipline**: [`DENSITY_FIRST.md`](../DENSITY_FIRST.md) — both favor commitment over hedging.
 
 ## One-line summary
 

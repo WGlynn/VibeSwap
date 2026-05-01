@@ -89,7 +89,7 @@ If the attestor who invests 30 min of careful review gets additional reward, cal
 - `previewAttestationWeight` — shows attestor their effective weight before committing.
 - Trust-weighted multipliers — high-trust attestors' votes count for more → per-attestation benefit is higher for them → rational to invest.
 
-**Limitation**: only works if "thoroughness" is measurable. [Goodhart's Law](./THE_OBSERVER_EFFECT_IN_ATTESTATION.md) bites here too.
+**Limitation**: only works if "thoroughness" is measurable. [Goodhart's Law](../research/theorems/THE_OBSERVER_EFFECT_IN_ATTESTATION.md) bites here too.
 
 ### Response 2 — Delegate to informed (expert proxies)
 
@@ -103,7 +103,7 @@ Most attestors delegate to small number of "expert" attestors who are paid for w
 
 Make information legible. Canonical issue templates + traceability chains + closing comments.
 
-**VibeSwap implementation**: [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) canonical format reduces per-attestation evaluation cost from ~30 min to ~5 min.
+**VibeSwap implementation**: [Chat-to-DAG Traceability](identity/CONTRIBUTION_TRACEABILITY.md) canonical format reduces per-attestation evaluation cost from ~30 min to ~5 min.
 
 **Effectiveness**: high — cost side of equation reduced dramatically.
 
@@ -210,7 +210,7 @@ VibeSwap does this: trust compounds with attestation accuracy over time. Long-te
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), rational ignorance is a cognitive-economic equilibrium. Attention is scarce, decisions are many, most decisions don't justify full attention. Humans evolved heuristics (gut feel, pattern-match, defer-to-expert) that navigate this economy well.
+Under [Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md), rational ignorance is a cognitive-economic equilibrium. Attention is scarce, decisions are many, most decisions don't justify full attention. Humans evolved heuristics (gut feel, pattern-match, defer-to-expert) that navigate this economy well.
 
 VibeSwap's architecture mirrors these heuristics on-chain. Trust-delegation = defer-to-expert. Pattern-matching = shallow fast evaluation. Tribunal escalation = reach for deep attention when it matters.
 

@@ -217,9 +217,9 @@ Discovery Ceiling ←→ ALL
 
 ## See Also
 
-- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
 - [TRP Empirical RSI](trp-empirical-rsi.md) — 53-round empirical evidence (companion paper)
-- [TRP Runner Paper](../trp-runner-paper.md) — Crash-resilient recursive improvement
-- [Efficiency Heat Map](../trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
-- [Loop 1: Adversarial](../trp/loop-1-adversarial-verification.md) — The loop that generated these patterns
-- [Loop 2: Knowledge](../trp/loop-2-common-knowledge.md) — The loop that extracted these patterns
+- [TRP Runner Paper](trp-runner/trp-runner-paper.md) — Crash-resilient recursive improvement
+- [Efficiency Heat Map](../../_meta/trp-existing/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [Loop 1: Adversarial](../../_meta/trp-existing/loop-1-adversarial-verification.md) — The loop that generated these patterns
+- [Loop 2: Knowledge](../../_meta/trp-existing/loop-2-common-knowledge.md) — The loop that extracted these patterns

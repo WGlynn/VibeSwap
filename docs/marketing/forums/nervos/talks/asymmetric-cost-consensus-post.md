@@ -9,7 +9,7 @@
 
 We designed a consensus model where **honest participation gets cheaper over time while attacking stays expensive**. Traditional consensus (PoW, PoS) is memoryless -- a 5-year honest validator pays the same cost as a day-one attacker. Our model composes three independent cost dimensions (Proof of Work, Proof of Mind, Proof of Stake) into a multiplicative cost surface where cooperation earns compounding discounts and attack earns nothing. The result: a flywheel that drops the viral threshold from ~10,000 participants (PoW) to ~30 participants (3D model). We think CKB's cell model is the natural substrate for encoding this cost surface, and this post explains why.
 
-**Full paper:** [Asymmetric Cost Consensus: Making Cooperation Cheaper Than Attack](../papers/asymmetric-cost-consensus.md)
+**Full paper:** [Asymmetric Cost Consensus: Making Cooperation Cheaper Than Attack](../../../../research/papers/asymmetric-cost-consensus.md)
 
 ---
 
@@ -212,7 +212,7 @@ The Shapley cooperation rebate maps to CKB cell composition. Each participant's 
 
 ## Further Reading
 
-- **Full paper**: [Asymmetric Cost Consensus](../papers/asymmetric-cost-consensus.md)
+- **Full paper**: [Asymmetric Cost Consensus](../../../../research/papers/asymmetric-cost-consensus.md)
 - **Proof of Mind**: [Proof of Mind consensus post](proof-of-mind-post.md)
 - **Shapley distribution**: [Shapley Distribution on CKB](shapley-distribution-post.md)
 - **CKB integration**: [Nervos and VibeSwap Synergy](nervos-vibeswap-synergy.md)

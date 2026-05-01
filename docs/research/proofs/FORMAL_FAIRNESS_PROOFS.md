@@ -657,12 +657,12 @@ This represents a principled tradeoff between theoretical purity and practical s
 ## See Also
 
 - [IIA Empirical Verification](IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation of these proofs against live code
-- [Omniscient Adversary Proof](../docs/papers/omniscient-adversary-proof.md) — Proof that fairness holds even against omniscient attackers
-- [P-001: No Extraction Ever](../docs/nervos-talks/p001-no-extraction-ever-post.md) — The axiom these proofs formalize
-- [Clawback Cascade](CLAWBACK_CASCADE.md) — Enforcement mechanism when fairness is violated
-- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
-- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
-- [Composable Fairness](COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
-- [Proof of Contribution](PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
-- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
-- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms
+- [Omniscient Adversary Proof](../papers/omniscient-adversary-proof.md) — Proof that fairness holds even against omniscient attackers
+- [P-001: No Extraction Ever](../../marketing/forums/nervos/talks/p001-no-extraction-ever-post.md) — The axiom these proofs formalize
+- [Clawback Cascade](../../concepts/security/CLAWBACK_CASCADE.md) — Enforcement mechanism when fairness is violated
+- [Shapley Reward System](../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Cross-Domain Shapley](../../concepts/shapley/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](../../concepts/COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
+- [Proof of Contribution](../../concepts/identity/PROOF_OF_CONTRIBUTION.md) — Shapley-based consensus for block production
+- [Atomized Shapley (paper)](../papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../papers/shapley-value-distribution.md) — On-chain implementation with five axioms

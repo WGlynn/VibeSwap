@@ -2,7 +2,7 @@
 
 **Status**: Security primitive. Live in `contracts/libraries/FibonacciScaling.sol`.
 **Audience**: First-encounter OK. Attacker vs normal-user compared with specific numbers.
-**Instance of**: [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md).
+**Instance of**: [Substrate-Geometry Match](../SUBSTRATE_GEOMETRY_MATCH.md).
 
 ---
 
@@ -204,9 +204,9 @@ Observe how Fibonacci protects light users more than linear does, while hurting 
 
 ## Relationship to other primitives
 
-- **Parent**: [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md) — matches power-law attacker distribution + golden-ratio recovery.
+- **Parent**: [Substrate-Geometry Match](../SUBSTRATE_GEOMETRY_MATCH.md) — matches power-law attacker distribution + golden-ratio recovery.
 - **Sibling**: [Circuit Breaker Design](./CIRCUIT_BREAKER_DESIGN.md) — both are security primitives but address different triggers (CB = system-wide; FB = per-user-per-pool).
-- **Anti-pattern for**: linear rate limiters. See [First-Available Trap](../memory/primitive_first-available-trap.md).
+- **Anti-pattern for**: linear rate limiters. See [First-Available Trap](../memory/primitive_first-available-trap.md). <!-- FIXME: ../memory/primitive_first-available-trap.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ## One-line summary
 

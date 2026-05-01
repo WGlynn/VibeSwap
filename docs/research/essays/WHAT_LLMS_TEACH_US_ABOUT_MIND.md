@@ -2,7 +2,7 @@
 
 **Status**: Pedagogical essay. Assumes the reader is new to these ideas.
 **Audience**: Students, educators, curious practitioners.
-**Related**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), [Cognitive Economy Thesis](./THE_COGNITIVE_ECONOMY_THESIS.md), [Non-Code Proof of Work](./NON_CODE_PROOF_OF_WORK.md).
+**Related**: [Economic Theory of Mind](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md), [Cognitive Economy Thesis](./THE_COGNITIVE_ECONOMY_THESIS.md), [Non-Code Proof of Work](../../concepts/NON_CODE_PROOF_OF_WORK.md).
 
 ---
 

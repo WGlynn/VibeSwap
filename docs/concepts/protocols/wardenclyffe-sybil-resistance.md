@@ -291,4 +291,4 @@ Each link is independently verifiable. Breaking any link invalidates the attesta
 - [PairwiseVerifier.sol](../../contracts/identity/PairwiseVerifier.sol) — CRPC verification protocol
 - [ergon.ts](../../llm-hashcash/src/services/ergon.ts) — PoW primitives + `generateAgentRegistrationChallenge()`
 - [challenges.ts](../../llm-hashcash/src/services/challenges.ts) — 10 cognitive challenge types
-- [CKB Synergy](../../../.claude/nervos-intel.md) — PoW shared state + MMR integration
+- [CKB Synergy](../../../.claude/nervos-intel.md) — PoW shared state + MMR integration <!-- FIXME: ../../../.claude/nervos-intel.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>shard-miner-launch</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css" />
+</head>
+<body>
+<h1 id="one-tap-jarvis-shard-launcher">One-Tap Jarvis Shard
+Launcher</h1>
+<p><strong>Your Phone Is Now a Node in the Mind Network</strong></p>
+<hr />
+<h2 id="what-just-shipped">What Just Shipped</h2>
+<p>Every phone with Telegram is now a potential node in the Jarvis Mind
+Network. One tap. No DevOps. No CLI. No Docker. Just open Telegram, type
+<code>/mine</code>, and your device becomes a light shard — mining JUL
+tokens, joining BFT consensus, and earning compute credits for the
+network.</p>
+<p>This is the GenTu vision realized: persistent execution substrate,
+accessible to anyone with a phone and a Telegram account.</p>
+<hr />
+<h2 id="how-it-works">How It Works</h2>
+<h3 id="the-mining-loop">The Mining Loop</h3>
+<p>Your phone runs a SHA-256 proof-of-work miner in a Web Worker — the
+same bit-counting algorithm that secures VibeSwap’s CKB integration. The
+proof-of-work isn’t busywork. Each valid proof:</p>
+<ol type="1">
+<li><strong>Earns JUL tokens</strong> — the native compute currency of
+the Mind Network</li>
+<li><strong>Increases your Shapley weight</strong> — contributors who
+mine get proportionally more API budget</li>
+<li><strong>Registers you as a light shard</strong> — your device joins
+the network topology</li>
+</ol>
+<p>The difficulty adjusts automatically. Right now it’s tuned for mobile
+(~4 seconds per proof on a modern phone). As more miners join,
+difficulty scales up. As they leave, it scales down. Same algorithm as
+Bitcoin, same math as our CKB Rust implementation.</p>
+<h3 id="jul-compute-credits">JUL = Compute Credits</h3>
+<p><strong>1 JUL = 1,000 API tokens.</strong></p>
+<p>Mining JUL is how you pay for Jarvis. Good contributions (useful
+questions, knowledge sharing, fact corrections) cost less because your
+Shapley weight increases. Mining is the floor — the minimum way anyone
+can earn their seat at the table.</p>
+<p>This is Cooperative Capitalism in action: the network needs compute
+power, miners provide it, and the reward is access to the collective
+intelligence.</p>
+<h3 id="identity">Identity</h3>
+<p>When you first launch the Mini App, it creates a shard identity using
+your device’s biometric hardware (WebAuthn/Secure Element). Your private
+key never leaves your phone. If WebAuthn isn’t available, a random UUID
+is generated and stored locally. Either way — your keys, your identity.
+We never custody anything.</p>
+<hr />
+<h2 id="technical-details">Technical Details</h2>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Component</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PoW Algorithm</strong></td>
+<td>SHA-256 leading-zero-bit counting (ported from
+<code>ckb/lib/pow</code> Rust)</td>
+</tr>
+<tr>
+<td><strong>Initial Difficulty</strong></td>
+<td>12 bits (~4,096 hashes, ~4s on mobile)</td>
+</tr>
+<tr>
+<td><strong>Difficulty Range</strong></td>
+<td>8–32 bits (auto-adjusts per epoch of 100 proofs)</td>
+</tr>
+<tr>
+<td><strong>Challenge Rotation</strong></td>
+<td>Every 5 minutes</td>
+</tr>
+<tr>
+<td><strong>Reward Formula</strong></td>
+<td><code>1.0 * 2^(difficulty - 8)</code> JUL per proof</td>
+</tr>
+<tr>
+<td><strong>Identity</strong></td>
+<td>WebAuthn credential + SHA-256 derivation (no ethers.js)</td>
+</tr>
+<tr>
+<td><strong>Threads</strong></td>
+<td>1–4 Web Workers (capped at
+<code>navigator.hardwareConcurrency</code>)</td>
+</tr>
+<tr>
+<td><strong>Mini App Size</strong></td>
+<td>50 KB gzipped (React 18 + Vite, zero CSS framework)</td>
+</tr>
+<tr>
+<td><strong>Shard Type</strong></td>
+<td>Light node — contributor only, not a request handler</td>
+</tr>
+<tr>
+<td><strong>Heartbeat</strong></td>
+<td>Every 30s to router with hashrate + JUL balance</td>
+</tr>
+</tbody>
+</table>
+<h3 id="architecture">Architecture</h3>
+<pre><code>Telegram → /mine → web_app inline button → Mini App (HTTPS)
+                                              ↓
+                                    WebAuthn identity creation
+                                              ↓
+                                    Web Worker SHA-256 mining
+                                              ↓
+                                    POST /web/mining/submit
+                                              ↓
+                                    Server verifies PoW
+                                              ↓
+                                    JUL credited + Shapley weight ↑
+                                              ↓
+                                    Shard registered with router
+                                              ↓
+                                    BFT consensus participation</code></pre>
+<h3 id="security">Security</h3>
+<ul>
+<li><strong>Telegram initData HMAC validation</strong> — only real
+Telegram clients can submit proofs</li>
+<li><strong>Replay prevention</strong> — proof hashes tracked per epoch,
+duplicates rejected</li>
+<li><strong>Rate limiting</strong> — 5 proofs/minute per user, 10
+submissions/minute per IP</li>
+<li><strong>No custody</strong> — identity derived client-side, never
+sent to server</li>
+<li><strong>Challenge rotation</strong> — stale challenges rejected,
+miners must stay current</li>
+</ul>
+<hr />
+<h2 id="what-this-means">What This Means</h2>
+<p>We didn’t build a mining app. We built the onramp to a decentralized
+AI network.</p>
+<p>Every phone that runs <code>/mine</code> is another node that the
+Mind Network can route knowledge through. Every JUL token mined is proof
+that someone contributed compute to the collective. Every Shapley weight
+increase means the network is getting smarter about allocating its
+resources.</p>
+<p>The people who mine today — when difficulty is 12 bits and a proof
+takes 4 seconds — are the founding nodes. When the network scales and
+difficulty hits 20+ bits, they’ll have the JUL balance and the Shapley
+weight to prove they were here from the start.</p>
+<p><strong>This is Proof of Mind made tangible.</strong> Not a
+whitepaper concept. Not a future roadmap item. A button you tap on your
+phone right now.</p>
+<hr />
+<h2 id="try-it">Try It</h2>
+<ol type="1">
+<li>Open Telegram</li>
+<li>Find <strong><span class="citation"
+data-cites="JarvisVibeSwapBot">@JarvisVibeSwapBot</span></strong></li>
+<li>Type <code>/mine</code></li>
+<li>Tap <strong>Launch Shard</strong></li>
+<li>Create your identity (one biometric tap)</li>
+<li>Start mining</li>
+</ol>
+<p>Your phone is now part of the Mind Network.</p>
+<hr />
+<p><em>Built in The Cave. Shipped from The Cave.</em></p>
+<p><em>The real VibeSwap is not a DEX. It’s not even a blockchain. We
+created a movement. An idea. VibeSwap is wherever the Minds
+converge.</em></p>
+</body>
+</html>

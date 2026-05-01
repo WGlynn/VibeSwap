@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>7 Audit Passes</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="data:text/css,body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:20px;line-height:1.6;color:%23333}h1,h2,h3{color:%23111}code{background:%23f4f4f4;padding:2px 6px;border-radius:3px}pre{background:%23f4f4f4;padding:16px;border-radius:6px;overflow-x:auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid %23ddd;padding:8px 12px;text-align:left}th{background:%23f4f4f4}blockquote{border-left:4px solid %23ddd;margin:0;padding-left:16px;color:%23666}" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">7 Audit Passes</h1>
+</header>
+<h1
+id="audit-passes-35-findings-0-compromises-how-we-hardened-vibeswaps-smart-contracts">7
+Audit Passes, 35 Findings, 0 Compromises: How We Hardened VibeSwap’s
+Smart Contracts</h1>
+<p>Seven is a lucky number. Seven days in a week. Seven notes in a
+scale. And now — seven full security audit passes across every smart
+contract in the VibeSwap protocol.</p>
+<p>Here’s what we found, what we fixed, and what we learned about
+building secure DeFi from scratch.</p>
+<hr />
+<h2 id="what-is-vibeswap">What Is VibeSwap?</h2>
+<p>VibeSwap is an omnichain DEX built on LayerZero V2 that eliminates
+MEV through commit-reveal batch auctions with uniform clearing prices.
+The protocol spans 25+ upgradeable smart contracts covering AMM
+mechanics, cross-chain routing, governance, incentive distribution,
+identity, compliance, and quantum-resistant security.</p>
+<p>The codebase is built on Solidity 0.8.20 with OpenZeppelin v5.0.1,
+using UUPS proxy patterns and Foundry for testing.</p>
+<p>Before the audit marathon began, we had 476 passing tests. By the
+end: <strong>550 tests, 0 failures, 35+ vulnerabilities fixed across 14
+commits.</strong></p>
+<hr />
+<h2 id="the-seven-passes">The Seven Passes</h2>
+<h3 id="pass-1-deploy-scripts-configuration">Pass 1: Deploy Scripts
+&amp; Configuration</h3>
+<p><strong>The boring stuff that would have ruined launch
+day.</strong></p>
+<p>We started where most auditors don’t — the deployment scripts. Good
+thing we did:</p>
+<ul>
+<li><code>CommitRevealAuction.initialize()</code> requires 3 parameters.
+Both deploy scripts passed 2. <strong>Every deployment would have
+reverted on-chain.</strong> Dead on arrival.</li>
+<li><code>setGuardian()</code> was called on <code>VibeAMM</code>, which
+doesn’t have that function. It belongs on
+<code>VibeSwapCore</code>.</li>
+<li>Emergency pause logic called <code>setGlobalPause()</code> on the
+AMM — a function that doesn’t exist. The emergency brake was
+disconnected.</li>
+</ul>
+<p>We also added post-deployment verification: EOA requirements, rate
+limits, guardian assignment, flash loan protection, TWAP validation, and
+router authorization — all checked automatically after deploy.</p>
+<p><strong>Lesson:</strong> Your contracts can be perfect and still fail
+at the last mile. Audit the scripts.</p>
+<hr />
+<h3 id="pass-2-core-contract-deep-dive">Pass 2: Core Contract Deep
+Dive</h3>
+<p><strong>Where tokens actually move.</strong></p>
+<p>This pass focused on the contracts that handle real value —
+IncentiveController, VolatilityInsurancePool, StablecoinFlowRegistry,
+and FederatedConsensus.</p>
+<p>The worst finding: <strong>IncentiveController was silently
+swallowing failed deposits.</strong> When routing fees to the volatility
+insurance pool via a low-level call, a failure returned
+<code>false</code> — and the code continued as if nothing happened.
+Tokens pulled from LPs sat trapped in the controller forever, invisible
+to everyone.</p>
+<p>Other findings: - <strong>VolatilityInsurancePool</strong> used a
+shared <code>claimedAmount</code> counter across multiple insurance
+events. Claiming from Event 1 reduced your payout from Event 2. LPs were
+being systematically shortchanged. - <strong>FederatedConsensus</strong>
+checked vote expiry <em>after</em> state changes. The revert undid the
+<code>EXPIRED</code> status write, so proposals stayed
+<code>PENDING</code> forever — zombie proposals that could never be
+settled. - <strong>StablecoinFlowRegistry</strong> had no bounds on flow
+ratios. A zero ratio caused division-by-zero downstream. Extreme ratios
+caused overflow.</p>
+<p><strong>Lesson:</strong> Silent failures are the most dangerous kind.
+If a call can fail, it must revert or be explicitly handled.</p>
+<hr />
+<h3 id="pass-3-governance-infrastructure">Pass 3: Governance &amp;
+Infrastructure</h3>
+<p><strong>The contracts that govern the contracts.</strong></p>
+<p><code>DecentralizedTribunal</code> had two critical issues:</p>
+<ol type="1">
+<li><p><strong>Stake settlement used a push pattern.</strong> If even
+one juror was a contract without a <code>receive()</code> function,
+<code>_settleStakes()</code> reverted for <em>everyone</em>. One bad
+actor could permanently block all tribunal settlements. We converted to
+a pull pattern with <code>pendingStakeWithdrawals</code> and a separate
+<code>withdrawStake()</code> function.</p></li>
+<li><p><strong>No identity verification for jurors.</strong> Anyone
+could <code>volunteerAsJuror()</code> — no soulbound identity, no level
+check, no reputation minimum. A sybil attacker could flood the juror
+pool with puppet accounts. We added
+<code>ISoulboundIdentityMinimal</code> integration with level and
+reputation thresholds.</p></li>
+</ol>
+<p>We also verified UUPS upgrade safety across all 25 contracts — every
+single <code>_authorizeUpgrade</code> is properly gated with
+<code>onlyOwner</code>.</p>
+<p><strong>Lesson:</strong> Pull over push for ETH transfers. Always.
+One reverting recipient should never block a system.</p>
+<hr />
+<h3 id="pass-4-peripheral-contract-sweep">Pass 4: Peripheral Contract
+Sweep</h3>
+<p><strong>13 contracts. 7 fixes. The long tail.</strong></p>
+<p>This was the broadest pass — reviewing every contract outside the
+core flow:</p>
+<ul>
+<li><p><strong>WalletRecovery</strong> used Solidity’s
+<code>.transfer()</code> for ETH in three places (bond returns, slash
+payments, reporter rewards). Since <code>.transfer()</code> forwards
+only 2300 gas, any recipient with a non-trivial <code>receive()</code>
+function would fail. We replaced all three with
+<code>.call{value:}()</code> with success checks.</p></li>
+<li><p><strong>DisputeResolver</strong> trapped excess ETH. If you sent
+1.5 ETH to <code>registerArbitrator()</code> but the minimum stake was 1
+ETH, the extra 0.5 ETH was permanently locked. Same issue in
+<code>escalateToTribunal()</code>. Added refund logic to both.</p></li>
+<li><p><strong>SoulboundIdentity</strong> allowed instant recovery
+contract changes. If an owner’s key was compromised, the attacker could
+immediately <code>setRecoveryContract()</code> and steal all identities.
+We replaced this with a 2-step timelock:
+<code>queueRecoveryContract()</code> then a 2-day wait then
+<code>executeRecoveryContractChange()</code>.</p></li>
+<li><p><strong>QuantumVault</strong> emitted an event when keys were
+exhausted but didn’t actually prevent reuse. The
+<code>AllKeysExhausted</code> error existed in the error declarations
+but was never triggered. Added the revert check.</p></li>
+</ul>
+<p><strong>Lesson:</strong> Peripheral contracts get less attention but
+the same attack surface. Audit everything.</p>
+<hr />
+<h3 id="pass-5-medium-severity-hardening">Pass 5: Medium-Severity
+Hardening</h3>
+<p><strong>Death by a thousand cuts.</strong></p>
+<p>Three fixes that prevent gas exhaustion and array manipulation:</p>
+<ul>
+<li><p><strong>DisputeResolver</strong> had an unbounded arbitrator
+assignment loop. If all arbitrators were suspended, the
+<code>while</code> loop would iterate forever, consuming all gas. We
+bounded it by <code>activeArbitrators.length</code> with a hard
+<code>require</code> at the end.</p></li>
+<li><p><strong>ClawbackRegistry</strong> had no limit on
+<code>caseWallets[caseId]</code>. An attacker could push addresses until
+any function iterating the array hit the block gas limit. Added
+<code>MAX_CASE_WALLETS = 1000</code>.</p></li>
+<li><p><strong>WalletRecovery</strong> allowed setting
+<code>guardianThreshold</code> higher than the actual number of active
+guardians — making recovery permanently impossible. Added validation
+against <code>getActiveGuardianCount()</code>.</p></li>
+</ul>
+<p><strong>Lesson:</strong> Unbounded arrays and loops are ticking time
+bombs. Cap everything.</p>
+<hr />
+<h3 id="pass-6-compliance-economic-safety">Pass 6: Compliance &amp;
+Economic Safety</h3>
+<p><strong>The rules that keep regulators happy.</strong></p>
+<ul>
+<li><p><strong>ComplianceRegistry</strong> checked KYC expiry in
+<code>canTrade()</code> but NOT in <code>canProvideLiquidity()</code> or
+<code>canUsePriorityAuction()</code>. A user whose KYC expired could
+still provide liquidity and access priority auctions — a clear
+compliance violation. Added expiry checks to both functions.</p></li>
+<li><p><strong>LoyaltyRewardsManager</strong> calculated reward shares
+based on the <code>amount</code> parameter rather than actual tokens
+received. If a fee-on-transfer token was ever used as the reward token,
+<code>rewardPerShareAccumulated</code> would be inflated, paying out
+more than the contract actually holds. Added balance-before/after
+pattern.</p></li>
+<li><p><strong>SlippageGuaranteeFund</strong> had a config field
+<code>userDailyLimitBps: 500</code> (5% of reserves) that was completely
+ignored. The actual daily limit was hardcoded to <code>1e18</code>. Dead
+config code. We wired it up properly.</p></li>
+</ul>
+<p><strong>Lesson:</strong> View functions need the same validation as
+state-changing functions. Dead config code means untested
+assumptions.</p>
+<hr />
+<h3 id="pass-7-cross-contract-interactions">Pass 7: Cross-Contract
+Interactions</h3>
+<p><strong>The final boss — composability risk.</strong></p>
+<p>The last pass examined how contracts call each other. Most concerns
+turned out to be false positives once you understand EVM atomicity:</p>
+<ul>
+<li>“Partial settlement leaves tokens stranded” —
+<strong>False.</strong> <code>settleBatch()</code> is a single atomic
+transaction. Tokens either fully settle or fully revert.</li>
+<li>“Admin can pause mid-swap” — <strong>False.</strong> A transaction
+is atomic. You can’t pause in the middle of someone else’s
+transaction.</li>
+<li>“Shapley tokens stuck if computation reverts” —
+<strong>False.</strong> <code>safeTransfer</code> +
+<code>computeShapleyValues</code> happen in the same TX. If computation
+reverts, the transfer reverts too.</li>
+</ul>
+<p>But we did find one real issue:</p>
+<p><strong>DAOTreasury passed <code>0, 0</code> for slippage protection
+on both <code>addLiquidity</code> and
+<code>removeLiquidity</code>.</strong> This means an attacker monitoring
+the mempool could sandwich the treasury’s liquidity operations —
+manipulating pool prices right before the treasury TX, then extracting
+the difference after. We added 95% minimum slippage protection on
+additions and caller-specified minimums on removals.</p>
+<p><strong>Lesson:</strong> Most cross-contract “vulnerabilities”
+dissolve once you understand EVM atomicity. But zero-slippage operations
+are always a real risk.</p>
+<hr />
+<h2 id="by-the-numbers">By the Numbers</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Audit passes</td>
+<td>7</td>
+</tr>
+<tr>
+<td>Contracts reviewed</td>
+<td>25+</td>
+</tr>
+<tr>
+<td>Vulnerabilities found</td>
+<td>35+</td>
+</tr>
+<tr>
+<td>Critical fixes</td>
+<td>6</td>
+</tr>
+<tr>
+<td>High fixes</td>
+<td>14</td>
+</tr>
+<tr>
+<td>Medium fixes</td>
+<td>15+</td>
+</tr>
+<tr>
+<td>False positives filtered</td>
+<td>20+</td>
+</tr>
+<tr>
+<td>New adversarial tests written</td>
+<td>30+</td>
+</tr>
+<tr>
+<td>Final test count</td>
+<td>550</td>
+</tr>
+<tr>
+<td>Test failures</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Commits</td>
+<td>14</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="severity-breakdown">Severity Breakdown</h2>
+<p><strong>Critical (6):</strong> Silent token loss in
+IncentiveController, tribunal settlement DoS, tribunal sybil attacks,
+deploy script revert, cross-chain security bypass, rate limit
+bypass.</p>
+<p><strong>High (14):</strong> Insurance double-claim, vote expiry
+corruption, ETH trapped in disputes, unsafe <code>.transfer()</code>,
+instant identity theft, zero-slippage treasury, KYC expiry gaps,
+non-functional clawback, key exhaustion bypass, fund lock on
+zero-address.</p>
+<p><strong>Medium (15+):</strong> Deploy misconfigurations, unbounded
+loops, array growth, threshold validation, dead config code,
+fee-on-transfer risk, ratio bounds, quorum minimums.</p>
+<hr />
+<h2 id="what-we-didnt-find">What We Didn’t Find</h2>
+<p>Equally important — what held up under scrutiny:</p>
+<ul>
+<li><strong>AMM core math</strong> — constant product invariant, fee
+accounting, LP share calculations all verified through fuzz testing and
+formal invariant checks.</li>
+<li><strong>Commit-reveal mechanism</strong> — hash hiding, slash
+accounting, priority bid ordering all battle-tested with adversarial
+tests.</li>
+<li><strong>TWAP oracle</strong> — deviation checks, flash loan
+protection, same-block interaction blocks all functioning
+correctly.</li>
+<li><strong>Shapley distribution</strong> — game theory axioms
+(efficiency, symmetry, null player, additivity) all formally
+verified.</li>
+<li><strong>DeterministicShuffle</strong> — production code correctly
+uses <code>generateSeedSecure()</code> with block entropy, not the
+simplified <code>generateSeed()</code>.</li>
+</ul>
+<hr />
+<h2 id="the-meta-lesson">The Meta-Lesson</h2>
+<p>Security isn’t a single event. It’s iterative.</p>
+<p>Pass 1 found issues that Pass 7 wouldn’t have caught. Pass 7 required
+understanding gained from Passes 1-6. Each layer of review builds
+context that makes the next layer more effective.</p>
+<p>If you’re building a DeFi protocol:</p>
+<ol type="1">
+<li><strong>Audit your deploy scripts.</strong> Seriously.</li>
+<li><strong>Silent failures kill.</strong> Every external call needs
+explicit success handling.</li>
+<li><strong>Pull over push</strong> for ETH transfers. Always.</li>
+<li><strong>Cap your arrays.</strong> Unbounded data structures are gas
+bombs.</li>
+<li><strong>View functions need validation too.</strong> Access control
+gaps in read functions become compliance violations.</li>
+<li><strong>Understand EVM atomicity</strong> before panicking about
+cross-contract risks.</li>
+<li><strong>Seven passes beats one.</strong> Each round catches what the
+last round missed.</li>
+</ol>
+<hr />
+<p><em>VibeSwap is an open-source omnichain DEX. The full codebase,
+including all security fixes and 550 tests, is available on
+GitHub.</em></p>
+<p><em>Built in a cave. With a box of scraps.</em></p>
+</body>
+</html>

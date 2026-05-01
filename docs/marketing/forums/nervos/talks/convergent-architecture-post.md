@@ -9,7 +9,7 @@
 
 Three independent projects -- built by three people who did not know each other, from three different intellectual traditions (mathematics, biology, economics) -- arrived at the same three-layer architecture without coordination. The layers: **Substrate** (WHERE computation lives), **Object** (WHAT the native unit of work is), and **Consensus** (HOW the system agrees on truth). Independent convergence cannot be coordinated. When multiple paths arrive at the same destination without communication, the destination is likely fundamental -- a natural joint in the problem space. We argue this architecture maps naturally to CKB's cell model, and that CKB may be the convergence point where all three projects meet.
 
-**Full paper:** [Convergent Architecture: When Three Independent Paths Arrive at the Same Design](../papers/convergent-architecture.md)
+**Full paper:** [Convergent Architecture: When Three Independent Paths Arrive at the Same Design](../../../../research/papers/convergent-architecture.md)
 
 ---
 
@@ -206,7 +206,7 @@ For collaboration: the strongest partnerships are those where people agree becau
 
 ## Further Reading
 
-- **Full paper**: [Convergent Architecture](../papers/convergent-architecture.md)
+- **Full paper**: [Convergent Architecture](../../../../research/papers/convergent-architecture.md)
 - **Proof of Mind**: [PoM consensus post](proof-of-mind-post.md)
 - **CKB integration**: [Nervos and VibeSwap Synergy](nervos-vibeswap-synergy.md)
 - **Cooperative capitalism**: [Cooperative Capitalism post](cooperative-capitalism-post.md)

@@ -214,15 +214,15 @@ Observe: structure is cheap; content dominates.
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive memory has temperature tiers: vivid episodic (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived).
+Under [Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md), cognitive memory has temperature tiers: vivid episodic (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived).
 
 The DAG's hot/warm/cold storage tiers mirror this. Cognition doesn't preserve entropy uniformly; it compresses over time. Same pattern.
 
 ## Relationship to other primitives
 
-- **Companion**: [Kolmogorov Complexity of Attribution](./KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.md) — Kolmogorov gives the storage lower bounds; entropy preservation is about which parts we keep.
-- **Instance**: [ContributionAttestor](./CONTRIBUTION_ATTESTOR_EXPLAINER.md) — stores the structural layer.
-- **Enabling**: [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) — captures source content that then goes to off-chain tiers.
+- **Companion**: [Kolmogorov Complexity of Attribution](../research/theorems/KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.md) — Kolmogorov gives the storage lower bounds; entropy preservation is about which parts we keep.
+- **Instance**: [ContributionAttestor](identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md) — stores the structural layer.
+- **Enabling**: [Chat-to-DAG Traceability](identity/CONTRIBUTION_TRACEABILITY.md) — captures source content that then goes to off-chain tiers.
 
 ## One-line summary
 

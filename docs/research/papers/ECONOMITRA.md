@@ -410,9 +410,9 @@ Implementation details and extended proofs are available in the VibeSwap documen
 
 ## See Also
 
-- [Economitra v1.0](../../DOCUMENTATION/ECONOMITRA.md) — Original framework document
-- [Economitra v1.2](../../DOCUMENTATION/ECONOMITRA_V1.2.md) — Updated with trinomial stability
-- [Three-Token Economy](../../DOCUMENTATION/THREE_TOKEN_ECONOMY.md) — Token architecture
-- [Time-Neutral Tokenomics](../../DOCUMENTATION/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness proofs
+- [Economitra v1.0](../../DOCUMENTATION/ECONOMITRA.md) — Original framework document <!-- FIXME: ../../DOCUMENTATION/ECONOMITRA.md — multiple candidates: docs/concepts/monetary/ECONOMITRA.md, docs/research/papers/ECONOMITRA.md, NOTE: auto-repair would self-link -->
+- [Economitra v1.2](../../concepts/monetary/ECONOMITRA_V1.2.md) — Updated with trinomial stability
+- [Three-Token Economy](../../concepts/monetary/THREE_TOKEN_ECONOMY.md) — Token architecture
+- [Time-Neutral Tokenomics](../../concepts/monetary/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness proofs
 - [Cooperative Emission Design](cooperative-emission-design.md) — Emission mechanism
 - [Near-Zero Token Scaling](near-zero-token-scaling.md) — Minimal-token coordination

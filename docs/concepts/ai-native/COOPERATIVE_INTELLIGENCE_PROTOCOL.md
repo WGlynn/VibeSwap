@@ -955,10 +955,10 @@ This paper is the synthesis. The others are the components.
 
 ## See Also
 
-- [Cooperative Capitalism (paper)](../docs/papers/cooperative-capitalism.md) — Mechanism design for mutualized risk and free market competition
+- [Cooperative Capitalism (paper)](../../research/papers/cooperative-capitalism.md) — Mechanism design for mutualized risk and free market competition
 - [Cooperative Markets Philosophy](COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation using multilevel selection theory
-- [Augmented Governance](AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
-- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Mechanism design proofs and axiom verification
-- [IIA Empirical Verification](IIA_EMPIRICAL_VERIFICATION.md) — Independence of irrelevant alternatives verification
-- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain Shapley implementation
-- [Cognitive Consensus Markets (paper)](../docs/papers/cognitive-consensus-markets.md) — CRPC mechanism
+- [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Formal Fairness Proofs](../../research/proofs/FORMAL_FAIRNESS_PROOFS.md) — Mechanism design proofs and axiom verification
+- [IIA Empirical Verification](../../research/proofs/IIA_EMPIRICAL_VERIFICATION.md) — Independence of irrelevant alternatives verification
+- [Shapley Value Distribution (paper)](../../research/papers/shapley-value-distribution.md) — On-chain Shapley implementation
+- [Cognitive Consensus Markets (paper)](../../research/papers/cognitive-consensus-markets.md) — CRPC mechanism

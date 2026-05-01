@@ -16,13 +16,13 @@ The substrate doesn't matter. The mechanism does.
 
 ### Cryptoeconomic mechanism design — Clawback Cascade
 
-In the Cascade architecture ([Clawback Cascade §5](../../DOCUMENTATION/CLAWBACK_CASCADE.md)), every successful attack feeds the system more value than it extracts:
+In the Cascade architecture ([Clawback Cascade §5](../../concepts/security/CLAWBACK_CASCADE.md)), every successful attack feeds the system more value than it extracts:
 
 $$\text{SystemValue}(\text{post-attack}) = \text{SystemValue}(\text{pre-attack}) + \text{SlashedStake} - \text{AttackCost}$$
 
 Slashed stakes flow to the insurance pool (50%), bug bounties (30%), and burned supply (20%). The attacker's wallet network is permanently tainted. Their soulbound identity is marked. The system is *measurably* stronger after each attempt.
 
-The proof is game-theoretic: rational agents converge on compliance because non-compliance is the higher-energy state ([§3.3](../../DOCUMENTATION/CLAWBACK_CASCADE.md)). Damage is not just absorbed — it is consumed.
+The proof is game-theoretic: rational agents converge on compliance because non-compliance is the higher-energy state ([§3.3](../../concepts/security/CLAWBACK_CASCADE.md)). Damage is not just absorbed — it is consumed.
 
 ### Neural network training — Persistent Stochastic Ablation
 
@@ -81,7 +81,7 @@ The corollary: systems that try to avoid damage entirely (no slashing, no ablati
 
 ## See also
 
-- [Clawback Cascade Mechanics](../../DOCUMENTATION/CLAWBACK_CASCADE.md) — the cryptoeconomic instance
+- [Clawback Cascade Mechanics](../../concepts/security/CLAWBACK_CASCADE.md) — the cryptoeconomic instance
 - [Knowledge Primitives Index](knowledge-primitives-index.md) — P-114 entry
 - [Cooperative Capitalism](cooperative-capitalism.md) — the philosophical frame in which anti-fragility sits
 - [Augmented Mechanism Design](augmented-mechanism-design.md) — the methodology that operationalizes the primitive

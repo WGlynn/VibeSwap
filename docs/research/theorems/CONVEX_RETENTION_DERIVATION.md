@@ -159,7 +159,7 @@ No — but they're structurally analogous. A contribution's value to the ecosyst
 - The decay shape is convex — slow at first, accelerating.
 - Very old contributions (facts) retain trace value but are largely deprecated.
 
-The analogy isn't perfect (Ebbinghaus measured INDIVIDUAL memory; NCI models ECOSYSTEM value), but the SHAPE of decay matches. The substrate-geometry-match (see [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md)) argues this shape-match is load-bearing — a mechanism that decays linearly or exponentially would mis-mirror the cognitive substrate.
+The analogy isn't perfect (Ebbinghaus measured INDIVIDUAL memory; NCI models ECOSYSTEM value), but the SHAPE of decay matches. The substrate-geometry-match (see [`CORRESPONDENCE_TRIAD.md`](../../concepts/CORRESPONDENCE_TRIAD.md)) argues this shape-match is load-bearing — a mechanism that decays linearly or exponentially would mis-mirror the cognitive substrate.
 
 ## What would falsify α ≈ 1.6?
 
@@ -198,7 +198,7 @@ This doc provides the calibration reference that the tests assert against. Witho
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — the primitive this calibration implements. This doc is the empirical grounding; that doc is the pattern.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../../concepts/ATTENTION_SURFACE_SCALING.md)) — the primitive this calibration implements. This doc is the empirical grounding; that doc is the pattern.
 - **ETM Mathematical Foundation** — the general math framework for ETM-aligned mechanisms.
 - **ETM Build Roadmap** — Gap #1 spec that consumes this calibration.
 

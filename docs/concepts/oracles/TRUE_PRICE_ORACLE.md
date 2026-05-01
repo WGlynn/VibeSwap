@@ -2163,5 +2163,5 @@ Where:
 - [True Price Discovery](TRUE_PRICE_DISCOVERY.md) — Philosophy: why true price matters
 - [Price Intelligence Oracle](PRICE_INTELLIGENCE_ORACLE.md) — Intelligence layer: manipulation detection
 - [Kalman Filter Oracle](KALMAN_FILTER_ORACLE.md) — The Kalman filter this oracle uses
-- [Clearing Price Convergence Proof](../docs/papers/clearing-price-convergence-proof.md) — Proof that clearing prices converge
+- [Clearing Price Convergence Proof](../../research/papers/clearing-price-convergence-proof.md) — Proof that clearing prices converge
 - Implementation: `oracle/` (Python pipeline)

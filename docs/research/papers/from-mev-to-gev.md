@@ -630,6 +630,6 @@ The result is a financial system where the answer to "who extracts?" is "nobody"
 
 - [Commit-Reveal Batch Auctions (paper)](commit-reveal-batch-auctions.md) — Core mechanism: temporal decoupling for MEV elimination
 - [Five-Layer MEV Defense on CKB](five-layer-mev-defense-ckb.md) — CKB-specific five-layer defense analysis
-- [Recursive Batch Auctions](../../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
-- [Commit-Reveal (Nervos post)](../nervos-talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages and temporal enforcement
-- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the mechanism
+- [Recursive Batch Auctions](../../architecture/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
+- [Commit-Reveal (Nervos post)](../../marketing/forums/nervos/talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages and temporal enforcement
+- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the mechanism <!-- FIXME: ../../blog/01_commit_reveal_mev.md — no candidate found in docs/ tree. -->

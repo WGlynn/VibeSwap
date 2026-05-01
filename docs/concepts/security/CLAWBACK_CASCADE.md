@@ -177,7 +177,7 @@ The system becomes *stronger* after each attack. This is anti-fragility by desig
 
 Anti-fragility under persistent damage is not specific to cryptoeconomic mechanism design. **Persistent Stochastic Ablation** ([Cotten, 2024](https://github.com/tcotten-scrypted/persistent-stochastic-ablation-mlp)) demonstrates the empirical analog in neural network training: networks evolved under persistent ablation outperform pristine baselines in two of four classified training regimes (*Beneficial Regularization* and *Chaotic Optimization*).
 
-The convergence is structural. Whether the substrate is a transaction graph (Cascade) or a high-dimensional weight space (PSA), systems exposed to persistent stochastic damage with proper accounting evolve toward higher-value configurations than systems shielded from damage entirely. The anti-fragility primitive is substrate-independent. See [P-114](../docs/papers/knowledge-primitives-index.md) and [Anti-Fragility Under Persistent Damage](../docs/papers/anti-fragility.md) for the generalization.
+The convergence is structural. Whether the substrate is a transaction graph (Cascade) or a high-dimensional weight space (PSA), systems exposed to persistent stochastic damage with proper accounting evolve toward higher-value configurations than systems shielded from damage entirely. The anti-fragility primitive is substrate-independent. See [P-114](../../research/papers/knowledge-primitives-index.md) and [Anti-Fragility Under Persistent Damage](../../research/papers/anti-fragility.md) for the generalization.
 
 ---
 
@@ -224,7 +224,7 @@ The end state: a system where compliance is not enforced but *emergent* — the 
 
 ## See Also
 
-- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — The mathematical framework clawback enforces
-- [IIA Empirical Verification](IIA_EMPIRICAL_VERIFICATION.md) — Empirical proof that fairness properties hold
-- [Omniscient Adversary Proof](../docs/papers/omniscient-adversary-proof.md) — Fairness against worst-case attackers
-- [P-001: No Extraction Ever](../docs/nervos-talks/p001-no-extraction-ever-post.md) — The axiom clawback enforces
+- [Formal Fairness Proofs](../../research/proofs/FORMAL_FAIRNESS_PROOFS.md) — The mathematical framework clawback enforces
+- [IIA Empirical Verification](../../research/proofs/IIA_EMPIRICAL_VERIFICATION.md) — Empirical proof that fairness properties hold
+- [Omniscient Adversary Proof](../../research/papers/omniscient-adversary-proof.md) — Fairness against worst-case attackers
+- [P-001: No Extraction Ever](../../marketing/forums/nervos/talks/p001-no-extraction-ever-post.md) — The axiom clawback enforces

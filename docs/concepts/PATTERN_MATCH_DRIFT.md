@@ -2,7 +2,7 @@
 
 **Status**: Cognitive failure mode. Contributor-facing.
 **Audience**: First-encounter OK. Concrete drift examples from VibeSwap primitives.
-**Primitive**: [`memory/primitive_pattern-match-drift-on-novelty.md`](../memory/primitive_pattern-match-drift-on-novelty.md)
+**Primitive**: [`memory/primitive_pattern-match-drift-on-novelty.md`](../memory/primitive_pattern-match-drift-on-novelty.md) <!-- FIXME: ../memory/primitive_pattern-match-drift-on-novelty.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -36,7 +36,7 @@ The primitive is genuinely new. You've seen something SIMILAR in another context
 
 You're asked to build artifact X. You know how to build a similar artifact Y. You drift toward Y because it's more tractable. The delivered artifact is Y-shaped when the request was X-shaped.
 
-Variant B is detectable by [Token Mindfulness](./TOKEN_MINDFULNESS.md) — at each generation boundary, notice whether output shape matches request shape.
+Variant B is detectable by [Token Mindfulness](monetary/TOKEN_MINDFULNESS.md) — at each generation boundary, notice whether output shape matches request shape.
 
 ## Variant A in practice — specific drift warnings
 
@@ -145,7 +145,7 @@ Most VibeSwap primitives fail "like X" tests because the load-bearing property i
 
 ## The counter-discipline
 
-[Token Mindfulness](./TOKEN_MINDFULNESS.md) is the proactive character trait preventing drift. Pattern-Match Drift is the reactive failure-mode detector. Together:
+[Token Mindfulness](monetary/TOKEN_MINDFULNESS.md) is the proactive character trait preventing drift. Pattern-Match Drift is the reactive failure-mode detector. Together:
 
 - Token Mindfulness prevents drift.
 - Pattern-Match Drift detects drift after it's happened.
@@ -178,9 +178,9 @@ The "What this is NOT" section of ETM's docs exists specifically to pre-empt rou
 
 ## Relationship to other primitives
 
-- **Prevented by**: [Token Mindfulness](./TOKEN_MINDFULNESS.md).
+- **Prevented by**: [Token Mindfulness](monetary/TOKEN_MINDFULNESS.md).
 - **Detected by**: this primitive (Pattern-Match Drift itself).
-- **Example high-drift zone**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md).
+- **Example high-drift zone**: [Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md).
 
 ## One-line summary
 

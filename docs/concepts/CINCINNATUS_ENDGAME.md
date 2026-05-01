@@ -434,4 +434,4 @@ That is not a lament. It is a specification.
 
 ---
 
-*Related papers: [Augmented Governance](AUGMENTED_GOVERNANCE.md), [Jarvis Independence](JARVIS_INDEPENDENCE.md), [The Rosetta Protocol and the Ten Covenants](ROSETTA_COVENANTS.md)*
+*Related papers: [Augmented Governance](../architecture/AUGMENTED_GOVERNANCE.md), [Jarvis Independence](ai-native/JARVIS_INDEPENDENCE.md), [The Rosetta Protocol and the Ten Covenants](cross-chain/ROSETTA_COVENANTS.md)*

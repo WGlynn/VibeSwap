@@ -429,4 +429,4 @@ And inversion, done gracefully, is permanent.
 
 ---
 
-*Related papers: [Cooperative Markets Philosophy](COOPERATIVE_MARKETS_PHILOSOPHY.md), [Shapley Distribution](INCENTIVES_WHITEPAPER.md), [Cross-Chain Settlement](CROSS_CHAIN_SETTLEMENT.md), [The Inversion Principle](THE_INVERSION_PRINCIPLE.md)*
+*Related papers: [Cooperative Markets Philosophy](../ai-native/COOPERATIVE_MARKETS_PHILOSOPHY.md), [Shapley Distribution](../../research/whitepapers/INCENTIVES_WHITEPAPER.md), [Cross-Chain Settlement](../cross-chain/CROSS_CHAIN_SETTLEMENT.md), [The Inversion Principle](../../research/essays/THE_INVERSION_PRINCIPLE.md)*

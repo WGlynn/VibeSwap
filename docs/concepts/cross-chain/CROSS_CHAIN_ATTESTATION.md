@@ -2,7 +2,7 @@
 
 > *A user on Arbitrum submits a contribution. The protocol needs to score and reward them — but the similarity keeper runs on Optimism, and the reward distribution happens on Ethereum mainnet. How does the attestation flow across chains without losing integrity?*
 
-This doc specifies how VibeSwap's attestation system works across chains. VibeSwap is omnichain (LayerZero V2). Contributions can originate anywhere. Attestations must traverse chain boundaries while preserving the schema, signatures, and slashing guarantees from [`ATTESTATION_CLAIM_SCHEMA.md`](./ATTESTATION_CLAIM_SCHEMA.md).
+This doc specifies how VibeSwap's attestation system works across chains. VibeSwap is omnichain (LayerZero V2). Contributions can originate anywhere. Attestations must traverse chain boundaries while preserving the schema, signatures, and slashing guarantees from [`ATTESTATION_CLAIM_SCHEMA.md`](../identity/ATTESTATION_CLAIM_SCHEMA.md).
 
 ## The cross-chain challenge
 
@@ -271,7 +271,7 @@ But: if circuit breakers are LINKED (trip on A causes pause on B), resume attest
 
 - **OmnichainContributionAttestor** — migrate existing ContributionAttestor to OApp-based omnichain. Substantial work: ~300 LOC + LayerZero config + testing.
 
-- **Cross-chain Shapley** — downstream consumer of cross-chain attestations. Aggregates across chains. See [`CROSS_DOMAIN_SHAPLEY.md`](./CROSS_DOMAIN_SHAPLEY.md) for related.
+- **Cross-chain Shapley** — downstream consumer of cross-chain attestations. Aggregates across chains. See [`CROSS_DOMAIN_SHAPLEY.md`](../shapley/CROSS_DOMAIN_SHAPLEY.md) for related.
 
 - **Chain-split recovery tools** — governance tools for handling reorg-affected attestations.
 
@@ -281,7 +281,7 @@ But: if circuit breakers are LINKED (trip on A causes pause on B), resume attest
 
 ## Relationship to other primitives
 
-- **Attestation Claim Schema** (see [`ATTESTATION_CLAIM_SCHEMA.md`](./ATTESTATION_CLAIM_SCHEMA.md)) — schema extended with cross-chain fields.
+- **Attestation Claim Schema** (see [`ATTESTATION_CLAIM_SCHEMA.md`](../identity/ATTESTATION_CLAIM_SCHEMA.md)) — schema extended with cross-chain fields.
 - **Commit-Reveal For Oracles** — function commitment propagates.
 - **Attested Resume** — per-chain circuit breakers; resume attestations are per-chain.
 - **LayerZero V2** — the underlying cross-chain messaging.

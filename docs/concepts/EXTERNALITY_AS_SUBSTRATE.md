@@ -49,7 +49,7 @@ Without VibeSwap's infrastructure, Alice's contribution is an externality — va
 
 ### How VibeSwap captures it
 
-The [Chat-to-DAG Traceability](./CONTRIBUTION_TRACEABILITY.md) loop:
+The [Chat-to-DAG Traceability](identity/CONTRIBUTION_TRACEABILITY.md) loop:
 
 1. Alice's Telegram message is flagged (by Alice or a bot) as a `[Dialogue]` contribution. Issue opened. Source field = Alice + date.
 
@@ -151,7 +151,7 @@ VibeSwap's attribution is better in direct chains than in distant ones. Honest a
 
 An idea that unlocks $1B of value gets more attribution than one that unlocks $1K. This matches intuitions but some externality-producers may expect more than they receive.
 
-Calibration is done via the broader Shapley math; subject to the [Attribution Problem](./THE_ATTRIBUTION_PROBLEM.md)'s five gaps.
+Calibration is done via the broader Shapley math; subject to the [Attribution Problem](../research/essays/THE_ATTRIBUTION_PROBLEM.md)'s five gaps.
 
 ## The tagline connection
 
@@ -163,7 +163,7 @@ This is what "coordination primitive" means in the context of externality-captur
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive-economic externalities are the cognitive equivalent of "knowledge spillover" — ideas that emerge from one cognitive process informing many others.
+Under [Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md), cognitive-economic externalities are the cognitive equivalent of "knowledge spillover" — ideas that emerge from one cognitive process informing many others.
 
 Cognitive systems evolved to handle these (episodic memory, social learning, language itself). On-chain systems typically don't. VibeSwap's attribution stack brings cognitive-economic externality-capture on-chain.
 

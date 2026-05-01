@@ -2,7 +2,7 @@
 
 **Trigger**: Will, 2026-04-27, after USD8 history-compression-spec was corrected to off-chain-storage + on-chain-commitment: *"i agree vibeswap needs the same architecture to scale. good catch. immediate fix needed."*
 
-**Cross-reference**: [`vibeswap/docs/usd8/history-compression-spec.md`](../usd8/history-compression-spec.md) — the USD8 spec is the architectural template; this doc applies the same template to VibeSwap's three highest-pressure on-chain-storage surfaces.
+**Cross-reference**: [`vibeswap/docs/usd8/history-compression-spec.md`](../partnerships/usd8/internal/history-compression-spec.md) — the USD8 spec is the architectural template; this doc applies the same template to VibeSwap's three highest-pressure on-chain-storage surfaces.
 
 **Status**: refactor plan. Not blocking any current work. Phase 1 (indexer setup) requires zero contract changes.
 

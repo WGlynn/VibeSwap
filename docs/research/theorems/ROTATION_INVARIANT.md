@@ -32,7 +32,7 @@ Surfaces lacking any of the three will ossify: early claimants capture all capac
 
 Blockchain storage slots ARE the classic ossification hazard. Early contracts grab slots and hold them forever; new contracts pay gas to write but nothing happens to old slots.
 
-CKB state-rent (see [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md)) implements **price-driven rotation**: rent grows convexly with slot age (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)). Old claimants face accelerating costs. Eventually they release; the slot rotates.
+CKB state-rent (see [`COGNITIVE_RENT_ECONOMICS.md`](../../concepts/monetary/COGNITIVE_RENT_ECONOMICS.md)) implements **price-driven rotation**: rent grows convexly with slot age (see [`ATTENTION_SURFACE_SCALING.md`](../../concepts/ATTENTION_SURFACE_SCALING.md)). Old claimants face accelerating costs. Eventually they release; the slot rotates.
 
 Without state-rent, Ethereum-style chains gradually fill with abandoned contracts. The chain's effective capacity shrinks over time.
 
@@ -157,7 +157,7 @@ Rotation happens but too slowly or too quickly for the surface's purpose.
 
 Example: 10-minute CRA batch windows would be too slow (market freezes). 1-second batches would be too fast (no time for human intents).
 
-Fix: calibrate rotation speed to match substrate. CRA at 10s is calibrated to human attention characteristic (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)).
+Fix: calibrate rotation speed to match substrate. CRA at 10s is calibrated to human attention characteristic (see [`ATTENTION_SURFACE_SCALING.md`](../../concepts/ATTENTION_SURFACE_SCALING.md)).
 
 ### Anti-pattern 3 — Soft cap, hard reality
 
@@ -191,7 +191,7 @@ Rotation policy is a governance decision:
 - **What's the rent-curve for price-driven rotation?**
 - **What's the term-limit for active rotation?**
 
-These parameters have defaults but are tunable via governance within math-enforced bounds (see [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md)).
+These parameters have defaults but are tunable via governance within math-enforced bounds (see [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md)).
 
 Changes to rotation policy require careful review: aggressive rotation discourages long-term investment; passive rotation enables ossification. Governance should understand the tradeoff before tuning.
 
@@ -209,7 +209,7 @@ This forces the rotation question to be answered explicitly, not forgotten.
 
 ### Queued for un-scheduled cycles
 
-- **CKB state-rent audit** — verify the rent-curve calibration implements price-driven rotation per this invariant. See [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md) Place 2.
+- **CKB state-rent audit** — verify the rent-curve calibration implements price-driven rotation per this invariant. See [`ATTENTION_SURFACE_SCALING.md`](../../concepts/ATTENTION_SURFACE_SCALING.md) Place 2.
 
 - **DAG handshake gradient** — upgrade from step-function (passive rotation at T_floor) to convex gradient (price-driven rotation). See Attention-Surface doc for the shape.
 
@@ -227,10 +227,10 @@ Extract this to `memory/primitive_rotation-invariant.md` as a design-gate: every
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — price-driven rotation is the primary rotation type for VibeSwap's attention-surface mechanisms.
-- **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md)) — governance tunes rotation parameters within math-enforced bounds.
-- **Correspondence Triad** (see [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md)) — rotation is one way substrate-geometry-match manifests (cognitive surfaces rotate via forgetting; VibeSwap surfaces rotate via rent/time).
-- **First-Available Trap** (see [`FIRST_AVAILABLE_TRAP.md`](./FIRST_AVAILABLE_TRAP.md)) — a common first-available pattern is "permanent claim, no rotation." This invariant explicitly rules that pattern out for shared surfaces.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../../concepts/ATTENTION_SURFACE_SCALING.md)) — price-driven rotation is the primary rotation type for VibeSwap's attention-surface mechanisms.
+- **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md)) — governance tunes rotation parameters within math-enforced bounds.
+- **Correspondence Triad** (see [`CORRESPONDENCE_TRIAD.md`](../../concepts/CORRESPONDENCE_TRIAD.md)) — rotation is one way substrate-geometry-match manifests (cognitive surfaces rotate via forgetting; VibeSwap surfaces rotate via rent/time).
+- **First-Available Trap** (see [`FIRST_AVAILABLE_TRAP.md`](../../concepts/FIRST_AVAILABLE_TRAP.md)) — a common first-available pattern is "permanent claim, no rotation." This invariant explicitly rules that pattern out for shared surfaces.
 
 ## How this doc feeds the Code↔Text Inspiration Loop
 

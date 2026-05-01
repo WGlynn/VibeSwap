@@ -292,6 +292,6 @@ The deeper insight: any system that can be governed can be captured. The only un
 
 ## See Also
 
-- [Augmented Governance](../../DOCUMENTATION/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
-- [Constitutional DAO Layer](../../DOCUMENTATION/CONSTITUTIONAL_DAO_LAYER.md) — Layered interoperability framework for DAOs
-- [Cooperative Markets Philosophy](../../DOCUMENTATION/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation for cooperative market design
+- [Augmented Governance](../../../architecture/AUGMENTED_GOVERNANCE.md) — Constitutional invariants enforced by cooperative game theory
+- [Constitutional DAO Layer](../../../architecture/CONSTITUTIONAL_DAO_LAYER.md) — Layered interoperability framework for DAOs
+- [Cooperative Markets Philosophy](../../../concepts/ai-native/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation for cooperative market design

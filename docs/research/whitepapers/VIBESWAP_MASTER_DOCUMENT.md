@@ -4722,7 +4722,7 @@ This creates:
 
 # Part VII: Price Intelligence
 
-> **Note**: For the rigorous quantitative framework including Kalman filter state-space models, Bayesian estimation, and formal signal generation, see the companion document: [True Price Oracle](TRUE_PRICE_ORACLE.md). This section provides the conceptual overview.
+> **Note**: For the rigorous quantitative framework including Kalman filter state-space models, Bayesian estimation, and formal signal generation, see the companion document: [True Price Oracle](../../concepts/oracles/TRUE_PRICE_ORACLE.md). This section provides the conceptual overview.
 
 ---
 
@@ -5660,7 +5660,7 @@ Where:
 - True Price Oracle (Quantitative Framework)
 
 **Related Documents**:
-- [True Price Oracle](TRUE_PRICE_ORACLE.md) - Rigorous quantitative framework with Kalman filter state-space model, Bayesian estimation, regime detection, and signal generation
+- [True Price Oracle](../../concepts/oracles/TRUE_PRICE_ORACLE.md) - Rigorous quantitative framework with Kalman filter state-space model, Bayesian estimation, regime detection, and signal generation
 
 **License**: MIT
 
@@ -7501,7 +7501,7 @@ Range: 50% (new) to 150% (max reputation)
 *VibeSwap - Fair Rewards, Protected Returns, Accountable Participants*
 
 **Related Documents**:
-- [Security Mechanism Design](SECURITY_MECHANISM_DESIGN.md) - Deep dive into anti-fragile security architecture
+- [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Deep dive into anti-fragile security architecture
 
 
 ---
@@ -8278,8 +8278,8 @@ can also be achieved with a mechanism where truth-telling is optimal.
 ## Appendix C: Related Documents
 
 - [VibeSwap Incentives Whitepaper](INCENTIVES_WHITEPAPER.md) - Detailed mechanism specifications
-- [Security Mechanism Design](SECURITY_MECHANISM_DESIGN.md) - Anti-fragile defense architecture
-- [VibeSwap README](../README.md) - Technical implementation overview
+- [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Anti-fragile defense architecture
+- [VibeSwap README](../papers/README.md) - Technical implementation overview
 
 ---
 
@@ -11341,9 +11341,9 @@ Where:
 
 ## Appendix C: Related Documents
 
-- [True Price Discovery](TRUE_PRICE_DISCOVERY.md) - Philosophy of cooperative price discovery
+- [True Price Discovery](../../concepts/oracles/TRUE_PRICE_DISCOVERY.md) - Philosophy of cooperative price discovery
 - [Incentives Whitepaper](INCENTIVES_WHITEPAPER.md) - Soulbound reputation system details
-- [Security Mechanism Design](SECURITY_MECHANISM_DESIGN.md) - Trust tier and slashing mechanics
+- [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Trust tier and slashing mechanics
 
 ---
 

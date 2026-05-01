@@ -115,13 +115,13 @@ Alice might take less-money actions that optimize reputation (if those shift her
 
 ### Surface 5 — ETM-blindness to phenomenal states
 
-[Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) captures cognitive-economic processes. It doesn't capture phenomenal consciousness, affect, embodiment.
+[Economic Theory of Mind](etm/ECONOMIC_THEORY_OF_MIND.md) captures cognitive-economic processes. It doesn't capture phenomenal consciousness, affect, embodiment.
 
 **Concrete scenario**: a mechanism that inadvertently triggers shame-engagement-loops. Users feel bad after using it. The mechanism's Shapley math looks clean; the user experience is harmful.
 
 ETM-alignment audit says the mechanism is correct. But users are being phenomenally harmed. The math doesn't measure the harm.
 
-**Mitigation**: P-000 (Fairness Above All) as a constitutional override; [Dignity Gradient](./THE_DIGNITY_GRADIENT.md) consideration; user feedback channels.
+**Mitigation**: P-000 (Fairness Above All) as a constitutional override; [Dignity Gradient](../research/essays/THE_DIGNITY_GRADIENT.md) consideration; user feedback channels.
 
 **Capture surface**: mechanisms can pass ETM-alignment and still cause phenomenal harm. The capture surface is literally "things ETM doesn't measure."
 
@@ -129,7 +129,7 @@ ETM-alignment audit says the mechanism is correct. But users are being phenomena
 
 You might hope to close these surfaces by composing more mechanisms.
 
-Doesn't quite work. Per [`MECHANISM_COMPOSITION_ALGEBRA.md`](./MECHANISM_COMPOSITION_ALGEBRA.md), composition introduces new surfaces. A mechanism + fix-for-surface-1 composition can have NEW capture surfaces at the composition boundary.
+Doesn't quite work. Per [`MECHANISM_COMPOSITION_ALGEBRA.md`](../architecture/MECHANISM_COMPOSITION_ALGEBRA.md), composition introduces new surfaces. A mechanism + fix-for-surface-1 composition can have NEW capture surfaces at the composition boundary.
 
 So adding fixes is asymptotic approach, not convergent progress. You can reduce the total capture surface over time, but you can't eliminate it.
 
@@ -149,7 +149,7 @@ The longer statement is more accurate and more usable. Adversaries reading the s
 
 Maintain a public list: for each mechanism, the known capture surfaces. Update as new surfaces are discovered. Rank by severity.
 
-This is the [`memory/project_rsi-backlog.md`](../memory/project_rsi-backlog.md) discipline applied architecturally.
+This is the [`memory/project_rsi-backlog.md`](../memory/project_rsi-backlog.md) discipline applied architecturally. <!-- FIXME: ../memory/project_rsi-backlog.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ### Implication 3 — Resist "one more mechanism closes it"
 

@@ -2,7 +2,7 @@
 
 **Status**: Methodology. Design philosophy + concrete examples.
 **Audience**: First-encounter OK. Real VibeSwap instances with specific numbers.
-**Primitive**: [`memory/feedback_augmented-mechanism-design-paper.md`](../memory/feedback_augmented-mechanism-design-paper.md)
+**Primitive**: [`memory/feedback_augmented-mechanism-design-paper.md`](../memory/feedback_augmented-mechanism-design-paper.md) <!-- FIXME: ../memory/feedback_augmented-mechanism-design-paper.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -119,7 +119,7 @@ Different mechanism problems need different invariant types.
 **VibeSwap example 3 — ZK-proof of computation** (V2+):
 - Prove an off-chain computation is correct without re-executing on-chain.
 - Mathematical consequence: trust-minimized delegation of expensive computation.
-- Planned for: ZK-verified Shapley distribution (see [`ZK_ATTRIBUTION.md`](./ZK_ATTRIBUTION.md)).
+- Planned for: ZK-verified Shapley distribution (see [`ZK_ATTRIBUTION.md`](../concepts/identity/ZK_ATTRIBUTION.md)).
 
 ## Real mechanisms combine invariant types
 
@@ -201,7 +201,7 @@ Use paper values for bond (10e18 CKB), challenge window (30 min), etc. Don't inv
 
 ### Step 5 — Triad-check
 
-Run [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md) on the resulting design.
+Run [`CORRESPONDENCE_TRIAD.md`](../concepts/CORRESPONDENCE_TRIAD.md) on the resulting design.
 
 ### Step 6 — Ship with regression tests
 
@@ -223,7 +223,7 @@ Augmentation avoids these because the market/governance continues to function. T
 
 ## The relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), the cognitive economy runs without needing administrators. Ideas compete; good ones accumulate credit; bad ones get discounted. No one decides centrally which ideas win — the cognitive substrate's invariants decide.
+Under [Economic Theory of Mind](../concepts/etm/ECONOMIC_THEORY_OF_MIND.md), the cognitive economy runs without needing administrators. Ideas compete; good ones accumulate credit; bad ones get discounted. No one decides centrally which ideas win — the cognitive substrate's invariants decide.
 
 Augmented Mechanism Design applies this same pattern to on-chain systems. The market is the cognitive-economic process. Invariants are the structural properties that keep it honest. No administrator needed.
 

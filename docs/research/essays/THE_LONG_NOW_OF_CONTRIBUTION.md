@@ -79,7 +79,7 @@ Protocol maturity unclear. Could still be running; could be superseded. Multiple
 
 Attribution records must survive chain forks, substrate changes, provider failures.
 
-[Mind Persistence Mission](./MIND_PERSISTENCE_MISSION.md) addresses the infrastructure. Multiple redundant substrates + Shamir-shared keys + archival snapshots. On-chain records replicated across chains; off-chain content on IPFS/Arweave.
+[Mind Persistence Mission](../../concepts/ai-native/MIND_PERSISTENCE_MISSION.md) addresses the infrastructure. Multiple redundant substrates + Shamir-shared keys + archival snapshots. On-chain records replicated across chains; off-chain content on IPFS/Arweave.
 
 Realistic survivability: 95%+ over 20 years with VibeSwap's persistence architecture.
 
@@ -92,7 +92,7 @@ Rewards for old attributions must remain economically meaningful. Two dangers:
 Mitigations:
 - JUL's PoW-backing + halving schedule protects against inflation.
 - PoM attributions decay gradually (not cliff-off); obsolete contributions retain some weight.
-- [Novelty Bonus](./THE_NOVELTY_BONUS_THEOREM.md) ensures early-novel contributions earn super-linear credit, protecting against "late obsolescence = zero value."
+- [Novelty Bonus](../theorems/THE_NOVELTY_BONUS_THEOREM.md) ensures early-novel contributions earn super-linear credit, protecting against "late obsolescence = zero value."
 
 Realistic: economically meaningful credit over 10-20 years.
 
@@ -100,7 +100,7 @@ Realistic: economically meaningful credit over 10-20 years.
 
 After 20 years, a reader examining the DAG must be able to reconstruct WHY each attribution was assigned. Not just "Alice got N units" but "Alice got N units because of contribution X, which addressed problem Y, in context Z."
 
-[Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) captures this narrative layer. Source fields + issue bodies + closing comments + commit messages together preserve context.
+[Contribution Traceability](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md) captures this narrative layer. Source fields + issue bodies + closing comments + commit messages together preserve context.
 
 Realistic: legible over 20+ years if content-storage tiers are maintained.
 
@@ -151,7 +151,7 @@ For VibeSwap to earn Lindy, it has to survive long enough to compile the track r
 - Modular primitives (any primitive can be replaced without breaking the whole).
 - Self-documenting architecture (newcomers can navigate after 10+ years of accretion).
 
-[MASTER_INDEX.md](./MASTER_INDEX.md) serves the navigability need. Minimal axioms P-000/P-001. Modular mechanisms per [Mechanism Composition Algebra](./MECHANISM_COMPOSITION_ALGEBRA.md).
+[MASTER_INDEX.md](../../INDEX.md) serves the navigability need. Minimal axioms P-000/P-001. Modular mechanisms per [Mechanism Composition Algebra](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md).
 
 ## The generation-gap problem
 
@@ -165,7 +165,7 @@ A 2046 contributor with patience can reconstruct 2026 context. Not automatic, bu
 
 ## The Lawson Constant as keystone
 
-[Lawson Constant](./LAWSON_CONSTANT.md) is the keystone of long-arc attribution.
+[Lawson Constant](../proofs/LAWSON_CONSTANT.md) is the keystone of long-arc attribution.
 
 Without attribution: the DAG becomes a sequence of orphan events. History is opaque.
 
@@ -193,7 +193,7 @@ Either way, the long-arc investment isn't wasted. It either compounds within Vib
 
 ## Relationship to ETM
 
-Under [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md), cognitive attribution has the same long-arc requirement. Humans who can't remember WHO originated an idea don't credit them; they credit themselves or the ambient culture.
+Under [Economic Theory of Mind](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md), cognitive attribution has the same long-arc requirement. Humans who can't remember WHO originated an idea don't credit them; they credit themselves or the ambient culture.
 
 Long-arc cognitive attribution works via:
 - **Written language** — ideas survive the originator.
@@ -215,10 +215,10 @@ For long-arc attribution to work, the answer to all four should be "yes, even de
 
 ## Relationship to other primitives
 
-- **Substrate**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) captures lineage.
-- **Anchoring**: [Lawson Constant](./LAWSON_CONSTANT.md) makes lineage preservation structural.
-- **Infrastructure**: [Mind Persistence Mission](./MIND_PERSISTENCE_MISSION.md) provides multi-substrate preservation.
-- **Modifier**: [Novelty Bonus](./THE_NOVELTY_BONUS_THEOREM.md) + [Lawson Floor](./THE_LAWSON_FLOOR_MATHEMATICS.md) ensure long-arc credit has economic weight.
+- **Substrate**: [Contribution Traceability](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md) captures lineage.
+- **Anchoring**: [Lawson Constant](../proofs/LAWSON_CONSTANT.md) makes lineage preservation structural.
+- **Infrastructure**: [Mind Persistence Mission](../../concepts/ai-native/MIND_PERSISTENCE_MISSION.md) provides multi-substrate preservation.
+- **Modifier**: [Novelty Bonus](../theorems/THE_NOVELTY_BONUS_THEOREM.md) + [Lawson Floor](../proofs/THE_LAWSON_FLOOR_MATHEMATICS.md) ensure long-arc credit has economic weight.
 
 ## One-line summary
 

@@ -45,7 +45,7 @@ The contributor is actively participating. Multiple claims, multiple handshakes 
 - **DAG**: active bidirectional handshake activity. Subject to 1-day cooldown per pair.
 - **NCI**: aggregate retention weight grows. Older claims start to decay (see Stage 5 for curve).
 - **Shapley**: regular reward distributions. Time-Indexed Marginal Credit (Gap #2) adjusts for novelty.
-- **Governance**: voting power accumulates. If voting power depends on NCI (see [`MULTI_SURFACE_INTERACTION.md`](./MULTI_SURFACE_INTERACTION.md)), the contributor starts to have meaningful say in governance votes.
+- **Governance**: voting power accumulates. If voting power depends on NCI (see [`MULTI_SURFACE_INTERACTION.md`](../MULTI_SURFACE_INTERACTION.md)), the contributor starts to have meaningful say in governance votes.
 
 **Experience**: routine. Contribute, get endorsed, receive tokens, vote occasionally. The mechanisms are in the background.
 
@@ -53,11 +53,11 @@ The contributor is actively participating. Multiple claims, multiple handshakes 
 
 The first claims start losing retention weight.
 
-- **NCI retention**: per [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md) and [`CONVEX_RETENTION_DERIVATION.md`](./CONVEX_RETENTION_DERIVATION.md), the curve is convex with α=1.6 and T=365. At day 90, retention ≈ 894 (≈11% decay). At day 180, retention ≈ 662 (34% decay).
+- **NCI retention**: per [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md) and [`CONVEX_RETENTION_DERIVATION.md`](../../research/theorems/CONVEX_RETENTION_DERIVATION.md), the curve is convex with α=1.6 and T=365. At day 90, retention ≈ 894 (≈11% decay). At day 180, retention ≈ 662 (34% decay).
 
 **Experience**: the contributor notices their old contributions "aging." Their aggregate weight is growing slower now — new contributions add, but old ones subtract (slowly).
 
-**Behavior**: natural response is to keep contributing. The system's design (see [`PHASE_TRANSITION_DESIGN.md`](./PHASE_TRANSITION_DESIGN.md)) signals that old work is fading — incentivizing fresh contribution.
+**Behavior**: natural response is to keep contributing. The system's design (see [`PHASE_TRANSITION_DESIGN.md`](../../architecture/PHASE_TRANSITION_DESIGN.md)) signals that old work is fading — incentivizing fresh contribution.
 
 ## Stage 6: Phase transition (month ~7, day 208)
 
@@ -107,7 +107,7 @@ If no new claims within the year, the contributor's retention weight is zero.
 
 ## Rent obligations across stages
 
-Per [`MULTI_SURFACE_INTERACTION.md`](./MULTI_SURFACE_INTERACTION.md), users have rent obligations across surfaces:
+Per [`MULTI_SURFACE_INTERACTION.md`](../MULTI_SURFACE_INTERACTION.md), users have rent obligations across surfaces:
 
 | Stage | Active surfaces | Approximate rent/period |
 |---|---|---|
@@ -142,7 +142,7 @@ If a contributor's engagement drops, they transition toward zero-retention. The 
 - Not force them to continue (they chose to pause).
 - Make re-entry easy (no re-registration friction).
 
-A healthy contributor economy has INFLOW from new contributors and OUTFLOW from fading ones. The outflow is not failure — it's rotation (see [`ROTATION_INVARIANT.md`](./ROTATION_INVARIANT.md)).
+A healthy contributor economy has INFLOW from new contributors and OUTFLOW from fading ones. The outflow is not failure — it's rotation (see [`ROTATION_INVARIANT.md`](../../research/theorems/ROTATION_INVARIANT.md)).
 
 ## Special cases
 
@@ -201,7 +201,7 @@ These metrics inform governance calibration. If phase-transition responsiveness 
 
 ### Queued for un-scheduled cycles
 
-- **userDashboard contribution view** — part of the userDashboard broader effort (see [`MULTI_SURFACE_INTERACTION.md`](./MULTI_SURFACE_INTERACTION.md)). Specifically shows: current lifecycle stage, NCI aggregate weight, next phase transition, recommended actions.
+- **userDashboard contribution view** — part of the userDashboard broader effort (see [`MULTI_SURFACE_INTERACTION.md`](../MULTI_SURFACE_INTERACTION.md)). Specifically shows: current lifecycle stage, NCI aggregate weight, next phase transition, recommended actions.
 
 - **Re-engagement notification hook** — off-chain service that detects approaching phase transitions and sends opt-in reminders.
 
@@ -219,11 +219,11 @@ This is already a cross-mechanism view; likely no new primitive to extract, but 
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — drives the retention decay across the lifecycle.
-- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](./TIME_INDEXED_MARGINAL_CREDIT.md)) — determines reward flows per stage.
-- **Rotation Invariant** (see [`ROTATION_INVARIANT.md`](./ROTATION_INVARIANT.md)) — the contributor lifecycle IS rotation at the contributor layer.
-- **Multi-Surface Interaction** (see [`MULTI_SURFACE_INTERACTION.md`](./MULTI_SURFACE_INTERACTION.md)) — composes the rent/reward flows across stages.
-- **Phase Transition Design** (see [`PHASE_TRANSITION_DESIGN.md`](./PHASE_TRANSITION_DESIGN.md)) — specifies the critical moments in the lifecycle.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md)) — drives the retention decay across the lifecycle.
+- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](../monetary/TIME_INDEXED_MARGINAL_CREDIT.md)) — determines reward flows per stage.
+- **Rotation Invariant** (see [`ROTATION_INVARIANT.md`](../../research/theorems/ROTATION_INVARIANT.md)) — the contributor lifecycle IS rotation at the contributor layer.
+- **Multi-Surface Interaction** (see [`MULTI_SURFACE_INTERACTION.md`](../MULTI_SURFACE_INTERACTION.md)) — composes the rent/reward flows across stages.
+- **Phase Transition Design** (see [`PHASE_TRANSITION_DESIGN.md`](../../architecture/PHASE_TRANSITION_DESIGN.md)) — specifies the critical moments in the lifecycle.
 
 ## How this doc feeds the Code↔Text Inspiration Loop
 

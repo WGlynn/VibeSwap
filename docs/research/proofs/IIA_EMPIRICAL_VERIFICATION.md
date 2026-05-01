@@ -825,6 +825,6 @@ These assumptions are standard in blockchain security literature.
 ## See Also
 
 - [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — The mathematical theorems this verifies
-- [Omniscient Adversary Proof](../docs/papers/omniscient-adversary-proof.md) — Fairness under worst-case adversary
-- [P-001: No Extraction Ever](../docs/nervos-talks/p001-no-extraction-ever-post.md) — The axiom driving all fairness work
-- [Clawback Cascade](CLAWBACK_CASCADE.md) — Enforcement when extraction is detected
+- [Omniscient Adversary Proof](../papers/omniscient-adversary-proof.md) — Fairness under worst-case adversary
+- [P-001: No Extraction Ever](../../marketing/forums/nervos/talks/p001-no-extraction-ever-post.md) — The axiom driving all fairness work
+- [Clawback Cascade](../../concepts/security/CLAWBACK_CASCADE.md) — Enforcement when extraction is detected

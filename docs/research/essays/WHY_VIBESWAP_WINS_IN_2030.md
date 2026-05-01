@@ -180,7 +180,7 @@ Crypto regulation 2026-2030 uncertain. Two regimes:
 - **Permissive**: operations free; growth unconstrained.
 - **Restrictive**: governance tokens classified as securities; attestation-based attribution restricted.
 
-[Augmented Governance](./AUGMENTED_GOVERNANCE.md) is designed to be regulatable. Should help under restrictive regimes. Not guaranteed.
+[Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md) is designed to be regulatable. Should help under restrictive regimes. Not guaranteed.
 
 ### Determinant 4 — Competitive response
 

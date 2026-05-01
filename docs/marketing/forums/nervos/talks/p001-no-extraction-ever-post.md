@@ -254,7 +254,7 @@ The constant doesn't grant power. It records responsibility. Someone had to deci
 
 ## See Also
 
-- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Mathematical formalization of P-001
-- [IIA Empirical Verification](../../DOCUMENTATION/IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation against code
-- [Omniscient Adversary Proof](../papers/omniscient-adversary-proof.md) — P-001 holds even against omniscient attackers
-- [Clawback Cascade](../../DOCUMENTATION/CLAWBACK_CASCADE.md) — Enforcement when extraction is detected
+- [Formal Fairness Proofs](../../../../research/proofs/FORMAL_FAIRNESS_PROOFS.md) — Mathematical formalization of P-001
+- [IIA Empirical Verification](../../../../research/proofs/IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation against code
+- [Omniscient Adversary Proof](../../../../research/papers/omniscient-adversary-proof.md) — P-001 holds even against omniscient attackers
+- [Clawback Cascade](../../../../concepts/security/CLAWBACK_CASCADE.md) — Enforcement when extraction is detected

@@ -2,7 +2,7 @@
 
 **Status**: Meta-principle, Axis 1 (geometric) of the VibeSwap design stack.
 **Audience**: First-encounter OK. No prior background required; real examples up front.
-**Primitive**: [`memory/primitive_substrate-geometry-match.md`](../memory/primitive_substrate-geometry-match.md)
+**Primitive**: [`memory/primitive_substrate-geometry-match.md`](../memory/primitive_substrate-geometry-match.md) <!-- FIXME: ../memory/primitive_substrate-geometry-match.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -70,7 +70,7 @@ Fibonacci-scaled:
 - 60% of cap → heavy damping (attackers feel the pressure).
 - Attackers can't "cut at 59% to avoid penalty" because the curve is continuous; every attack step costs more than the last.
 
-See [`FIBONACCI_SCALING.md`](./FIBONACCI_SCALING.md) for full mechanism detail.
+See [`FIBONACCI_SCALING.md`](security/FIBONACCI_SCALING.md) for full mechanism detail.
 
 ### Example 2 — Commit-Reveal Batch Duration
 
@@ -105,7 +105,7 @@ Each off-the-shelf mechanism was designed by someone, for some substrate, with s
 
 First-Available Trap: the ecosystem default is not shaped like YOUR substrate. You adopt it because it's there. Your mechanism bleeds at the tail where the mismatch shows up.
 
-See [`memory/primitive_first-available-trap.md`](../memory/primitive_first-available-trap.md) for the full anti-pattern.
+See [`memory/primitive_first-available-trap.md`](../memory/primitive_first-available-trap.md) for the full anti-pattern. <!-- FIXME: ../memory/primitive_first-available-trap.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 Substrate-Geometry Match is the antidote: characterize your substrate's geometry before choosing a mechanism. Reject candidates that don't match, even if they're readily available.
 
@@ -157,8 +157,8 @@ This inverts the typical engineering posture. Engineers often default to "choose
 
 ## Relationship to other meta-principles
 
-- **Parent**: [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md). ETM says mind is an economy; Substrate-Geometry Match says the economy's mechanisms must match the cognitive-substrate geometry.
-- **Sibling**: [`AUGMENTED_MECHANISM_DESIGN.md`](./AUGMENTED_MECHANISM_DESIGN.md). The methodology; substrate-geometry is the geometric correctness criterion the methodology applies.
+- **Parent**: [`ECONOMIC_THEORY_OF_MIND.md`](etm/ECONOMIC_THEORY_OF_MIND.md). ETM says mind is an economy; Substrate-Geometry Match says the economy's mechanisms must match the cognitive-substrate geometry.
+- **Sibling**: [`AUGMENTED_MECHANISM_DESIGN.md`](../architecture/AUGMENTED_MECHANISM_DESIGN.md). The methodology; substrate-geometry is the geometric correctness criterion the methodology applies.
 - **Enforcement**: [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md). Check 1 of the triad.
 
 ## Practical test questions

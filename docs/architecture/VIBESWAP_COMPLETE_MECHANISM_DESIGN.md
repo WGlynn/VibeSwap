@@ -1941,7 +1941,7 @@ This creates:
 
 # Part VII: Price Intelligence
 
-> **Note**: For the rigorous quantitative framework including Kalman filter state-space models, Bayesian estimation, and formal signal generation, see the companion document: [True Price Oracle](TRUE_PRICE_ORACLE.md). This section provides the conceptual overview.
+> **Note**: For the rigorous quantitative framework including Kalman filter state-space models, Bayesian estimation, and formal signal generation, see the companion document: [True Price Oracle](../concepts/oracles/TRUE_PRICE_ORACLE.md). This section provides the conceptual overview.
 
 ---
 
@@ -2879,6 +2879,6 @@ Where:
 - True Price Oracle (Quantitative Framework)
 
 **Related Documents**:
-- [True Price Oracle](TRUE_PRICE_ORACLE.md) - Rigorous quantitative framework with Kalman filter state-space model, Bayesian estimation, regime detection, and signal generation
+- [True Price Oracle](../concepts/oracles/TRUE_PRICE_ORACLE.md) - Rigorous quantitative framework with Kalman filter state-space model, Bayesian estimation, regime detection, and signal generation
 
 **License**: MIT

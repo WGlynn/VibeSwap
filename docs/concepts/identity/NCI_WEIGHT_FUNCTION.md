@@ -216,7 +216,7 @@ High-PoM validators attest each other's contributions.
 
 Mitigation:
 - Three-branch attestation ([`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md)) — cartel in executive branch doesn't capture others.
-- [Novelty Bonus](./THE_NOVELTY_BONUS_THEOREM.md) penalizes replication.
+- [Novelty Bonus](../../research/theorems/THE_NOVELTY_BONUS_THEOREM.md) penalizes replication.
 - log₂ dampens inflation payoff.
 
 ### Sybil PoW
@@ -233,7 +233,7 @@ Mitigation: active-validator requirement. `totalActiveWeight` tracking only coun
 
 ## Gap #1 in ETM Alignment Audit — reconciled 2026-04-23
 
-**Earlier drafts of this doc (and [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md), and [`ETM_BUILD_ROADMAP.md`](./ETM_BUILD_ROADMAP.md)) asserted that NCI currently applies linear time-decay: `retentionWeight(t) = base - k × t`. Verification against the contract contradicts that.**
+**Earlier drafts of this doc (and [`COGNITIVE_RENT_ECONOMICS.md`](../monetary/COGNITIVE_RENT_ECONOMICS.md), and [`ETM_BUILD_ROADMAP.md`](../etm/ETM_BUILD_ROADMAP.md)) asserted that NCI currently applies linear time-decay: `retentionWeight(t) = base - k × t`. Verification against the contract contradicts that.**
 
 Actual on-chain state in `contracts/consensus/NakamotoConsensusInfinity.sol`:
 - `cumulativePoW` is monotone-cumulative. No time-decay applied.
@@ -279,7 +279,7 @@ A validator with high NCI weight gets more say in consensus. A contributor with 
 
 ## Relationship to ETM
 
-[Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) frames consensus as aggregated belief from heterogeneous agents. NCI IS the aggregation formula for heterogeneous-agent consensus — each agent type contributes with appropriate weighting.
+[Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md) frames consensus as aggregated belief from heterogeneous agents. NCI IS the aggregation formula for heterogeneous-agent consensus — each agent type contributes with appropriate weighting.
 
 Pure-PoW: only hash-crunching agents count.
 Pure-PoS: only capital-holders count.

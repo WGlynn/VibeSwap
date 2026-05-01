@@ -50,7 +50,7 @@ Without Loop 0, the other three loops degrade per-session as context fills with 
 
 ## See Also
 
-- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
 - [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 2: Knowledge](loop-2-common-knowledge.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
 - [TRP Runner Protocol](TRP_RUNNER.md) — Execution protocol with crash mitigation
 - [Efficiency Heat Map](efficiency-heatmap.md) — Per-contract discovery yield tracking

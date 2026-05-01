@@ -135,7 +135,7 @@ Bonded-yet-trusted intermediary:
 - **Slashable** via successful challenge.
 - **Rotatable** — governance can replace keeper without chain disruption.
 
-This introduces a specific intermediary role. See [Disintermediation Grades](./DISINTERMEDIATION_GRADES.md). Optimistic Shapley is Grade 4 (bonded intermediary with accountability), not Grade 5 (permissionless).
+This introduces a specific intermediary role. See [Disintermediation Grades](../DISINTERMEDIATION_GRADES.md). Optimistic Shapley is Grade 4 (bonded intermediary with accountability), not Grade 5 (permissionless).
 
 Grade 5 goal: permissionless keepers. Harder to bootstrap; may come in V2.
 
@@ -207,7 +207,7 @@ Contributors pay subscription fee to keep Shapley-involvement active. Passive co
 
 ## Integration with existing mechanisms
 
-Composes cleanly (per [Mechanism Composition Algebra](./MECHANISM_COMPOSITION_ALGEBRA.md)):
+Composes cleanly (per [Mechanism Composition Algebra](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md)):
 
 - **Lawson Floor** computed alongside Shapley; committed in same Merkle root.
 - **Novelty Bonus** modifier applied off-chain; verified during challenges.

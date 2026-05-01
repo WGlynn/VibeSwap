@@ -555,9 +555,9 @@ The system that improved the code then improved itself. That is recursion. The e
 
 ## See Also
 
-- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
 - [TRP Pattern Taxonomy](trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns from the same 53 rounds
-- [TRP Runner Paper](../trp-runner-paper.md) — Crash-resilient recursive improvement
-- [TRP Runner Protocol](../trp/TRP_RUNNER.md) — Execution protocol (v3.0)
-- [Efficiency Heat Map](../trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
-- [TRP Verification Report](../TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
+- [TRP Runner Paper](trp-runner/trp-runner-paper.md) — Crash-resilient recursive improvement
+- [TRP Runner Protocol](../../_meta/trp-existing/TRP_RUNNER.md) — Execution protocol (v3.0)
+- [Efficiency Heat Map](../../_meta/trp-existing/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Verification Report](../../_meta/trp/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims

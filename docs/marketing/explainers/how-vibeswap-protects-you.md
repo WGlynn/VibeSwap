@@ -177,4 +177,4 @@ Every good system is built on love. Most engineers won't admit that. I will.
 
 ---
 
-*Technical references for anyone curious: [LAWSON_CONSTANT.md](DOCUMENTATION/LAWSON_CONSTANT.md) | [ShapleyDistributor.sol](contracts/incentives/ShapleyDistributor.sol) | [ClawbackRegistry.sol](contracts/compliance/ClawbackRegistry.sol) | [ContributionDAG.sol](contracts/identity/ContributionDAG.sol) | [CommitRevealAuction.sol](contracts/core/CommitRevealAuction.sol)*
+*Technical references for anyone curious: [LAWSON_CONSTANT.md](../../research/proofs/LAWSON_CONSTANT.md) | [ShapleyDistributor.sol](contracts/incentives/ShapleyDistributor.sol) | [ClawbackRegistry.sol](contracts/compliance/ClawbackRegistry.sol) | [ContributionDAG.sol](contracts/identity/ContributionDAG.sol) | [CommitRevealAuction.sol](contracts/core/CommitRevealAuction.sol)*

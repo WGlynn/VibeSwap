@@ -50,7 +50,7 @@ Retention applies to PoW and PoM only. PoS stake is present-tense locked capital
 - No phase transition ("knee") where decay accelerates.
 - Medium-term contributions over-preserved; long-term contributions decay too slowly.
 
-**Concrete numeric impact** (per [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md)):
+**Concrete numeric impact** (per [`COGNITIVE_RENT_ECONOMICS.md`](../monetary/COGNITIVE_RENT_ECONOMICS.md)):
 - Day 1: 1000 × (1 - 1/365) ≈ 997.3
 - Day 30: 1000 × (1 - 30/365) ≈ 917.8
 - Day 180: 1000 × (1 - 180/365) ≈ 506.8
@@ -87,11 +87,11 @@ Governance can tune α, but within bounded ranges [1.2, 1.8]. No arbitrary value
 
 ### What the gap IS
 
-[Shapley distribution](./SHAPLEY_REWARD_SYSTEM.md) computes marginal contribution purely within each batch. Doesn't weight by *time-indexed marginality* (was this insight novel to the ecosystem when it arrived, or already derivable from priors?).
+[Shapley distribution](../shapley/SHAPLEY_REWARD_SYSTEM.md) computes marginal contribution purely within each batch. Doesn't weight by *time-indexed marginality* (was this insight novel to the ecosystem when it arrived, or already derivable from priors?).
 
 ### Why this matters
 
-Per [`THE_NOVELTY_BONUS_THEOREM.md`](./THE_NOVELTY_BONUS_THEOREM.md): plain Shapley is permutation-symmetric and provably under-rewards novelty.
+Per [`THE_NOVELTY_BONUS_THEOREM.md`](../../research/theorems/THE_NOVELTY_BONUS_THEOREM.md): plain Shapley is permutation-symmetric and provably under-rewards novelty.
 
 **Before (plain Shapley)**:
 - Alice publishes first. Bob publishes 6 months later with similar content.
@@ -177,7 +177,7 @@ These aren't fixes; they deepen alignment where it already exists.
 
 ### Strengthen #1 — CRA Attention-Window Naming
 
-[Commit-reveal auction](./TRUE_PRICE_ORACLE_DEEP_DIVE.md) uses 8-second commit + 2-second reveal = 10 seconds. Why 10 and not 15 or 5? Because the human+bot substrate has a ~10-second characteristic attention-time.
+[Commit-reveal auction](../oracles/TRUE_PRICE_ORACLE_DEEP_DIVE.md) uses 8-second commit + 2-second reveal = 10 seconds. Why 10 and not 15 or 5? Because the human+bot substrate has a ~10-second characteristic attention-time.
 
 Action: surface this via `ATTENTION_WINDOW_COMMIT = 8` + `ATTENTION_WINDOW_REVEAL = 2` constants in the contract. NatSpec documents the cognitive-economic rationale.
 
@@ -256,7 +256,7 @@ The original ETM plan had 4 steps:
 
 It's a work plan. Specific deliverables mapped to specific cycles with specific dates.
 
-It's NOT a vision doc (that's [`THE_COGNITIVE_ECONOMY_THESIS.md`](./THE_COGNITIVE_ECONOMY_THESIS.md) and [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md)).
+It's NOT a vision doc (that's [`THE_COGNITIVE_ECONOMY_THESIS.md`](../../research/essays/THE_COGNITIVE_ECONOMY_THESIS.md) and [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md)).
 
 When you're ready to ship, look here for the next target. When you want to understand WHY we ship, look at the vision docs.
 
@@ -276,12 +276,12 @@ The mirror property is the correctness criterion, not just "it compiles." A test
 
 If you're external, these cycles are plausibly-accessible. The Gap #1 fix is ~50 LOC change + tests. A contributor with Solidity experience could ship it.
 
-See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) for how external contributions earn DAG credit.
+See [`CONTRIBUTION_TRACEABILITY.md`](../identity/CONTRIBUTION_TRACEABILITY.md) for how external contributions earn DAG credit.
 
 ## Relationship to other primitives
 
 - **Feeds into**: [`ETM_ALIGNMENT_AUDIT.md`](./ETM_ALIGNMENT_AUDIT.md) — Step 1.
-- **Feeds from**: [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md) (Gap #1), [`THE_NOVELTY_BONUS_THEOREM.md`](./THE_NOVELTY_BONUS_THEOREM.md) (Gap #2).
+- **Feeds from**: [`COGNITIVE_RENT_ECONOMICS.md`](../monetary/COGNITIVE_RENT_ECONOMICS.md) (Gap #1), [`THE_NOVELTY_BONUS_THEOREM.md`](../../research/theorems/THE_NOVELTY_BONUS_THEOREM.md) (Gap #2).
 - **Delivers to**: production codebase (contracts/consensus/, contracts/core/, contracts/incentives/).
 
 ## One-line summary

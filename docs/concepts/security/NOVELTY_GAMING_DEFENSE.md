@@ -2,7 +2,7 @@
 
 > *Any reward function can be gamed. Point-per-kill games produce kill-stealing; citation-count incentives produce citation rings; novelty-weighted Shapley produces pseudo-novelty. Before shipping Gap #2, we must map the attack space.*
 
-This doc catalogs attacks on novelty-weighted Shapley (Gap #2, C41-C42) and the defenses VibeSwap employs. It's an adversarial companion to [`TIME_INDEXED_MARGINAL_CREDIT.md`](./TIME_INDEXED_MARGINAL_CREDIT.md) and [`SIMILARITY_KEEPER_DESIGN.md`](./SIMILARITY_KEEPER_DESIGN.md).
+This doc catalogs attacks on novelty-weighted Shapley (Gap #2, C41-C42) and the defenses VibeSwap employs. It's an adversarial companion to [`TIME_INDEXED_MARGINAL_CREDIT.md`](../monetary/TIME_INDEXED_MARGINAL_CREDIT.md) and [`SIMILARITY_KEEPER_DESIGN.md`](../../architecture/SIMILARITY_KEEPER_DESIGN.md).
 
 ## Why novelty gaming matters
 
@@ -28,7 +28,7 @@ Contributor adds irrelevant content to dilute the semantic center. Adding 500 wo
 
 Example: Bob's paper is "X [plus 3 pages of tangential background reading]." Embedding similarity to Alice's "just X" is lower due to the background content's contribution.
 
-Defense: **anchor on the key claim, not the full document.** Contributions include a `subjectHash` field (see [`ATTESTATION_CLAIM_SCHEMA.md`](./ATTESTATION_CLAIM_SCHEMA.md)) that binds the claim to specific content. Similarity computation uses the claim's core content, not surrounding padding.
+Defense: **anchor on the key claim, not the full document.** Contributions include a `subjectHash` field (see [`ATTESTATION_CLAIM_SCHEMA.md`](../identity/ATTESTATION_CLAIM_SCHEMA.md)) that binds the claim to specific content. Similarity computation uses the claim's core content, not surrounding padding.
 
 Residual risk: defining "core content" is fuzzy. Mitigation: governance-approved content summarization methods; attestor review for borderline cases.
 
@@ -48,7 +48,7 @@ Defense: **Sybil-resistance via SoulboundIdentity.** Attestations require SBT. C
 
 Contributor bribes the similarity keeper to return favorable scores. Contributors willing to pay get 2.0x multiplier regardless of actual similarity.
 
-Defense: **commit-reveal of similarity function + lazy verification.** Per [`COMMIT_REVEAL_FOR_ORACLES.md`](./COMMIT_REVEAL_FOR_ORACLES.md), the function is publicly committed. Anyone can re-compute any score using the committed function. If the keeper produces a score inconsistent with the committed function, slashing happens.
+Defense: **commit-reveal of similarity function + lazy verification.** Per [`COMMIT_REVEAL_FOR_ORACLES.md`](../oracles/COMMIT_REVEAL_FOR_ORACLES.md), the function is publicly committed. Anyone can re-compute any score using the committed function. If the keeper produces a score inconsistent with the committed function, slashing happens.
 
 Residual risk: attestor might collude AND decide not to enforce. Mitigation: multi-keeper consensus (future); anyone can challenge and earn slashed bond as reward.
 
@@ -113,7 +113,7 @@ Detected gaming → slashing:
 
 ## Relationship to Lawson Floor
 
-The Lawson Floor (see [`THE_LAWSON_FLOOR_MATHEMATICS.md`](./THE_LAWSON_FLOOR_MATHEMATICS.md)) ensures replicated contributions still receive credit. This is sometimes attacked as "replicators gaming the floor." Defense:
+The Lawson Floor (see [`THE_LAWSON_FLOOR_MATHEMATICS.md`](../../research/proofs/THE_LAWSON_FLOOR_MATHEMATICS.md)) ensures replicated contributions still receive credit. This is sometimes attacked as "replicators gaming the floor." Defense:
 
 - Lawson Floor multiplier is low (0.2x). Replication is credited but much less than original.
 - High volume of pure replication would require many accounts (Sybil cost dominates).

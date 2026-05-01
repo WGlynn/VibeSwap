@@ -7,7 +7,7 @@
 
 ## A stage name
 
-In start-up parlance, "bootstrap phase" is a well-known stage. For a crypto protocol, it's the period between "zero users" and "community has emergent properties" (see [Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md)).
+In start-up parlance, "bootstrap phase" is a well-known stage. For a crypto protocol, it's the period between "zero users" and "community has emergent properties" (see [Cooperative Emergence Threshold](../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md)).
 
 For VibeSwap, bootstrap is roughly 2025-2028.
 
@@ -80,7 +80,7 @@ Each category needs targeted outreach. Shipping docs broadly misses; targeted ou
 
 ## The Heterogeneity Mandate
 
-Per [Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md), emergence requires contributor-type heterogeneity (Shannon entropy ≥ 2.5 bits). Means 5-6 contribution types with meaningful presence, not just Code.
+Per [Cooperative Emergence Threshold](../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md), emergence requires contributor-type heterogeneity (Shannon entropy ≥ 2.5 bits). Means 5-6 contribution types with meaningful presence, not just Code.
 
 Current state (2026-04-22): heavily skewed Code + Research + Inspiration. Need more Design, Security, Community, Governance.
 
@@ -158,7 +158,7 @@ Culture emerges from repeated interactions. VibeSwap's deliberate culture:
 
 ### Norm 1 — Density-first communication
 
-Per [Density First](./DENSITY_FIRST.md). Crisp, direct over wordy.
+Per [Density First](../../concepts/DENSITY_FIRST.md). Crisp, direct over wordy.
 
 ### Norm 2 — Substance over marketing
 
@@ -255,7 +255,7 @@ Bootstrap ends when community self-sustains. New contributors onboard without co
 
 Expected endpoint: 2027-2028.
 
-Post-bootstrap, playbook shifts to [Cooperative Emergence Threshold](./COOPERATIVE_EMERGENCE_THRESHOLD.md) management — tune for sustained emergence; don't revert to bootstrap patterns.
+Post-bootstrap, playbook shifts to [Cooperative Emergence Threshold](../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md) management — tune for sustained emergence; don't revert to bootstrap patterns.
 
 ## For contributors
 

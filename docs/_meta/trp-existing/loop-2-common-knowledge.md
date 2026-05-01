@@ -43,6 +43,6 @@ The graph grows denser, not just longer. That's the recursive part.
 
 ## See Also
 
-- [TRP Core Spec](../TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
+- [TRP Core Spec](../../concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md) — Full protocol specification
 - [Loop 0: Token Density](loop-0-token-density.md) | [Loop 1: Adversarial](loop-1-adversarial-verification.md) | [Loop 3: Capability](loop-3-capability-bootstrap.md)
-- [TRP Pattern Taxonomy (paper)](../papers/trp-pattern-taxonomy.md) — Output of this loop: 12 recurring patterns
+- [TRP Pattern Taxonomy (paper)](../../research/papers/trp-pattern-taxonomy.md) — Output of this loop: 12 recurring patterns

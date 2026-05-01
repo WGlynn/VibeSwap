@@ -2,7 +2,7 @@
 
 **Status**: Structural pattern. Live in ~22 contracts (~50 setters).
 **Audience**: First-encounter OK. Walked production event-stream scenario.
-**Primitive**: [`memory/primitive_admin-event-observability.md`](../memory/primitive_admin-event-observability.md)
+**Primitive**: [`memory/primitive_admin-event-observability.md`](../memory/primitive_admin-event-observability.md) <!-- FIXME: ../memory/primitive_admin-event-observability.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -176,7 +176,7 @@ The `admin-event-coverage-check.py` tool (queued) automates this as a pre-commit
 
 ### With Augmented Governance
 
-Under [Augmented Governance](./AUGMENTED_GOVERNANCE.md), governance acts within Physics + Constitution bounds. Admin Event Observability is the INSTRUMENTATION that lets observers verify governance is staying within bounds.
+Under [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md), governance acts within Physics + Constitution bounds. Admin Event Observability is the INSTRUMENTATION that lets observers verify governance is staying within bounds.
 
 Without events: the accountability claim is unauditable.
 With events: accountability is real-time checkable.
@@ -187,7 +187,7 @@ With events: accountability is real-time checkable.
 
 ### With Disintermediation Grades
 
-Per [Disintermediation Grades Update](./DISINTERMEDIATION_GRADES_UPDATE_2026_04.md), admin-setter observability moves the admin-parameter state from Grade 3 (admin-trusted) to Grade 4 (admin-auditable-in-real-time). One tier of disintermediation gained structurally.
+Per [Disintermediation Grades Update](../DISINTERMEDIATION_GRADES_UPDATE_2026_04.md), admin-setter observability moves the admin-parameter state from Grade 3 (admin-trusted) to Grade 4 (admin-auditable-in-real-time). One tier of disintermediation gained structurally.
 
 ## The cost
 
@@ -220,7 +220,7 @@ This exercise teaches pattern recognition + hands-on application.
 ## Relationship to other primitives
 
 - **Parent**: ETM's cognitive-economic principle of legibility. A legible substrate allows governance accountability.
-- **Composed with**: [Augmented Governance](./AUGMENTED_GOVERNANCE.md), [GEV Resistance](./GEV_RESISTANCE.md), [Disintermediation Grades](./DISINTERMEDIATION_GRADES.md).
+- **Composed with**: [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md), [GEV Resistance](./GEV_RESISTANCE.md), [Disintermediation Grades](../DISINTERMEDIATION_GRADES.md).
 - **Extracted from**: C36-F2 RSI cycle (2026-04-21).
 
 ## One-line summary

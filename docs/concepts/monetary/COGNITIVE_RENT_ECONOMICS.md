@@ -1,6 +1,6 @@
 # Cognitive Rent Economics
 
-**Status**: Theoretical deepening of [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md).
+**Status**: Theoretical deepening of [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md).
 **Audience**: First-encounter OK. Numbers walked through with linear-vs-convex contrast.
 
 ---
@@ -88,7 +88,7 @@ This is the convex pattern. α ≈ 1.4-1.7 empirically. Matches Ebbinghaus and m
 
 The real gap is: ABSENT. Where cognitive substrate demands convex retention on the work-and-mind pillars, NCI has nothing.
 
-The fix per [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1 is to add convex decay where it belongs (PoW and PoM — not PoS, since stake is present-tense locked capital, not a historical record):
+The fix per [ETM Build Roadmap](../etm/ETM_BUILD_ROADMAP.md) Gap #1 is to add convex decay where it belongs (PoW and PoM — not PoS, since stake is present-tense locked capital, not a historical record):
 
 ```
 retentionWeight(t) = base × (1 - (t/T)^α)
@@ -98,7 +98,7 @@ with α ≈ 1.6. This matches cognitive substrate geometry per paper §6.4.
 
 ### Shipped C40 (2026-04-23)
 
-Pure primitive `calculateRetentionWeight(elapsedSec, horizonSec)` landed in NCI with α hardcoded at 1.6 via cubic polynomial approximation. Returns basis-points weight; max ~3% error vs exact. Not yet wired into per-pillar weight recompute — see [NCI_WEIGHT_FUNCTION.md](./NCI_WEIGHT_FUNCTION.md#shipped-c40-2026-04-23) for the six design decisions gating integration (C40b).
+Pure primitive `calculateRetentionWeight(elapsedSec, horizonSec)` landed in NCI with α hardcoded at 1.6 via cubic polynomial approximation. Returns basis-points weight; max ~3% error vs exact. Not yet wired into per-pillar weight recompute — see [NCI_WEIGHT_FUNCTION.md](../identity/NCI_WEIGHT_FUNCTION.md#shipped-c40-2026-04-23) for the six design decisions gating integration (C40b).
 
 ## Worked example — the linear-vs-convex difference
 
@@ -172,9 +172,9 @@ These four phases are observable empirically in both substrates. Same mathematic
 
 Why α = 1.6? Because that's approximately what Ebbinghaus observed for human memory decay, across multiple replications over a century.
 
-This is NOT a tuning choice. It's matching the substrate's geometry per [Substrate-Geometry Match](./SUBSTRATE_GEOMETRY_MATCH.md). If we choose α = 1.0, we get linear — mismatched to cognition. If we choose α = 3.0, we get super-convex — also mismatched (too steep).
+This is NOT a tuning choice. It's matching the substrate's geometry per [Substrate-Geometry Match](../SUBSTRATE_GEOMETRY_MATCH.md). If we choose α = 1.0, we get linear — mismatched to cognition. If we choose α = 3.0, we get super-convex — also mismatched (too steep).
 
-Paper [`memory/feedback_augmented-mechanism-design-paper.md`](../memory/feedback_augmented-mechanism-design-paper.md) §6.4 recommends α = 1.6 based on these observations.
+Paper [`memory/feedback_augmented-mechanism-design-paper.md`](../memory/feedback_augmented-mechanism-design-paper.md) §6.4 recommends α = 1.6 based on these observations. <!-- FIXME: ../memory/feedback_augmented-mechanism-design-paper.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ## The retrieval-cost coupling
 
@@ -217,9 +217,9 @@ Compare to cognitive retention + CKB state-rent. Are the patterns similar?
 
 ## Relationship to other primitives
 
-- **Parent**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — ETM's first bijection (memory decay ↔ state-rent) is what this doc elaborates.
-- **Fix in the roadmap**: [ETM Build Roadmap](./ETM_BUILD_ROADMAP.md) Gap #1 — NCI retention weight should be convex.
-- **Instance**: NCI weight function ([`NCI_WEIGHT_FUNCTION.md`](./NCI_WEIGHT_FUNCTION.md)).
+- **Parent**: [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md) — ETM's first bijection (memory decay ↔ state-rent) is what this doc elaborates.
+- **Fix in the roadmap**: [ETM Build Roadmap](../etm/ETM_BUILD_ROADMAP.md) Gap #1 — NCI retention weight should be convex.
+- **Instance**: NCI weight function ([`NCI_WEIGHT_FUNCTION.md`](../identity/NCI_WEIGHT_FUNCTION.md)).
 
 ## One-line summary
 

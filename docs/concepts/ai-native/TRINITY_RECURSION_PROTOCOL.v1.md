@@ -230,12 +230,12 @@ This protocol is public domain. Use it, extend it, improve it. If the three loop
 
 ## See Also
 
-- [TRP (docs copy)](../docs/TRINITY_RECURSION_PROTOCOL.md) — Working copy in docs/
-- [TRP Explained](../docs/trp/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
-- [TRP Runner Protocol](../docs/trp/TRP_RUNNER.md) — Execution protocol with crash mitigation
-- [TRP Runner Paper](../docs/trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
-- [Loop 0–3 Specs](../docs/trp/) — Individual loop specifications
-- [Efficiency Heat Map](../docs/trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
-- [TRP Verification Report](../docs/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
-- [TRP Empirical RSI (paper)](../docs/papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
-- [TRP Pattern Taxonomy (paper)](../docs/papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
+- [TRP (docs copy)](TRINITY_RECURSION_PROTOCOL.md) — Working copy in docs/
+- [TRP Explained](../../_meta/trp-existing/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
+- [TRP Runner Protocol](../../_meta/trp-existing/TRP_RUNNER.md) — Execution protocol with crash mitigation
+- [TRP Runner Paper](../../research/papers/trp-runner/trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
+- [Loop 0–3 Specs](../docs/trp/) — Individual loop specifications <!-- FIXME: ../docs/trp/ — no candidate found in docs/ tree. -->
+- [Efficiency Heat Map](../../_meta/trp-existing/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Verification Report](../../_meta/trp/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
+- [TRP Empirical RSI (paper)](../../research/papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
+- [TRP Pattern Taxonomy (paper)](../../research/papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns

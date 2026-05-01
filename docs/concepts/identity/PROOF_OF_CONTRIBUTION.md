@@ -583,11 +583,11 @@ The best contributors produce the most blocks. That is the entire thesis. The Sh
 
 ## See Also
 
-- [Shapley Reward System](SHAPLEY_REWARD_SYSTEM.md) — Application-layer Shapley distribution with four axioms
-- [Cross-Domain Shapley](CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
-- [Composable Fairness](COMPOSABLE_FAIRNESS.md) — Why Shapley values are the unique solution to mechanism composition
-- [Formal Fairness Proofs](FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
-- [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Formal time neutrality proofs
-- [Atomized Shapley (paper)](../docs/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
-- [Shapley Value Distribution (paper)](../docs/papers/shapley-value-distribution.md) — On-chain implementation with five axioms
-- [Game Theory Catalogue](../docs/game-theory-games-catalogue/game-theory-games-catalogue.md) — 39 game theory games with DeFi relevance mapping
+- [Shapley Reward System](../shapley/SHAPLEY_REWARD_SYSTEM.md) — Application-layer Shapley distribution with four axioms
+- [Cross-Domain Shapley](../shapley/CROSS_DOMAIN_SHAPLEY.md) — Fair value distribution across heterogeneous platforms
+- [Composable Fairness](../COMPOSABLE_FAIRNESS.md) — Why Shapley values are the unique solution to mechanism composition
+- [Formal Fairness Proofs](../../research/proofs/FORMAL_FAIRNESS_PROOFS.md) — Axiom verification and omniscient adversary proofs
+- [Time-Neutral Tokenomics](../monetary/TIME_NEUTRAL_TOKENOMICS.md) — Formal time neutrality proofs
+- [Atomized Shapley (paper)](../../research/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Shapley Value Distribution (paper)](../../research/papers/shapley-value-distribution.md) — On-chain implementation with five axioms
+- [Game Theory Catalogue](../game-theory-games-catalogue/game-theory-games-catalogue.md) — 39 game theory games with DeFi relevance mapping

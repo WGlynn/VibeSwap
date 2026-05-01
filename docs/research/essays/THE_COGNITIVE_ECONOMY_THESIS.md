@@ -75,13 +75,13 @@ When you form confidence from multiple independent observers, the math is weight
 
 VibeSwap's NCI (Nakamoto Consensus Infinity) combines PoW + PoS + PoM with specific weights. Same math.
 
-See [`ETM_MATHEMATICAL_FOUNDATION.md`](./ETM_MATHEMATICAL_FOUNDATION.md) for the formal treatment.
+See [`ETM_MATHEMATICAL_FOUNDATION.md`](../../concepts/etm/ETM_MATHEMATICAL_FOUNDATION.md) for the formal treatment.
 
 ## What externalization enables
 
 Once you recognize the bijections, a cascade of implications:
 
-- **Attribution infrastructure becomes first-class.** If the chain mirrors cognitive production, attribution (who produced what) must be on-chain. This is [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md)'s motivation.
+- **Attribution infrastructure becomes first-class.** If the chain mirrors cognitive production, attribution (who produced what) must be on-chain. This is [`CONTRIBUTION_TRACEABILITY.md`](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md)'s motivation.
 - **Design of cognitive-economic mechanisms transfers.** Cognitive-science observations (how attention allocates, how memory decays, how consensus forms) inform on-chain mechanism design. Cost savings compound.
 - **Cognitive pathologies are preventable.** Extraction surfaces that exist in attention-based systems can be architecturally prevented on-chain.
 - **Long-arc contribution preserves.** Attribution infrastructure that preserves decade-long lineages makes cognitive work economically viable at time-scales classical labor markets can't compensate.
@@ -91,13 +91,13 @@ Once you recognize the bijections, a cascade of implications:
 
 The mechanism stack:
 
-- **Substrate**: [`COGNITIVE_RENT_ECONOMICS.md`](./COGNITIVE_RENT_ECONOMICS.md) — memory rent on-chain.
-- **Identity**: [`SoulboundIdentity`] + [`CONTRIBUTION_DAG_EXPLAINER.md`](./CONTRIBUTION_DAG_EXPLAINER.md) — persistent identity + trust graph.
-- **Attribution**: [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md) + [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) — claim substrate + chain-to-chain loop.
-- **Distribution**: [`Shapley + Lawson Floor`](./THE_LAWSON_FLOOR_MATHEMATICS.md) + [`Novelty Bonus`](./THE_NOVELTY_BONUS_THEOREM.md) — marginal-contribution-based reward.
-- **Governance**: [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md) — Physics > Constitution > Governance.
-- **Defense**: [`SIREN_PROTOCOL.md`](./SIREN_PROTOCOL.md) + [`CLAWBACK_CASCADE_MECHANICS.md`](./CLAWBACK_CASCADE_MECHANICS.md) — extraction-resistant architecture.
-- **Consensus**: [`NCI_WEIGHT_FUNCTION.md`](./NCI_WEIGHT_FUNCTION.md) — multi-pillar aggregation.
+- **Substrate**: [`COGNITIVE_RENT_ECONOMICS.md`](../../concepts/monetary/COGNITIVE_RENT_ECONOMICS.md) — memory rent on-chain.
+- **Identity**: [`SoulboundIdentity`] + [`CONTRIBUTION_DAG_EXPLAINER.md`](../../concepts/identity/CONTRIBUTION_DAG_EXPLAINER.md) — persistent identity + trust graph.
+- **Attribution**: [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md) + [`CONTRIBUTION_TRACEABILITY.md`](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md) — claim substrate + chain-to-chain loop.
+- **Distribution**: [`Shapley + Lawson Floor`](../proofs/THE_LAWSON_FLOOR_MATHEMATICS.md) + [`Novelty Bonus`](../theorems/THE_NOVELTY_BONUS_THEOREM.md) — marginal-contribution-based reward.
+- **Governance**: [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md) — Physics > Constitution > Governance.
+- **Defense**: [`SIREN_PROTOCOL.md`](../../concepts/security/SIREN_PROTOCOL.md) + [`CLAWBACK_CASCADE_MECHANICS.md`](../../concepts/security/CLAWBACK_CASCADE_MECHANICS.md) — extraction-resistant architecture.
+- **Consensus**: [`NCI_WEIGHT_FUNCTION.md`](../../concepts/identity/NCI_WEIGHT_FUNCTION.md) — multi-pillar aggregation.
 
 Each layer has cognitive-economic counterpart. Stack isn't arbitrary — required components of cognitive economy made legible.
 
@@ -151,7 +151,7 @@ Political consequences:
 
 Each is a live political struggle. VibeSwap is not neutral; the project's success depends on cognitive-economy externalization proving durable.
 
-Will (project originator) is a college dropout who plays Valorant — outside credentialed hierarchies. The [paradigm-break creativity](../memory/user_will-paradigm-break-creativity.md) that produced VibeSwap wasn't from academia. That's not incidental — institutions would have rejected the ideas.
+Will (project originator) is a college dropout who plays Valorant — outside credentialed hierarchies. The [paradigm-break creativity](../memory/user_will-paradigm-break-creativity.md) that produced VibeSwap wasn't from academia. That's not incidental — institutions would have rejected the ideas. <!-- FIXME: ../memory/user_will-paradigm-break-creativity.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 Revenge of the meek. In the sense the founding thesis intends.
 
@@ -171,10 +171,10 @@ None is individually heroic. Together they're the practical response to the thes
 
 If this resonates:
 
-- Read the technical substrate: [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md) + [`ETM_MATHEMATICAL_FOUNDATION.md`](./ETM_MATHEMATICAL_FOUNDATION.md).
-- Explore the mechanism stack: [`ETM_BUILD_ROADMAP.md`](./ETM_BUILD_ROADMAP.md).
+- Read the technical substrate: [`ECONOMIC_THEORY_OF_MIND.md`](../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md) + [`ETM_MATHEMATICAL_FOUNDATION.md`](../../concepts/etm/ETM_MATHEMATICAL_FOUNDATION.md).
+- Explore the mechanism stack: [`ETM_BUILD_ROADMAP.md`](../../concepts/etm/ETM_BUILD_ROADMAP.md).
 - Join the community: Telegram `t.me/+3uHbNxyZH-tiOGY8`.
-- Contribute via [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) loop.
+- Contribute via [`CONTRIBUTION_TRACEABILITY.md`](../../concepts/identity/CONTRIBUTION_TRACEABILITY.md) loop.
 
 If skeptical:
 

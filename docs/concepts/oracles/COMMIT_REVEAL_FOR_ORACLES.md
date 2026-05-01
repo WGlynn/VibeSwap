@@ -146,7 +146,7 @@ Salt makes the commitment opaque until reveal.
 
 ### Similarity oracle (primary use case)
 
-Gap #2 C42 ships a similarity oracle with commit-reveal. See [`SIMILARITY_KEEPER_DESIGN.md`](./SIMILARITY_KEEPER_DESIGN.md) for details.
+Gap #2 C42 ships a similarity oracle with commit-reveal. See [`SIMILARITY_KEEPER_DESIGN.md`](../../architecture/SIMILARITY_KEEPER_DESIGN.md) for details.
 
 ### True Price Oracle
 
@@ -188,7 +188,7 @@ What if the oracle tells someone the function before revealing?
 
 Technically this is possible but hard to prove. Defense: track oracle behavior over time. If an oracle consistently produces favorable outputs for specific parties, investigate.
 
-Long-term, multi-keeper consensus (see [`SIMILARITY_KEEPER_DESIGN.md`](./SIMILARITY_KEEPER_DESIGN.md)) defends against this by requiring M-of-N oracles to agree.
+Long-term, multi-keeper consensus (see [`SIMILARITY_KEEPER_DESIGN.md`](../../architecture/SIMILARITY_KEEPER_DESIGN.md)) defends against this by requiring M-of-N oracles to agree.
 
 ## Why not zero-knowledge proofs?
 
@@ -233,7 +233,7 @@ These are settable via governance votes. Default values from launch:
 
 ## Integration with admin observability
 
-Every commitment, reveal, challenge, and function-activation must emit an event per [ADMIN_EVENT_OBSERVABILITY](./ADMIN_EVENT_OBSERVABILITY.md):
+Every commitment, reveal, challenge, and function-activation must emit an event per [ADMIN_EVENT_OBSERVABILITY](../security/ADMIN_EVENT_OBSERVABILITY.md):
 
 - `event FunctionCommitted(bytes32 indexed commitment, address indexed oracle, uint256 timestamp)`
 - `event FunctionRevealed(bytes32 indexed commitment, string functionSpec, uint256 timestamp)`
@@ -262,9 +262,9 @@ If 3+ oracle use cases adopt this pattern, extract to `memory/primitive_commit-r
 
 ## Relationship to other primitives
 
-- **Similarity Keeper Design** (see [`SIMILARITY_KEEPER_DESIGN.md`](./SIMILARITY_KEEPER_DESIGN.md)) — primary use case.
-- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](./TIME_INDEXED_MARGINAL_CREDIT.md)) — depends on similarity oracle.
-- **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md)) — commit-reveal is a math-enforced invariant layered on top of governance discretion.
+- **Similarity Keeper Design** (see [`SIMILARITY_KEEPER_DESIGN.md`](../../architecture/SIMILARITY_KEEPER_DESIGN.md)) — primary use case.
+- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](../monetary/TIME_INDEXED_MARGINAL_CREDIT.md)) — depends on similarity oracle.
+- **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md)) — commit-reveal is a math-enforced invariant layered on top of governance discretion.
 - **Admin Event Observability** — event emission requirements.
 - **True Price Oracle** — similar trust-boundary concern, different mechanism (Kalman filter with public parameters).
 

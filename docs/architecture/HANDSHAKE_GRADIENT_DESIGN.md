@@ -6,7 +6,7 @@ This doc proposes replacing the DAG handshake's step-function cooldown with a co
 
 ## The current mechanism
 
-The Contribution DAG (see [`CONTRIBUTION_DAG_EXPLAINER.md`](./CONTRIBUTION_DAG_EXPLAINER.md)) uses a 1-day (24-hour) cooldown between handshakes from the same user to the same recipient.
+The Contribution DAG (see [`CONTRIBUTION_DAG_EXPLAINER.md`](../concepts/identity/CONTRIBUTION_DAG_EXPLAINER.md)) uses a 1-day (24-hour) cooldown between handshakes from the same user to the same recipient.
 
 Current contract logic:
 
@@ -23,7 +23,7 @@ modifier handshakeCooldown(address from, address to) {
 
 **Behavior**: user calls `handshake(from, to)` → if 24 hours elapsed since last handshake between these two, allowed; otherwise, reverts.
 
-**Gap type**: Type 4 (discretization error) per [`MIRROR_VS_IMPLEMENTATION_GAP.md`](./MIRROR_VS_IMPLEMENTATION_GAP.md). Cognitive-attention substrate is CONTINUOUS; the current mechanism is DISCRETE.
+**Gap type**: Type 4 (discretization error) per [`MIRROR_VS_IMPLEMENTATION_GAP.md`](../concepts/identity/MIRROR_VS_IMPLEMENTATION_GAP.md). Cognitive-attention substrate is CONTINUOUS; the current mechanism is DISCRETE.
 
 ## The proposed gradient
 
@@ -124,7 +124,7 @@ User endorses themselves (A → A) to avoid cooldown. Already prevented by exist
 
 User uses 10 accounts to handshake each other rapidly. Costs them 10× the gradient. If that cost is affordable, they can create rapid endorsement cycles.
 
-Defense: this attack exists in the current step-function mechanism too. Mitigation is SBT-gating (require soulbound identity to handshake) rather than gradient-specific. See [`SOULBOUND_IDENTITY.md`](./SOULBOUND_IDENTITY.md) if extant, or similar.
+Defense: this attack exists in the current step-function mechanism too. Mitigation is SBT-gating (require soulbound identity to handshake) rather than gradient-specific. See [`SOULBOUND_IDENTITY.md`](./SOULBOUND_IDENTITY.md) if extant, or similar. <!-- FIXME: ./SOULBOUND_IDENTITY.md — no candidate found in docs/ tree. -->
 
 ### Attack 4: Cost-based DoS
 
@@ -169,11 +169,11 @@ contract ContributionDAG {
 }
 ```
 
-Roughly 40 lines of change. The `computeCost` function uses PRBMath per [`ONCHAIN_POWER_LAW.md`](./ONCHAIN_POWER_LAW.md).
+Roughly 40 lines of change. The `computeCost` function uses PRBMath per [`ONCHAIN_POWER_LAW.md`](../concepts/monetary/ONCHAIN_POWER_LAW.md).
 
 ## Mirror test
 
-Per [`ETM_MIRROR_TEST.md`](./ETM_MIRROR_TEST.md):
+Per [`ETM_MIRROR_TEST.md`](../concepts/etm/ETM_MIRROR_TEST.md):
 
 ```solidity
 function test_HandshakeGradient_MirrorsAttention() public {
@@ -234,7 +234,7 @@ The gradient captures more information about user intent.
 
 ### Primitive extraction
 
-The convex-cost-over-cooldown pattern is an instance of [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md) applied to social-surface (attention bandwidth). No new primitive needed.
+The convex-cost-over-cooldown pattern is an instance of [`ATTENTION_SURFACE_SCALING.md`](../concepts/ATTENTION_SURFACE_SCALING.md) applied to social-surface (attention bandwidth). No new primitive needed.
 
 ## Relationship to other primitives
 

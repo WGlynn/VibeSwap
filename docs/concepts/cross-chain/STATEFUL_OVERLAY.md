@@ -2,7 +2,7 @@
 
 **Status**: Architectural pattern.
 **Audience**: First-encounter OK. Before/after scenarios throughout.
-**Primitive**: [`memory/primitive_stateful-overlay.md`](../memory/primitive_stateful-overlay.md)
+**Primitive**: [`memory/primitive_stateful-overlay.md`](../memory/primitive_stateful-overlay.md) <!-- FIXME: ../memory/primitive_stateful-overlay.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -94,7 +94,7 @@ Four required properties for something to qualify as an overlay:
 
 **Why it's externalized**: the event stream is observer-consumable, not internal to the setter logic.
 
-See [`ADMIN_EVENT_OBSERVABILITY.md`](./ADMIN_EVENT_OBSERVABILITY.md).
+See [`ADMIN_EVENT_OBSERVABILITY.md`](../security/ADMIN_EVENT_OBSERVABILITY.md).
 
 ### Overlay 3 — Chat-to-DAG Traceability
 
@@ -120,7 +120,7 @@ See [`ADMIN_EVENT_OBSERVABILITY.md`](./ADMIN_EVENT_OBSERVABILITY.md).
 
 **Failure mode if overlay breaks**: Bob's code still ships. Alice's contribution just stays invisible (pre-overlay state).
 
-See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md).
+See [`CONTRIBUTION_TRACEABILITY.md`](../identity/CONTRIBUTION_TRACEABILITY.md).
 
 ### Overlay 4 — SHIELD-PERSIST-LEAK Defense
 
@@ -232,9 +232,9 @@ This is a generalizable skill. Once trained, engineers find overlays quickly. Th
 
 ## Relationship to other primitives
 
-- **Parent**: [Universal-Coverage → Hook](../memory/primitive_universal-coverage-hook.md) — hooks are a specific overlay pattern at tool-call boundaries.
-- **Cousin**: [Economic Theory of Mind](./ECONOMIC_THEORY_OF_MIND.md) — cognition's self-externalization onto blockchain is itself a grand overlay pattern.
-- **Instance**: [Contribution Traceability](./CONTRIBUTION_TRACEABILITY.md) — concrete overlay for chat → DAG.
+- **Parent**: [Universal-Coverage → Hook](../memory/primitive_universal-coverage-hook.md) — hooks are a specific overlay pattern at tool-call boundaries. <!-- FIXME: ../memory/primitive_universal-coverage-hook.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **Cousin**: [Economic Theory of Mind](../etm/ECONOMIC_THEORY_OF_MIND.md) — cognition's self-externalization onto blockchain is itself a grand overlay pattern.
+- **Instance**: [Contribution Traceability](../identity/CONTRIBUTION_TRACEABILITY.md) — concrete overlay for chat → DAG.
 
 ## For students
 

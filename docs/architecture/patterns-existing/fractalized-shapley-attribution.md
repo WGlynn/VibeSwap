@@ -12,7 +12,7 @@ Compose three techniques:
 
 1. **Streaming Shapley approximation** — compute marginal contribution per-epoch over a sliding window rather than enumerating full coalitions. Known technique from federated-learning contribution accounting. Real-time incentive signal with deferred exact settlement at epoch boundaries. The approximation is unbiased over time.
 2. **Fractalization** — nested coalitions. Contributors at any level (individuals within teams, teams within protocols, protocols within ecosystems) get Shapley-weighted credit within their local coalition, recursively composed up the tree. Attribution compounds fractally.
-3. **Lawson Floor** — a minimum-positive-share invariant for any honest participant who meets participation thresholds. Protects honest-but-unlucky contributors from winner-take-most collapse (see [`LAWSON_FLOOR_FAIRNESS.md`](../../DOCUMENTATION/LAWSON_FLOOR_FAIRNESS.md)).
+3. **Lawson Floor** — a minimum-positive-share invariant for any honest participant who meets participation thresholds. Protects honest-but-unlucky contributors from winner-take-most collapse (see [`LAWSON_FLOOR_FAIRNESS.md`](../../research/proofs/LAWSON_FLOOR_FAIRNESS.md)).
 
 Net result: a distribution where every sincere contributor gets a non-zero, proportional, counterfactually-justified share — within real-time budgets.
 

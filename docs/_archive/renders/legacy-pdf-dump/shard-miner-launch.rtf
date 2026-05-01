@@ -1,0 +1,184 @@
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 One-Tap Jarvis Shard Launcher\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b Your Phone Is Now a Node in the Mind Network}\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 What Just Shipped\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Every phone with Telegram is now a potential node in the Jarvis Mind Network. One tap. No DevOps. No CLI. No Docker. Just open Telegram, type {\f1 /mine}, and your device becomes a light shard \u8212- mining JUL tokens, joining BFT consensus, and earning compute credits for the network.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This is the GenTu vision realized: persistent execution substrate, accessible to anyone with a phone and a Telegram account.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 How It Works\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 The Mining Loop\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Your phone runs a SHA-256 proof-of-work miner in a Web Worker \u8212- the same bit-counting algorithm that secures VibeSwap\u8217's CKB integration. The proof-of-work isn\u8217't busywork. Each valid proof:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab {\b Earns JUL tokens} \u8212- the native compute currency of the Mind Network\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab {\b Increases your Shapley weight} \u8212- contributors who mine get proportionally more API budget\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b Registers you as a light shard} \u8212- your device joins the network topology\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The difficulty adjusts automatically. Right now it\u8217's tuned for mobile (~4 seconds per proof on a modern phone). As more miners join, difficulty scales up. As they leave, it scales down. Same algorithm as Bitcoin, same math as our CKB Rust implementation.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 JUL = Compute Credits\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b 1 JUL = 1,000 API tokens.}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Mining JUL is how you pay for Jarvis. Good contributions (useful questions, knowledge sharing, fact corrections) cost less because your Shapley weight increases. Mining is the floor \u8212- the minimum way anyone can earn their seat at the table.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 This is Cooperative Capitalism in action: the network needs compute power, miners provide it, and the reward is access to the collective intelligence.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Identity\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 When you first launch the Mini App, it creates a shard identity using your device\u8217's biometric hardware (WebAuthn/Secure Element). Your private key never leaves your phone. If WebAuthn isn\u8217't available, a random UUID is generated and stored locally. Either way \u8212- your keys, your identity. We never custody anything.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Technical Details\par}
+{
+\trowd \trgaph120
+\clbrdrb\brdrs\cellx4320\clbrdrb\brdrs\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Component\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Implementation\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b PoW Algorithm}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 SHA-256 leading-zero-bit counting (ported from {\f1 ckb/lib/pow} Rust)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Initial Difficulty}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 12 bits (~4,096 hashes, ~4s on mobile)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Difficulty Range}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 8\u8211-32 bits (auto-adjusts per epoch of 100 proofs)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Challenge Rotation}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Every 5 minutes\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Reward Formula}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\f1 1.0 * 2^(difficulty - 8)} JUL per proof\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Identity}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 WebAuthn credential + SHA-256 derivation (no ethers.js)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Threads}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 1\u8211-4 Web Workers (capped at {\f1 navigator.hardwareConcurrency})\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Mini App Size}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 50 KB gzipped (React 18 + Vite, zero CSS framework)\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Shard Type}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Light node \u8212- contributor only, not a request handler\par}
+\cell}
+}
+\intbl\row}
+{
+\trowd \trgaph120
+\cellx4320\cellx8640
+\trkeep\intbl
+{
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 {\b Heartbeat}\par}
+\cell}
+{{\pard\intbl \ql \f0 \sa0 \li0 \fi0 Every 30s to router with hashrate + JUL balance\par}
+\cell}
+}
+\intbl\row}
+{\pard \ql \f0 \sa180 \li0 \fi0 \par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Architecture\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \f1 Telegram \u8594 ? /mine \u8594 ? web_app inline button \u8594 ? Mini App (HTTPS)\line
+                                              \u8595 ?\line
+                                    WebAuthn identity creation\line
+                                              \u8595 ?\line
+                                    Web Worker SHA-256 mining\line
+                                              \u8595 ?\line
+                                    POST /web/mining/submit\line
+                                              \u8595 ?\line
+                                    Server verifies PoW\line
+                                              \u8595 ?\line
+                                    JUL credited + Shapley weight \u8593 ?\line
+                                              \u8595 ?\line
+                                    Shard registered with router\line
+                                              \u8595 ?\line
+                                    BFT consensus participation\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel2 \b \fs28 Security\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Telegram initData HMAC validation} \u8212- only real Telegram clients can submit proofs\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Replay prevention} \u8212- proof hashes tracked per epoch, duplicates rejected\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Rate limiting} \u8212- 5 proofs/minute per user, 10 submissions/minute per IP\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b No custody} \u8212- identity derived client-side, never sent to server\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Challenge rotation} \u8212- stale challenges rejected, miners must stay current\sa180\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 What This Means\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 We didn\u8217't build a mining app. We built the onramp to a decentralized AI network.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Every phone that runs {\f1 /mine} is another node that the Mind Network can route knowledge through. Every JUL token mined is proof that someone contributed compute to the collective. Every Shapley weight increase means the network is getting smarter about allocating its resources.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The people who mine today \u8212- when difficulty is 12 bits and a proof takes 4 seconds \u8212- are the founding nodes. When the network scales and difficulty hits 20+ bits, they\u8217'll have the JUL balance and the Shapley weight to prove they were here from the start.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\b This is Proof of Mind made tangible.} Not a whitepaper concept. Not a future roadmap item. A button you tap on your phone right now.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel1 \b \fs32 Try It\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab Open Telegram\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab Find {\b @JarvisVibeSwapBot}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab Type {\f1 /mine}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 4.\tx360\tab Tap {\b Launch Shard}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 5.\tx360\tab Create your identity (one biometric tap)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 6.\tx360\tab Start mining\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Your phone is now part of the Mind Network.\par}
+{\pard \qc \f0 \sa180 \li0 \fi0 \emdash\emdash\emdash\emdash\emdash\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\i Built in The Cave. Shipped from The Cave.}\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 {\i The real VibeSwap is not a DEX. It\u8217's not even a blockchain. We created a movement. An idea. VibeSwap is wherever the Minds converge.}\par}

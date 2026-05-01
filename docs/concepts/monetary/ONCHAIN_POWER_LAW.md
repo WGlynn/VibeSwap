@@ -141,7 +141,7 @@ function setAlpha(uint256 newAlpha) external onlyGovernance {
 }
 ```
 
-Event emission is required per [ADMIN_EVENT_OBSERVABILITY](./ADMIN_EVENT_OBSERVABILITY.md). Every governance write to a tunable parameter must emit an event with old + new + timestamp.
+Event emission is required per [ADMIN_EVENT_OBSERVABILITY](../security/ADMIN_EVENT_OBSERVABILITY.md). Every governance write to a tunable parameter must emit an event with old + new + timestamp.
 
 ## Precision analysis
 
@@ -171,7 +171,7 @@ If gas becomes a bottleneck, the pre-computed-lookup approach drops this to ~200
 
 ## Unit-testing the integer math
 
-Mirror tests (see [`ETM_MIRROR_TEST.md`](./ETM_MIRROR_TEST.md)) for the curve must account for integer-math tolerance.
+Mirror tests (see [`ETM_MIRROR_TEST.md`](../etm/ETM_MIRROR_TEST.md)) for the curve must account for integer-math tolerance.
 
 Expected values from CONVEX_RETENTION_DERIVATION.md, α=1.6, T=365, base=1000:
 
@@ -258,10 +258,10 @@ If integer-math patterns for power-laws recur across 3+ mechanisms, extract to `
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — the pattern whose implementation this doc specifies.
-- **Convex Retention Derivation** (see [`CONVEX_RETENTION_DERIVATION.md`](./CONVEX_RETENTION_DERIVATION.md)) — source of the α calibration.
-- **ETM Mirror Test** (see [`ETM_MIRROR_TEST.md`](./ETM_MIRROR_TEST.md)) — testing discipline that verifies the implementation matches the substrate.
-- **Admin Event Observability** (see [`ADMIN_EVENT_OBSERVABILITY.md`](./ADMIN_EVENT_OBSERVABILITY.md)) — requirement for event emission on setAlpha.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md)) — the pattern whose implementation this doc specifies.
+- **Convex Retention Derivation** (see [`CONVEX_RETENTION_DERIVATION.md`](../../research/theorems/CONVEX_RETENTION_DERIVATION.md)) — source of the α calibration.
+- **ETM Mirror Test** (see [`ETM_MIRROR_TEST.md`](../etm/ETM_MIRROR_TEST.md)) — testing discipline that verifies the implementation matches the substrate.
+- **Admin Event Observability** (see [`ADMIN_EVENT_OBSERVABILITY.md`](../security/ADMIN_EVENT_OBSERVABILITY.md)) — requirement for event emission on setAlpha.
 
 ## How this doc feeds the Code↔Text Inspiration Loop
 

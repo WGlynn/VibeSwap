@@ -135,6 +135,6 @@ Fairness is not a policy that can be voted away. It is physics — built into th
 
 ---
 
-*Technical references: [ShapleyDistributor.sol](contracts/incentives/ShapleyDistributor.sol) | [ClawbackRegistry.sol](contracts/compliance/ClawbackRegistry.sol) | [ContributionDAG.sol](contracts/identity/ContributionDAG.sol) | [CommitRevealAuction.sol](contracts/core/CommitRevealAuction.sol) | [LAWSON_CONSTANT.md](DOCUMENTATION/LAWSON_CONSTANT.md)*
+*Technical references: [ShapleyDistributor.sol](contracts/incentives/ShapleyDistributor.sol) | [ClawbackRegistry.sol](contracts/compliance/ClawbackRegistry.sol) | [ContributionDAG.sol](contracts/identity/ContributionDAG.sol) | [CommitRevealAuction.sol](contracts/core/CommitRevealAuction.sol) | [LAWSON_CONSTANT.md](../../research/proofs/LAWSON_CONSTANT.md)*
 
 *377 smart contracts. 513 test files. Built in a cave, with a box of scraps.*

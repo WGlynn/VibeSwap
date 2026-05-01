@@ -140,7 +140,7 @@ This constant is stored in the contract at deployment. Tests assert its presence
 
 Why anchor it? Because attribution is load-bearing. Remove attribution, trust-score computation has no structural grounding — it becomes arbitrary numbers. The Constant is the philosophical anchor encoded in code.
 
-See [`LAWSON_CONSTANT.md`](./LAWSON_CONSTANT.md) for the fuller story.
+See [`LAWSON_CONSTANT.md`](../../research/proofs/LAWSON_CONSTANT.md) for the fuller story.
 
 ## Founder rotation — the timelock
 
@@ -152,7 +152,7 @@ Founder changes are high-leverage. A compromised founder key grants 3.0x voting 
 4. After 7 days: `executeFounderChange(changeId)` finalizes.
 5. If wrong: `cancelFounderChange(changeId)` can abort before execution.
 
-This is Path Commitment ([`PATH_COMMITMENT_PROTOCOL.md`](./PATH_COMMITMENT_PROTOCOL.md)) applied to governance: commit to the action, then time-delay before execution.
+This is Path Commitment ([`PATH_COMMITMENT_PROTOCOL.md`](../security/PATH_COMMITMENT_PROTOCOL.md)) applied to governance: commit to the action, then time-delay before execution.
 
 ## The M-09 O(1) handshake lookup
 
@@ -227,7 +227,7 @@ This exercise teaches BFS computation + trust-tier implications hands-on.
 
 ## Relationship to other primitives
 
-- **Parent**: ETM — the cognitive-economic concept of trust propagation. See [`ECONOMIC_THEORY_OF_MIND.md`](./ECONOMIC_THEORY_OF_MIND.md).
+- **Parent**: ETM — the cognitive-economic concept of trust propagation. See [`ECONOMIC_THEORY_OF_MIND.md`](../etm/ECONOMIC_THEORY_OF_MIND.md).
 - **Consumer**: [`ContributionAttestor`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md), [`ShapleyDistributor`], [`QuadraticVoting`] — all use DAG's trust-score.
 - **Sibling**: [`SoulboundIdentity`] — provides Sybil resistance for vouch validity.
 

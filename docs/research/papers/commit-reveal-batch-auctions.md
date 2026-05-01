@@ -298,6 +298,6 @@ MEV elimination is not a theoretical possibility. It is a deployed mechanism. Th
 
 - [From MEV to GEV](from-mev-to-gev.md) — Nine-component architecture for generalized extractable value resistance
 - [Five-Layer MEV Defense on CKB](five-layer-mev-defense-ckb.md) — PoW locking, MMR accumulation, forced inclusion, Fisher-Yates, uniform clearing
-- [Recursive Batch Auctions](../../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
-- [Commit-Reveal Batch Auctions (Nervos post)](../nervos-talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages and temporal enforcement
-- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the three-phase mechanism
+- [Recursive Batch Auctions](../../architecture/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
+- [Commit-Reveal Batch Auctions (Nervos post)](../../marketing/forums/nervos/talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages and temporal enforcement
+- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the three-phase mechanism <!-- FIXME: ../../blog/01_commit_reveal_mev.md — no candidate found in docs/ tree. -->

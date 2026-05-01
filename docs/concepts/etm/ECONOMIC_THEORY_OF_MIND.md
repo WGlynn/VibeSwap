@@ -2,7 +2,7 @@
 
 **Status**: Meta-principle, Axis 0 of the VibeSwap design stack.
 **Audience**: First-encounter OK. No prior familiarity with mechanism design or crypto-economics required.
-**Primitive**: [`memory/primitive_economic-theory-of-mind.md`](../memory/primitive_economic-theory-of-mind.md)
+**Primitive**: [`memory/primitive_economic-theory-of-mind.md`](../memory/primitive_economic-theory-of-mind.md) <!-- FIXME: ../memory/primitive_economic-theory-of-mind.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
 
@@ -87,7 +87,7 @@ W(v) = 0.10 × log₂(1 + work)      // how much computation you've contributed
      + 0.60 × log₂(1 + mindScore)  // how much attested contribution
 ```
 
-See [`NCI_WEIGHT_FUNCTION.md`](./NCI_WEIGHT_FUNCTION.md) for the full mechanism. The point here: this weighted aggregation is the same math your brain uses when evaluating multi-observer consensus.
+See [`NCI_WEIGHT_FUNCTION.md`](../identity/NCI_WEIGHT_FUNCTION.md) for the full mechanism. The point here: this weighted aggregation is the same math your brain uses when evaluating multi-observer consensus.
 
 ## What this is NOT (important — don't round off)
 
@@ -103,7 +103,7 @@ ETM is **NOT**:
 
 If you find yourself explaining ETM using the bullets above, the pattern-match-drift reflex is firing. Pause and re-read this doc.
 
-See [`PATTERN_MATCH_DRIFT.md`](./PATTERN_MATCH_DRIFT.md) for more on why novel concepts get rounded to familiar ones.
+See [`PATTERN_MATCH_DRIFT.md`](../PATTERN_MATCH_DRIFT.md) for more on why novel concepts get rounded to familiar ones.
 
 ## How VibeSwap uses ETM
 
@@ -112,14 +112,14 @@ Each mechanism in the stack is designed by asking "what cognitive-economic prope
 | Cognitive property | VibeSwap mechanism |
 |---|---|
 | Working memory rent | CKB state-rent |
-| Marginal-contribution credit | Shapley distribution ([`SHAPLEY_REWARD_SYSTEM.md`](./SHAPLEY_REWARD_SYSTEM.md)) |
-| Evidence-weighted belief update | Commit-reveal batch auction ([`TRUE_PRICE_ORACLE_DEEP_DIVE.md`](./TRUE_PRICE_ORACLE_DEEP_DIVE.md)) |
+| Marginal-contribution credit | Shapley distribution ([`SHAPLEY_REWARD_SYSTEM.md`](../shapley/SHAPLEY_REWARD_SYSTEM.md)) |
+| Evidence-weighted belief update | Commit-reveal batch auction ([`TRUE_PRICE_ORACLE_DEEP_DIVE.md`](../oracles/TRUE_PRICE_ORACLE_DEEP_DIVE.md)) |
 | Multi-agent consensus | NCI weight function |
 | Reputation / trust | ContributionDAG + SoulboundIdentity |
-| Attribution (Lawson Constant) | ContributionAttestor ([`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md)) |
+| Attribution (Lawson Constant) | ContributionAttestor ([`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](../identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md)) |
 | Self-monitoring | Circuit breakers + TWAP validation |
 | Memory decay | Unbonding delay + state eviction |
-| Attention-capture defense | Siren Protocol ([`SIREN_PROTOCOL.md`](./SIREN_PROTOCOL.md)) |
+| Attention-capture defense | Siren Protocol ([`SIREN_PROTOCOL.md`](../security/SIREN_PROTOCOL.md)) |
 
 Every row is a cognitive-economic property implemented on-chain. Not by accident — by design.
 
@@ -162,7 +162,7 @@ Concrete example: NCI's retention weight is currently linear (weight decays prop
 
 Don't design a mechanism and then ask "what does it model?" The direction is cognitive-property → mechanism. Backward-design ensures the mechanism actually serves the cognitive economy.
 
-Concrete example: [Siren Protocol](./SIREN_PROTOCOL.md) was designed by asking "how does a cognitive system defend itself against exploitative parasites?" The answer (progressive cost-scaling against attack-signals, never blacklist) mapped to the on-chain mechanism.
+Concrete example: [Siren Protocol](../security/SIREN_PROTOCOL.md) was designed by asking "how does a cognitive system defend itself against exploitative parasites?" The answer (progressive cost-scaling against attack-signals, never blacklist) mapped to the on-chain mechanism.
 
 ### Consequence 4 — Gaps are data
 
@@ -193,7 +193,7 @@ If you're designing a mechanism:
 1. Name the cognitive-economic property you're implementing.
 2. Find the mathematical structure of that property in cognitive science.
 3. Implement the same structure on-chain.
-4. Verify the mirror is faithful (use [`CORRESPONDENCE_TRIAD.md`](./CORRESPONDENCE_TRIAD.md) as the design-gate).
+4. Verify the mirror is faithful (use [`CORRESPONDENCE_TRIAD.md`](../CORRESPONDENCE_TRIAD.md) as the design-gate).
 
 The mechanism stack grows by adding faithful mirrors, not by inventing.
 

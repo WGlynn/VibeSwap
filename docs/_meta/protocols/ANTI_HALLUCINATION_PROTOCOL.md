@@ -2,7 +2,7 @@
 
 **Status**: Assertion-verification discipline. Live.
 **Audience**: First-encounter OK. Walked AHP invocation examples.
-**Primitive**: [`memory/primitive_anti-hallucination-protocol.md`](../memory/primitive_anti-hallucination-protocol.md)
+**Primitive**: [`memory/primitive_anti-hallucination-protocol.md`](../memory/primitive_anti-hallucination-protocol.md) <!-- FIXME: ../memory/primitive_anti-hallucination-protocol.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 **Skill**: `~/.claude/skills/anti-hallucination/` (invoked via `/ahp`).
 
 ---
@@ -40,7 +40,7 @@ LLMs are this pattern scaled up.
 
 The mitigation isn't "LLMs are untrustworthy." It's: "before any system asserts a claim, link the assertion to a verification step."
 
-AHP is one specific instantiation of [Stateful Overlay](./STATEFUL_OVERLAY.md) applied to the cognition substrate's hallucination-gap: externalize the verification step so the assertion-layer can't bypass it.
+AHP is one specific instantiation of [Stateful Overlay](../../concepts/cross-chain/STATEFUL_OVERLAY.md) applied to the cognition substrate's hallucination-gap: externalize the verification step so the assertion-layer can't bypass it.
 
 ## The four checks
 
@@ -176,9 +176,9 @@ If all pass, assert. Downstream actions can proceed with confidence.
 
 ## Relationship to other primitives
 
-- **Parent of**: [Citation Hygiene Gate](../memory/primitive_citation-hygiene-gate.md) — citation-specific sub-protocol.
-- **Sibling of**: [P-001 Extraction Gate](../memory/feedback_p001-extraction-gate.md) — both are "check before act" patterns.
-- **Instance of**: [Stateful Overlay](./STATEFUL_OVERLAY.md) — externalized verification applied to the assertion-generation substrate.
+- **Parent of**: [Citation Hygiene Gate](../memory/primitive_citation-hygiene-gate.md) — citation-specific sub-protocol. <!-- FIXME: ../memory/primitive_citation-hygiene-gate.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **Sibling of**: [P-001 Extraction Gate](../memory/feedback_p001-extraction-gate.md) — both are "check before act" patterns. <!-- FIXME: ../memory/feedback_p001-extraction-gate.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- **Instance of**: [Stateful Overlay](../../concepts/cross-chain/STATEFUL_OVERLAY.md) — externalized verification applied to the assertion-generation substrate.
 
 ## For users
 

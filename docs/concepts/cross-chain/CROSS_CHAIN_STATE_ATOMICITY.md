@@ -2,7 +2,7 @@
 
 **Status**: Pedagogical deep-dive on LayerZero V2 integration + atomicity tradeoffs.
 **Audience**: First-encounter with cross-chain concepts is OK.
-**Related**: [Cross-Chain Settlement](./CROSS_CHAIN_SETTLEMENT.md), [Rosetta Covenants Cross-Chain](./ROSETTA_COVENANTS_CROSS_CHAIN.md), [Mechanism Composition Algebra](./MECHANISM_COMPOSITION_ALGEBRA.md).
+**Related**: [Cross-Chain Settlement](./CROSS_CHAIN_SETTLEMENT.md), [Rosetta Covenants Cross-Chain](./ROSETTA_COVENANTS_CROSS_CHAIN.md), [Mechanism Composition Algebra](../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md).
 
 ---
 

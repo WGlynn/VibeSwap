@@ -879,8 +879,8 @@ Where:
 ## Appendix C: Related Documents
 
 - [True Price Discovery](TRUE_PRICE_DISCOVERY.md) - Philosophy of cooperative price discovery
-- [Incentives Whitepaper](INCENTIVES_WHITEPAPER.md) - Soulbound reputation system details
-- [Security Mechanism Design](SECURITY_MECHANISM_DESIGN.md) - Trust tier and slashing mechanics
+- [Incentives Whitepaper](../../research/whitepapers/INCENTIVES_WHITEPAPER.md) - Soulbound reputation system details
+- [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Trust tier and slashing mechanics
 
 ---
 
@@ -901,5 +901,5 @@ Where:
 - [True Price Discovery](TRUE_PRICE_DISCOVERY.md) — Philosophy: cooperative price formation
 - [True Price Oracle](TRUE_PRICE_ORACLE.md) — Core oracle engine with stablecoin awareness
 - [Kalman Filter Oracle](KALMAN_FILTER_ORACLE.md) — The filtering math this intelligence layer uses
-- [Clearing Price Convergence Proof](../docs/papers/clearing-price-convergence-proof.md) — Convergence guarantees
+- [Clearing Price Convergence Proof](../../research/papers/clearing-price-convergence-proof.md) — Convergence guarantees
 - Implementation: `oracle/` (Python pipeline)

@@ -764,9 +764,9 @@ can also be achieved with a mechanism where truth-telling is optimal.
 
 ## Appendix C: Related Documents
 
-- [VibeSwap Incentives Whitepaper](INCENTIVES_WHITEPAPER.md) - Detailed mechanism specifications
-- [Security Mechanism Design](SECURITY_MECHANISM_DESIGN.md) - Anti-fragile defense architecture
-- [VibeSwap README](../README.md) - Technical implementation overview
+- [VibeSwap Incentives Whitepaper](../../research/whitepapers/INCENTIVES_WHITEPAPER.md) - Detailed mechanism specifications
+- [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Anti-fragile defense architecture
+- [VibeSwap README](../README.md) - Technical implementation overview <!-- FIXME: ../README.md — multiple candidates: docs/README.md, docs/architecture/patterns-existing/README.md, docs/marketing/forums/nervos/talks/README.md, docs/partnerships/usd8/internal/from-vibeswap/README.md, docs/research/papers/README.md -->
 
 ---
 
@@ -785,5 +785,5 @@ can also be achieved with a mechanism where truth-telling is optimal.
 - [True Price Oracle](TRUE_PRICE_ORACLE.md) — Implementation: stablecoin-aware estimation engine
 - [Price Intelligence Oracle](PRICE_INTELLIGENCE_ORACLE.md) — Manipulation detection and regime classification
 - [Kalman Filter Oracle](KALMAN_FILTER_ORACLE.md) — The filtering math behind true price estimation
-- [Clearing Price Convergence Proof](../docs/papers/clearing-price-convergence-proof.md) — Proof that batch clearing prices converge to true price
+- [Clearing Price Convergence Proof](../../research/papers/clearing-price-convergence-proof.md) — Proof that batch clearing prices converge to true price
 - Implementation: `oracle/` (Python pipeline)

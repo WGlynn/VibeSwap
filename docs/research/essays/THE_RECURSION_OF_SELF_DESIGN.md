@@ -61,7 +61,7 @@ Alice gets her marginal-contribution share. If the design was crucial and unique
 
 ### Condition 2 — Constitutional axioms block self-amplification
 
-P-000 (Fairness) and P-001 (No Extraction) are constitutional — NOT governance parameters. Alice cannot vote to make them "except in her case". See [`NO_EXTRACTION_AXIOM.md`](./NO_EXTRACTION_AXIOM.md).
+P-000 (Fairness) and P-001 (No Extraction) are constitutional — NOT governance parameters. Alice cannot vote to make them "except in her case". See [`NO_EXTRACTION_AXIOM.md`](../../concepts/NO_EXTRACTION_AXIOM.md).
 
 If a future Alice tries to game the mechanism for self-benefit, the constitutional axioms block it. Amendment requires amending the Constitution, which requires the Constitution to allow it — which P-000 explicitly forbids.
 
@@ -73,7 +73,7 @@ Alice's direct influence is substantial but dilutes organically as the graph gro
 
 ### Condition 4 — Three-branch attestation resists capture
 
-Accepting a claim requires either executive (trust-weighted peers), judicial (tribunal), or legislative (governance). Alice alone cannot swing all three branches. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](./CONTRIBUTION_ATTESTOR_EXPLAINER.md).
+Accepting a claim requires either executive (trust-weighted peers), judicial (tribunal), or legislative (governance). Alice alone cannot swing all three branches. See [`CONTRIBUTION_ATTESTOR_EXPLAINER.md`](../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md).
 
 Even if Alice could bias executive branch (she has high trust-weight), tribunal jury selection is random and governance requires quadratic voting. No single actor can capture all three.
 
@@ -185,7 +185,7 @@ Stable because: credit is proportional to marginal contribution (is this doc cla
 
 ## Relationship to the Lawson Constant
 
-The Lawson Constant (see [`LAWSON_CONSTANT.md`](./LAWSON_CONSTANT.md)) ensures attribution is preserved across successive rounds of design. You can always trace who did what when.
+The Lawson Constant (see [`LAWSON_CONSTANT.md`](../proofs/LAWSON_CONSTANT.md)) ensures attribution is preserved across successive rounds of design. You can always trace who did what when.
 
 This is what makes recursion auditable. Without attribution-preservation, recursion becomes invisible; drift compounds undetected. With attribution-preservation, each recursive round is legible; drift can be detected and corrected.
 

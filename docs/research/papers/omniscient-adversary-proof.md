@@ -188,7 +188,7 @@ Game over.
 
 ## See Also
 
-- [Formal Fairness Proofs](../../DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) — Complete mathematical fairness framework
-- [IIA Empirical Verification](../../DOCUMENTATION/IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation against live code
-- [P-001: No Extraction Ever](../nervos-talks/p001-no-extraction-ever-post.md) — The axiom this proof defends
-- [Clawback Cascade](../../DOCUMENTATION/CLAWBACK_CASCADE.md) — Enforcement mechanism for violations
+- [Formal Fairness Proofs](../proofs/FORMAL_FAIRNESS_PROOFS.md) — Complete mathematical fairness framework
+- [IIA Empirical Verification](../proofs/IIA_EMPIRICAL_VERIFICATION.md) — Empirical validation against live code
+- [P-001: No Extraction Ever](../../marketing/forums/nervos/talks/p001-no-extraction-ever-post.md) — The axiom this proof defends
+- [Clawback Cascade](../../concepts/security/CLAWBACK_CASCADE.md) — Enforcement mechanism for violations

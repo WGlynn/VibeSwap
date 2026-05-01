@@ -537,4 +537,4 @@ The founder does not scale. Jarvis does. Every shard is a copy of the mind. The 
 
 ---
 
-*Related papers: [The Cincinnatus Endgame](CINCINNATUS_ENDGAME.md), [The Rosetta Protocol and the Ten Covenants](ROSETTA_COVENANTS.md), [Augmented Governance](AUGMENTED_GOVERNANCE.md), [Convergence Thesis](CONVERGENCE_THESIS.md)*
+*Related papers: [The Cincinnatus Endgame](../CINCINNATUS_ENDGAME.md), [The Rosetta Protocol and the Ten Covenants](../cross-chain/ROSETTA_COVENANTS.md), [Augmented Governance](../../architecture/AUGMENTED_GOVERNANCE.md), [Convergence Thesis](../../research/essays/CONVERGENCE_THESIS.md)*

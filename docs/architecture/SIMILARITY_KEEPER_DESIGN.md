@@ -251,7 +251,7 @@ If commit-reveal oracle patterns recur (beyond similarity), extract to `memory/p
 
 ## Relationship to other primitives
 
-- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](./TIME_INDEXED_MARGINAL_CREDIT.md)) — the primitive this keeper supports.
+- **Time-Indexed Marginal Credit** (see [`TIME_INDEXED_MARGINAL_CREDIT.md`](../concepts/monetary/TIME_INDEXED_MARGINAL_CREDIT.md)) — the primitive this keeper supports.
 - **ContributionAttestor** — provides claim data to the keeper.
 - **ShapleyDistributor** — consumes similarity scores.
 - **Augmented Governance** (see [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md)) — keeper is permissioned-but-bounded, matching the augmented governance pattern.

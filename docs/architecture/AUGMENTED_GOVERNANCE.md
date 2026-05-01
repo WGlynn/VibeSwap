@@ -525,6 +525,6 @@ This is not governance without trust. It is governance where trust is unnecessar
 ## See Also
 
 - [Constitutional DAO Layer](CONSTITUTIONAL_DAO_LAYER.md) — Layered interoperability framework for DAOs with cooperative game theory
-- [Ungovernance Spec](../docs/ungovernance-spec-2026/ungovernance-spec-2026.md) — Hardcoded governance decay to protocol autonomy
-- [Cooperative Markets Philosophy](COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation for cooperative market design
-- [Cooperative Intelligence Protocol](COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation
+- [Ungovernance Spec](../governance/ungovernance/spec-2026/ungovernance-spec-2026.md) — Hardcoded governance decay to protocol autonomy
+- [Cooperative Markets Philosophy](../concepts/ai-native/COOPERATIVE_MARKETS_PHILOSOPHY.md) — Mathematical foundation for cooperative market design
+- [Cooperative Intelligence Protocol](../concepts/ai-native/COOPERATIVE_INTELLIGENCE_PROTOCOL.md) — Multi-mind coordination with Shapley allocation

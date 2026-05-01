@@ -365,7 +365,7 @@ Games involving continuous strategy spaces, search, or pursuit.
 
 ## See Also
 
-- [Shapley Reward System](../../DOCUMENTATION/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
-- [Composable Fairness](../../DOCUMENTATION/COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
-- [Atomized Shapley (paper)](../papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
-- [Cooperative Capitalism (paper)](../papers/cooperative-capitalism.md) — Mechanism design applying cooperative game theory to markets
+- [Shapley Reward System](../shapley/SHAPLEY_REWARD_SYSTEM.md) — Core Shapley-based reward distribution with four axioms
+- [Composable Fairness](../COMPOSABLE_FAIRNESS.md) — Shapley as unique solution to mechanism composition
+- [Atomized Shapley (paper)](../../research/papers/atomized-shapley.md) — Universal fair measurement for all protocol interactions
+- [Cooperative Capitalism (paper)](../../research/papers/cooperative-capitalism.md) — Mechanism design applying cooperative game theory to markets

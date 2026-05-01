@@ -405,8 +405,8 @@ A reference implementation of the mechanisms described in this paper exists as o
 ## See Also
 
 - [Economitra v1.0](ECONOMITRA.md) — Original economic model framework
-- [Economitra (paper)](../docs/papers/ECONOMITRA.md) — Academic treatment with formal proofs
+- [Economitra (paper)](../../research/papers/ECONOMITRA.md) — Academic treatment with formal proofs
 - [Three-Token Economy](THREE_TOKEN_ECONOMY.md) — Token architecture implementing this model
 - [Time-Neutral Tokenomics](TIME_NEUTRAL_TOKENOMICS.md) — Mathematical fairness framework
-- [Cooperative Emission Design](../docs/papers/cooperative-emission-design.md) — Emission mechanism design
-- [Near-Zero Token Scaling](../docs/papers/near-zero-token-scaling.md) — Minimal-token coordination
+- [Cooperative Emission Design](../../research/papers/cooperative-emission-design.md) — Emission mechanism design
+- [Near-Zero Token Scaling](../../research/papers/near-zero-token-scaling.md) — Minimal-token coordination

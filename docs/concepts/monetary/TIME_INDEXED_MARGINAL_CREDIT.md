@@ -21,13 +21,13 @@ The fix: make Shapley time-indexed. Compute each contribution's marginal value r
 - **Each contribution C is a function of (content, arrival_time).** Content is what was contributed. Arrival time is when the ecosystem first learned it.
 - **The marginal value of C is computed relative to the ecosystem knowledge-state S(t_C)** at arrival time t_C — not relative to an abstract all-contributors coalition.
 - **Novelty multiplier ν(C) = f(similarity(C, S(t_C)))** — high novelty (C dissimilar to prior state) → high multiplier; low novelty (C similar to prior state) → low multiplier.
-- **Floor constraint**: replications still receive credit, bounded below by a Lawson Floor (see [`THE_LAWSON_FLOOR_MATHEMATICS.md`](./THE_LAWSON_FLOOR_MATHEMATICS.md)). Zero credit is not the right answer for replications; partial credit is.
+- **Floor constraint**: replications still receive credit, bounded below by a Lawson Floor (see [`THE_LAWSON_FLOOR_MATHEMATICS.md`](../../research/proofs/THE_LAWSON_FLOOR_MATHEMATICS.md)). Zero credit is not the right answer for replications; partial credit is.
 
 The result: first publishers get high credit, replications get floor-bounded credit, and derivative work gets intermediate credit proportional to its incremental novelty.
 
 ## Why plain Shapley is wrong
 
-Plain Shapley (see [`SHAPLEY_REWARD_SYSTEM.md`](./SHAPLEY_REWARD_SYSTEM.md)) is **permutation-symmetric**. It averages over all permutations of the coalition. This is a strength — symmetric treatment of all members — in settings where arrival order doesn't matter. But in a knowledge-accumulation setting, arrival order DOES matter.
+Plain Shapley (see [`SHAPLEY_REWARD_SYSTEM.md`](../shapley/SHAPLEY_REWARD_SYSTEM.md)) is **permutation-symmetric**. It averages over all permutations of the coalition. This is a strength — symmetric treatment of all members — in settings where arrival order doesn't matter. But in a knowledge-accumulation setting, arrival order DOES matter.
 
 Consider three contributors submitting knowledge K to an ecosystem:
 
@@ -82,15 +82,15 @@ A supporting change. `getClaimsByContributorSince(contributor, since)` becomes a
 
 ### Novelty Bonus Theorem
 
-[`THE_NOVELTY_BONUS_THEOREM.md`](./THE_NOVELTY_BONUS_THEOREM.md) proves that plain Shapley under-rewards novelty by a specific bounded amount. The Time-Indexed variant provably closes that gap. The doc exists; the code cycle is Gap #2.
+[`THE_NOVELTY_BONUS_THEOREM.md`](../../research/theorems/THE_NOVELTY_BONUS_THEOREM.md) proves that plain Shapley under-rewards novelty by a specific bounded amount. The Time-Indexed variant provably closes that gap. The doc exists; the code cycle is Gap #2.
 
 ### Contribution DAG ordering
 
-The DAG (see [`CONTRIBUTION_DAG_EXPLAINER.md`](./CONTRIBUTION_DAG_EXPLAINER.md)) already records arrival times via block timestamps. The data needed for TIMC already exists. What's missing is the scoring function that consumes arrival times.
+The DAG (see [`CONTRIBUTION_DAG_EXPLAINER.md`](../identity/CONTRIBUTION_DAG_EXPLAINER.md)) already records arrival times via block timestamps. The data needed for TIMC already exists. What's missing is the scoring function that consumes arrival times.
 
 ### Cross-Domain Shapley
 
-[`CROSS_DOMAIN_SHAPLEY.md`](./CROSS_DOMAIN_SHAPLEY.md) describes Shapley across multiple domains (code, docs, tests, etc.). TIMC applies within each domain — a contribution's novelty is computed against the ecosystem's prior state **in that domain**.
+[`CROSS_DOMAIN_SHAPLEY.md`](../shapley/CROSS_DOMAIN_SHAPLEY.md) describes Shapley across multiple domains (code, docs, tests, etc.). TIMC applies within each domain — a contribution's novelty is computed against the ecosystem's prior state **in that domain**.
 
 ## The similarity function
 
@@ -109,7 +109,7 @@ The Gap #2 implementation plan uses **embedding similarity** (option 2) because:
 
 **Trust boundary**: the keeper is trusted to compute similarities correctly. Mitigation: the keeper **commits** the similarity function publicly (via on-chain hash commitment) BEFORE being asked to compute any scores. Subsequent reveals verify the committed function is what's being used. No retroactive tuning.
 
-See [`COMMIT_REVEAL_FOR_ORACLES.md`](./COMMIT_REVEAL_FOR_ORACLES.md) (queued) for more on this pattern.
+See [`COMMIT_REVEAL_FOR_ORACLES.md`](../oracles/COMMIT_REVEAL_FOR_ORACLES.md) (queued) for more on this pattern.
 
 ## Student exercises
 
@@ -146,7 +146,7 @@ TIMC parameters are governance-tunable within bounds:
 
 Why bounded? Because extreme multipliers distort incentives. A 10x novelty bonus would make contributors compete on pure novelty-gaming regardless of content quality. A 0.01x floor would collapse the replication ecosystem. The bounds preserve the mechanism's intended shape.
 
-See [`AUGMENTED_GOVERNANCE.md`](./AUGMENTED_GOVERNANCE.md) for the general principle: governance is free WITHIN math-enforced invariants.
+See [`AUGMENTED_GOVERNANCE.md`](../../architecture/AUGMENTED_GOVERNANCE.md) for the general principle: governance is free WITHIN math-enforced invariants.
 
 ## Future work — concrete code cycles this primitive surfaces
 
@@ -174,7 +174,7 @@ Extract this primitive to `memory/primitive_time-indexed-marginal-credit.md` onc
 
 ## Relationship to other primitives
 
-- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](./ATTENTION_SURFACE_SCALING.md)) — the finite-surface-pays-convex-rent primitive. TIMC addresses a DIFFERENT axis: not how long a contribution persists, but what the ecosystem knew when it arrived.
+- **Attention-Surface Scaling** (see [`ATTENTION_SURFACE_SCALING.md`](../ATTENTION_SURFACE_SCALING.md)) — the finite-surface-pays-convex-rent primitive. TIMC addresses a DIFFERENT axis: not how long a contribution persists, but what the ecosystem knew when it arrived.
 - **Novelty Bonus Theorem** — proves plain Shapley's gap quantitatively.
 - **Lawson Floor Mathematics** — prevents replications from getting zero.
 - **Commit-Reveal For Oracles** (queued) — protects the similarity function from retroactive tuning.

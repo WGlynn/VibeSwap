@@ -514,6 +514,28 @@ contract ShapleyDistributor is
         keeperRevealDelay = DEFAULT_KEEPER_REVEAL_DELAY;
     }
 
+    /**
+     * @notice C42-F1 (post-upgrade-initialization-gate): one-shot reinitializer for proxies
+     *         upgraded from a pre-C42 implementation. Sets safe defaults for the keeper
+     *         commit-reveal machinery so the anti-frontrunning property holds immediately
+     *         post-upgrade — without this, `keeperRevealDelay == 0` would let a keeper commit
+     *         and reveal in the same block, defeating the commit-reveal scheme.
+     * @dev MUST be packaged into `upgradeToAndCall(newImpl, abi.encodeCall(initializeC42Defaults, ()))`.
+     *      Idempotent on already-set state: only writes a slot when its current value is zero.
+     *      That makes this safe to call on a fresh deploy (where `initialize()` already set the
+     *      same defaults) — the only side effect is claiming the version-2 slot.
+     *      A use-site floor in `revealNoveltyMultiplier` provides defense-in-depth even when
+     *      this migration has not yet run.
+     */
+    function initializeC42Defaults() external reinitializer(2) onlyOwner {
+        if (keeperRevealDelay == 0) {
+            keeperRevealDelay = DEFAULT_KEEPER_REVEAL_DELAY;
+        }
+        if (keeperRevealThreshold == 0) {
+            keeperRevealThreshold = 1;
+        }
+    }
+
     // ============ ABC Conservation Seal (Set Once, Immutable Forever) ============
 
     /**
@@ -1788,8 +1810,18 @@ contract ShapleyDistributor is
         bytes32 commitment = keeperCommitment[gameId][participant][msg.sender];
         if (commitment == bytes32(0)) revert NoActiveCommitment();
 
-        uint256 commitTime = keeperCommitTime[gameId][participant][msg.sender];
-        if (block.timestamp < commitTime + keeperRevealDelay) revert RevealTooEarly();
+        // C42-F1: defense-in-depth use-site floor. Mirrors the existing
+        // `keeperRevealThreshold == 0 ? 1` floor below. If a pre-C42 proxy is upgraded
+        // without packaging the `initializeC42Defaults()` reinitializer call, the storage
+        // slot is zero — without this floor, a keeper could commit + reveal in the same
+        // block and defeat the anti-frontrunning property. The floor activates ONLY when
+        // governance has not yet set a delay; once set (even to a non-default value), the
+        // governance choice is honored. Inlined (no local var) to avoid stack-too-deep.
+        if (
+            block.timestamp <
+                keeperCommitTime[gameId][participant][msg.sender]
+                    + (keeperRevealDelay == 0 ? DEFAULT_KEEPER_REVEAL_DELAY : keeperRevealDelay)
+        ) revert RevealTooEarly();
 
         uint256 currentRound = revealRound[gameId][participant];
         bytes32 expected = computeNoveltyCommitment(

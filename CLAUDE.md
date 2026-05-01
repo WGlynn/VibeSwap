@@ -52,7 +52,7 @@ Per the Anthropic Frontend Aesthetics Cookbook pattern: name the aesthetic, appl
 ### BOOT
 ```
 SESSION_STATE.md FIRST ──→ WAL.md check ──→ [ACTIVE?] ──YES──→ AAP Recovery ──→ Auto-Commit Orphans
-  (last session's final thought            │NO                   (docs/ANTI_AMNESIA_PROTOCOL.md)
+  (last session's final thought            │NO                   (docs/_meta/protocols/ANTI_AMNESIA_PROTOCOL.md)
    = this session's first thought)         ▼
                                 Read SKB ──→ Read CLAUDE.md ──→ git pull ──→ READY
                                   (fresh boot: .claude/JarvisxWill_SKB.md)

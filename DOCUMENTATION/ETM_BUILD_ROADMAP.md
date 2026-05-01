@@ -10,12 +10,16 @@
 
 Step 1 of the ETM plan audited VibeSwap's mechanisms against ETM. Each mechanism got classified: MIRRORS (faithful), PARTIALLY MIRRORS (distorted), or FAILS TO MIRROR (misaligned).
 
-Results:
+Initial audit results:
 - **16 MIRRORS** — mechanisms that already reflect cognitive-economic structure faithfully. No action needed.
 - **3 PARTIALLY MIRRORS** — mechanisms that reflect with distortion. Refinement needed.
 - **0 FAILS TO MIRROR** — no full-redesign gaps.
 
-This doc is the roadmap for addressing those 3 PARTIAL gaps + strengthening already-mirroring mechanisms.
+Original 3 PARTIAL gaps (NCI retention, Shapley time-indexed marginal, attested circuit-breaker resume) are addressed by C40-C43 below.
+
+**Reconciliation note (2026-04-30)**: the audit was reconciled against shipped contract state and Section 7 was rewritten as a 6-item prioritized forward-gap list. Two new gaps (Gap 5 — Clawback bonded contest; Gap 6 — C43 default-on flip) were surfaced. The Audit-Section-7 ↔ Cycle cross-reference appears under the Cycle Budget table below.
+
+This doc is the roadmap for: (1) the original 3 PARTIAL gaps, (2) the strengthening track on already-mirroring mechanisms, and (3) the new audit-Section-7 forward queue.
 
 ## What makes a gap worth fixing
 
@@ -103,11 +107,11 @@ Rewards shift toward originators. Replications still credited (Lawson Floor) but
 
 ### The cycle
 
-**Cycle C41-C42 (target 2026-04-25 to 04-28)**:
+**Cycle C41-C42 (C41 shipped 2026-04-23, C42 shipped 2026-05-01)**:
 
 - **Before**: `ShapleyDistributor.computeShare()` uses permutation-averaged Shapley only.
-- **During (C41)**: extend signature to accept `priorContext: bytes32` representing the knowledge-set at the contribution's time. Modify Shapley to weight by similarity to prior-state.
-- **During (C42)**: implement off-chain similarity-keeper. Commits similarity scores on-chain via commit-reveal.
+- **Shipped (C41, 2026-04-23)**: novelty multiplier primitive — per-game, per-participant, BPS-scaled, applied at `computeShapleyValues` weight step. Owner-setter for similarity scores at this stage (placeholder for keeper).
+- **Shipped (C42, 2026-05-01)**: similarity keeper commit-reveal — replaces owner-setter with attested-keeper commit-reveal flow. Keeper commits `hash(scores || salt)`, reveals after delay, then writes scores. Same primitive shape as CRA (4th invocation of commit-reveal pattern in the codebase).
 - **After**: Shapley rewards incorporate novelty multipliers. Similarity function is commit-reveal-protected from retroactive tuning.
 
 **Deliverables**:
@@ -183,17 +187,21 @@ Benefit: future engineers tuning these constants see the rationale, reject arbit
 
 Identity mint currently captures (address, mint timestamp). Add (source-lineage-hash) — derived from the first attested contribution. This ties identity roots into the ContributionDAG by design.
 
+**Shipped (C45, 2026-05-01)**: source-lineage hash captured at mint, exposed via getter, immutable after mint. Mint surface now requires lineage-hash input from the caller (typically the first attested-contribution claim id). Identity roots are structurally bound to the DAG from genesis.
+
 ### Strengthen #3 — ContributionDAG Handshake Cooldown Audit
 
 The 1-day handshake cooldown models attention-rarity. Worth auditing: what percentage of handshakes hit the cooldown floor? Data informs whether cooldown should be raised (more rare) or lowered (less rare).
 
 ## New primitive candidates
 
-Three primitive candidates surfaced during audit:
+Five primitive candidates have surfaced across the original audit and the 2026-04-30 reconciliation:
 
-1. **Attention-surface scaling** — mechanisms that scale rent/cost with shared-state occupancy. Generalizes the NCI fix.
+1. **Attention-surface scaling** — mechanisms that scale rent/cost with shared-state occupancy. Generalizes the NCI fix and the audit-Gap-1 LP-rent direction.
 2. **Time-indexed marginal credit** — generalizes the Shapley fix beyond economics into any credit-assignment setting.
-3. **Attested resume** — paused-state systems that resume via attestation-weight, not wall-clock timeout.
+3. **Attested resume** — paused-state systems that resume via attestation-weight, not wall-clock timeout. Maturing toward load-bearing via C39 default-on flip.
+4. **Bonded permissionless contest** *(new, from audit Gap 5)* — adversarial on-chain challenge geometry where any party can post a bond to contest an authority decision within a fixed window before execution; mirrors OCR V2a permissionless-challenge geometry, applied here to the value-clawback domain. Generalizable to any authority-vote-then-execute pipeline.
+5. **Default-on structural augmentation** *(new, from audit Gap 6)* — pattern where a structural-augmentation mechanism is shipped as opt-in for backwards-compat, then promoted to default-on after attestor/keeper bootstrapping. Surfaces the "augmentation is dormant until default-on" failure mode as a checklist item for any future opt-in augmentation.
 
 Extract to `memory/primitive_*.md` as respective cycles ship.
 
@@ -201,16 +209,39 @@ Extract to `memory/primitive_*.md` as respective cycles ship.
 
 | Cycle | Status | Scope |
 |---|---|---|
-| C40a | SHIPPED 2026-04-23 | Gap #1 — Pure `calculateRetentionWeight` primitive on NCI (α=1.6) |
-| C40b | SHIPPED 2026-04-23 | Gap #1 — Retention wired into `vote()` weight accumulation (PoW+PoM decays, PoS untouched; single call site; threshold unchanged) |
-| C40c | PENDING | Gap #1 — Governance-tunable α in [1.2, 1.8] (ships when a real tuning need appears) |
-| C41 | SHIPPED 2026-04-23 | Gap #2a — Shapley novelty multiplier primitive (per-game, per-participant, BPS-scaled; applied at computeShapleyValues weight step) |
-| C42 | PENDING | Gap #2b — Similarity keeper + commit-reveal (replaces owner setter with attested keeper) |
-| C43 | SHIPPED 2026-04-23 | Gap #3 — Attested circuit-breaker resume (opt-in per-breaker; cooldown floor + M-of-N attestor gate) |
+| C40a | SHIPPED 2026-04-23 | Roadmap Gap #1 — Pure `calculateRetentionWeight` primitive on NCI (α=1.6) |
+| C40b | SHIPPED 2026-04-23 | Roadmap Gap #1 — Retention wired into `vote()` weight accumulation (PoW+PoM decays, PoS untouched; single call site; threshold unchanged) |
+| C40c | PENDING | Roadmap Gap #1 — Governance-tunable α in [1.2, 1.8] (ships when a real tuning need appears) |
+| C41 | SHIPPED 2026-04-23 | Roadmap Gap #2a — Shapley novelty multiplier primitive (per-game, per-participant, BPS-scaled; applied at computeShapleyValues weight step) |
+| C42 | SHIPPED 2026-05-01 | Roadmap Gap #2b — Similarity keeper + commit-reveal (replaces owner setter with attested keeper). 4th invocation of commit-reveal pattern. |
+| C43 | SHIPPED 2026-04-23 | Roadmap Gap #3 — Attested circuit-breaker resume (opt-in per-breaker; cooldown floor + M-of-N attestor gate) |
 | C44 | SHIPPED 2026-04-23 | Strengthen #1 — CRA attention-window NatSpec + alias constants + tripwire test |
-| C45+ | ongoing | Strengthen #2, #3 + primitive extractions |
+| C45 | SHIPPED 2026-05-01 | Strengthen #2 — SoulboundIdentity source-lineage binding (lineage-hash at mint, immutable, exposed via getter; ties identity roots to ContributionDAG) |
+| C39 | PENDING | Audit-Section-7 Gap 6 — C43 attested-resume **default-on flip** for high-stake breakers (`LOSS_BREAKER`, `TRUE_PRICE_BREAKER`) + initial certified attestor bootstrap (M=2). Cost: **S** (1 cycle). Activates structural augmentation currently dormant in production. *Being shipped in parallel by another agent.* |
+| C46+ | PENDING | Audit-Section-7 Gap 5 — Clawback Cascade **bonded contest path**. Permissionless `contest(caseId, wallet, evidence, bond)` on `ClawbackRegistry`; bond at-risk during fixed contest window before `executeClawback` may fire; FederatedConsensus remains dispute-resolution oracle but must engage with on-chain evidence on math-enforced timeline. Mirrors OCR V2a permissionless-challenge geometry. Cost: **M** (2 cycles). |
+| Strengthen track | rolling | Strengthen #3 (handshake-cooldown audit) + primitive extractions (`primitive_attested-resume.md`, `primitive_attention-surface-scaling.md`, `primitive_time-indexed-marginal-credit.md`) — interleaved with cycle work above |
 
-Estimated total: 1 week for gaps, 2 weeks with strengthens.
+Estimated total: gaps + strengthens currently in flight (C39, C46+, Strengthen track) ship in ~1.5 weeks. Audit-Section-7 forward-queue (Gaps 1/2/3, plus Gap 4 conditional) adds 8-11 cycles (~3-4 weeks) per the audit's recommended `Gap 6 → Gap 2 → Gap 1` sequence; Gaps 3 and 4 sequence behind based on mainnet runtime data.
+
+### Gap List Sync — Audit Section 7 ↔ Build Roadmap Cycles
+
+The audit's Section 7 prioritized gap list (post-reconciliation, 2026-04-30) sequences six forward gaps. Two of them (Gap 5, Gap 6) are NEW — surfaced during reconciliation and not present in the original 3-PARTIAL-gap audit. Cross-reference with cycles below. Note: the build roadmap's original "Gap #1 / #2 / #3" labels predate the reconciled audit. To avoid confusion this section uses the audit's Section 7 numbering.
+
+| Audit S7 Gap | Leverage | Cost | Build Roadmap Cycle | Status |
+|---|---|---|---|---|
+| 1 — VibeAMM LP positions rent-free | HIGH | M (2-3) | (forward queue, audit recommends after Gap 2) | PENDING — not yet slotted into cycle ledger |
+| 2 — TPO 5% deviation gate | MED-HIGH | S-M (1-2) | (forward queue, audit recommends after Gap 6) | PENDING — not yet slotted into cycle ledger |
+| 3 — Circuit breakers / TWAP policy thresholds | MED | M (2-3) | (forward queue, mainnet-data-conditional) | PENDING — not yet slotted into cycle ledger |
+| 4 — IL Protection Vault re-eval | LOW-MED | S-M (conditional) | (deferred, depends on Gap 1 + mainnet IL-claim data) | DEFER |
+| 5 — Clawback Cascade bonded contest | MED | M (2) | **C46+** | PENDING |
+| 6 — C43 attested-resume default-on for high-stake breakers | LOW-MED | S (1) | **C39** | PENDING (parallel) |
+
+Mapping note for the **roadmap's** original PARTIAL gaps (now reconciled-as-shipped):
+- Roadmap Gap #1 (NCI convex retention) → C40a/b SHIPPED, C40c PENDING
+- Roadmap Gap #2 (Shapley time-indexed marginal) → C41/C42 SHIPPED
+- Roadmap Gap #3 (attested circuit-breaker resume) → C43 SHIPPED *(opt-in only — Audit Gap 6 / C39 closes the default-on residual)*
+
+C39 is the audit-recommended Step-4 opener (cheap + activates dormant augmentation). The audit-recommended sequence after C39 is `Gap 2 → Gap 1`, which translates to additional new cycles to be slotted as those gaps reach the head of the queue.
 
 ## Step 3 and Step 4 references
 
@@ -255,4 +286,4 @@ See [`CONTRIBUTION_TRACEABILITY.md`](./CONTRIBUTION_TRACEABILITY.md) for how ext
 
 ## One-line summary
 
-*Step 2 of 4 in ETM Build Plan — addresses 3 PARTIAL gaps found in Step 1 audit (convex NCI retention C40, time-indexed Shapley C41-C42, attested circuit-breaker resume C43). Each cycle walked before/during/after with concrete numbers and mechanism references. Budget ~1 week for gaps + 2 weeks with strengthens. First concrete alignment fix is C40 — deployed convex retention function matches cognitive substrate's α=1.6.*
+*Step 2 of 4 in ETM Build Plan — original 3 PARTIAL gaps addressed (convex NCI retention C40 SHIPPED, time-indexed Shapley C41/C42 SHIPPED, attested circuit-breaker resume C43 SHIPPED, Strengthen #1 C44 + #2 C45 SHIPPED). 2026-04-30 audit reconciliation surfaced 6-item forward gap-list (Section 7); C39 (Gap 6 default-on flip, S) and C46+ (Gap 5 Clawback bonded contest, M) now in queue. Each cycle walked before/during/after with concrete numbers and mechanism references. First concrete alignment fix was C40 — deployed convex retention matches cognitive substrate's α=1.6.*

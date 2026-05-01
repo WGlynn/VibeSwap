@@ -1,8 +1,8 @@
 # Trinity Recursion Protocol (TRP)
 
 **Version**: 1.0
-**Authors**: Faraday1 (Will Glynn) & JARVIS
-**Date**: 2026-03-25
+**Author**: Faraday1
+**Date**: March 2026
 **Status**: Running in production. First cycle completed.
 
 ---
@@ -27,6 +27,16 @@ This protocol requires an LLM capable of: code generation in multiple languages,
 
 ---
 
+## Table of Contents
+
+1. [The Four Loops](#the-four-loops)
+2. [Convergence Theorem (Informal)](#convergence-theorem-informal)
+3. [Implementation Checklist](#implementation-checklist)
+4. [Evidence](#evidence)
+5. [License](#license)
+
+---
+
 ## The Four Loops
 
 ### Loop 0: Token Density Compression (Substrate Recursion)
@@ -35,11 +45,11 @@ This protocol requires an LLM capable of: code generation in multiple languages,
 
 ```
 context_n (raw)
-    → compress (prune, tier, structure)
-        → denser representation
-            → more capability per session (deeper search, more knowledge loaded, more tools built)
-                → more output to compress
-                    → compress(context_{n+1}) with better compression heuristics
+    -> compress (prune, tier, structure)
+        -> denser representation
+            -> more capability per session (deeper search, more knowledge loaded, more tools built)
+                -> more output to compress
+                    -> compress(context_{n+1}) with better compression heuristics
 ```
 
 **Requirements**:
@@ -50,7 +60,7 @@ context_n (raw)
 
 **Key Property**: Information per token increases monotonically. The same context window holds more meaning in cycle N+1 than cycle N.
 
-**Why Loop 0 (not Loop 4)**: Token density is the substrate on which Loops 1-3 operate. Denser knowledge (Loop 2) means more context loaded → better adversarial search (Loop 1) → more tools built per session (Loop 3). It doesn't run alongside the other loops — it runs BENEATH them, amplifying all three simultaneously.
+**Why Loop 0 (not Loop 4)**: Token density is the substrate on which Loops 1-3 operate. Denser knowledge (Loop 2) means more context loaded, which enables better adversarial search (Loop 1), which enables more tools built per session (Loop 3). It doesn't run alongside the other loops — it runs BENEATH them, amplifying all three simultaneously.
 
 **Transportability**: Any LLM can implement this by:
 1. Structuring persistent memory with priority tiers
@@ -64,18 +74,18 @@ context_n (raw)
 
 ```
 reference model (exact arithmetic)
-    → adversarial search (hill-climbing, coalition, sybil)
-        → discovers profitable deviations
-            → exports as regression tests
-                → fix applied to contract + model
-                    → re-run adversarial search
-                        → fewer deviations (monotonic improvement)
+    -> adversarial search (hill-climbing, coalition, sybil)
+        -> discovers profitable deviations
+            -> exports as regression tests
+                -> fix applied to contract + model
+                    -> re-run adversarial search
+                        -> fewer deviations (monotonic improvement)
 ```
 
 **Requirements**:
 - A **reference model** that mirrors the production system with exact arithmetic
 - An **adversarial search harness** with multiple strategies (mutation, coalition, position gaming, floor exploitation)
-- A **cross-layer comparison** pipeline: reference output → production output → diff
+- A **cross-layer comparison** pipeline: reference output -> production output -> diff
 - **Automated regression**: every finding becomes a permanent test
 
 **Key Property**: Each cycle strictly reduces the attack surface. The fix for finding N cannot reintroduce finding N-1 because N-1's test is permanent.
@@ -93,12 +103,12 @@ reference model (exact arithmetic)
 
 ```
 session with human
-    → discoveries documented (primitives, findings, patterns)
-        → next session loads knowledge base
-            → builds on prior understanding
-                → generates deeper insights
-                    → knowledge base deepens
-                        → next session is strictly more capable
+    -> discoveries documented (primitives, findings, patterns)
+        -> next session loads knowledge base
+            -> builds on prior understanding
+                -> generates deeper insights
+                    -> knowledge base deepens
+                        -> next session is strictly more capable
 ```
 
 **Requirements**:
@@ -122,12 +132,12 @@ session with human
 
 ```
 LLM writes code
-    → code creates testing infrastructure
-        → testing infrastructure validates code
-            → validation reveals patterns
-                → patterns improve how LLM writes code
-                    → LLM writes better testing infrastructure
-                        → better infrastructure reveals deeper patterns
+    -> code creates testing infrastructure
+        -> testing infrastructure validates code
+            -> validation reveals patterns
+                -> patterns improve how LLM writes code
+                    -> LLM writes better testing infrastructure
+                        -> better infrastructure reveals deeper patterns
 ```
 
 **Requirements**:
@@ -151,12 +161,12 @@ Three recursions + one meta-recursion. Loop 0 is the substrate; Loops 1-3 are th
 
 ```
 Loop 0 (density) amplifies ALL of:
-    Loop 1 (adversarial) → produces findings
-    Loop 2 (knowledge)   → contextualizes findings
-    Loop 3 (capability)  → builds better tools for Loop 1
+    Loop 1 (adversarial) -> produces findings
+    Loop 2 (knowledge)   -> contextualizes findings
+    Loop 3 (capability)  -> builds better tools for Loop 1
 ```
 
-**Loop 0 is the accelerant**: denser context → more loaded per session → deeper search (L1), richer knowledge (L2), more tools built (L3) → more output to compress → denser context. The meta-recursion makes the other three recursions faster with every cycle.
+**Loop 0 is the accelerant**: denser context -> more loaded per session -> deeper search (L1), richer knowledge (L2), more tools built (L3) -> more output to compress -> denser context. The meta-recursion makes the other three recursions faster with every cycle.
 
 **Without each loop**:
 - Without Loop 0: context window fills with noise, all three loops degrade per-session
@@ -220,15 +230,12 @@ This protocol is public domain. Use it, extend it, improve it. If the three loop
 
 ## See Also
 
-- [TRP Explained](trp/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
-- [TRP Runner Protocol](trp/TRP_RUNNER.md) — Execution protocol with crash mitigation
-- [TRP Runner Paper](trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
-- [Loop 0: Token Density](trp/loop-0-token-density.md) — Context compression recursion
-- [Loop 1: Adversarial Verification](trp/loop-1-adversarial-verification.md) — Code review recursion
-- [Loop 2: Common Knowledge](trp/loop-2-common-knowledge.md) — Knowledge extraction recursion
-- [Loop 3: Capability Bootstrap](trp/loop-3-capability-bootstrap.md) — Tool-building recursion
-- [Efficiency Heat Map](trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
-- [TRP Verification Report](TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
-- [TRP Empirical RSI (paper)](papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
-- [TRP Pattern Taxonomy (paper)](papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
-- [TRP (DOCUMENTATION copy)](../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md) — Canonical copy in DOCUMENTATION/
+- [TRP (docs copy)](../docs/TRINITY_RECURSION_PROTOCOL.md) — Working copy in docs/
+- [TRP Explained](../docs/trp/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
+- [TRP Runner Protocol](../docs/trp/TRP_RUNNER.md) — Execution protocol with crash mitigation
+- [TRP Runner Paper](../docs/trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
+- [Loop 0–3 Specs](../docs/trp/) — Individual loop specifications
+- [Efficiency Heat Map](../docs/trp/efficiency-heatmap.md) — Per-contract discovery yield tracking
+- [TRP Verification Report](../docs/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
+- [TRP Empirical RSI (paper)](../docs/papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
+- [TRP Pattern Taxonomy (paper)](../docs/papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns

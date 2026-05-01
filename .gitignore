@@ -32,6 +32,7 @@ node_modules/
 
 # Research repos (cloned, too large for main repo)
 research/
+!docs/research/
 
 # OS files
 .DS_Store

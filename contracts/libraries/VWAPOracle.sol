@@ -91,18 +91,37 @@ library VWAPOracle {
     ) internal {
         if (volume == 0) return;
 
+        // Normalize volume to PRECISION units BEFORE accumulating, so that
+        // priceCumulative and volumeCumulative truncate symmetrically.
+        //
+        // C19-F1 (precision-loss fix): the prior implementation computed
+        //   priceContribution = scaledPrice * volume / PRECISION
+        //   volumeCumulative += volume / PRECISION
+        // which truncate volume at different stages. For volume < PRECISION
+        // (sub-1-token trades on 18-dec assets, or any non-trivial amount on
+        // low-decimal tokens like USDC-6), priceContribution accumulated a
+        // non-zero value while volumeCumulative did not — biasing VWAP
+        // toward dust-trade prices. Normalizing volume up-front and treating
+        // dust trades as no-ops keeps both cumulators in lockstep.
+        uint256 scaledVolume = volume / PRECISION;
+        if (scaledVolume == 0) {
+            // Dust trade: below the cumulator's resolution. Update lastPrice
+            // for fallback queries but do not pollute either cumulator.
+            state.lastPrice = uint128(price / PRICE_SCALE);
+            return;
+        }
+
         VolumeObservation memory last = state.observations[state.index];
 
         // Scale price to prevent overflow when multiplied by volume
         uint128 scaledPrice = uint128(price / PRICE_SCALE);
         state.lastPrice = scaledPrice;
 
-        // Calculate weighted contribution (price × volume)
-        // Use checked math to detect overflow
-        uint256 priceContribution = uint256(scaledPrice) * volume / PRECISION;
+        // Calculate weighted contribution (price × volume) at matched scale
+        uint256 priceContribution = uint256(scaledPrice) * scaledVolume;
 
         uint128 newPriceCumulative = last.priceCumulative + uint128(priceContribution);
-        uint128 newVolumeCumulative = last.volumeCumulative + uint128(volume / PRECISION);
+        uint128 newVolumeCumulative = last.volumeCumulative + uint128(scaledVolume);
 
         // Write new observation if timestamp changed
         if (block.timestamp != last.timestamp) {

@@ -62,9 +62,14 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     // submit a resume attestation. Defaults remain backwards-compatible — the flag
     // is opt-in per breaker type.
 
-    /// @notice Per-breaker flag. When true, cooldown expiry does NOT auto-reset state;
-    ///         resume requires `attestResume` from certified attestors (cooldown floor
-    ///         still enforced). Defaults to false for backwards compatibility.
+    /// @notice Per-breaker explicit override of attested-resume requirement.
+    ///         Read in conjunction with `attestedResumeOverridden[breakerType]`.
+    ///         When override is unset, the EFFECTIVE value falls back to the
+    ///         classification default (see `_isAttestedResumeRequired`).
+    /// @dev Direct reads of this slot do NOT reflect C39 default-on behavior for
+    ///      security-load-bearing breakers (LOSS_BREAKER, TRUE_PRICE_BREAKER) when
+    ///      no override has been set. External consumers should call
+    ///      `isAttestedResumeRequired(breakerType)` for the effective answer.
     mapping(bytes32 => bool) public requiresAttestedResume;
 
     /// @notice Registry of governance-certified attestors eligible to sign resume evaluations.
@@ -88,10 +93,56 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     ///         Old generations are implicitly stale when generation increments.
     mapping(bytes32 => mapping(uint256 => mapping(address => bool))) private _hasAttestedResume;
 
-    /// @dev Reserved storage gap for future upgrades. Consumed 6 slots for C43:
-    ///      requiresAttestedResume, certifiedAttestor, resumeAttestationThreshold,
-    ///      resumeAttestationCount, tripGeneration, _hasAttestedResume. 44 remain.
-    uint256[44] private __gap;
+    // ============ C39: Default-On Attested-Resume for Security-Load-Bearing Breakers (Gap 6) ============
+    //
+    // C43 shipped attested-resume as opt-in: `requiresAttestedResume[bType]` defaulted
+    // false, governance had to call `setAttestedResumeRequired(bType, true)` to engage
+    // the augmentation. Section 7 / Gap 6 of ETM_ALIGNMENT_AUDIT.md identifies this as
+    // the highest-confidence-low-cost maturation: while C43 is dormant, the structural
+    // augmentation is shipped but not load-bearing.
+    //
+    // C39 promotes `LOSS_BREAKER` and `TRUE_PRICE_BREAKER` to default-on. These are the
+    // breakers where mistaken wall-clock auto-resume is cognitively-incorrect: a
+    // depleted insurance pool or a manipulated true-price oracle does not heal on a
+    // timer; only an explicit safety re-evaluation can authorize resume.
+    //
+    // The override path (`setAttestedResumeRequired`) is preserved. Once governance
+    // explicitly sets the flag (true OR false) on a security-load-bearing breaker,
+    // the override takes precedence over the classification default. This lets
+    // governance flip OFF the default-on behavior per breaker if operational reality
+    // demands it (e.g., a chain with no certified attestors yet).
+    //
+    // Existing-data preservation: a one-shot reinitializer-class migration runs in
+    // child contracts to detect any in-flight tripped state on a security breaker
+    // that has no override set, and pin its override to FALSE so the trip-in-progress
+    // continues on the wall-clock semantics it started under. New trips after
+    // migration get the default-on behavior.
+
+    /// @notice Per-breaker override flag. When true, `requiresAttestedResume[bType]`
+    ///         is the authoritative answer. When false (default), the effective
+    ///         requirement is determined by `_isSecurityLoadBearing(bType)`.
+    /// @dev Set automatically by `setAttestedResumeRequired` (any explicit governance
+    ///      call locks in the chosen value, regardless of whether it agrees with the
+    ///      classification default). This means a governance call to
+    ///      `setAttestedResumeRequired(LOSS_BREAKER, false)` will pin LOSS_BREAKER to
+    ///      false and disengage the C39 default-on behavior for that breaker.
+    mapping(bytes32 => bool) public attestedResumeOverridden;
+
+    /// @notice C39 migration completion flag. Per `primitive_post-upgrade-initialization-gate`:
+    ///         the zero-value of this slot ("false") semantically means "C39 migration
+    ///         has not run on this proxy". Concrete inheritors MUST call
+    ///         `_initializeC39SecurityDefaults()` from their own initializer (fresh
+    ///         deploy) and from a `reinitializer(N)` (upgrade path) to claim this slot.
+    /// @dev Without the migration, EXISTING tripped breakers on a pre-C39 proxy would
+    ///      surprise-flip semantics mid-trip on the next read of `_isAttestedResumeRequired`.
+    ///      The migration pins overrides on any in-flight tripped security breaker so
+    ///      the trip-in-progress completes under its original wall-clock semantics.
+    bool public c39SecurityDefaultsInitialized;
+
+    /// @dev Reserved storage gap for future upgrades. C43 consumed 6 slots; C39
+    ///      consumed 2 more (attestedResumeOverridden, c39SecurityDefaultsInitialized).
+    ///      44 - 2 = 42 remain.
+    uint256[42] private __gap;
 
     // ============ Events ============
 
@@ -109,6 +160,9 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
     event ResumeAttestationThresholdSet(uint256 threshold);
     event ResumeAttestationSubmitted(bytes32 indexed breakerType, address indexed attestor, bytes32 evidenceHash, uint256 count);
     event BreakerResumedByAttestation(bytes32 indexed breakerType, uint256 totalAttestations);
+    // C39 default-on events
+    event C39SecurityDefaultsInitialized(bytes32[] preservedBreakers);
+    event SecurityBreakerDefaultOverridden(bytes32 indexed breakerType, bool overrideValue, string reason);
 
     // ============ Errors ============
 
@@ -248,12 +302,30 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
 
     // ============ C43: Attested-Resume Admin ============
 
-    /// @notice Opt a breaker type into attested-resume (cooldown floor only; no auto-reset).
-    /// @dev Off by default. Existing consumers keep wall-clock auto-reset semantics
-    ///      unless explicitly opted in.
+    /// @notice Set the attested-resume requirement for a breaker type. Always pins
+    ///         the effective answer to `required` for this breaker, overriding the
+    ///         C39 classification default if any.
+    /// @dev C43 originally defaulted false for all breakers. C39 (Gap 6) flips
+    ///      `LOSS_BREAKER` and `TRUE_PRICE_BREAKER` to default-on. Calling this
+    ///      function — with EITHER value — sets `attestedResumeOverridden[bType]`
+    ///      to true so the explicit choice locks in. To reset back to "follow the
+    ///      classification default", call `clearAttestedResumeOverride`.
     function setAttestedResumeRequired(bytes32 breakerType, bool required) external onlyOwner {
         requiresAttestedResume[breakerType] = required;
+        attestedResumeOverridden[breakerType] = true;
         emit AttestedResumeRequirementSet(breakerType, required);
+    }
+
+    /// @notice Clear a per-breaker override and let the C39 classification default
+    ///         decide whether attested-resume is required.
+    /// @dev After this call, `isAttestedResumeRequired(breakerType)` returns
+    ///      `_isSecurityLoadBearing(breakerType)`. This is the only path that can
+    ///      restore the classification default after governance has explicitly
+    ///      pinned a value via `setAttestedResumeRequired`.
+    function clearAttestedResumeOverride(bytes32 breakerType) external onlyOwner {
+        delete attestedResumeOverridden[breakerType];
+        delete requiresAttestedResume[breakerType];
+        emit AttestedResumeRequirementSet(breakerType, _isAttestedResumeRequired(breakerType));
     }
 
     /// @notice Register or revoke a certified resume-attestor.
@@ -321,6 +393,94 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         emit BreakerResumedByAttestation(breakerType, finalCount);
     }
 
+    // ============ C39: Default-On Classification + Migration ============
+
+    /// @notice Pure classification: is this breaker security-load-bearing?
+    /// @dev Security-load-bearing breakers are those whose mistaken wall-clock
+    ///      auto-resume materially harms users. Currently:
+    ///      - LOSS_BREAKER: insurance-pool or PnL-vault depletion event; resuming on
+    ///        a timer cannot heal a depleted reserve.
+    ///      - TRUE_PRICE_BREAKER: oracle deviation event; resuming on a timer cannot
+    ///        confirm the oracle is no longer manipulated.
+    ///      VOLUME_BREAKER, PRICE_BREAKER, WITHDRAWAL_BREAKER are operational and
+    ///      keep wall-clock auto-resume by default. New breaker types added in
+    ///      future cycles must be classified explicitly here if they qualify.
+    function _isSecurityLoadBearing(bytes32 breakerType) internal pure returns (bool) {
+        return breakerType == LOSS_BREAKER || breakerType == TRUE_PRICE_BREAKER;
+    }
+
+    /// @notice Effective answer to "is attested-resume required for this breaker"?
+    ///         Combines C43 explicit-override with C39 classification default.
+    /// @dev Resolution order:
+    ///      1. If governance has explicitly set the override (`attestedResumeOverridden`),
+    ///         return the stored `requiresAttestedResume` value verbatim.
+    ///      2. Otherwise return `_isSecurityLoadBearing(breakerType)` (C39 default).
+    function _isAttestedResumeRequired(bytes32 breakerType) internal view returns (bool) {
+        if (attestedResumeOverridden[breakerType]) {
+            return requiresAttestedResume[breakerType];
+        }
+        return _isSecurityLoadBearing(breakerType);
+    }
+
+    /// @notice External read of the effective attested-resume requirement.
+    ///         Use this rather than `requiresAttestedResume(bType)` for the
+    ///         post-C39 answer.
+    function isAttestedResumeRequired(bytes32 breakerType) external view returns (bool) {
+        return _isAttestedResumeRequired(breakerType);
+    }
+
+    /// @notice C39 (post-upgrade-initialization-gate): one-shot migration that
+    ///         pins overrides on any IN-FLIGHT tripped security-load-bearing
+    ///         breaker so the trip-in-progress completes under the wall-clock
+    ///         semantics it started under. Idempotent via `c39SecurityDefaultsInitialized`.
+    /// @dev Concrete inheritors MUST call this from BOTH:
+    ///      - `initialize()` (fresh deploy — no in-flight trips, sets the flag)
+    ///      - `reinitializer(N)` (upgrade — preserves in-flight trips, sets the flag)
+    ///
+    ///      Without this migration, an existing pre-C39 proxy whose LOSS_BREAKER
+    ///      is currently tripped would see `_isAttestedResumeRequired` flip from
+    ///      false to true on the next read — pinning the breaker tripped past
+    ///      cooldown until attestors arrive. We pin the override to false on
+    ///      ALREADY-TRIPPED security breakers with no override set, which keeps
+    ///      the in-flight trip on its original wall-clock path. New trips after
+    ///      this point fall through to the C39 default-on classification.
+    function _initializeC39SecurityDefaults() internal {
+        if (c39SecurityDefaultsInitialized) return;
+
+        bytes32[] memory preserved = new bytes32[](2);
+        uint256 preservedCount = 0;
+
+        bytes32[2] memory securityBreakers = [LOSS_BREAKER, TRUE_PRICE_BREAKER];
+        for (uint256 i = 0; i < securityBreakers.length; i++) {
+            bytes32 bType = securityBreakers[i];
+            // Only pin on IN-FLIGHT tripped breakers without an existing override.
+            // Untripped breakers fall through to the new classification default.
+            if (
+                breakerStates[bType].tripped &&
+                !attestedResumeOverridden[bType]
+            ) {
+                attestedResumeOverridden[bType] = true;
+                requiresAttestedResume[bType] = false;
+                preserved[preservedCount] = bType;
+                preservedCount++;
+                emit SecurityBreakerDefaultOverridden(
+                    bType,
+                    false,
+                    "C39 migration: in-flight trip preserved on wall-clock"
+                );
+            }
+        }
+
+        c39SecurityDefaultsInitialized = true;
+
+        // Trim preserved[] to the actual count for the event payload.
+        bytes32[] memory finalPreserved = new bytes32[](preservedCount);
+        for (uint256 j = 0; j < preservedCount; j++) {
+            finalPreserved[j] = preserved[j];
+        }
+        emit C39SecurityDefaultsInitialized(finalPreserved);
+    }
+
     // ============ Internal Functions ============
 
     /**
@@ -346,8 +506,9 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
                 revert BreakerTrippedError(breakerType);
             }
             // C43: cooldown expiry auto-resets only when attestation is NOT required.
+            // C39: lookup the EFFECTIVE answer — explicit override or security-default.
             // Opted-in breakers stay tripped past cooldown until `attestResume` clears.
-            if (requiresAttestedResume[breakerType]) {
+            if (_isAttestedResumeRequired(breakerType)) {
                 revert BreakerTrippedError(breakerType);
             }
             // Cooldown expired — auto-reset state so windowValue is fresh
@@ -381,9 +542,11 @@ abstract contract CircuitBreaker is OwnableUpgradeable {
         // C43: opt-in attested-resume breakers skip the auto-reset path entirely
         // and keep returning `true` (tripped) until `attestResume` clears state.
         if (state.tripped) {
+            // C39: read the EFFECTIVE attested-resume requirement (explicit override
+            // wins; otherwise security-load-bearing classification default).
             if (
                 block.timestamp >= state.trippedAt + config.cooldownPeriod &&
-                !requiresAttestedResume[breakerType]
+                !_isAttestedResumeRequired(breakerType)
             ) {
                 // Cooldown expired AND attestation not required — auto-reset.
                 state.tripped = false;

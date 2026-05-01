@@ -458,48 +458,55 @@ Three properties keep Siren ETM-aligned:
 
 ### 5.2 Clawback Cascade
 
-**What it is.** `contracts/compliance/ClawbackRegistry.sol` + `contracts/compliance/ClawbackVault.sol`. When a transaction is identified as tainted (malicious, stolen-funds-derived, sanctions-flagged), the clawback mechanism propagates the taint along the DAG of downstream transactions — anyone who received the funds from the tainted source is also tainted. Recovery happens topologically: all downstream holders are notified, have a window to contest, and on non-contest, the tainted portion is clawed back to the registry.
+**What it is.** `contracts/compliance/ClawbackRegistry.sol` + `contracts/compliance/ClawbackVault.sol`, gated on `contracts/compliance/FederatedConsensus.sol`. When a wallet is flagged (`openCase`, `ClawbackRegistry.sol:187`), authorities open a `ClawbackCase` and the origin wallet's `WalletRecord` enters `TaintLevel.FLAGGED`. Taint propagates along the recorded transaction graph (`recordTransaction`/`_propagateTaint`, `ClawbackRegistry.sol:342, 488`): every downstream recipient inherits a `TaintRecord` and an incremented `taintDepth`, bounded by `maxCascadeDepth` and `MAX_CASE_WALLETS = 1000`, with `minTaintAmount` filtering dust. Adjudication is gated on FederatedConsensus voting — `submitForVoting` (`ClawbackRegistry.sol:227`) sends the case to authority vote; `executeClawback` (`ClawbackRegistry.sol:256`) requires `consensus.isProposalApproved(...)` before transferring tainted balances to the vault. Per the contract NatSpec: *"Off-chain entities (government, lawyers, courts, SEC) vote through FederatedConsensus before any clawback executes."*
 
-**ETM analysis.** Clawback Cascade externalizes the cognitive-economic property that **provenance-based quality assessment propagates through the substrate.** In cognition, if you learn that a source you relied on was fraudulent, you don't just update that one claim — you re-evaluate everything you learned from that source, and everything you taught others based on it. The re-evaluation propagates topologically through your knowledge graph. Clawback Cascade is this dynamic, applied to value-flow rather than belief-propagation, but with the same structural geometry: topological-taint, contest windows, cascading update.
+**ETM analysis.** Clawback Cascade externalizes the cognitive-economic property that **provenance-based quality assessment propagates through the substrate.** In cognition, if you learn that a source you relied on was fraudulent, you re-evaluate everything you learned from that source and everything you taught others based on it; the re-evaluation propagates topologically through your knowledge graph. Clawback Cascade applies the same geometry to value-flow: topological taint, depth-bounded propagation, registry-coordinated adjudication.
 
 ETM-aligned structural properties:
 
-- *Topological propagation.* Taint flows along the transaction graph, not by address-list membership. This is substrate-faithful: cognitive taint also follows the graph of information flow, not membership in a "bad" category.
-- *Contest windows preserve good-faith holders.* Anyone who received tainted funds legitimately (e.g., an AMM counterparty unaware of the source) can contest within the window; uncontested taint claws back, contested taint gets adjudicated. ETM-aligned because rigid propagation without contest would amount to strict liability, which no cognitive economy would tolerate.
-- *Registry-based centralization of the adjudication, not the detection.* The detection can be permissionless (anyone can flag a tainted source with evidence); the adjudication routes through the registry for consistency. ETM-aligned because consistent adjudication is a common-knowledge anchor that permissionless-detection + Sybil-prone-adjudication would not provide.
+- *Topological propagation.* Taint flows along the recorded transaction graph (`taintChain[wallet]`), not by address-list membership. Substrate-faithful: cognitive taint also follows the graph of information flow, not membership in a "bad" category. The `taintDepth` field surfaces the path metric directly on each record, matching ETM's preference for legible structural state.
+- *Bounded cascade.* `maxCascadeDepth` + `MAX_CASE_WALLETS` + `minTaintAmount` keep the cascade well-bounded against gas griefing and dust-Sybil amplification. ETM-aligned because cognitive-graph re-evaluation is also bounded — you don't trace fraud to the dawn of recorded thought; you stop at evidentiary depth limits.
+- *Registry-coordinated adjudication.* Detection is permissioned to authorized trackers + authorities (`onlyTracker` modifier; authority gate on `openCase`); adjudication routes through FederatedConsensus voting. ETM-aligned in the sense that *consistent adjudication is a common-knowledge anchor*, but see partial-mirror caveat below for where the structure diverges.
 
-**Pattern-match drift warning.** Do NOT round Clawback Cascade to "freeze funds" or "blacklist addresses." Both framings miss the topological-propagation-with-contest property that is the structural substance of the mechanism.
+**Partial-mirror caveat.** The cascade geometry is ETM-aligned, but the **adjudication layer is governance-by-authority, not structural rent.** The audit's earlier draft described "anyone who received tainted funds legitimately can contest within the window" — that is not what ships. What ships is FederatedConsensus voting by registered authorities (government / legal / regulatory entities), with the on-chain side providing only the execution rail. Downstream holders cannot file an in-protocol contest; their recourse is off-chain (legal challenge to the authority decision). ETM predicts this is the right call for the regulatory adjudication problem (which is genuinely off-chain in nature) but flags the absence of an on-chain contest primitive as a partial-alignment edge: tainted holders bear strict on-chain liability subject only to off-chain authority discretion. A future structural augmentation — bond-backed on-chain contest with FederatedConsensus as the dispute-resolution oracle, mirroring OCR V2a's permissionless-challenge geometry — would close this edge without removing authority adjudication.
 
-**Classification: ✅ MIRRORS.**
+**Pattern-match drift warning.** Do NOT round Clawback Cascade to "freeze funds" or "blacklist addresses" — those framings miss the topological-propagation-with-bounded-depth property. But also do NOT round it to "permissionless contest with adjudication oracle" — that overshoots in the other direction relative to what the contract actually implements.
+
+**Classification: ◐ PARTIALLY MIRRORS.** The cascade geometry MIRRORS; the adjudication path PARTIALLY MIRRORS due to authority-only contest. Net: PARTIALLY.
 
 **Refinement targets**:
-- Contest-window duration. Too short → legitimate holders can't contest; too long → recovery is delayed past usefulness. Empirical tuning.
-- Cross-chain taint propagation. Currently contained to native-chain transactions. LayerZero integration + registry-replication across chains would extend the topological scope. Future cycle.
+- *On-chain bonded contest primitive.* Permissionless `contest(caseId, wallet, evidence, bond)` against an in-flight clawback. Wins return bond + share of slash from authority error budget; losses forfeit bond. Mirrors OCR V2a challenge geometry. Converts strict-liability-with-only-off-chain-recourse to math-enforced rent-on-disputes-pays-discovery.
+- *Cross-chain taint propagation.* Currently contained to native-chain transactions; LayerZero integration + registry replication across chains would extend the topological scope to match the actual fund-flow graph. Future cycle.
+- *Cascade-depth elasticity.* Currently a single `maxCascadeDepth` parameter. Cognitive analog: depth-of-trace should scale with magnitude (high-stake fraud warrants deeper trace). Parameterizable per-case rather than per-registry.
 
 ### 5.3 Circuit Breakers / TWAP guards
 
-**What it is.** `contracts/core/CircuitBreaker.sol` + TWAP deviation checks in `contracts/amm/VibeAMM.sol` (max 5% deviation). Circuit breakers halt trading when volume/price/withdrawal thresholds are exceeded; TWAP guards reject individual trades whose price exceeds the time-weighted average by more than the deviation threshold.
+**What it is.** Two related defense surfaces:
 
-**ETM analysis.** Here ETM-alignment runs out. Circuit breakers and TWAP deviation gates are **policy-level defenses**: a threshold is set, an action fires when the threshold is crossed. They do not impose continuous rent, do not propagate topologically, and do not engage-until-exhaustion. They are classical pause-switches and bounded-rejection filters, imposed on top of the substrate rather than emerging from it.
+- *Circuit breakers* — `contracts/core/CircuitBreaker.sol` (abstract base inherited by VibeAMM and others). Five typed breakers (`VOLUME_BREAKER`, `PRICE_BREAKER`, `WITHDRAWAL_BREAKER`, `LOSS_BREAKER`, `TRUE_PRICE_BREAKER`) each parameterized by `threshold`, `cooldownPeriod`, `windowDuration`. `_checkBreaker` (`CircuitBreaker.sol:334`) gates protected functions; `_updateBreaker` (`CircuitBreaker.sol:367`) accumulates window values and trips on threshold breach. **C43 augmentation (`CircuitBreaker.sol:52-94, 282-322`)**: opt-in `requiresAttestedResume[breakerType]` flag turns cooldown into a *floor* — past cooldown the breaker stays tripped until M-of-N certified attestors call `attestResume(breakerType, evidenceHash)`; trip generation counter (`tripGeneration`) scopes attestor signatures to the current trip and implicitly invalidates them on the next trip without iteration.
+- *TWAP guards in VibeAMM* — `contracts/amm/VibeAMM.sol` `validatePrice` modifier (`VibeAMM.sol:399`). Two layered gates: (a) **AMM-04** single-trade deviation gate `MAX_DEVIATION = 500` bps (5%) against TWAP, applied post-swap via `_validatePriceAgainstTWAP` (`VibeAMM.sol:79, 422`); (b) **AMM-05** cross-window drift gate `MAX_TWAP_DRIFT_BPS = 200` bps (2%) against `lastTwapSnapshot[poolId]`, applied pre-swap (`VibeAMM.sol:88-95, 405-419`). The AMM-05 gate explicitly catches gradual manipulation that walks the TWAP across windows while staying under the 5% per-trade limit.
 
-These mechanisms exist for pragmatic reasons: structural defenses against extreme oracle manipulation or flash-crash cascades require complex primitives (commit-reveal oracle aggregation, adaptive fee curves, Treasury Stabilizer expansion) that are not all shipped. Circuit breakers + TWAP guards are the bridge mechanisms that protect against worst cases while the structural refinements are queued.
+**ETM analysis.** This is the audit's most nuanced alignment case. The naive read — "circuit breakers and TWAP deviation are policy-level pause-switches" — is true of the *vanilla* breaker behavior but understates two structural augmentations already shipped: AMM-05 and C43. With those two layered in, the defense surface is closer to a hybrid: vanilla policy-thresholds for normal operation, structural augmentations for the gaming pressure that pure policy admits.
 
-What's aligned:
-- *Transparent thresholds.* The firing conditions are on-chain and observable; no off-chain discretion in the firing decision itself.
-- *Last-resort disposition.* Per backlog entries FAT-AUDIT-2 (commit-reveal oracle) and FAT-AUDIT-3 (adaptive fees + Stabilizer expansion), the current design acknowledges these are last-resort policy mechanisms and that the goal is to reduce their firing domain over time by shipping structural alternatives.
+What's aligned (structural augmentations already shipped):
+- *Transparent thresholds + last-resort disposition.* Firing conditions are on-chain and observable; no off-chain discretion in the firing decision. The design explicitly treats these as last-resort, with backlog items FAT-AUDIT-2 (commit-reveal oracle) and FAT-AUDIT-3 (adaptive fees + Stabilizer) targeting reduction of the firing domain.
+- *Cross-window drift catch (AMM-05).* The 200 bps drift gate is the structural answer to the "stay-just-under-the-threshold" attack on the 5% single-trade gate. By measuring TWAP-against-snapshot at window boundaries, AMM-05 removes the threshold-gaming free-ride. ETM-aligned because it imposes structural cost on the *strategy of riding-just-under*, not on individual trades.
+- *Attested resume (C43).* The cognitive analog of breaker-resume is *biological flinch relaxation* — which never relaxes on a wall-clock timer alone. The substrate evaluates safety before resuming engagement. C43 externalizes exactly this: cooldown becomes a floor, not a trigger; M-of-N certified attestors must sign a safety-evaluation evidence-hash before trading resumes; trip generation prevents stale attestations from short-circuiting future trips. ETM-aligned in geometry — explicit safety attestation gates re-engagement, mirroring how cognitive systems gate reactivation after a defensive response.
 
-What's NOT aligned:
-- *Attacker-learnable thresholds.* An attacker studying on-chain history can stay-just-under the threshold, drive-to-halt-wait-resume, or front-run-the-halt. ETM predicts this — discretionary thresholds create exactly this class of exploit.
-- *Governance-set parameters.* Who decides the circuit-breaker thresholds? The DAO. What stops governance capture from setting thresholds that serve captors? Only the augmented-governance hierarchy (Physics > Constitution > Governance), which is strongest at the structural-invariant level and thinnest at the parameter-setting level. Circuit breakers live in the thin territory.
-- *No continuous rent.* A participant whose activity consistently runs near the threshold pays no continuous cost for that positioning. ETM-aligned defense would impose continuous rent proportional to proximity-to-threshold (e.g., steeper fee curves as volume or price-move approaches the circuit-breaker threshold).
+What's NOT aligned (the remaining policy edges):
+- *Attacker-learnable single-trade thresholds.* The 5% AMM-04 gate is still threshold-based per-trade; AMM-05 closes the cross-window edge but a single-window saturating attack within 5% per trade and 2% per window is still feasible. ETM predicts this class will not fully close until the deviation gates are replaced by structural commit-reveal oracle aggregation (FAT-AUDIT-2).
+- *Governance-set breaker parameters.* `configureBreaker` (`CircuitBreaker.sol:219`) is `onlyOwner`; thresholds, cooldown, window are governance-tunable. Augmented Governance (Physics > Constitution > Governance) puts these in the "thin" governance territory — math-invariants do not constrain `threshold` choices. Capture-resistance here depends on social/political layer, not structural.
+- *No continuous rent on near-threshold positioning.* A participant whose activity consistently runs at 4.9% deviation pays no continuous cost for that positioning. ETM-aligned defense would impose continuous rent proportional to proximity-to-threshold (e.g., superlinear fee curves), making the near-threshold strategy unprofitable independent of breaker firing.
+- *C43 is opt-in, not default.* `requiresAttestedResume` defaults to `false` for backwards compatibility. The structural augmentation is shipped but not yet load-bearing across the production breaker set. The augmentation matures as governance opts breakers in.
 
-**Classification: ◐ PARTIALLY MIRRORS.** The transparency and last-resort disposition keep it from being a full FAIL; the policy-level nature and attacker-learnable thresholds keep it from being a full MIRROR.
+**Classification: ◐ PARTIALLY MIRRORS.** AMM-05 + C43 lift this above what the audit's earlier categorization implied — there is real structural augmentation work shipped — but the policy-level core (governance-set thresholds, no near-threshold rent, single-trade deviation gate) keeps it from full MIRROR. Closer to MIRROR than to FAIL; refinement-class, not redesign-class.
 
-**Refinement targets** (these are the FAT-AUDIT-3 + FAT-AUDIT-2 canonicals):
-- *Adaptive fee curves.* Fee grows superlinearly with volume / price-move, so the cascade-profit motive drops organically before the breaker fires. Converts policy-threshold to structural-rent.
-- *Treasury Stabilizer expansion.* Auto-provides liquidity during stress rather than halting. Preserves trading during the exact moments breakers would otherwise fire.
-- *Commit-reveal oracle aggregation* (FAT-AUDIT-2). Removes the TWAP-deviation gate's load-bearing role by making oracle aggregation structural.
-- *Last-resort shrinkage.* Keep circuit breakers as true last-resort (unreachable in normal + near-normal operation), not as first-line defense. As structural mechanisms ship, relax breaker parameters so they only fire under catastrophic conditions.
+**Refinement targets** (FAT-AUDIT-2 + FAT-AUDIT-3 canonicals plus C43 maturation):
+- *Commit-reveal oracle aggregation* (FAT-AUDIT-2). Removes the AMM-04 5% deviation gate's load-bearing role by making oracle aggregation structural. Co-refinement with Section 4.2 Gap 2.
+- *Adaptive fee curves* (FAT-AUDIT-3). Superlinear fee scaling with volume / price-move replaces the binary breaker-fires-or-not edge with continuous near-threshold rent. Closes the "no continuous rent" edge structurally.
+- *Treasury Stabilizer expansion* (FAT-AUDIT-3). Auto-provides liquidity during stress rather than halting. Preserves trading during the exact moments breakers would otherwise fire.
+- *C43 default-on for high-stake breakers.* Promote `requiresAttestedResume = true` from opt-in to default for `LOSS_BREAKER` and `TRUE_PRICE_BREAKER`; keep opt-out for low-stake operational breakers. Matures the C43 mechanism to load-bearing status.
+- *Attestor-set decentralization.* `setCertifiedAttestor` is currently `onlyOwner`; ETM-aligned trajectory is FederatedConsensus-style multi-authority gating, then PoM-weighted attestor selection.
 
 <!-- SECTION-5-MARKER -->
 
@@ -524,18 +531,18 @@ What's NOT aligned:
 | 4.5 | Lawson Floor | ✅ MIRRORS | Maximin-derived settlement gate; structural not threshold. |
 | 4.6 | Contribution DAG | ✅ MIRRORS | Acyclic + PoM-weighted + soulbound-attributed. Substrate for common-knowledge layer. |
 | 5.1 | Siren Protocol | ✅ MIRRORS | Rent-until-exhaustion, not blacklist. High-drift zone handled correctly. |
-| 5.2 | Clawback Cascade | ✅ MIRRORS | Topological taint + contest windows. Not "freeze funds." |
-| 5.3 | Circuit Breakers + TWAP guards | ◐ PARTIALLY | Transparent last-resort, but attacker-learnable thresholds, no continuous rent. Refinement: FAT-AUDIT-2 + FAT-AUDIT-3. |
+| 5.2 | Clawback Cascade | ◐ PARTIALLY | Topological taint geometry MIRRORS; adjudication is FederatedConsensus authority-vote with no on-chain bonded-contest path for tainted holders. |
+| 5.3 | Circuit Breakers + TWAP guards | ◐ PARTIALLY | AMM-05 cross-window drift + C43 attested-resume are real structural augmentations; remaining policy edges (single-trade 5% gate, governance-set thresholds, no near-threshold rent) keep it short of full MIRROR. Refinement: FAT-AUDIT-2 + FAT-AUDIT-3 + C43 maturation. |
 
-**Totals**: 16 MIRRORS / 3 PARTIALLY MIRRORS / 0 FAILS TO MIRROR across 19 major mechanisms audited.
+**Totals**: 15 MIRRORS / 4 PARTIALLY MIRRORS / 0 FAILS TO MIRROR across 19 major mechanisms audited.
 
-**The 0 FAILS TO MIRROR result is itself noteworthy.** VibeSwap was designed against the cognitive-economic spec before the spec was articulated as ETM. The absence of full-fail mechanisms says: the underlying design intuition has been consistently ETM-aligned across the mechanism space. The 3 PARTIAL cases are known backlog items (FAT-AUDIT-1, FAT-AUDIT-2, FAT-AUDIT-3) already queued for refinement.
+**The 0 FAILS TO MIRROR result is itself noteworthy.** VibeSwap was designed against the cognitive-economic spec before the spec was articulated as ETM. The absence of full-fail mechanisms says: the underlying design intuition has been consistently ETM-aligned across the mechanism space. The 4 PARTIAL cases — TPO 5% gate (FAT-AUDIT-2), VibeAMM LP rent-free (FAT-AUDIT-1), Clawback authority-only adjudication, Circuit-breaker policy edges (FAT-AUDIT-3 + C43 maturation) — are all refinement-class with known structural-augmentation paths, not redesign-class.
 
 <!-- SECTION-6-MARKER -->
 
 ## Section 7 — Prioritized gap list (feeds Step 2 Build Roadmap)
 
-The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order is by leverage — the gap whose closure most strengthens the overall ETM-fidelity of the system, not necessarily by implementation cost.
+The 4 PARTIALLY MIRRORS classifications convert into 5 prioritized gaps. Order is by leverage — the gap whose closure most strengthens the overall ETM-fidelity of the system, not necessarily by implementation cost. Estimated cycle cost is S (single cycle, ≤ ~3 days), M (2-3 cycles), or L (4+ cycles or multi-component).
 
 ### Gap 1 — VibeAMM LP positions are rent-free (HIGH leverage)
 
@@ -548,7 +555,7 @@ The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order i
 - Differentiate active-rebalancing LPs from passive-holding LPs in fee distribution (concentrated-liquidity-position-style metrics, or per-block rebalancing attribution).
 - Reframe IL-protection vault as conditional-on-residual-IL after rent + active-LP differentiation reduce the underlying problem.
 
-**Rough scope**: 2-3 cycles. New `LPRentRegistry` sidecar + VibeAMM wire-in + fee-distribution recomputation.
+**Rough scope (M)**: 2-3 cycles. New `LPRentRegistry` sidecar + VibeAMM wire-in + fee-distribution recomputation.
 
 ### Gap 2 — TPO uses 5% deviation gate as primary defense (MED-HIGH leverage)
 
@@ -561,7 +568,7 @@ The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order i
 - Replaces the deviation-gate's load-bearing role with structural commit-reveal opacity.
 - Hardens VibeStable liquidation path (closes C7-GOV-008 dependency).
 
-**Rough scope**: 1-2 cycles. New aggregation contract + TPO wire-in + VibeStable liquidation path update.
+**Rough scope (S-M)**: 1-2 cycles. New aggregation contract + TPO wire-in + VibeStable liquidation path update.
 
 ### Gap 3 — Circuit breakers / TWAP deviation are policy thresholds (MED leverage)
 
@@ -574,7 +581,7 @@ The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order i
 - Treasury Stabilizer expansion: auto-provides liquidity during stress, preserving trading rather than halting.
 - Goal: shrink breaker firing domain over time. Keep breakers as true last-resort, not first-line.
 
-**Rough scope**: 2-3 cycles. New fee-curve contract + Treasury Stabilizer extension + breaker parameter rebalance.
+**Rough scope (M)**: 2-3 cycles. New fee-curve contract + Treasury Stabilizer extension + breaker parameter rebalance + C43 default-on flip for high-stake breakers.
 
 ### Gap 4 — IL Protection Vault may be insurance against a symptom (LOW-MED leverage, post-mainnet decision)
 
@@ -587,16 +594,59 @@ The 3 PARTIALLY MIRRORS classifications convert into 4 prioritized gaps. Order i
 - Instrument IL-claim frequency on mainnet launch.
 - Re-audit post-volume. If claim data supports low-incidence, route Vault revenue streams (priority bid % + early-exit penalty %) directly to LPs — simpler, cheaper, same user outcome.
 
-**Rough scope**: depends on Gap 1 + mainnet runtime data.
+**Rough scope (S-M, conditional)**: depends on Gap 1 + mainnet runtime data. If empirical claim-frequency supports it: 1 cycle to retire vault + redirect revenue streams (S). If claim data shows residual IL: 2-3 cycles to refactor vault as last-resort backstop only (M).
+
+### Gap 5 — Clawback Cascade has no on-chain bonded-contest path (MED leverage)
+
+**From Section 5.2.** The cascade geometry is ETM-aligned, but tainted-by-association holders have no in-protocol way to contest the clawback before execution. Adjudication is FederatedConsensus authority-vote; downstream recourse is purely off-chain (legal challenge to the authority decision). This produces strict on-chain liability subject only to off-chain authority discretion.
+
+**Why MED leverage**: not the highest-frequency interface (most users never hit the clawback path), but the one where ETM's "math-enforced not policy-enforced" principle is most visible-by-its-absence. Adding an on-chain contest primitive would also harden the system against authority-set capture, which sits in Augmented Governance's "thin" territory until structurally augmented.
+
+**Refinement direction**:
+- Permissionless `contest(caseId, wallet, evidence, bond)` on `ClawbackRegistry`. Bond sits at-risk during a fixed contest window before `executeClawback` may fire.
+- Wins (case dismissed via FederatedConsensus on the contest evidence) return bond + share of slash from authority error budget; losses (case proceeds) forfeit bond.
+- Mirrors OCR V2a permissionless-challenge geometry — same primitive, applied to the value-clawback domain rather than the operator-availability domain.
+- Keeps FederatedConsensus as the dispute-resolution oracle (it is the right authority for regulatory adjudication); changes only that the authority must engage with on-chain evidence on a math-enforced timeline rather than firing into a mute on-chain target.
+
+**Rough scope (M)**: 2 cycles. `ClawbackContest` extension to `ClawbackRegistry` + bond accounting + FederatedConsensus-callback wiring + tests modeling the contest window state machine.
+
+### Gap 6 — C43 attested-resume is opt-in rather than default-on for high-stake breakers (LOW-MED leverage, S)
+
+**From Section 5.3.** The C43 mechanism is shipped but `requiresAttestedResume` defaults `false` for backwards compatibility. As long as it is opt-in, the structural-augmentation it provides is dormant in production breaker behavior.
+
+**Why LOW-MED leverage**: small surface area; the augmentation is already implemented; the gap is configuration-and-attestor-bootstrapping, not new code. Low-leverage in absolute terms but cheap to close, so high return-per-cycle.
+
+**Refinement direction**:
+- Promote `requiresAttestedResume = true` from opt-in to default for `LOSS_BREAKER` and `TRUE_PRICE_BREAKER` (the high-stake breakers where wall-clock auto-resume is cognitively-incorrect).
+- Bootstrap initial certified attestor set (governance-set, M=2 default to start).
+- Document attestor expectations in `docs/attestor-charter.md`; queue PoM-weighted attestor-selection for a future cycle (replaces `onlyOwner` `setCertifiedAttestor`).
+
+**Rough scope (S)**: 1 cycle. Configuration flip + attestor bootstrap + tests verifying the default-on path.
+
+### Cycle-cost summary
+
+| Gap | Leverage | Cost | Type |
+|---|---|---|---|
+| 1. VibeAMM LP rent-free | HIGH | M (2-3) | New code (LPRentRegistry sidecar) |
+| 2. TPO 5% deviation gate | MED-HIGH | S-M (1-2) | New code (commit-reveal aggregation) |
+| 3. Circuit breakers / TWAP policy edges | MED | M (2-3) | New code + parameter rebalance |
+| 4. IL Protection Vault re-eval | LOW-MED | S-M (conditional) | Conditional refactor / retire |
+| 5. Clawback bonded contest | MED | M (2) | New code (ClawbackContest) |
+| 6. C43 default-on for high-stake | LOW-MED | S (1) | Config + attestor bootstrap |
 
 ---
 
 ## Step 2 entry point
 
-`DOCUMENTATION/ETM_BUILD_ROADMAP.md` will translate these 4 gaps into concrete engineering tasks: per-gap acceptance criteria, contracts to modify, primitives to draft, tests to write. Each gap becomes ~1-3 RSI cycles in the build queue.
+`DOCUMENTATION/ETM_BUILD_ROADMAP.md` will translate these 6 gaps into concrete engineering tasks: per-gap acceptance criteria, contracts to modify, primitives to draft, tests to write. Each gap becomes ~1-3 RSI cycles in the build queue.
 
 ## Step 4 candidate
 
-C39 (next concrete alignment fix) should be **Gap 2 — TPO commit-reveal oracle aggregation**. Reasons: smaller scope than Gap 1 (1-2 cycles vs 2-3), high code reuse from existing CRA primitive (4th invocation of commit-reveal pattern, see Cycle 36 memory), unblocks downstream VibeStable refresh. Gap 1 should be C40+ after Gap 2 ships, with the LPRentRegistry pattern informed by what we learn from oracle aggregation.
+C39 (next concrete alignment fix) — two viable openers, both small:
+
+- **Gap 6 — C43 default-on flip (S, 1 cycle)** is the cheapest. Code is already shipped; the work is configuration + attestor bootstrap + tests. Activates a structural augmentation that is currently dormant.
+- **Gap 2 — TPO commit-reveal oracle aggregation (S-M, 1-2 cycles)** is the highest-leverage among the cheap ones. High code reuse from existing CRA primitive (4th invocation of commit-reveal pattern, see Cycle 36 memory); unblocks downstream VibeStable refresh.
+
+Recommended sequence: **Gap 6 (C39) → Gap 2 (C40-41) → Gap 1 (C42-44)**. Gap 6 is high-confidence-low-cost so it ships fast and matures the C43 augmentation to load-bearing status. Gap 2 ships next because it propagates ETM-fidelity into the oracle layer that all other mechanisms depend on. Gap 1 (LPRentRegistry) takes longer but draws on the patterns proved out by Gap 2's commit-reveal-aggregation work. Gaps 3, 4, 5 queue behind based on mainnet runtime data and emerging priorities.
 
 <!-- SECTION-7-MARKER -->

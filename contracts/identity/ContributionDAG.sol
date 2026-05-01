@@ -29,6 +29,39 @@ import "./interfaces/IContributionDAG.sol";
 contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     event SoulboundIdentityUpdated(address indexed previous, address indexed current);
 
+    // ============ Strengthen #3: Handshake Cooldown Observability ============
+    //
+    // The 1-day handshake cooldown models attention-rarity. To audit whether
+    // the cooldown is calibrated correctly we need on-chain metrics:
+    //   - totalHandshakeAttempts: every (addVouch | tryAddVouch) call that
+    //     reaches the cooldown gate (i.e., post-identity, post-self-check,
+    //     post-vouch-limit). Distinct from successes because some get gated.
+    //   - totalHandshakeSuccesses: every NEW handshake confirmation
+    //     (a Handshake row appended to _handshakes).
+    //   - totalHandshakesBlockedByCooldown: every cooldown-gated attempt
+    //     observed via tryAddVouch (the non-reverting entry point — reverting
+    //     entry points cannot increment counters because reverts wipe state).
+    //   - lastHandshakeAt[pairKey]: O(1) per-pair last-handshake timestamp,
+    //     surfaced for off-chain hit-rate analytics.
+    //
+    // Hit-rate audit: blocks / attempts. If the hit-rate is high the cooldown
+    // is too coarse; if near-zero it isn't doing meaningful gating. Data first,
+    // tuning second — see ETM_BUILD_ROADMAP Strengthen #3.
+    event HandshakeBlockedByCooldown(
+        address indexed from,
+        address indexed to,
+        uint256 remaining
+    );
+
+    /// @notice Status code returned by tryAddVouch (non-reverting addVouch).
+    enum VouchStatus {
+        Success,             // Vouch recorded (may or may not have created a handshake)
+        BlockedByCooldown,   // Re-vouch within HANDSHAKE_COOLDOWN window
+        BlockedByVouchLimit, // Caller already at MAX_VOUCH_PER_USER
+        BlockedBySelf,       // Caller tried to vouch for themselves
+        BlockedByIdentity    // Caller lacks SoulboundIdentity
+    }
+
     using IncrementalMerkleTree for IncrementalMerkleTree.Tree;
 
     // ============ The Lawson Constant ============
@@ -114,6 +147,26 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
     event FounderChangeQueued(uint256 indexed changeId, address founder, bool isAddition, uint256 executeAfter);
     event FounderChangeCancelled(uint256 indexed changeId);
 
+    // ============ Strengthen #3: Cooldown Observability State ============
+
+    /// @notice Total addVouch + tryAddVouch attempts that reached the cooldown gate.
+    ///         Denominator for cooldown-hit-rate: blocks / attempts.
+    uint256 public totalHandshakeAttempts;
+
+    /// @notice Total NEW handshakes confirmed (a Handshake row appended).
+    ///         Distinct from attempts because most attempts are one-way vouches.
+    uint256 public totalHandshakeSuccesses;
+
+    /// @notice Total tryAddVouch attempts blocked by HANDSHAKE_COOLDOWN.
+    ///         Reverting addVouch cannot increment this (revert wipes state);
+    ///         off-chain analytics SHOULD migrate to tryAddVouch for accurate
+    ///         cooldown audit. Numerator for cooldown-hit-rate.
+    uint256 public totalHandshakesBlockedByCooldown;
+
+    /// @notice O(1) per-pair last-handshake timestamp. Keyed by _handshakeKey.
+    ///         0 if never handshaken; otherwise unix-ts of most recent confirmation.
+    mapping(bytes32 => uint256) public lastHandshakeAt;
+
     // ============ Constructor ============
 
     constructor(address _soulbound) Ownable(msg.sender) {
@@ -150,6 +203,13 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
         if (_vouchesFrom[msg.sender].length >= MAX_VOUCH_PER_USER) {
             revert MaxVouchesReached();
         }
+
+        // Strengthen #3: count attempts at the cooldown gate. NOTE: reverts
+        // below this point will wipe this increment, which is exactly the
+        // pre-existing UX guarantee for addVouch — callers wanting accurate
+        // cooldown-block telemetry MUST use tryAddVouch (it never reverts on
+        // cooldown, so its block-counter survives).
+        totalHandshakeAttempts++;
 
         // Check if already vouched
         Vouch storage existing = _vouches[msg.sender][to];
@@ -199,9 +259,130 @@ contract ContributionDAG is IContributionDAG, Ownable, ReentrancyGuard {
                     timestamp: block.timestamp
                 }));
                 _handshakeMap[_handshakeKey(msg.sender, to)] = true;
+                lastHandshakeAt[_handshakeKey(msg.sender, to)] = block.timestamp;
+                totalHandshakeSuccesses++;
                 emit HandshakeConfirmed(msg.sender, to);
             }
         }
+    }
+
+    /// @notice Non-reverting variant of addVouch for cooldown observability.
+    /// @dev Strengthen #3: Reverting addVouch cannot increment a cooldown-block
+    ///      counter because reverts wipe state. tryAddVouch returns a status code
+    ///      and increments `totalHandshakesBlockedByCooldown` when it observes a
+    ///      cooldown hit. Off-chain analytics indexing
+    ///      `HandshakeBlockedByCooldown` events get a precise hit-rate dataset.
+    ///      Existing addVouch behavior is unchanged — both entry points coexist.
+    /// @param to Address to vouch for
+    /// @param messageHash IPFS hash of endorsement message
+    /// @return status One of the VouchStatus codes
+    /// @return isHandshake_ True if this call confirmed a (new or refreshed) handshake
+    /// @return cooldownRemaining Seconds until cooldown elapses (0 if not cooldown-blocked)
+    function tryAddVouch(
+        address to,
+        bytes32 messageHash
+    ) external returns (VouchStatus status, bool isHandshake_, uint256 cooldownRemaining) {
+        // Identity gate (mirror of requiresIdentity, but non-reverting)
+        if (soulboundIdentity != address(0)) {
+            (bool ok, bytes memory data) = soulboundIdentity.staticcall(
+                abi.encodeWithSignature("hasIdentity(address)", msg.sender)
+            );
+            if (!ok || (data.length >= 32 && !abi.decode(data, (bool)))) {
+                return (VouchStatus.BlockedByIdentity, false, 0);
+            }
+        }
+
+        if (msg.sender == to) {
+            return (VouchStatus.BlockedBySelf, false, 0);
+        }
+
+        if (_vouchesFrom[msg.sender].length >= MAX_VOUCH_PER_USER) {
+            return (VouchStatus.BlockedByVouchLimit, false, 0);
+        }
+
+        // Past pre-checks — count this as an attempt.
+        totalHandshakeAttempts++;
+
+        Vouch storage existing = _vouches[msg.sender][to];
+        if (existing.timestamp != 0) {
+            uint256 elapsed = block.timestamp - existing.timestamp;
+            if (elapsed < HANDSHAKE_COOLDOWN) {
+                cooldownRemaining = HANDSHAKE_COOLDOWN - elapsed;
+                totalHandshakesBlockedByCooldown++;
+                emit HandshakeBlockedByCooldown(msg.sender, to, cooldownRemaining);
+                return (VouchStatus.BlockedByCooldown, false, cooldownRemaining);
+            }
+            // Refresh path
+            existing.timestamp = block.timestamp;
+            existing.messageHash = messageHash;
+            emit VouchAdded(msg.sender, to, messageHash);
+            isHandshake_ = _vouches[to][msg.sender].timestamp != 0;
+            return (VouchStatus.Success, isHandshake_, 0);
+        }
+
+        // New vouch path (mirrors addVouch new-vouch branch)
+        _vouches[msg.sender][to] = Vouch({
+            timestamp: block.timestamp,
+            messageHash: messageHash
+        });
+        _vouchesFrom[msg.sender].push(to);
+        _vouchedBy[to].push(msg.sender);
+
+        if (_vouchTreeInitialized) {
+            bytes32 vouchLeaf = keccak256(abi.encodePacked(
+                msg.sender, to, block.timestamp, messageHash
+            ));
+            _vouchTree.insert(vouchLeaf);
+        }
+
+        emit VouchAdded(msg.sender, to, messageHash);
+
+        isHandshake_ = _vouches[to][msg.sender].timestamp != 0;
+        if (isHandshake_) {
+            if (!_handshakeExists(msg.sender, to)) {
+                _handshakes.push(Handshake({
+                    user1: msg.sender,
+                    user2: to,
+                    timestamp: block.timestamp
+                }));
+                _handshakeMap[_handshakeKey(msg.sender, to)] = true;
+                lastHandshakeAt[_handshakeKey(msg.sender, to)] = block.timestamp;
+                totalHandshakeSuccesses++;
+                emit HandshakeConfirmed(msg.sender, to);
+            }
+        }
+
+        return (VouchStatus.Success, isHandshake_, 0);
+    }
+
+    /// @notice Read cooldown status for a directional (from -> to) vouch pair.
+    /// @dev Off-chain helper for UIs that want to disable a "vouch" button
+    ///      before the user submits a doomed tx. Pure read, no state.
+    /// @return active True if a re-vouch within the cooldown window would be blocked.
+    /// @return remaining Seconds until cooldown elapses (0 if not active).
+    function getCooldownStatus(
+        address from,
+        address to
+    ) external view returns (bool active, uint256 remaining) {
+        Vouch storage existing = _vouches[from][to];
+        if (existing.timestamp == 0) return (false, 0);
+        uint256 elapsed = block.timestamp - existing.timestamp;
+        if (elapsed >= HANDSHAKE_COOLDOWN) return (false, 0);
+        return (true, HANDSHAKE_COOLDOWN - elapsed);
+    }
+
+    /// @notice Composite snapshot of cooldown observability counters.
+    /// @dev Off-chain analytics convenience. hit-rate = blocked / attempts.
+    function getCooldownAuditCounters()
+        external
+        view
+        returns (uint256 attempts, uint256 successes, uint256 blocked)
+    {
+        return (
+            totalHandshakeAttempts,
+            totalHandshakeSuccesses,
+            totalHandshakesBlockedByCooldown
+        );
     }
 
     /// @notice REMOVED — vouching on behalf is intermediation (Grade 4 dissolution)

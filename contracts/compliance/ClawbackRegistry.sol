@@ -115,9 +115,105 @@ contract ClawbackRegistry is
     /// @notice ClawbackVault address
     address public vault;
 
+    // ============ C47: Bonded Permissionless Contest (Gap 5) ============
+    //
+    // ETM_ALIGNMENT_AUDIT.md Section 5.2 / Section 7 Gap 5 (MED leverage):
+    //
+    //   Adds a permissionless on-chain contest path alongside the existing
+    //   FederatedConsensus authority-vote path. ANY party can post a bond and
+    //   contest a clawback case before `executeClawback` may fire. The contest
+    //   converts strict-on-chain-liability-with-only-off-chain-recourse into
+    //   math-enforced rent-on-disputes-pays-discovery, mirroring OCR V2a
+    //   (`OperatorCellRegistry.sol`) permissionless-challenge geometry.
+    //
+    // Adjudication: FederatedConsensus authorities REMAIN the dispute-resolution
+    // oracle (right authority for regulatory adjudication; see audit Section 5.2
+    // partial-mirror caveat). What changes:
+    //   - Authority must engage with the contest on a math-enforced timeline.
+    //   - During the active contest window, `executeClawback` is GATED and
+    //     reverts with `ContestActive`.
+    //   - Authority calls `upholdContest` (contest wins, case DISMISSED, bond +
+    //     reward returned to contestant) or `dismissContest` (contest loses,
+    //     bond forfeited to `contestRewardPool`, clawback may proceed).
+    //   - If neither happens before window expiry, anyone may call
+    //     `resolveExpiredContest` which forfeits the bond (default favors the
+    //     standing case — contest must be proven, not assumed).
+    //
+    // Compensatory augmentation (mirrors OCR V2a §6.5):
+    //   - On uphold: contestant receives bond + reward (paid from
+    //     `contestRewardPool`, capped at MIN(reward, pool balance)).
+    //   - On dismiss/expiry: bond credited to `contestRewardPool` to fund
+    //     future successful contestants. Self-bootstrapping bug-bounty channel.
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    enum ContestStatus {
+        NONE,        // 0 - no contest
+        ACTIVE,      // 1 - bond posted, window open
+        UPHELD,      // 2 - contest succeeded, case dismissed
+        DISMISSED,   // 3 - contest failed, bond forfeited
+        EXPIRED      // 4 - window passed without resolution; bond forfeited
+    }
+
+    struct CaseContest {
+        address contestant;
+        uint256 bond;
+        address bondToken;
+        uint64  openedAt;
+        uint64  deadline;
+        ContestStatus status;
+        string  evidenceURI;  // off-chain pointer (IPFS / etc) to evidence package
+    }
+
+    /// @notice Active / historical contest record per caseId. Only one contest
+    ///         per caseId at a time; a dismissed/expired contest does NOT
+    ///         re-open the slot — the case proceeds on the standing path.
+    mapping(bytes32 => CaseContest) public caseContests;
+
+    /// @notice Token used for contest bonds (governance-set). MAY be the same
+    ///         as the case token, but governance can set a stable bond token
+    ///         (e.g. CKB, JUL) so contestants don't need to acquire arbitrary
+    ///         case-token denominations.
+    address public contestBondToken;
+
+    /// @notice Required contest bond amount (governance-set, floored).
+    uint256 public contestBondAmount;
+
+    /// @notice Minimum allowed contest bond. Mirrors OCR's MIN_BOND_PER_CELL
+    ///         floor — prevents governance from disabling the bonded contest
+    ///         primitive by setting bond to zero.
+    uint256 public constant MIN_CONTEST_BOND = 0.1 ether;
+
+    /// @notice Contest window length (governance-set, bounded).
+    uint64 public contestWindow;
+
+    /// @notice Floor on contestWindow.
+    uint64 public constant MIN_CONTEST_WINDOW = 1 hours;
+
+    /// @notice Ceiling on contestWindow.
+    uint64 public constant MAX_CONTEST_WINDOW = 7 days;
+
+    /// @notice Reward paid to a successful contestant on top of bond return.
+    ///         Drawn from contestRewardPool; capped at pool balance at uphold
+    ///         time (no underflow).
+    uint256 public contestSuccessReward;
+
+    /// @notice Pool of forfeited bonds + governance-seeded funds, used to pay
+    ///         success rewards. Pull-based via internal accounting; tokens sit
+    ///         in this contract until claimed. Mirrors OCR `slashPool`.
+    uint256 public contestRewardPool;
+
+    /// @notice C47 reinitializer version sentinel. Allows post-upgrade
+    ///         initialization of contest parameters (initializeContestV1).
+    bool public contestParamsInitialized;
+
+    /// @dev Reserved storage gap for future upgrades.
+    ///      C47 shrank 50 → 41:
+    ///        +caseContests (1)
+    ///        +contestBondToken (1) + contestBondAmount (1)
+    ///        +contestWindow (1) + contestSuccessReward (1)
+    ///        +contestRewardPool (1) + contestParamsInitialized (1)
+    ///        Total consumed: 9 slots. (mappings count as 1 slot; the
+    ///        constants are inlined and consume no slots.)
+    uint256[41] private __gap;
 
     // ============ Events ============
 
@@ -134,6 +230,18 @@ contract ClawbackRegistry is
     event MinTaintAmountUpdated(uint256 previous, uint256 current);
     event ConsensusUpdated(address indexed previous, address indexed current);
 
+    // C47 (bonded permissionless contest, Gap 5)
+    event ContestParamsInitialized(address bondToken, uint256 bondAmount, uint64 window, uint256 successReward);
+    event ContestBondTokenUpdated(address indexed previous, address indexed current);
+    event ContestBondAmountUpdated(uint256 previous, uint256 current);
+    event ContestWindowUpdated(uint64 previous, uint64 current);
+    event ContestSuccessRewardUpdated(uint256 previous, uint256 current);
+    event ContestRewardPoolFunded(address indexed funder, uint256 amount, uint256 newPoolBalance);
+    event ContestOpened(bytes32 indexed caseId, address indexed contestant, uint256 bond, uint64 deadline, string evidenceURI);
+    event ContestUpheld(bytes32 indexed caseId, address indexed contestant, uint256 bondReturned, uint256 reward);
+    event ContestDismissed(bytes32 indexed caseId, address indexed contestant, uint256 bondForfeited);
+    event ContestExpired(bytes32 indexed caseId, address indexed contestant, uint256 bondForfeited);
+
     // ============ Errors ============
 
     error WalletNotFlagged();
@@ -144,6 +252,20 @@ contract ClawbackRegistry is
     error ConsensusNotApproved();
     error WalletAlreadyFlagged();
     error VaultNotSet();
+
+    // C47 (bonded permissionless contest)
+    error ContestParamsNotInitialized();
+    error ContestAlreadyInitialized();
+    error ContestActive();
+    error NoActiveContest();
+    error ContestNotExpired();
+    error ContestExpiredError();
+    error ContestBondTokenNotSet();
+    error InsufficientContestBond();
+    error BondBelowMin();
+    error WindowOutOfRange();
+    error InvalidContestStatus();
+    error InvalidEvidenceURI();
 
     // ============ Modifiers ============
 
@@ -259,6 +381,13 @@ contract ClawbackRegistry is
         ClawbackCase storage c = cases[caseId];
         if (c.createdAt == 0) revert CaseNotFound();
         if (c.status != CaseStatus.VOTING) revert InvalidCaseStatus();
+
+        // C47: bonded contest gate. If a contest is ACTIVE, clawback must wait
+        //      for authority resolution (uphold/dismiss) or window expiry.
+        //      UPHELD contests transition the case to DISMISSED via _upholdContest;
+        //      DISMISSED/EXPIRED contests permit execution to proceed.
+        CaseContest storage ct = caseContests[caseId];
+        if (ct.status == ContestStatus.ACTIVE) revert ContestActive();
 
         // Verify consensus approval
         if (!consensus.isExecutable(c.consensusProposalId)) revert ConsensusNotApproved();
@@ -531,6 +660,298 @@ contract ClawbackRegistry is
 
             emit WalletCleared(wallet, caseId);
         }
+    }
+
+    // ============ C47: Bonded Permissionless Contest (Gap 5) ============
+    //
+    // Lives alongside (not replacing) the FederatedConsensus authority-vote path.
+    // See storage block above for full design rationale + mirror to OCR V2a.
+
+    /**
+     * @notice Post-upgrade initializer for the C47 contest parameters.
+     * @dev   reinitializer(2) — runs exactly once per proxy. MUST be packaged
+     *        into `upgradeToAndCall(newImpl, abi.encodeCall(initializeContestV1, (...)))`
+     *        so the contest path is wired atomically with the upgrade. Calling
+     *        upgradeTo alone leaves contest params zeroed and contest entry
+     *        functions revert with `ContestParamsNotInitialized` — fail-closed
+     *        posture (security is no weaker than pre-upgrade, just unavailable
+     *        until migration runs). Mirrors SoulboundIdentity.initializeV2 pattern.
+     *
+     * @param _bondToken       ERC20 used for contest bonds (governance choice).
+     * @param _bondAmount      Required bond per contest (>= MIN_CONTEST_BOND).
+     * @param _window          Contest window length in seconds; bounded by
+     *                         MIN_CONTEST_WINDOW / MAX_CONTEST_WINDOW.
+     * @param _successReward   Reward paid to a successful contestant on top of
+     *                         bond return. Capped at pool balance at uphold time.
+     */
+    function initializeContestV1(
+        address _bondToken,
+        uint256 _bondAmount,
+        uint64  _window,
+        uint256 _successReward
+    ) external reinitializer(2) onlyOwner {
+        if (contestParamsInitialized) revert ContestAlreadyInitialized();
+        if (_bondToken == address(0)) revert ContestBondTokenNotSet();
+        if (_bondAmount < MIN_CONTEST_BOND) revert BondBelowMin();
+        if (_window < MIN_CONTEST_WINDOW || _window > MAX_CONTEST_WINDOW) revert WindowOutOfRange();
+
+        contestBondToken = _bondToken;
+        contestBondAmount = _bondAmount;
+        contestWindow = _window;
+        contestSuccessReward = _successReward;
+        contestParamsInitialized = true;
+
+        emit ContestParamsInitialized(_bondToken, _bondAmount, _window, _successReward);
+    }
+
+    /**
+     * @notice Permissionlessly contest an in-flight clawback case by posting a bond.
+     * @dev   Anyone may call (typically a tainted-by-association holder, but the
+     *        primitive is permissionless — third-party bond posting is allowed).
+     *        Requires:
+     *          - Contest params initialized (initializeContestV1 has run).
+     *          - Case exists and is in OPEN or VOTING (not RESOLVED / DISMISSED / EXECUTING).
+     *          - No active contest already on this caseId.
+     *          - Bond amount transferred via safeTransferFrom (ERC20 approve required).
+     *
+     *        After this call, `executeClawback(caseId)` reverts with `ContestActive`
+     *        until authority resolves the contest (uphold/dismiss) or the window
+     *        expires.
+     *
+     * @param caseId        Case under contest.
+     * @param evidenceURI   Off-chain evidence pointer (IPFS / arweave / etc).
+     */
+    function openContest(
+        bytes32 caseId,
+        string calldata evidenceURI
+    ) external nonReentrant {
+        if (!contestParamsInitialized) revert ContestParamsNotInitialized();
+        if (bytes(evidenceURI).length == 0) revert InvalidEvidenceURI();
+
+        ClawbackCase storage c = cases[caseId];
+        if (c.createdAt == 0) revert CaseNotFound();
+
+        // Must be in a contestable state — case still un-executed and un-dismissed.
+        if (c.status != CaseStatus.OPEN && c.status != CaseStatus.VOTING) {
+            revert InvalidCaseStatus();
+        }
+
+        CaseContest storage ct = caseContests[caseId];
+        if (ct.status == ContestStatus.ACTIVE) revert ContestActive();
+
+        uint256 bond = contestBondAmount;
+        IERC20(contestBondToken).safeTransferFrom(msg.sender, address(this), bond);
+
+        ct.contestant   = msg.sender;
+        ct.bond         = bond;
+        ct.bondToken    = contestBondToken;  // snapshot at open time
+        ct.openedAt     = uint64(block.timestamp);
+        ct.deadline     = uint64(block.timestamp) + contestWindow;
+        ct.status       = ContestStatus.ACTIVE;
+        ct.evidenceURI  = evidenceURI;
+
+        emit ContestOpened(caseId, msg.sender, bond, ct.deadline, evidenceURI);
+    }
+
+    /**
+     * @notice Authority upholds the contest — case is dismissed, bond returned
+     *         to contestant + reward paid from contestRewardPool.
+     * @dev   Authorization mirrors `dismissCase`: active FederatedConsensus
+     *        authority OR contract owner (governance over-ride). Bond return
+     *        + reward use the snapshot bondToken from openContest, not the
+     *        current contestBondToken (governance may have rotated it mid-flight).
+     *
+     *        Side effects:
+     *          - All wallets in the case are cleared (existing dismiss flow).
+     *          - Case status → DISMISSED.
+     *          - Contest status → UPHELD.
+     */
+    function upholdContest(bytes32 caseId) external nonReentrant {
+        require(
+            consensus.isActiveAuthority(msg.sender) || msg.sender == owner(),
+            "Not authorized"
+        );
+
+        CaseContest storage ct = caseContests[caseId];
+        if (ct.status != ContestStatus.ACTIVE) revert NoActiveContest();
+        if (block.timestamp > ct.deadline) revert ContestExpiredError();
+
+        ClawbackCase storage c = cases[caseId];
+        if (c.createdAt == 0) revert CaseNotFound();
+
+        address contestant_ = ct.contestant;
+        uint256 bond = ct.bond;
+        address bondToken_ = ct.bondToken;
+
+        // Cap reward at current pool balance — never underflow.
+        uint256 reward = contestSuccessReward;
+        if (reward > contestRewardPool) {
+            reward = contestRewardPool;
+        }
+        if (reward > 0) {
+            contestRewardPool -= reward;
+        }
+
+        // Mark contest UPHELD before external transfers (CEI).
+        ct.status = ContestStatus.UPHELD;
+
+        // Dismiss the case — clears all wallets, transitions case status.
+        CaseStatus oldStatus = c.status;
+        c.status = CaseStatus.DISMISSED;
+        c.resolvedAt = uint64(block.timestamp);
+
+        address[] storage wallets = caseWallets[caseId];
+        for (uint256 i = 0; i < wallets.length; i++) {
+            _clearWallet(wallets[i], caseId);
+        }
+
+        emit CaseStatusChanged(caseId, oldStatus, CaseStatus.DISMISSED);
+
+        // Pay contestant: bond + reward (single transfer to minimize external calls).
+        // Reward uses the same token as the bond — natural, since the pool is
+        // funded in contestBondToken which equals bondToken at uphold time
+        // unless governance rotated. If they differ, reward is paid in the
+        // current bondToken (the pool token) and bond returned in the snapshot
+        // token — two separate transfers in that edge case.
+        if (bondToken_ == contestBondToken) {
+            // Common path: single transfer.
+            IERC20(bondToken_).safeTransfer(contestant_, bond + reward);
+        } else {
+            // Edge: governance rotated bondToken between open and uphold.
+            // Return original bond in snapshot token; pay reward in current pool token.
+            IERC20(bondToken_).safeTransfer(contestant_, bond);
+            if (reward > 0) {
+                IERC20(contestBondToken).safeTransfer(contestant_, reward);
+            }
+        }
+
+        emit ContestUpheld(caseId, contestant_, bond, reward);
+    }
+
+    /**
+     * @notice Authority dismisses the contest — bond forfeited to reward pool,
+     *         standing case path resumes (executeClawback may proceed once
+     *         consensus is approved).
+     * @dev   Authorization mirrors upholdContest. Forfeited bond is credited
+     *        to contestRewardPool to bootstrap rewards for future successful
+     *        contestants (self-funding bug-bounty channel).
+     */
+    function dismissContest(bytes32 caseId) external nonReentrant {
+        require(
+            consensus.isActiveAuthority(msg.sender) || msg.sender == owner(),
+            "Not authorized"
+        );
+
+        CaseContest storage ct = caseContests[caseId];
+        if (ct.status != ContestStatus.ACTIVE) revert NoActiveContest();
+        if (block.timestamp > ct.deadline) revert ContestExpiredError();
+
+        address contestant_ = ct.contestant;
+        uint256 bond = ct.bond;
+        address bondToken_ = ct.bondToken;
+
+        ct.status = ContestStatus.DISMISSED;
+
+        // Bond forfeit credited to pool ONLY if it's in the current pool token.
+        // (Governance pool-token rotation case: forfeited bond in stale token
+        // is held in-contract but not credited to the active pool, since the
+        // pool can only pay out one token. Stale bonds can be swept via
+        // sweepStaleContestBond if/when introduced. For now: simple credit
+        // when token matches, hold otherwise.)
+        if (bondToken_ == contestBondToken) {
+            contestRewardPool += bond;
+        }
+
+        emit ContestDismissed(caseId, contestant_, bond);
+    }
+
+    /**
+     * @notice Permissionless resolution of an expired contest. Anyone may call
+     *         after the contest window passes without authority resolution.
+     * @dev   Default outcome favors the standing case path: bond is forfeited
+     *        to the pool, contest transitions to EXPIRED, and the standing
+     *        executeClawback path is unblocked. Rationale: an active contest
+     *        is a claim that must be substantiated — silence does not
+     *        substantiate. Mirrors OCR V2a's `claimAssignmentSlash` (default-
+     *        on-expiry favors the slash, not the operator).
+     *
+     *        Defensive: this is permissionless precisely so the case cannot
+     *        be deadlocked by an authority who refuses to engage.
+     */
+    function resolveExpiredContest(bytes32 caseId) external nonReentrant {
+        CaseContest storage ct = caseContests[caseId];
+        if (ct.status != ContestStatus.ACTIVE) revert NoActiveContest();
+        if (block.timestamp <= ct.deadline) revert ContestNotExpired();
+
+        address contestant_ = ct.contestant;
+        uint256 bond = ct.bond;
+        address bondToken_ = ct.bondToken;
+
+        ct.status = ContestStatus.EXPIRED;
+
+        if (bondToken_ == contestBondToken) {
+            contestRewardPool += bond;
+        }
+
+        emit ContestExpired(caseId, contestant_, bond);
+    }
+
+    /**
+     * @notice Fund the contest reward pool. Anyone may call (governance,
+     *         insurance pool, treasury, donors). Tokens pulled from caller.
+     * @dev   Bootstrap path for the reward pool before any forfeitures
+     *        accumulate. Pool is only funded in the current contestBondToken;
+     *        a governance change to bondToken should be paired with a fresh
+     *        funding call in the new token.
+     */
+    function fundContestRewardPool(uint256 amount) external nonReentrant {
+        if (!contestParamsInitialized) revert ContestParamsNotInitialized();
+        IERC20(contestBondToken).safeTransferFrom(msg.sender, address(this), amount);
+        contestRewardPool += amount;
+        emit ContestRewardPoolFunded(msg.sender, amount, contestRewardPool);
+    }
+
+    /**
+     * @notice Read the active/historical contest record for a case.
+     */
+    function getCaseContest(bytes32 caseId) external view returns (CaseContest memory) {
+        return caseContests[caseId];
+    }
+
+    /**
+     * @notice True iff a contest is currently ACTIVE on this case (blocks executeClawback).
+     */
+    function hasActiveContest(bytes32 caseId) external view returns (bool) {
+        return caseContests[caseId].status == ContestStatus.ACTIVE;
+    }
+
+    // ============ C47: Contest Admin (governance-tunable parameters) ============
+
+    function setContestBondToken(address _bondToken) external onlyOwner {
+        if (_bondToken == address(0)) revert ContestBondTokenNotSet();
+        address prev = contestBondToken;
+        contestBondToken = _bondToken;
+        emit ContestBondTokenUpdated(prev, _bondToken);
+    }
+
+    function setContestBondAmount(uint256 _bondAmount) external onlyOwner {
+        if (_bondAmount < MIN_CONTEST_BOND) revert BondBelowMin();
+        uint256 prev = contestBondAmount;
+        contestBondAmount = _bondAmount;
+        emit ContestBondAmountUpdated(prev, _bondAmount);
+    }
+
+    function setContestWindow(uint64 _window) external onlyOwner {
+        if (_window < MIN_CONTEST_WINDOW || _window > MAX_CONTEST_WINDOW) revert WindowOutOfRange();
+        uint64 prev = contestWindow;
+        contestWindow = _window;
+        emit ContestWindowUpdated(prev, _window);
+    }
+
+    function setContestSuccessReward(uint256 _reward) external onlyOwner {
+        uint256 prev = contestSuccessReward;
+        contestSuccessReward = _reward;
+        emit ContestSuccessRewardUpdated(prev, _reward);
     }
 
     // ============ Admin Functions ============

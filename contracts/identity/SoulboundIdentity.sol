@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/IContributionAttestor.sol";
 
 /**
@@ -37,7 +38,7 @@ import "./interfaces/IContributionAttestor.sol";
  *   pre-existing proxies must call `initializeV2(attestor)` (reinitializer(2)) packaged
  *   into `upgradeToAndCall` to enable lineage binding atomically with the upgrade.
  */
-contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     event AuthorizedRecorderUpdated(address indexed recorder, bool previous, bool current);
 
 
@@ -201,6 +202,7 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
         __ERC721_init("VibeSwap Identity", "VIBE-ID");
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
 
         _nextTokenId = 1;
         _nextContributionId = 1;
@@ -278,7 +280,7 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
      * @notice Mint a new soulbound identity (standard mode)
      * @param username Unique username (3-20 chars, alphanumeric + underscore)
      */
-    function mintIdentity(string calldata username) external returns (uint256) {
+    function mintIdentity(string calldata username) external nonReentrant returns (uint256) {
         return _mintIdentity(username, false, bytes32(0));
     }
 
@@ -287,7 +289,7 @@ contract SoulboundIdentity is ERC721Upgradeable, OwnableUpgradeable, UUPSUpgrade
      * @param username Unique username (3-20 chars, alphanumeric + underscore)
      * @param quantumKeyRoot Merkle root of Lamport public key hashes
      */
-    function mintIdentityQuantum(string calldata username, bytes32 quantumKeyRoot) external returns (uint256) {
+    function mintIdentityQuantum(string calldata username, bytes32 quantumKeyRoot) external nonReentrant returns (uint256) {
         require(quantumKeyRoot != bytes32(0), "Quantum key root required");
         return _mintIdentity(username, true, quantumKeyRoot);
     }

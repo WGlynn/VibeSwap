@@ -83,6 +83,18 @@ contract VibeHarbergerPublicGoods is OwnableUpgradeable, UUPSUpgradeable, Reentr
     event ValueReassessed(bytes32 indexed assetId, uint256 oldValue, uint256 newValue);
     event AssetForeclosed(bytes32 indexed assetId, address indexed formerOwner);
 
+    // ============ Constructor ============
+
+    /// @dev TRP C23-F6: Lock the implementation contract so only proxies can be
+    ///      initialized. Without this, anyone could call `initialize` directly on
+    ///      the deployed implementation and seize its `owner()` slot. The impl
+    ///      holds no funds, but a hijacked impl is a persistent footgun for the
+    ///      upgrade path and a confusing artifact for indexers.
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Init ============
 
     function initialize(

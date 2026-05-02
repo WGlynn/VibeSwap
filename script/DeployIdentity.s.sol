@@ -111,6 +111,16 @@ contract DeployIdentity is Script {
         ));
         console.log("  ContributionAttestor:", contributionAttestor);
 
+        // Step 6.5: Wire SoulboundIdentity -> ContributionAttestor (C45)
+        // SoulboundIdentity ships with lineageBindingEnabled=false to break the
+        // deploy-order cycle (attestor and identity may be deployed in either
+        // order). This is the standard wire-up that the contract NatSpec at
+        // SoulboundIdentity.sol:222-227 references. Without it, bindSourceLineage()
+        // reverts and C45 is dead post-deploy until owner runs it manually.
+        console.log("Step 6.5: Wiring SoulboundIdentity -> ContributionAttestor...");
+        SoulboundIdentity(soulboundIdentity).setContributionAttestor(contributionAttestor);
+        console.log("  Lineage binding enabled (C45 live)");
+
         // Step 7: Verify
         console.log("Step 7: Running verification...");
         _verify();
@@ -127,6 +137,16 @@ contract DeployIdentity is Script {
         require(vibeCode.code.length > 0, "VibeCode has no code");
         require(rewardLedger.code.length > 0, "RewardLedger has no code");
         require(contributionAttestor.code.length > 0, "ContributionAttestor has no code");
+
+        // C45: lineage binding wire-up must be live after Step 6.5
+        require(
+            SoulboundIdentity(soulboundIdentity).contributionAttestor() == contributionAttestor,
+            "C45: SoulboundIdentity attestor not wired"
+        );
+        require(
+            SoulboundIdentity(soulboundIdentity).lineageBindingEnabled(),
+            "C45: lineageBindingEnabled is false"
+        );
 
         console.log("  All verifications passed");
     }

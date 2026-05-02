@@ -195,6 +195,12 @@ contract ContributionAttestor is IContributionAttestor, Ownable, ReentrancyGuard
         if (claim.status != ClaimStatus.Pending) revert ClaimNotPending();
         if (block.timestamp >= claim.expiresAt) revert ClaimExpiredError();
         if (_hasAttested[claimId][msg.sender]) revert AlreadyAttested();
+        // C7-CCS-F1: Enforce the declared per-claim attestation cap to bound storage
+        // and on-chain/off-chain iteration over _attestations[claimId]. Without this
+        // gate, MAX_ATTESTATIONS_PER_CLAIM was a comment, not a constraint.
+        if (_attestations[claimId].length >= MAX_ATTESTATIONS_PER_CLAIM) {
+            revert TooManyAttestations();
+        }
 
         // Cannot attest your own claim (claimant or contributor)
         if (msg.sender == claim.claimant || msg.sender == claim.contributor) {
@@ -240,6 +246,11 @@ contract ContributionAttestor is IContributionAttestor, Ownable, ReentrancyGuard
         if (claim.status != ClaimStatus.Pending) revert ClaimNotPending();
         if (block.timestamp >= claim.expiresAt) revert ClaimExpiredError();
         if (_hasAttested[claimId][msg.sender]) revert AlreadyAttested();
+        // C7-CCS-F1: Same cap as attest(). _attestations is the shared array, so the
+        // bound applies to the combined attest+contest count.
+        if (_attestations[claimId].length >= MAX_ATTESTATIONS_PER_CLAIM) {
+            revert TooManyAttestations();
+        }
 
         // Get contester's trust score and multiplier
         (uint256 score, , uint256 multiplier, , ) = contributionDAG.getTrustScore(msg.sender);

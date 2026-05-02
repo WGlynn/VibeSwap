@@ -142,6 +142,8 @@ interface IContributionAttestor {
     error TrialCaseIdMismatch();
     error ProposalNotFinalized();
     error ProposalClaimMismatch();
+    /// @notice Reverts when a claim already has MAX_ATTESTATIONS_PER_CLAIM entries.
+    error TooManyAttestations();
 
     // ============ Executive Branch (Handshake Protocol) ============
 

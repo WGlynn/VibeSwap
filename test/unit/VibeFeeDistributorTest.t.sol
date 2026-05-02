@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../../contracts/financial/VibeFeeDistributor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // ============ Mock ============
 
@@ -23,8 +24,15 @@ contract VibeFeDistributorTest is Test {
     address bob = address(0xB0);
 
     function setUp() public {
-        dist = new VibeFeeDistributor();
-        dist.initialize(treasuryAddr, insuranceAddr, mindAddr);
+        // Deploy via UUPS proxy. The implementation has _disableInitializers()
+        // in its constructor (C23), so initialize() must run on the proxy.
+        VibeFeeDistributor impl = new VibeFeeDistributor();
+        bytes memory initData = abi.encodeCall(
+            VibeFeeDistributor.initialize,
+            (treasuryAddr, insuranceAddr, mindAddr)
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        dist = VibeFeeDistributor(payable(address(proxy)));
 
         token = new MockFeeToken();
         dist.addSupportedToken(address(token));

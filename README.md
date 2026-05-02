@@ -1,12 +1,16 @@
 # VibeSwap
 
+> *a coordination primitive, not a casino.*
+
 **Omnichain DEX that eliminates MEV through commit-reveal batch auctions with uniform clearing prices.**
 
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue)](https://soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
 [![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5.0.1-purple)](https://www.openzeppelin.com/contracts)
 [![LayerZero](https://img.shields.io/badge/LayerZero-V2%20OApp-green)](https://layerzero.network/)
-[![License](https://img.shields.io/badge/License-MIT%20(libs)%20%7C%20Proprietary%20(protocol)-yellow.svg)](#license)
+[![Docs](https://img.shields.io/badge/Docs-docs%2F-informational)](docs/README.md)
+
+**Quick links** — [docs](docs/README.md) · [encyclopedia](docs/INDEX.md) · [developer guide](docs/developer/README.md) · [audits](docs/audits/README.md) · [research](docs/research/) · [security policy](SECURITY.md) · [contributing](CONTRIBUTING.md)
 
 ---
 
@@ -191,32 +195,53 @@ vibeswap/
 │   ├── oracle/                #   VolatilityOracle
 │   ├── security/              #   CircuitBreaker, RateLimiter
 │   └── libraries/             #   DeterministicShuffle, BatchMath, TWAPOracle
-├── test/                      # 510 test files
-├── script/                    # Deployment scripts
+├── test/                      # 510 test files (unit, fuzz, invariant, integration, security)
+├── script/                    # Foundry deployment scripts
 ├── frontend/                  # React 18 + Vite 5 (413 components, 72 hooks)
 ├── oracle/                    # Python Kalman filter price oracle
-├── DOCUMENTATION/             # 138 original research papers
-└── docs/                      # Proposals and additional docs
+└── docs/                      # Forward-facing canonical documentation
+    ├── INDEX.md               #   encyclopedia of every primitive
+    ├── architecture/          #   system design — consensus, AMM, oracle, cross-chain
+    ├── concepts/              #   individual primitives & mechanism docs
+    ├── research/              #   papers, theorems, formal proofs, manifestos
+    ├── developer/             #   build, test, deploy, integrate
+    ├── audits/                #   security audit reports, money-path audits
+    ├── governance/            #   VIPs, VSPs, proposals, regulatory
+    ├── partnerships/          #   USD8, Anthropic, Nervos, MIT, grants
+    ├── marketing/             #   pitch decks, content pipelines, press
+    ├── _meta/                 #   repo-internal protocols (AAP, RSI, TRP)
+    └── _archive/              #   historical / scratch
 ```
+
+For audience-keyed entry points (developer / auditor / researcher / partner / press), see [`docs/README.md`](docs/README.md).
 
 ---
 
 ## Research
 
-| Paper | Topic |
-|-------|-------|
-| [Whitepaper](DOCUMENTATION/VIBESWAP_WHITEPAPER.md) | Complete protocol specification |
-| [Mechanism Design](DOCUMENTATION/VIBESWAP_COMPLETE_MECHANISM_DESIGN.md) | Batch auctions, Fibonacci scaling, Shapley distribution |
-| [Incentives](DOCUMENTATION/INCENTIVES_WHITEPAPER.md) | Game theory, IL protection, loyalty rewards |
-| [True Price Oracle](DOCUMENTATION/TRUE_PRICE_ORACLE.md) | Kalman filter, Bayesian estimation, regime detection |
-| [Security](DOCUMENTATION/SECURITY_MECHANISM_DESIGN.md) | Anti-fragile security, cryptoeconomic defense |
-| [Formal Fairness Proofs](DOCUMENTATION/FORMAL_FAIRNESS_PROOFS.md) | Mathematical proofs of fairness properties |
-| [Proof Index](DOCUMENTATION/PROOF_INDEX.md) | Master catalog: 18 theorems, 18 dilemmas dissolved, 5 trilemmas, 4 quadrilemmas |
+The full research corpus (papers, theorems, formal proofs, manifestos) lives under [`docs/research/`](docs/research/). Highlights:
 
-See [`DOCUMENTATION/`](DOCUMENTATION/) for all 138 papers.
+| Paper | Where |
+|-------|-------|
+| Whitepaper — complete protocol specification | [`docs/research/`](docs/research/) |
+| Mechanism Design — batch auctions, Fibonacci scaling, Shapley distribution | [`docs/research/`](docs/research/) |
+| Incentives — game theory, IL protection, loyalty rewards | [`docs/research/`](docs/research/) |
+| True Price Oracle — Kalman filter, Bayesian estimation, regime detection | [`docs/research/`](docs/research/) |
+| Security Mechanism Design — anti-fragile security, cryptoeconomic defense | [`docs/research/`](docs/research/) |
+| Formal Fairness Proofs — mathematical proofs of fairness properties | [`docs/research/`](docs/research/) |
+| Proof Index — 18 theorems, 18 dilemmas dissolved, 5 trilemmas, 4 quadrilemmas | [`docs/research/`](docs/research/) |
+
+For an encyclopedia view of every primitive, see [`docs/INDEX.md`](docs/INDEX.md).
+
+---
+
+## Contributing & Security
+
+- **Contributing**: see [`CONTRIBUTING.md`](CONTRIBUTING.md) — fork/branch/PR workflow, Solidity conventions, Foundry test discipline, commit format.
+- **Security**: see [`SECURITY.md`](SECURITY.md) for responsible disclosure. Reach out privately before any public report. Past disclosures are summarized in [`docs/audits/`](docs/audits/README.md).
 
 ---
 
 ## License
 
-Libraries and tooling: MIT. Core protocol contracts: proprietary. See individual files for details.
+License terms are still being finalized. Libraries and tooling within this repository are intended as MIT; core protocol contracts are reserved pending a formal license decision. Until a top-level `LICENSE` file lands, treat this repository as **all rights reserved** by default — see individual files for SPDX headers where applicable.

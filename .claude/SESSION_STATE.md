@@ -1,4 +1,101 @@
-# Session State — 2026-04-30 (rolled over from 2026-04-29 multi-block session — jarvis-not-a-wrapper essay shipped multi-platform)
+# Session State — 2026-05-01 (rolled over from 2026-04-30 — major build burst + docs reorg + public-discourse mission shift)
+
+## Block Header — 2026-05-01 — Major build burst (~80 commits, multi-theme)
+
+> *"back to the outreach crm for rick and usd8"* → *"reply in my voice"* → *"im not sure what to work on so I want you to work on Vibeswap full auto TRP with 3 subagents and + 1 agent every time an agent completes a task, you review their code, then push commit. keep going until you make 50 commits"* → *"each agent must be replaced with a new one"* → *"also in the repo folders 'docs' ad documentation' are both for vibeswap douments... please do that now"* → *"also no more lurking in the ethsecurity telegram groups. i already posted out magnum opus, now the job is to demonstrate through public discourse..."* → *"do an extra 40 commits and focus on making vibeswap 'complete'"* — Will, 2026-05-01
+
+### Entry trigger
+
+Session opened on USD8 outreach CRM work for Rick (Daniel-thread voice-drafting), then pivoted into a sustained autonomous build burst on VibeSwap. Will's "full auto TRP with 3 subagents + 1 on completion until 50 commits" greenlit a long parallel-agent run, extended by "do an extra 40 commits and focus on making vibeswap 'complete'." Net: ~80 commits across TRP cycles, docs reorg, frontend ABI sync, and shipping the public-facing repo posture. Mission shift mid-session: stop lurking in ethsecurity TG groups; demonstrate by public discourse instead — Magnum Opus is the entry, not the destination.
+
+### What shipped this block (~80 commits since `8c0c0970`)
+
+**TRP cycles (security/incentives/identity/oracles/core)**:
+- C39 — attested-resume default-on for security-load-bearing breakers (Gap 6); C39-F1 wire migration in VibeSwapCore + VibeAMM (HIGH); C39-PROP fuzz on default-on classification
+- C42 — similarity keeper commit-reveal (Gap #2b); C42-F1 reinitializer for keeperRevealDelay (MED)
+- C45 — SoulboundIdentity source-lineage binding (Strengthen #2); C45-PROP invariant on source-lineage immutability
+- C46 — ContributionDAG handshake cooldown observability (Strengthen #3); C46-PROP invariant on cooldown audit counter coherence
+- C47 — Clawback Cascade bonded permissionless contest (Gap 5); C47-PROP invariant on contest bond accounting; C47-F1 storage doc-comment fix (LOW)
+- C48-F1 — gas-griefing cap on MicroGameFactory LP set (phantom-array)
+- C48-F2 — paginate VibeSwapCore.compactFailedExecutions (gas-DoS)
+- C19-F1 — VWAPOracle asymmetric truncation between cumulators (precision-loss-vwap-dust-bias); C19-F1-PROP fuzz on dust-trade no-op
+- C28-F2 — CEI fix in SoulboundIdentity.mintIdentity (erc721-receiver-reentrancy)
+- C-OFR-1 — close cross-fn reentrancy in IncentiveController.onLiquidityRemoved (HIGH)
+- C7-CCS-F1 — enforce MAX_ATTESTATIONS_PER_CLAIM in ContributionAttestor
+- C16-F1 / C16-F2 — bound LoyaltyRewardsManager.configureTier multiplier/penalty + ILProtectionVault tier kill-switch + symmetric active check (MED)
+- C49-F1 — reject stale aggregator batches in TruePriceOracle.pullFromAggregator
+- 5×C23 init-safety — disable initializers on VibeFeeDistributor / CreatorLiquidityLock / MemecoinLaunchAuction / VibeYieldFarming / RosettaProtocol implementations
+
+**Docs reorg (DOCUMENTATION/ → docs/, 5 commits)**:
+- 1/N skeleton + README + INDEX + tooling extraction
+- 2/N migration into docs/{concepts, research, architecture, audits, governance, _meta, _archive, developer}
+- 3/N collapse triplets + consolidate correspondence + reorg subdirs
+- 5/N internal markdown link repair + 13 ambiguous FIXME link resolutions
+- 10 top-level subdir READMEs added (architecture, concepts, research, developer, audits, governance, partnerships, marketing, _meta, _archive); SYSTEM_TAXONOMY refresh; CLAUDE.md ANTI_AMNESIA path fix
+- C22-F1 storage layout follow-up audit (post-C39/C42/C45/C46/C47 sweep)
+
+**Architecture overviews (3)**:
+- `docs/architecture/CONSENSUS_OVERVIEW.md` — 6-mechanism stack + airgap thesis
+- `docs/architecture/AMM_OVERVIEW.md` — constant-product + batch + TWAP composition
+- `docs/architecture/ORACLE_OVERVIEW.md` — sidestep thesis + TPO + VWAP + aggregation
+- `docs/architecture/DEPLOYMENT_TOPOLOGY.md` — deploy order, wiring, migrations
+- CONTRACTS_CATALOGUE refreshed for C39/C42/C45/C46/C47/C48 cycles
+
+**Primitive docs (14 in `docs/concepts/primitives/`)**:
+- README index + 13 individual primitives: classification-default-with-explicit-override (C39), generation-isolated-commit-reveal (C42/C43), one-way-graduation-flag (C42), bootstrap-cycle-dissolution-via-post-mint-lock (C45), fail-closed-on-upgrade (C39/C45/C47), in-flight-state-preservation-across-semantic-flip (C39), revert-wipes-counter-non-reverting-twin (Strengthen #3), pair-keyed-historical-anchor (Strengthen #3), phantom-array-cleanup-dos (C48-F2), bonded-permissionless-contest (C47/OCR V2a), self-funding-bug-bounty-pool (C47/OCR), two-layer-migration-idempotency (C39+C45), observability-before-tuning (Strengthen #3), dual-path-adjudication-preserving-existing-oracle (C47)
+
+**Tests (5 fuzz/invariant + 5 integration)**:
+- Property/invariant: C39-PROP, C19-F1-PROP, C45-PROP, C46-PROP, C47-PROP
+- Integration: C39 / C42 / C45 / C46 / C47 / C48 cross-cycle composition (5 scenarios)
+
+**Frontend wiring**:
+- ABIs regenerated against current C39/C42/C45/C47/C48 contracts
+- 4 new ABIs wired into useContracts (ClawbackRegistry, ContributionAttestor, ContributionDAG, FeeRouter)
+- `docs/_meta/frontend-abi-sync-status.md` documenting sync posture
+
+**Public-facing repo posture (forward-facing repo hygiene)**:
+- `CHANGELOG.md` (Keep-a-Changelog format) — [Unreleased] covers full session: Security 8 fixes (C28-F2/C-OFR-1/C49-F1/C39-F1 HIGH, C42-F1/C16-F1/C16-F2 MED, C7-CCS-F1), Added cycles, Docs reorg, Tests
+- `SECURITY.md` — responsible disclosure
+- `CONTRIBUTING.md`
+- top-level README updated for forward-facing posture
+- `.env.example` expanded with deploy-script env vars
+
+**Deploy script audit + fix**:
+- `docs/audit/2026-05-01-deploy-script-consistency.md` — DeployIdentity / Deploy / DeployIncentives audited for C39/C42/C45/C47 reinitializer correctness
+- `script/DeployIdentity.s.sol` — wire `SoulboundIdentity.setContributionAttestor` (was missing); flagged 2 BLOCKING bugs (CrossChainRouter LZ EID 4-arg, BuybackEngine deploy) — see Pending below
+- `13eb9a4d` — ETM Build Roadmap Step 2 derivation refresh against shipped state
+
+**Public-discourse mission shift (mid-session pivot)**:
+- Will: "no more lurking in the ethsecurity telegram groups… now the job is to demonstrate through public discourse." Magnum Opus essay (`jarvis-is-not-a-wrapper`) was the entry into rooms; staying-power requires public substance, not lurking. Operational: outbound technical writing on Medium/X using VibeSwap mechanism arguments (oracle-sidestep, every-patch-downstream-of-one-fix) as the demonstration substrate.
+
+### Pending — next session (hand-off)
+
+1. **LICENSE choice** — repo is forward-facing now but no LICENSE file. Three options flagged for Will:
+   - **MIT** — maximally permissive, reads as "we believe in the primitives more than the moat"; aligns with public-discourse mission. Risk: extractive forks.
+   - **BSL (Business Source License 1.1)** — source-visible + non-production for N years (typical 4y), then auto-converts to permissive (typical Apache-2.0/MIT). Used by Uniswap V3, Aave V3. Aligns with cooperative-capitalism while preserving commercial primacy during launch window.
+   - **AGPLv3** — strong copyleft, derivatives must publish source; protects against closed-source forks (CEX-style proprietary deployments).
+   - Recommendation: BSL with 4y cliff → MIT, but Will's call. Will's identity is in this code (per `U·vibeswap-as-identity-expression`); decision is identity-level not just legal.
+
+2. **2 BLOCKING deploy bugs** (need design calls, do not auto-fix):
+   - **CrossChainRouter LZ EID 4-arg** — current LayerZero V2 endpoint setup in deploy script uses old 3-arg signature; V2 SDK requires 4 args (eid + peer + delegate + …). Need to confirm with current LZ V2 docs; may also need ConfigurePeers.s.sol counterpart update.
+   - **BuybackEngine deploy** — deploy script does not currently instantiate BuybackEngine despite contract being live. Need design call: should it deploy as UUPS proxy, what's the initial config, who's the operator?
+
+3. **Public-discourse Medium followup** — two essay candidates flagged:
+   - **"Oracle Problem, Sidestepped"** — uses ORACLE_OVERVIEW.md as substrate; thesis is that the oracle problem is unsolved but routable-around via TPO + VWAP + aggregation + dual-path-adjudication (C47). Demonstrates by listing canonical "oracle attacks" and showing each is sidestepped.
+   - **"Why Every Security Patch Is Downstream of One Geometric Fix"** — uses the C39/C42/C45/C46/C47/C48 cycle synthesis; thesis is that each named-CVE pattern in DeFi is a special case of one of ~6 substrate-geometry violations. Maps each cycle to a CVE family.
+
+4. **USD8 outreach Tier 1 DMs queued** — 10 targets ready in CRM; needs Rick preclear on the 4 stablecoin-issuer contacts (Frax, Liquity, Reflexer, Origin) before sending. Other 6 (DeFi-research/DAO-treasury) can ship without preclear once Will returns to the CRM thread.
+
+5. **VibeFeeRouter deprecation cleanup** — file marked `// DEPRECATED — superseded by FeeRouter (C47 cycle)` in source comment but no removal commit yet. Need to either delete + script migration, or formally archive with a deprecation NOTICE in the file. Pick one + commit.
+
+### Session arc
+
+USD8 outreach CRM (Daniel voice-drafting) → "full auto TRP" greenlit → 4-agent parallel sweep (3 + 1-on-completion replacement) → review-and-commit gate held throughout → 50-commit target hit → Will redirected to docs reorg ("docs/ AND DOCUMENTATION/ both exist, please consolidate") → reorg shipped in 5 commits → Will mid-flow: "no more lurking in ethsecurity, demonstrate publicly" (mission shift captured) → Will: "do extra 40 commits, make vibeswap 'complete'" → second sweep (architecture overviews, primitive docs, integration tests, frontend ABI sync, CHANGELOG/SECURITY/CONTRIBUTING, deploy audit). Net: repo went from "internal-build" surface to "forward-facing public-discourse-ready" surface in one session.
+
+### Memory primitives saved this block
+None new flagged this block — the load-bearing pattern (autonomous TRP cycle with replacement-on-completion + per-commit review gate) is already captured by `M·shard-per-conversation` + `P·blast-radius-ascending`. The mission-shift moment ("demonstrate by public discourse, ¬ lurking") is captured here as a session-state pending and will be primitive-extracted next session if it persists across sessions as a posture (not yet earned that promotion).
+
+---
 
 ## Block Header — 2026-04-30 LATE — intent-guard fork + Cerron PR engagement + TRP cycle (multi-agent build burst)
 

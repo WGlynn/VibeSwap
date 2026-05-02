@@ -13,6 +13,11 @@ import WalletRecoveryABI from '../abis/WalletRecovery.json'
 import ShapleyDistributorABI from '../abis/ShapleyDistributor.json'
 import ILProtectionVaultABI from '../abis/ILProtectionVault.json'
 import SlippageGuaranteeFundABI from '../abis/SlippageGuaranteeFund.json'
+// Newly-wired ABIs (regen 2026-05-01: C39/C42/C45/C47/C48 cycles)
+import ClawbackRegistryABI from '../abis/ClawbackRegistry.json'
+import ContributionAttestorABI from '../abis/ContributionAttestor.json'
+import ContributionDAGABI from '../abis/ContributionDAG.json'
+import FeeRouterABI from '../abis/FeeRouter.json'
 
 // ABI registry — maps address key in CONTRACTS to its ABI
 const ABI_REGISTRY = {
@@ -26,6 +31,13 @@ const ABI_REGISTRY = {
   shapleyDistributor: ShapleyDistributorABI,
   ilProtectionVault: ILProtectionVaultABI,
   slippageGuaranteeFund: SlippageGuaranteeFundABI,
+  // C45/C47/C48 surfaces — addresses TBD post-deploy (see CONTRACTS map below).
+  // Until each chain's CONTRACTS entry includes a matching key with a non-zero
+  // address, the loop below silently skips these; no breakage to existing flows.
+  clawbackRegistry: ClawbackRegistryABI,
+  contributionAttestor: ContributionAttestorABI,
+  contributionDAG: ContributionDAGABI,
+  feeRouter: FeeRouterABI,
 }
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'

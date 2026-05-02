@@ -29,6 +29,11 @@ export const CONTRACTS = {
     shapleyDistributor: getEnvAddress('VITE_ETH_SHAPLEY_DISTRIBUTOR'),
     ilProtectionVault: getEnvAddress('VITE_ETH_IL_PROTECTION_VAULT'),
     slippageGuaranteeFund: getEnvAddress('VITE_ETH_SLIPPAGE_GUARANTEE_FUND'),
+    // C45/C47/C48 surfaces — TODO: insert mainnet addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_ETH_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_ETH_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_ETH_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_ETH_FEE_ROUTER'),
   },
   // ============================================
   // ARBITRUM ONE (Chain ID: 42161)
@@ -39,6 +44,11 @@ export const CONTRACTS = {
     amm: getEnvAddress('VITE_ARB_VIBE_AMM'),
     treasury: getEnvAddress('VITE_ARB_TREASURY'),
     router: getEnvAddress('VITE_ARB_ROUTER'),
+    // C45/C47/C48 surfaces — TODO: insert addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_ARB_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_ARB_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_ARB_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_ARB_FEE_ROUTER'),
   },
   // ============================================
   // OPTIMISM (Chain ID: 10)
@@ -49,6 +59,11 @@ export const CONTRACTS = {
     amm: getEnvAddress('VITE_OP_VIBE_AMM'),
     treasury: getEnvAddress('VITE_OP_TREASURY'),
     router: getEnvAddress('VITE_OP_ROUTER'),
+    // C45/C47/C48 surfaces — TODO: insert addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_OP_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_OP_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_OP_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_OP_FEE_ROUTER'),
   },
   // ============================================
   // BASE (Chain ID: 8453)
@@ -59,6 +74,11 @@ export const CONTRACTS = {
     amm: getEnvAddress('VITE_BASE_VIBE_AMM'),
     treasury: getEnvAddress('VITE_BASE_TREASURY'),
     router: getEnvAddress('VITE_BASE_ROUTER'),
+    // C45/C47/C48 surfaces — TODO: insert addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_BASE_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_BASE_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_BASE_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_BASE_FEE_ROUTER'),
   },
   // ============================================
   // POLYGON (Chain ID: 137)
@@ -69,6 +89,11 @@ export const CONTRACTS = {
     amm: getEnvAddress('VITE_POLYGON_VIBE_AMM'),
     treasury: getEnvAddress('VITE_POLYGON_TREASURY'),
     router: getEnvAddress('VITE_POLYGON_ROUTER'),
+    // C45/C47/C48 surfaces — TODO: insert addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_POLYGON_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_POLYGON_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_POLYGON_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_POLYGON_FEE_ROUTER'),
   },
   // ============================================
   // SEPOLIA TESTNET (Chain ID: 11155111)
@@ -79,6 +104,11 @@ export const CONTRACTS = {
     amm: getEnvAddress('VITE_SEPOLIA_VIBE_AMM'),
     treasury: getEnvAddress('VITE_SEPOLIA_TREASURY'),
     router: getEnvAddress('VITE_SEPOLIA_ROUTER'),
+    // C45/C47/C48 surfaces — TODO: insert testnet addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_SEPOLIA_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_SEPOLIA_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_SEPOLIA_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_SEPOLIA_FEE_ROUTER'),
   },
   // ============================================
   // ARBITRUM SEPOLIA (Chain ID: 421614)
@@ -89,6 +119,11 @@ export const CONTRACTS = {
     amm: getEnvAddress('VITE_ARB_SEPOLIA_VIBE_AMM'),
     treasury: getEnvAddress('VITE_ARB_SEPOLIA_TREASURY'),
     router: getEnvAddress('VITE_ARB_SEPOLIA_ROUTER'),
+    // C45/C47/C48 surfaces — TODO: insert testnet addresses post-deploy
+    clawbackRegistry: getEnvAddress('VITE_ARB_SEPOLIA_CLAWBACK_REGISTRY'),
+    contributionAttestor: getEnvAddress('VITE_ARB_SEPOLIA_CONTRIBUTION_ATTESTOR'),
+    contributionDAG: getEnvAddress('VITE_ARB_SEPOLIA_CONTRIBUTION_DAG'),
+    feeRouter: getEnvAddress('VITE_ARB_SEPOLIA_FEE_ROUTER'),
   },
   // ============================================
   // LOCAL DEVELOPMENT (Chain ID: 31337)

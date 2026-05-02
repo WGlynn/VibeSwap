@@ -269,7 +269,7 @@ Burned tokens go to protocol treasury or a "security bounty" pool incentivizing 
 - **Replay attacks**: without nonce + chain ID, a signature could be replayed across chains. EIP-712 domain separator prevents this (includes chain ID + contract address).
 - **Signature malleability**: use canonical signature form (e.g., OpenZeppelin's ECDSA.recover with S-value check).
 - **Front-running**: attestors can be front-run if their submission is visible before inclusion. Mitigation: private mempool submissions for high-stakes claims.
-- **Sybil attacks**: multiple accounts acting as one attestor. Mitigation: attestor certification (see [`SOULBOUND_IDENTITY.md`](./SOULBOUND_IDENTITY.md) if it exists, or certification-via-governance). <!-- FIXME: ./SOULBOUND_IDENTITY.md — no candidate found in docs/ tree. -->
+- **Sybil attacks**: multiple accounts acting as one attestor. Mitigation: attestor certification (see [the SoulboundIdentity contract](../../../contracts/identity/SoulboundIdentity.sol), or certification-via-governance).
 - **Bond drainage**: an attestor could exhaust their bond by rapid wrong attestations. Mitigation: rate-limit attestations per attestor; require fresh bond after slashing events.
 
 ## Integration with Gap #3 (Attested Resume)

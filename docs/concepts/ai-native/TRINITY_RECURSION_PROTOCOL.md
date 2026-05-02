@@ -231,4 +231,3 @@ This protocol is public domain. Use it, extend it, improve it. If the three loop
 - [TRP Verification Report](../../_meta/trp/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
 - [TRP Empirical RSI (paper)](../../research/papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI
 - [TRP Pattern Taxonomy (paper)](../../research/papers/trp-pattern-taxonomy.md) — 12 recurring vulnerability patterns
-- [TRP (DOCUMENTATION copy)](../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md) — Canonical copy in DOCUMENTATION/ <!-- FIXME: ../DOCUMENTATION/TRINITY_RECURSION_PROTOCOL.md — multiple candidates: docs/concepts/ai-native/TRINITY_RECURSION_PROTOCOL.md, NOTE: auto-repair would self-link -->

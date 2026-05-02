@@ -8279,7 +8279,7 @@ can also be achieved with a mechanism where truth-telling is optimal.
 
 - [VibeSwap Incentives Whitepaper](INCENTIVES_WHITEPAPER.md) - Detailed mechanism specifications
 - [Security Mechanism Design](../../architecture/SECURITY_MECHANISM_DESIGN.md) - Anti-fragile defense architecture
-- [VibeSwap README](../papers/README.md) - Technical implementation overview
+- [VibeSwap README](../../../README.md) - Technical implementation overview
 
 ---
 

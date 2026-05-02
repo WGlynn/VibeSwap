@@ -25,6 +25,7 @@ contract ILProtectionVault is
 
     event PoolQuoteTokenUpdated(bytes32 indexed poolId, address indexed previous, address indexed current);
     event IncentiveControllerUpdated(address indexed previous, address indexed current);
+    event TierActiveStatusUpdated(uint8 indexed tier, bool active);
 
     // ============ Constants ============
 
@@ -329,6 +330,11 @@ contract ILProtectionVault is
         uint256 timeStaked = block.timestamp - position.depositTimestamp;
         if (timeStaked < tierConfig.minDuration) revert MinDurationNotMet();
 
+        // C16-F2: closePosition gates compensation on tierConfig.active; the same
+        // gate must apply here. Without it, the active flag is half-enforced —
+        // an "inactive" tier still pays via direct claim, defeating the kill-switch.
+        if (!tierConfig.active) return 0;
+
         // Calculate claimable
         uint256 coverableIL = (position.ilAccrued * tierConfig.coverageRateBps) / BPS_PRECISION;
         amount = coverableIL > position.ilClaimed ? coverableIL - position.ilClaimed : 0;
@@ -363,6 +369,9 @@ contract ILProtectionVault is
         if (position.liquidity == 0) return 0;
 
         TierConfig storage tierConfig = tierConfigs[position.protectionTier];
+        // C16-F2: mirror the active-flag gate from closePosition + claimProtection.
+        // Off-chain views must reflect the on-chain pay-or-not decision honestly.
+        if (!tierConfig.active) return 0;
 
         uint256 timeStaked = block.timestamp - position.depositTimestamp;
         if (timeStaked < tierConfig.minDuration) return 0;
@@ -408,6 +417,30 @@ contract ILProtectionVault is
         });
 
         emit TierConfigured(tier, coverageRateBps, minDuration);
+    }
+
+    /**
+     * @notice Set whether a protection tier is active (i.e. eligible for compensation
+     *         payouts on closePosition / claimProtection).
+     * @dev C16-F2: closePosition gates compensation on `tierConfig.active`, but prior
+     *      to this fix there was no path to set a tier inactive. configureTier always
+     *      writes `active: true`, and the initializer also sets all defaults to true.
+     *      The on-chain check therefore had no off-switch — owners could not retire a
+     *      misconfigured or compromised tier without an upgrade. This restores the
+     *      kill-switch the gating code was already written against.
+     *
+     *      Existing positions on a deactivated tier are not retroactively voided —
+     *      ilAccrued is still computed and ilClaimed accounting still tracks — but
+     *      the compensation branch in closePosition will short-circuit, leaving the
+     *      LP to either (a) wait for owner to reactivate or (b) close without
+     *      compensation. Reactivation is just configureTier(...) again.
+     * @param tier Tier index (0..MAX_TIER)
+     * @param active True to activate, false to deactivate
+     */
+    function setTierActive(uint8 tier, bool active) external onlyOwner {
+        if (tier > MAX_TIER) revert InvalidTier();
+        tierConfigs[tier].active = active;
+        emit TierActiveStatusUpdated(tier, active);
     }
 
     /**

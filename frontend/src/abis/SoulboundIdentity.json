@@ -201,6 +201,19 @@
   },
   {
     "type": "function",
+    "name": "bindSourceLineage",
+    "inputs": [
+      {
+        "name": "claimId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "changeUsername",
     "inputs": [
       {
@@ -214,49 +227,13 @@
   },
   {
     "type": "function",
-    "name": "contributions",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "name": "contributionAttestor",
+    "inputs": [],
     "outputs": [
       {
-        "name": "author",
+        "name": "",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "timestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "contentHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "cType",
-        "type": "uint8",
-        "internalType": "enum SoulboundIdentity.ContributionType"
-      },
-      {
-        "name": "upvotes",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "downvotes",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -612,10 +589,48 @@
   },
   {
     "type": "function",
+    "name": "getSourceLineageHash",
+    "inputs": [
+      {
+        "name": "holder",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "hasIdentity",
     "inputs": [
       {
         "name": "addr",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "hasSourceLineage",
+    "inputs": [
+      {
+        "name": "holder",
         "type": "address",
         "internalType": "address"
       }
@@ -655,107 +670,6 @@
   },
   {
     "type": "function",
-    "name": "identities",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "username",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "level",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "xp",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "alignment",
-        "type": "int256",
-        "internalType": "int256"
-      },
-      {
-        "name": "contributions",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "reputation",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "createdAt",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "lastActive",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "avatar",
-        "type": "tuple",
-        "internalType": "struct SoulboundIdentity.AvatarTraits",
-        "components": [
-          {
-            "name": "background",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "body",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "eyes",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "mouth",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "accessory",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "aura",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
-      },
-      {
-        "name": "quantumEnabled",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "quantumKeyRoot",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "identityContributions",
     "inputs": [
       {
@@ -782,6 +696,19 @@
     "type": "function",
     "name": "initialize",
     "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initializeV2",
+    "inputs": [
+      {
+        "name": "_contributionAttestor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -819,6 +746,19 @@
         "internalType": "address"
       }
     ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lineageBindingEnabled",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -1137,6 +1077,19 @@
   },
   {
     "type": "function",
+    "name": "setContributionAttestor",
+    "inputs": [
+      {
+        "name": "_attestor",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -1163,6 +1116,44 @@
         "name": "",
         "type": "string",
         "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tokenLineageClaimId",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tokenLineageHash",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -1444,6 +1435,31 @@
   },
   {
     "type": "event",
+    "name": "AuthorizedRecorderUpdated",
+    "inputs": [
+      {
+        "name": "recorder",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "previous",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "current",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "AvatarUpdated",
     "inputs": [
       {
@@ -1489,6 +1505,25 @@
             "internalType": "uint8"
           }
         ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ContributionAttestorSet",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "current",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1608,6 +1643,12 @@
   },
   {
     "type": "event",
+    "name": "LineageBindingEnabled",
+    "inputs": [],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "OwnershipTransferred",
     "inputs": [
       {
@@ -1697,6 +1738,37 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SourceLineageBound",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "holder",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "claimId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "lineageHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -1813,6 +1885,21 @@
   {
     "type": "error",
     "name": "CannotVoteOwnContent",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ClaimContributorMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ClaimNotAccepted",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ContributionAttestorNotSet",
     "inputs": []
   },
   {
@@ -1951,6 +2038,16 @@
   },
   {
     "type": "error",
+    "name": "LineageAlreadyBound",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LineageBindingDisabled",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotInitializing",
     "inputs": []
   },
@@ -1980,6 +2077,11 @@
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ReentrancyGuardReentrantCall",
+    "inputs": []
   },
   {
     "type": "error",

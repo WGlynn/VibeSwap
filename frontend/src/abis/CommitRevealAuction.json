@@ -10,6 +10,32 @@
   },
   {
     "type": "function",
+    "name": "ATTENTION_WINDOW_COMMIT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ATTENTION_WINDOW_REVEAL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "BATCH_DURATION",
     "inputs": [],
     "outputs": [
@@ -37,6 +63,19 @@
   {
     "type": "function",
     "name": "COMMIT_DURATION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ESTIMATE_TOLERANCE_X",
     "inputs": [],
     "outputs": [
       {
@@ -95,6 +134,19 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "UPGRADE_INTERFACE_VERSION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -194,6 +246,11 @@
         "internalType": "uint256"
       },
       {
+        "name": "totalVirtualPriorityBids",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "orderCount",
         "type": "uint256",
         "internalType": "uint256"
@@ -237,12 +294,48 @@
   },
   {
     "type": "function",
+    "name": "claimRefund",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "commitOrder",
     "inputs": [
       {
         "name": "commitHash",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "commitId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "commitOrderCrossChain",
+    "inputs": [
+      {
+        "name": "originalUser",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "commitHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "destinationRecipient",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
@@ -311,6 +404,11 @@
       },
       {
         "name": "depositAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "estimatedTradeValue",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -405,6 +503,30 @@
   },
   {
     "type": "function",
+    "name": "crossChainRecipientByOrder",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "currentBatchId",
     "inputs": [],
     "outputs": [
@@ -454,6 +576,11 @@
           },
           {
             "name": "totalPriorityBids",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalVirtualPriorityBids",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -522,6 +649,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "estimatedTradeValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "depositor",
             "type": "address",
             "internalType": "address"
@@ -532,6 +664,30 @@
             "internalType": "enum ICommitRevealAuction.CommitStatus"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCrossChainRecipient",
+    "inputs": [
+      {
+        "name": "batchId",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "orderIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "recipient",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -787,6 +943,25 @@
   },
   {
     "type": "function",
+    "name": "pendingRefunds",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "pendingSlashedFunds",
     "inputs": [],
     "outputs": [
@@ -864,6 +1039,19 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proxiableUUID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -1142,6 +1330,24 @@
   },
   {
     "type": "function",
+    "name": "upgradeToAndCall",
+    "inputs": [
+      {
+        "name": "newImplementation",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "usedPoWProofs",
     "inputs": [
       {
@@ -1199,6 +1405,44 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "withdrawPriorityBids",
+    "inputs": [
+      {
+        "name": "batchId",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "AuthorizedSettlerUpdated",
+    "inputs": [
+      {
+        "name": "settler",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "authorized",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "event",
     "name": "BatchPhaseChanged",
     "inputs": [
@@ -1241,6 +1485,12 @@
       },
       {
         "name": "totalPriorityBids",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalVirtualPriorityBids",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1425,6 +1675,19 @@
   },
   {
     "type": "event",
+    "name": "PoWBaseValueUpdated",
+    "inputs": [
+      {
+        "name": "powBaseValue",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "PoWProofAccepted",
     "inputs": [
       {
@@ -1499,6 +1762,44 @@
   },
   {
     "type": "event",
+    "name": "PriorityBidsWithdrawn",
+    "inputs": [
+      {
+        "name": "batchId",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
+      },
+      {
+        "name": "settler",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ReputationOracleUpdated",
+    "inputs": [
+      {
+        "name": "oracle",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "SlashedFundsHeld",
     "inputs": [
       {
@@ -1523,9 +1824,46 @@
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "TreasuryUpdated",
+    "inputs": [
+      {
+        "name": "treasury",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Upgraded",
+    "inputs": [
+      {
+        "name": "implementation",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "AccreditationRequired",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1549,7 +1887,38 @@
   },
   {
     "type": "error",
+    "name": "ERC1967InvalidImplementation",
+    "inputs": [
+      {
+        "name": "implementation",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC1967NonPayable",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EstimateExceeded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailedInnerCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FlashLoanDetected",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientCollateral",
     "inputs": []
   },
   {
@@ -1605,6 +1974,11 @@
   {
     "type": "error",
     "name": "KYCRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoRefundPending",
     "inputs": []
   },
   {
@@ -1683,6 +2057,22 @@
     "type": "error",
     "name": "TransferFailed",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UUPSUnauthorizedCallContext",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UUPSUnsupportedProxiableUUID",
+    "inputs": [
+      {
+        "name": "slot",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
   },
   {
     "type": "error",

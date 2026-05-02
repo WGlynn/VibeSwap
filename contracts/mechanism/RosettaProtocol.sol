@@ -192,6 +192,13 @@ contract RosettaProtocol is
     error ChallengeExpired();
     error ChallengeNotExpired();
 
+    // ============ Constructor ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Initializer ============
 
     /**

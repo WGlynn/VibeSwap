@@ -106,6 +106,13 @@ contract MemecoinLaunchAuction is
     /// @dev Reserved storage gap
     uint256[50] private __gap;
 
+    // ============ Constructor ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Init ============
 
     function initialize(

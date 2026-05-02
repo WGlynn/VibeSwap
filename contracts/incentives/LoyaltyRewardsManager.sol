@@ -30,6 +30,18 @@ contract LoyaltyRewardsManager is
     uint256 public constant BPS_PRECISION = 10000;
     uint256 public constant PRECISION = 1e18;
     uint8 public constant MAX_TIERS = 4;
+    /// @dev Upper bound for the loyalty reward multiplier (5x). Prevents owner from
+    /// (accidentally or maliciously) configuring an unbounded multiplier that would
+    /// drain the reward pool — claimRewards multiplies pending by multiplierBps/BPS,
+    /// so an unchecked value reads as a privileged drain vector. Defense-in-depth:
+    /// even with onlyOwner, configuration values that scale economic outcomes by
+    /// orders of magnitude must have explicit ceilings.
+    uint256 public constant MAX_MULTIPLIER_BPS = 50000;
+    /// @dev Upper bound for the early-exit penalty (50%). Symmetric to the multiplier
+    /// cap: prevents owner from setting penalty > liquidity, which would corrupt
+    /// pendingPenalties accounting (penalty is added to a counter that flows into
+    /// rewardPerShareAccumulated via distributePenalties).
+    uint256 public constant MAX_PENALTY_BPS = 5000;
 
     // ============ State ============
 
@@ -432,6 +444,12 @@ contract LoyaltyRewardsManager is
         uint256 penaltyBps
     ) external override onlyOwner {
         if (tierIndex >= MAX_TIERS) revert InvalidTier();
+        // C16-F1: bound multiplier and penalty. setTreasuryPenaltyShare validates
+        // its parameter (<= BPS_PRECISION) but configureTier did not — asymmetric
+        // input validation across owner-only setters. Multiplier must be a finite
+        // amplification factor; penalty must be a fraction of withdrawn liquidity.
+        if (multiplierBps == 0 || multiplierBps > MAX_MULTIPLIER_BPS) revert InvalidAmount();
+        if (penaltyBps > MAX_PENALTY_BPS) revert InvalidAmount();
 
         loyaltyTiers[tierIndex] = LoyaltyTier({
             minDuration: minDuration,

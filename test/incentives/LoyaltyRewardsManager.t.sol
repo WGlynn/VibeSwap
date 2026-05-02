@@ -183,6 +183,49 @@ contract LoyaltyRewardsManagerTest is Test {
         assertEq(tier.earlyExitPenaltyBps, 400);
     }
 
+    // ============ C16-F1: configureTier bounds (access-control asymmetry) ============
+
+    /// @dev Pre-fix: configureTier accepted any uint256 for multiplierBps and penaltyBps,
+    ///      while setTreasuryPenaltyShare on the same contract validated <= BPS_PRECISION.
+    ///      An owner mistake (typo) or compromised key could set multiplierBps far above
+    ///      reasonable values, draining the reward pool on claim. This test asserts the
+    ///      cap exists.
+    function test_C16F1_configureTier_revertsOnOversizedMultiplier() public {
+        uint256 maxMult = manager.MAX_MULTIPLIER_BPS();
+        // 5x = MAX_MULTIPLIER_BPS — accepted
+        manager.configureTier(0, 7 days, maxMult, 100);
+        // 5x + 1 — rejected
+        uint256 over = maxMult + 1;
+        vm.expectRevert(LoyaltyRewardsManager.InvalidAmount.selector);
+        manager.configureTier(0, 7 days, over, 100);
+    }
+
+    function test_C16F1_configureTier_revertsOnZeroMultiplier() public {
+        // multiplier=0 would silently zero out all rewards on claim — also a footgun.
+        vm.expectRevert(LoyaltyRewardsManager.InvalidAmount.selector);
+        manager.configureTier(0, 7 days, 0, 100);
+    }
+
+    function test_C16F1_configureTier_revertsOnOversizedPenalty() public {
+        uint256 maxPen = manager.MAX_PENALTY_BPS();
+        // 50% = MAX_PENALTY_BPS — accepted
+        manager.configureTier(0, 7 days, 10000, maxPen);
+        // 50% + 1 — rejected
+        uint256 over = maxPen + 1;
+        vm.expectRevert(LoyaltyRewardsManager.InvalidAmount.selector);
+        manager.configureTier(0, 7 days, 10000, over);
+    }
+
+    /// @dev Demonstrates the pre-fix damage: with multiplierBps = 1e9 (100,000x), an LP
+    ///      claim would multiply pending rewards by 100,000, draining the reward pool
+    ///      far beyond the LP's fair share. Post-fix, the configureTier call reverts
+    ///      and the drain path is closed at the configuration boundary.
+    function test_C16F1_drainVector_blocked() public {
+        // Mimic compromised-owner attempt to set 100,000x multiplier on tier 0.
+        vm.expectRevert(LoyaltyRewardsManager.InvalidAmount.selector);
+        manager.configureTier(0, 7 days, 1_000_000_000, 0);
+    }
+
     // ============ Edge Cases ============
 
     function test_multiplePoolsIndependent() public {

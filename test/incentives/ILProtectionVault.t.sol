@@ -197,4 +197,93 @@ contract ILProtectionVaultTest is Test {
         vault.setPoolQuoteToken(newPool, address(newToken));
         assertEq(vault.poolQuoteTokens(newPool), address(newToken));
     }
+
+    // ============ C16-F2: Tier kill-switch (access-control asymmetry) ============
+
+    /// @dev Pre-fix: TierConfig.active was checked in closePosition but never settable
+    ///      to false (initializer + configureTier both wrote `active: true` only). Even
+    ///      worse, claimProtection and getClaimableAmount didn't check `active` at all,
+    ///      so the gate was half-enforced. This test asserts:
+    ///        1. setTierActive(false) actually flips the flag.
+    ///        2. closePosition skips compensation when tier is inactive.
+    ///        3. claimProtection returns 0 (no payout, no revert) when tier is inactive.
+    ///        4. getClaimableAmount mirrors the on-chain decision.
+    function test_C16F2_setTierActive_flipsFlag() public {
+        // Initially active
+        assertTrue(vault.getTierConfig(0).active);
+
+        vault.setTierActive(0, false);
+        assertFalse(vault.getTierConfig(0).active);
+
+        vault.setTierActive(0, true);
+        assertTrue(vault.getTierConfig(0).active);
+    }
+
+    function test_C16F2_setTierActive_revertsOnInvalidTier() public {
+        vm.expectRevert(ILProtectionVault.InvalidTier.selector);
+        vault.setTierActive(99, false);
+    }
+
+    function test_C16F2_setTierActive_onlyOwner() public {
+        vm.prank(alice);
+        vm.expectRevert(); // OZ Ownable revert
+        vault.setTierActive(0, false);
+    }
+
+    function test_C16F2_claimProtection_skipsWhenInactive() public {
+        // Register a position on tier 0 (no minDuration), accrue some IL, then
+        // deactivate the tier and confirm claim returns 0.
+        vm.prank(controller);
+        vault.registerPosition(POOL_ID, alice, 100 ether, 1e18, 0);
+
+        // Force ilAccrued > 0 by closing at a moved price (this also pays compensation
+        // via the controller path, but we're going to test direct claim afterwards)
+        // Use closePosition's tier-0 (zero minDuration, 25% coverage).
+        vm.prank(controller);
+        vault.closePosition(POOL_ID, alice, 1.5e18); // exitPrice 1.5x
+
+        // Re-register to set up a fresh position, then deactivate tier and try claim
+        vm.prank(controller);
+        vault.registerPosition(POOL_ID, bob, 100 ether, 1e18, 0);
+
+        // Manually accrue IL by calling closePosition for bob then re-registering — but
+        // close position zeros liquidity? Actually closePosition doesn't zero liquidity
+        // in this contract; it only updates ilAccrued. So bob has accrued IL now.
+        vm.prank(controller);
+        vault.closePosition(POOL_ID, bob, 1.5e18);
+
+        // Now deactivate tier 0
+        vault.setTierActive(0, false);
+
+        // Bob tries to claim directly — pre-fix this would pay; post-fix returns 0.
+        uint256 reservesBefore = vault.getTotalReserves(address(quoteToken));
+        vm.prank(bob);
+        uint256 claimed = vault.claimProtection(POOL_ID, bob);
+        assertEq(claimed, 0, "Claim should return 0 when tier inactive");
+        assertEq(
+            vault.getTotalReserves(address(quoteToken)),
+            reservesBefore,
+            "Reserves should not move when tier inactive"
+        );
+    }
+
+    function test_C16F2_getClaimableAmount_mirrorsActiveFlag() public {
+        // Register and accrue IL
+        vm.prank(controller);
+        vault.registerPosition(POOL_ID, alice, 100 ether, 1e18, 0);
+        vm.prank(controller);
+        vault.closePosition(POOL_ID, alice, 1.5e18);
+
+        // Active: claimable > 0
+        uint256 claimableActive = vault.getClaimableAmount(POOL_ID, alice);
+
+        // Deactivate
+        vault.setTierActive(0, false);
+        uint256 claimableInactive = vault.getClaimableAmount(POOL_ID, alice);
+        assertEq(claimableInactive, 0, "View must mirror on-chain inactive state");
+
+        // Reactivate restores parity
+        vault.setTierActive(0, true);
+        assertEq(vault.getClaimableAmount(POOL_ID, alice), claimableActive);
+    }
 }

@@ -4,7 +4,35 @@
 >
 > **Total: 290 implementation contracts + 80 interfaces = 370 .sol files**
 >
-> Last updated: 2026-03-26
+> Last updated: 2026-05-01 (refresh covers C39 / C42 / C45 / C46 / C47 / C48 cycles)
+
+---
+
+## Recent Cycles — what changed since 2026-03-26
+
+These cycles added storage slots and new external functions to several contracts. Slot
+counts cited below come from `docs/audits/2026-05-01-storage-layout-followup.md`. The
+per-contract rows further down reflect the post-cycle API surface.
+
+| Cycle | Contract(s) | Change | New slots | Reinitializer |
+|------|---|---|---:|---|
+| **C39** | `core/CircuitBreaker` | Default-on attested-resume for `LOSS_BREAKER` + `TRUE_PRICE_BREAKER` (security-load-bearing breakers stay tripped past cooldown until M certified attestors arrive) | +2 (gap 44 → 42) | `_initializeC39SecurityDefaults()` — **NOT WIRED into VibeSwapCore / VibeAMM yet** (HIGH finding, see audit) |
+| **C42** | `incentives/ShapleyDistributor` | Commit-reveal keeper machinery for `revealNoveltyMultiplier`; `commitNoveltyMultiplier` + `revealNoveltyMultiplier` + threshold/delay/setters; `disableOwnerSetter` legacy lever | +9 (gap 49 → 40) | `initializeC42Defaults() reinitializer(2)` — present, but `UpgradePostLaunch.s.sol` / `UpgradeShapleyABC.s.sol` ship bare `upgradeToAndCall(impl, "")` (NatSpec violation, see deploy audit §6) |
+| **C45** | `identity/SoulboundIdentity` | Source-lineage binding (`bindSourceLineage`, `tokenLineageHash`, `tokenLineageClaimId`, `lineageBindingEnabled`) tying minted identities to ContributionAttestor 3-factor claims | +4 (gap 50 → 46) | `initializeV2(attestor) reinitializer(2)` for upgrades; `setContributionAttestor()` for fresh deploys — both converge on same end state. `script/DeployIdentity.s.sol` wires it post-deploy as Step 6.5 |
+| **C46** | `identity/ContributionDAG` | Handshake cooldown observability (`totalHandshakeAttempts`, `totalHandshakeSuccesses`, `totalHandshakesBlockedByCooldown`, `lastHandshakeAt`, `BlockedByCooldown` enum, `HandshakeBlockedByCooldown` event); 1-day `HANDSHAKE_COOLDOWN` constant | +4 (non-upgradeable; new fields zero-init in constructor) | N/A (constructor-based, fresh deploy per upgrade) |
+| **C47** | `compliance/ClawbackRegistry` | Bonded permissionless contest path (`openContest`, `upholdContest`, `dismissContest`, `resolveExpiredContest`, `fundContestRewardPool`, `setContestBondToken`/`Amount`/`Window`/`SuccessReward`); `caseContests`, `contestBondToken`, `contestBondAmount`, `contestWindow`, `contestSuccessReward`, `contestRewardPool`, `contestParamsInitialized` | +8 actual / +9 doc-claimed (gap 50 → 41 — LOW off-by-one) | `initializeContestV1 reinitializer(2)` — gold-standard fail-closed pattern; entry points revert with `ContestParamsNotInitialized` until owner runs migration |
+| **C48** | (cross-cutting) | Storage-layout discipline pass + `script/DeployIdentity.s.sol` wire-up of `setContributionAttestor` | 0 | N/A |
+
+**Cross-references**:
+- Storage audit: `docs/audits/2026-05-01-storage-layout-followup.md` (full per-contract slot accounting, parent-collision analysis, mapping preimage check)
+- Deploy script audit: `docs/_meta/deploy-script-audit-2026-05-01.md` (which `Deploy*.s.sol` scripts wire / fail to wire which cycles)
+- Maintenance synthesis: `docs/audits/2026-04-27-maintenance-synthesis.md` (4-PR roadmap that produced these cycles)
+- Concept primitives:
+  - `docs/concepts/primitives/classification-default-with-explicit-override.md` (C39)
+  - `docs/concepts/primitives/in-flight-state-preservation-across-semantic-flip.md` (C39 migration semantics)
+  - `docs/concepts/primitives/fail-closed-on-upgrade.md` (C45 / C47 reinitializer pattern)
+  - `docs/concepts/primitives/two-layer-migration-idempotency.md` (C45 dual-path attestor wire-up)
+  - `docs/concepts/oracles/COMMIT_REVEAL_FOR_ORACLES.md` (C42 commit-reveal keeper architecture)
 
 ---
 
@@ -155,7 +183,7 @@ All community contracts are **UUPS upgradeable**.
 
 | Contract | Purpose | Upgradeable | Key Functions |
 |----------|---------|-------------|---------------|
-| **ClawbackRegistry** | Tracks tainted wallets and manages fund clawbacks with cascading reversal | UUPS | `submitForVoting`, `executeClawback`, `dismissCase`, `checkWallet` |
+| **ClawbackRegistry** | Tracks tainted wallets and manages fund clawbacks with cascading reversal. **C47**: bonded permissionless contest path — anyone can post a bond and contest a clawback case during `contestWindow`; uphold pays `contestSuccessReward` from `contestRewardPool`, dismiss forfeits the bond. Fail-closed: contest entry points revert with `ContestParamsNotInitialized` until owner runs `initializeContestV1`. | UUPS | `submitForVoting`, `executeClawback`, `dismissCase`, `checkWallet`, `openContest`, `upholdContest`, `dismissContest`, `resolveExpiredContest`, `fundContestRewardPool`, `setContestBondToken`, `setContestBondAmount`, `setContestWindow`, `setContestSuccessReward`, `getCaseContest`, `hasActiveContest`, `initializeContestV1(bondToken, bondAmount, window, successReward) reinitializer(2)` |
 | **ClawbackVault** | Escrow for clawed-back funds during dispute resolution | UUPS | `returnToOwner`, `returnAllForCase`, `getEscrow` |
 | **ComplianceRegistry** | Centralized compliance controls for regulatory flexibility | UUPS | `canProvideLiquidity`, `canUsePriorityAuction`, `freezeUser`, `suspendUser` |
 | **FederatedConsensus** | Hybrid authority consensus for clawback decisions | UUPS | `vote`, `isExecutable`, `markExecuted` |
@@ -192,7 +220,7 @@ The core contracts are the beating heart of VibeSwap.
 |----------|---------|-------------|---------------|
 | **VibeSwapCore** | Main entry point for the omnichain DEX | UUPS | `settleBatch`, `withdrawDeposit`, `refundExpiredCrossChain`, `pause`, `unpause` |
 | **CommitRevealAuction** | Batch auction mechanism with commit-reveal and priority bidding | Init | `advancePhase`, `settleBatch`, `withdrawDeposit`, `slashUnrevealedCommitment`, `claimRefund` |
-| **CircuitBreaker** | Emergency stop mechanism to protect against exploits | Abstract | `setGlobalPause`, `emergencyPauseAll`, `resetBreaker`, `setGuardian` |
+| **CircuitBreaker** | Emergency stop mechanism to protect against exploits. **C39**: `LOSS_BREAKER` and `TRUE_PRICE_BREAKER` are default-on attested-resume — they stay tripped past wall-clock cooldown until M certified attestors arrive. Owner can opt-out via `attestedResumeOverridden` mapping. | Abstract | `setGlobalPause`, `emergencyPauseAll`, `resetBreaker`, `setGuardian`, `attestedResumeOverridden(bytes32)`, `_initializeC39SecurityDefaults()` (concrete-child reinitializer hook) |
 | **FeeRouter** | Central protocol fee collector and distributor | No | `collectFee`, `distribute`, `distributeMultiple`, `updateConfig` |
 | **BuybackEngine** | Automated buyback-and-burn for protocol token value accrual | No | `executeBuyback`, `executeBuybackMultiple` |
 | **ProtocolFeeAdapter** | Bridges fee-generating contracts to cooperative distribution | No | `forwardFees`, `forwardETH` |
@@ -306,13 +334,13 @@ All DePIN contracts are **UUPS upgradeable**.
 | **AgentRegistry** | ERC-8004 compatible AI agent registry (PsiNet x VibeSwap) | UUPS | `setAgentStatus`, `updateContextRoot`, `recordInteraction`, `vouchForAgent` |
 | **ContextAnchor** | On-chain anchor for PsiNet context graphs (IPFS stored, Merkle verified) | UUPS | `archiveGraph`, `revokeAccess`, `getGraph` |
 | **ContributionAttestor** | 3-branch contribution attestation governance (separation of powers) | No | `attest`, `contest`, `escalateToTribunal`, `escalateToGovernance` |
-| **ContributionDAG** | On-chain trust DAG (Web of Trust) -- direct port of trustChain.js | No | `revokeVouch`, `recalculateTrustScores`, `getTrustScore`, `getVotingPowerMultiplier` |
+| **ContributionDAG** | On-chain trust DAG (Web of Trust) -- direct port of trustChain.js. Non-upgradeable, gas-bounded BFS (`MAX_TRUST_HOPS = 6`). **C46**: handshake cooldown observability — `addVouch`/`tryAddVouch` increment `totalHandshakeAttempts` / `totalHandshakeSuccesses` / `totalHandshakesBlockedByCooldown`, with per-pair `lastHandshakeAt` and 1-day `HANDSHAKE_COOLDOWN`. Lets governance audit cooldown-hit-rate (blocks/attempts) and recalibrate. | No | `revokeVouch`, `recalculateTrustScores`, `getTrustScore`, `getVotingPowerMultiplier`, `totalHandshakeAttempts()`, `totalHandshakeSuccesses()`, `totalHandshakesBlockedByCooldown()`, `lastHandshakeAt(pairKey)`, `HANDSHAKE_COOLDOWN()` |
 | **ContributionYieldTokenizer** | Pendle-inspired tokenization separating ideas from execution | No | `fundIdea`, `proposeExecution`, `claimStream`, `mergeIdeas` |
 | **Forum** | Decentralized forum bound to soulbound identities | UUPS | `createCategory`, `setCategoryActive`, `setPinned` |
 | **GitHubContributionTracker** | GitHub webhook-driven contribution ingestion | No | `setAuthorizedRelayer`, `bindGitHubAccount`, `getContributionRoot` |
 | **PairwiseVerifier** | CRPC (Commit-Reveal Pairwise Comparison) protocol | UUPS | `advancePhase`, `commitWork`, `settle`, `claimReward` |
 | **RewardLedger** | Retroactive + active Shapley reward tracking (port of shapleyTrust.js) | No | `finalizeRetroactive`, `distributeEvent`, `claimRetroactive`, `claimActive` |
-| **SoulboundIdentity** | Non-transferable identity NFT binding username, avatar, reputation | UUPS | `mintIdentity`, `mintIdentityQuantum`, `changeUsername`, `updateAvatar`, `vote` |
+| **SoulboundIdentity** | Non-transferable identity NFT binding username, avatar, reputation. **C45**: source-lineage binding ties each identity NFT to a 3-factor `ContributionAttestor` claim — `bindSourceLineage(claimId)` writes the lineage hash + claim id into `tokenLineageHash` / `tokenLineageClaimId`. Fresh deploys wire via `setContributionAttestor`; upgrades via `initializeV2 reinitializer(2)`. | UUPS | `mintIdentity`, `mintIdentityQuantum`, `changeUsername`, `updateAvatar`, `vote`, `bindSourceLineage`, `setContributionAttestor`, `initializeV2(attestor) reinitializer(2)` |
 | **VibeCode** | Deterministic identity fingerprint from on-chain contribution data | No | `refreshVibeCode`, `getVibeCode`, `getReputationScore`, `getVisualSeed` |
 | **VibeNames** | ENS-compatible naming system (.vibe TLD) | UUPS | `register`, `resolve`, `reverseResolve`, `setTextRecord` |
 | **WalletRecovery** | Multi-layer wallet recovery (social + time-locks + arbitration) | UUPS | `addGuardian`, `initiateGuardianRecovery`, `executeRecovery`, `reportFraud` |
@@ -335,7 +363,7 @@ All DePIN contracts are **UUPS upgradeable**.
 | **PlaceholderEscrow** | VIBE escrow for contributors without wallets yet | UUPS | `executeProposal`, `totalUnclaimed` |
 | **PoeRevaluation** | Posthumous/overlooked evidence revaluation of contributions | UUPS | `stakeConviction`, `unstake`, `execute`, `reject` |
 | **PriorityRegistry** | Immutable on-chain record of first-to-publish priority | UUPS | `setAuthorizedRecorder` |
-| **ShapleyDistributor** | Shapley value-based fair allocation reward distribution | UUPS | `computeShapleyValues`, `settleFromVerifier`, `claimReward`, `getCurrentHalvingEra` |
+| **ShapleyDistributor** | Shapley value-based fair allocation reward distribution. **C42**: M-of-N keeper commit-reveal for novelty multiplier (prevents single keeper from observing peer reveals + racing a counter-commit). | UUPS | `computeShapleyValues`, `settleFromVerifier`, `claimReward`, `getCurrentHalvingEra`, `commitNoveltyMultiplier`, `revealNoveltyMultiplier`, `setKeeperRevealThreshold`, `setKeeperRevealDelay`, `disableOwnerSetter`, `initializeC42Defaults() reinitializer(2)` |
 | **SingleStaking** | Synthetix-style single-sided staking rewards | No | `stake`, `withdraw`, `claimReward`, `exit`, `notifyRewardAmount` |
 | **SlippageGuaranteeFund** | Covers execution shortfall when actual output < expected minimum | UUPS | `setIncentiveController` |
 | **SoulboundSybilGuard** | Adapter: SoulboundIdentity to ISybilGuard | No | (adapter) |

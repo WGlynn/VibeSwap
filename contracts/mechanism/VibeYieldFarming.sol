@@ -73,6 +73,13 @@ contract VibeYieldFarming is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuar
     /// @dev Reserved storage gap for future upgrades
     uint256[50] private __gap;
 
+    // ============ Constructor ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Events ============
 
     event PoolAdded(uint256 indexed pid, address stakeToken, uint256 allocPoint);

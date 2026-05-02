@@ -1,5 +1,10 @@
 [
   {
+    "type": "constructor",
+    "inputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "function",
     "name": "ARBITRATION_PERIOD",
     "inputs": [],
@@ -15,6 +20,19 @@
   {
     "type": "function",
     "name": "ATTEMPT_COOLDOWN",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "GUARDIAN_ACTIVATION_DELAY",
     "inputs": [],
     "outputs": [
       {
@@ -281,50 +299,6 @@
   },
   {
     "type": "function",
-    "name": "configs",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "guardianThreshold",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "timelockDuration",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "deadmanTimeout",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "deadmanBeneficiary",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "quantumBackupHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "arbitrationEnabled",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "configureRecovery",
     "inputs": [
       {
@@ -399,6 +373,57 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getConfig",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct WalletRecovery.RecoveryConfig",
+        "components": [
+          {
+            "name": "guardianThreshold",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timelockDuration",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadmanTimeout",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadmanBeneficiary",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "quantumBackupHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "arbitrationEnabled",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -1080,6 +1105,25 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "AGIGuardUpdated",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "current",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",

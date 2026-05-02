@@ -211,8 +211,17 @@ contract ClawbackRegistry is
     ///        +contestBondToken (1) + contestBondAmount (1)
     ///        +contestWindow (1) + contestSuccessReward (1)
     ///        +contestRewardPool (1) + contestParamsInitialized (1)
-    ///        Total consumed: 9 slots. (mappings count as 1 slot; the
-    ///        constants are inlined and consume no slots.)
+    ///        Total consumed: 8 slots. (mappings count as 1 slot; the
+    ///        constants are inlined and consume no slots. uint64
+    ///        contestWindow is not packable with adjacent uint256 state,
+    ///        so it occupies a full slot.)
+    ///      Math-correct gap = 50 − 8 = 42. The declared __gap is 41,
+    ///      one slot below the canonical-50 convention. This is a
+    ///      conservative leftover from the prior 9-slot doc-count; left
+    ///      at 41 here as a doc-only fix (zero functional / security
+    ///      impact). Recovering the slot to 42 is deferred to the next
+    ///      upgrade cycle to avoid touching storage layout in this pass.
+    ///      Audit reference: docs/audits/2026-05-01-storage-layout-followup.md (C47-F1, LOW).
     uint256[41] private __gap;
 
     // ============ Events ============

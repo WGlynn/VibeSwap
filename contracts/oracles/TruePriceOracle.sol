@@ -458,6 +458,19 @@ contract TruePriceOracle is
         require(batch.phase == IOracleAggregationCRA.BatchPhase.SETTLED, "Batch not settled");
         require(batch.medianPrice > 0, "Zero median");
 
+        // C49-F1 — Reject stale batches. The replay guard below only prevents
+        // re-pulling a batch already pulled; without this gate, an adversary
+        // can pull a long-settled batch (whose median reflects market conditions
+        // from days/weeks ago) for the FIRST time and overwrite the live
+        // TruePrice. `revealDeadline` is the moment settlement became eligible —
+        // requiring the pull to land within MAX_STALENESS of that bound the
+        // batch to the same freshness window the rest of TPO enforces on
+        // signed updates (see getValidatedPrice / MAX_STALENESS).
+        require(
+            block.timestamp <= batch.revealDeadline + MAX_STALENESS,
+            "Batch too stale"
+        );
+
         // Confidence proportional to reveal count (capped at PRECISION).
         // 3 reveals -> ~30% confidence, 10+ reveals -> 100%.
         uint256 confidence = batch.revealCount * PRECISION / 10;

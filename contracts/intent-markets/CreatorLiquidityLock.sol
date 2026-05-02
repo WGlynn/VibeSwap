@@ -59,6 +59,13 @@ contract CreatorLiquidityLock is
     /// @dev Reserved storage gap for future upgrades
     uint256[50] private __gap;
 
+    // ============ Constructor ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Init ============
 
     function initialize(

@@ -1,6 +1,6 @@
 # VibeSwap System Taxonomy
 
-**Last updated**: 2026-04-02
+**Last updated**: 2026-05-01
 
 ---
 
@@ -35,7 +35,7 @@ vibeswap/                               # Root — Omnichain DEX
 │   ├── financial/         (20)         #   VibeBonds, VibeInsurance, VibePerpetual
 │   ├── incentives/        (19)         #   ShapleyDistributor, ILProtection, LoyaltyRewards
 │   ├── governance/        (14)         #   DAOTreasury, Governor, Tribunal, Timelock
-│   ├── identity/          (15)         #   ContributionDAG, SoulboundNFT, ReputationOracle
+│   ├── identity/          (15)         #   SoulboundIdentity, ContributionDAG, ReputationOracle
 │   ├── agents/            (15)         #   AgentRegistry, AgentCoordinator, JouleToken
 │   ├── settlement/        (15)         #   Settlement layer
 │   ├── libraries/         (15)         #   BatchMath, DeterministicShuffle, SecurityLib
@@ -58,12 +58,29 @@ vibeswap/                               # Root — Omnichain DEX
 │   ├── utils/             (38)         #   Utility functions
 │   └── contexts/          (6)          #   React context providers
 │
-├── docs/                               # DOCUMENTATION (29 .md + 85 subdirs)
-│   ├── trp/                            #   TRP protocol + round summaries
-│   │   └── round-summaries/            #     Round 16, 17, ...
-│   ├── CONTRACTS_CATALOGUE.md          #   Master contract reference
-│   ├── SYSTEM_TAXONOMY.md              #   This file
-│   └── [research, audit, marketing]    #   Papers, audits, strategy
+├── docs/                               # DOCUMENTATION (~590 .md, 10 top-level dirs)
+│   ├── README.md                       #   Top-level entry point for docs/
+│   ├── INDEX.md                        #   Cross-domain index of all docs
+│   ├── architecture/                   #   System architecture, patterns, protocols (12 subdirs)
+│   ├── concepts/                       #   Domain concepts: 15 subdirs incl. primitives/, identity/,
+│   │   │                               #     monetary/, oracles/, ai-native/, etm/, shapley/, security/
+│   │   └── primitives/                 #     Knowledge primitives (10 indexed)
+│   ├── research/                       #   Papers, whitepapers, essays, proofs, theorems
+│   │   ├── papers/                     #     23+ research papers (knowledge-primitives-index.md)
+│   │   ├── whitepapers/                #     VIBESWAP_MASTER_DOCUMENT, INCENTIVES_WHITEPAPER
+│   │   ├── essays/                     #     THE_COGNITIVE_ECONOMY_THESIS, etc.
+│   │   ├── proofs/                     #     Formal proofs
+│   │   └── theorems/                   #     Mechanism theorems
+│   ├── audits/                         #   7+ audits incl. 2026-05-01-storage-layout-followup.md
+│   ├── developer/                      #   CONTRACTS_CATALOGUE, INSTALLATION, runbooks/, testing/
+│   ├── governance/                     #   VIPs, VSPs, proposals, regulatory, ungovernance
+│   ├── marketing/                      #   forums/ (incl. nervos/), medium/, devto/, social/, pitch/
+│   ├── partnerships/                   #   usd8/, anthropic/, mit/, grants/, nervos/, framework/
+│   ├── _meta/                          #   Internal: protocols/, trp/, rsi/, roadmap/, KPIs, etc.
+│   │   ├── SYSTEM_TAXONOMY.md          #     This file
+│   │   ├── protocols/                  #     ANTI_HALLUCINATION_PROTOCOL, ANTI_AMNESIA_PROTOCOL
+│   │   └── trp-existing/               #     TRP loop specs (loop-0..3), TRP_RUNNER, efficiency-heatmap
+│   └── _archive/                       #   Historical correspondence, interview prep, renders
 │
 ├── script/                             # DEPLOYMENT (Deploy.s.sol, ConfigurePeers.s.sol)
 ├── oracle/                             # PYTHON ORACLE (Kalman filter)
@@ -71,6 +88,8 @@ vibeswap/                               # Root — Omnichain DEX
 ├── WHITEPAPER.md                       # VibeSwap whitepaper
 └── foundry.toml                        # Foundry profiles
 ```
+
+**Note (2026-05-01)**: `docs/` was reorganized from a flat `DOCUMENTATION/` into the 10 top-level subdirectories above (`architecture/`, `concepts/`, `research/`, `audits/`, `developer/`, `governance/`, `marketing/`, `partnerships/`, `_meta/`, `_archive/`). Each subdir has a `README.md` index. Knowledge primitives were consolidated under `docs/concepts/primitives/`. References to the legacy `DOCUMENTATION/` path are stale and should be updated.
 
 ---
 

@@ -1,4 +1,60 @@
-# Write-Ahead Log — CLEAN (session 2026-04-29 USD8 retroactive audit + meta-stack + GKB condensation)
+# Write-Ahead Log — CLEAN (session 2026-05-01 major build burst + docs reorg + public-discourse mission shift)
+
+## Epoch — CLEAN at 2026-05-01 major build burst + docs reorg + public-discourse mission shift
+- **Closed**: 2026-05-01 after Will's USD8-CRM → full-auto-TRP → docs-reorg → public-discourse-shift → "do an extra 40 commits and focus on making vibeswap 'complete'" arc.
+- **Branch**: VibeSwap `master` (push to `origin`). Range `8c0c0970..HEAD` = 79 substantive commits + this state-update commit (~80 total).
+- **Status**: CLEAN. Two BLOCKING deploy bugs identified (CrossChainRouter LZ EID 4-arg, BuybackEngine deploy) — design-call-required, not regressions; see SESSION_STATE Pending. No contract regressions; all TRP cycles passed targeted tests.
+
+**TRP cycles shipped (security/incentives/identity/oracles/core)**:
+- C39 + C39-F1 + C39-PROP — attested-resume default-on for security-load-bearing breakers (Gap 6) + migration wire-in (HIGH) + property fuzz
+- C42 + C42-F1 — similarity keeper commit-reveal (Gap #2b) + reinitializer (MED)
+- C45 + C45-PROP — SoulboundIdentity source-lineage binding (Strengthen #2) + invariant
+- C46 + C46-PROP — ContributionDAG handshake cooldown observability (Strengthen #3) + invariant
+- C47 + C47-PROP + C47-F1 — Clawback Cascade bonded permissionless contest (Gap 5) + invariant + storage doc fix (LOW)
+- C48-F1 + C48-F2 — gas-griefing cap on MicroGameFactory LP set (phantom-array) + paginate VibeSwapCore.compactFailedExecutions (gas-DoS)
+- C19-F1 + C19-F1-PROP — VWAPOracle asymmetric truncation (precision-loss-vwap-dust-bias) + dust-trade fuzz
+- C28-F2 — CEI fix in SoulboundIdentity.mintIdentity
+- C-OFR-1 — close cross-fn reentrancy in IncentiveController.onLiquidityRemoved (HIGH)
+- C7-CCS-F1 — enforce MAX_ATTESTATIONS_PER_CLAIM in ContributionAttestor
+- C16-F1 + C16-F2 — bound LoyaltyRewardsManager configureTier + ILProtectionVault tier kill-switch (MED)
+- C49-F1 — reject stale aggregator batches in TruePriceOracle.pullFromAggregator
+- 5×C23 — disable initializers on VibeFeeDistributor / CreatorLiquidityLock / MemecoinLaunchAuction / VibeYieldFarming / RosettaProtocol
+
+**Docs reorg (DOCUMENTATION/ → docs/ consolidation, 5 commits + 10 subdir READMEs)**:
+- 1/N skeleton + INDEX + tooling extraction
+- 2/N migration into 8 top-level subdirs (concepts, research, architecture, audits, governance, _meta, _archive, developer)
+- 3/N collapse triplets + consolidate correspondence
+- 5/N internal markdown link repair + 13 ambiguous FIXME resolutions
+- 10 subdir README.md files (architecture, concepts, research, developer, audits, governance, partnerships, marketing, _meta, _archive)
+- SYSTEM_TAXONOMY refresh; CLAUDE.md ANTI_AMNESIA path fix
+
+**Architecture overviews (4)**:
+- CONSENSUS_OVERVIEW.md, AMM_OVERVIEW.md, ORACLE_OVERVIEW.md, DEPLOYMENT_TOPOLOGY.md
+- CONTRACTS_CATALOGUE refreshed for C39/C42/C45/C46/C47/C48
+
+**Primitive docs (14 in `docs/concepts/primitives/`)**: README index + 13 individual primitives — see SESSION_STATE for full list.
+
+**Tests (10 new files)**: 5 fuzz/invariant suites (C39-PROP, C19-F1-PROP, C45-PROP, C46-PROP, C47-PROP) + 5 cross-cycle composition integration scenarios.
+
+**Frontend wiring**: ABIs regenerated against C39/C42/C45/C47/C48 contracts; 4 new ABIs wired into useContracts (ClawbackRegistry, ContributionAttestor, ContributionDAG, FeeRouter); ABI sync status doc.
+
+**Public-facing repo posture (forward-facing hygiene)**:
+- CHANGELOG.md (Keep-a-Changelog format, [Unreleased] covers full session)
+- SECURITY.md (responsible disclosure)
+- CONTRIBUTING.md
+- top-level README updated for forward-facing posture
+- .env.example expanded with deploy-script env vars
+
+**Deploy script audit + fix**:
+- `docs/audit/2026-05-01-deploy-script-consistency.md`
+- `script/DeployIdentity.s.sol` — wire SoulboundIdentity.setContributionAttestor (was missing)
+- 2 BLOCKING bugs flagged for design call (see SESSION_STATE Pending #2)
+
+**Public-discourse mission shift (mid-session)**: Will: "no more lurking in ethsecurity TG groups… now the job is to demonstrate through public discourse." Captured as posture in SESSION_STATE; not yet primitive-promoted (needs cross-session persistence). Two Medium followup essays queued ("Oracle Problem, Sidestepped" / "Why Every Security Patch Is Downstream of One Geometric Fix").
+
+**Pending hand-off (5 items in SESSION_STATE)**: LICENSE choice (MIT/BSL/AGPLv3, Will's call), 2 BLOCKING deploy bugs (LZ EID 4-arg + BuybackEngine), Medium followup essays, USD8 Tier 1 DM Rick-preclear (4 of 10), VibeFeeRouter deprecation cleanup commit.
+
+## Prior Epoch (2026-04-29) — archived below
 
 ## Epoch — CLEAN at 2026-04-29 USD8 retroactive audit + discipline substrate build
 - **Closed**: 2026-04-29 after Will's "save and close out" + "all 3 tasks." Triggered by Rick (USD8 founder) catching holder/insurer architectural conflation in cover-pool flow chart visually. De-conflation pass extended to retroactive audit across all 17 USD8 partner-facing artifacts (6 MAJOR/MEDIUM/MINOR findings fixed). Plus META_STACK inventory + GKB condensation pass + ~10 memory primitives + Lineage handshake validator commit.

@@ -1,6 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+// =============================================================================
+// DEPRECATED — DO NOT DEPLOY. DO NOT IMPORT IN NEW CONTRACTS.
+// =============================================================================
+// Canonical replacement:    contracts/core/FeeRouter.sol
+// Deprecated since:         TRP C23-F7 (2026-05-01)
+// Reason:                   Duplicate of canonical FeeRouter; no tests, no
+//                           downstream references, no deploy script wiring.
+// Migration:                Use contracts/core/FeeRouter.sol via the IFeeRouter
+//                           interface. The canonical version is referenced by
+//                           VibeAMM, BuybackEngine, StrategyVault, and
+//                           ProtocolFeeAdapter.
+// Init-safety note:         This contract is intentionally NOT given a
+//                           constructor with `_disableInitializers()` — adding
+//                           one would imply the contract is intended to be
+//                           deployed. It is not. The deprecation block above
+//                           is the load-bearing artifact preventing accidental
+//                           deployment.
+// =============================================================================
+
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -9,6 +28,13 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VibeFeeRouter — Protocol-Wide Fee Aggregation & Distribution
+ *
+ * @custom:deprecated Use contracts/core/FeeRouter.sol instead. This contract is
+ *                    a non-canonical duplicate retained only for design-reference
+ *                    of forward-port candidates (UUPS, dynamic recipients, native
+ *                    ETH, distribution threshold). New deploy scripts MUST NOT
+ *                    reference this contract. As of TRP C23-F7 (2026-05-01) it
+ *                    has zero downstream references in `contracts/` or `script/`.
  *
  * @notice DEPRECATED — Use contracts/core/FeeRouter.sol instead.
  *

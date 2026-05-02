@@ -1011,7 +1011,7 @@ Together, they are the intellectual foundation of Cooperative Capitalism — and
 ### P-088: Context-Adaptive State Estimation — The Meta-Estimator
 
 **Source**: oracle/kalman/filter.py, oracle/kalman/covariance.py
-**Paper**: [Kalman Filter True Price Discovery](kalman-filter-true-price-discovery.md) <!-- FIXME: kalman-filter-true-price-discovery.md — no candidate found in docs/ tree. -->
+**Paper**: [Kalman Filter True Price Discovery](../../concepts/oracles/KALMAN_FILTER_ORACLE.md)
 
 > The Kalman filter's noise matrices are dynamically recomputed every cycle based on regime signals (stablecoin flows, leverage stress, cascade detection), making the filter automatically skeptical during manipulation and responsive during genuine trends.
 

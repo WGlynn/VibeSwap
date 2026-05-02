@@ -257,4 +257,3 @@ Looking forward to the discussion.
 - [From MEV to GEV](../../../../research/papers/from-mev-to-gev.md) — Nine-component GEV resistance architecture
 - [Five-Layer MEV Defense on CKB](../../../../research/papers/five-layer-mev-defense-ckb.md) — PoW locking, MMR, forced inclusion, Fisher-Yates, uniform clearing
 - [Recursive Batch Auctions](../../../../architecture/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
-- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough of the mechanism <!-- FIXME: ../../blog/01_commit_reveal_mev.md — no candidate found in docs/ tree. -->

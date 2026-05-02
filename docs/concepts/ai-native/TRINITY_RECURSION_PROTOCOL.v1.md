@@ -234,7 +234,7 @@ This protocol is public domain. Use it, extend it, improve it. If the three loop
 - [TRP Explained](../../_meta/trp-existing/TRP-EXPLAINED.md) — Accessible introduction to TRP's three recursions
 - [TRP Runner Protocol](../../_meta/trp-existing/TRP_RUNNER.md) — Execution protocol with crash mitigation
 - [TRP Runner Paper](../../research/papers/trp-runner/trp-runner-paper.md) — Academic treatment of crash-resilient recursive improvement
-- [Loop 0–3 Specs](../docs/trp/) — Individual loop specifications <!-- FIXME: ../docs/trp/ — no candidate found in docs/ tree. -->
+- [Loop 0–3 Specs](../../_meta/trp-existing/) — Individual loop specifications
 - [Efficiency Heat Map](../../_meta/trp-existing/efficiency-heatmap.md) — Per-contract discovery yield tracking
 - [TRP Verification Report](../../_meta/trp/TRP_VERIFICATION_REPORT.md) — Anti-hallucination audit of TRP claims
 - [TRP Empirical RSI (paper)](../../research/papers/trp-empirical-rsi.md) — 53-round empirical evidence for LLM RSI

@@ -223,7 +223,7 @@ type: {user | feedback | project | reference}
 2. One-line pointer in `MEMORY.md`:
 
 ```markdown
-- [Title](memory/type_topic.md) — one-line hook <!-- FIXME: memory/type_topic.md — no candidate found in docs/ tree. -->
+- [Title](`memory/type_topic.md`) — one-line hook
 ```
 
 `MEMORY.md` is the index, not memory. Keep it under ~200 lines — content after that gets truncated.

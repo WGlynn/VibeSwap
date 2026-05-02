@@ -124,7 +124,7 @@ User endorses themselves (A → A) to avoid cooldown. Already prevented by exist
 
 User uses 10 accounts to handshake each other rapidly. Costs them 10× the gradient. If that cost is affordable, they can create rapid endorsement cycles.
 
-Defense: this attack exists in the current step-function mechanism too. Mitigation is SBT-gating (require soulbound identity to handshake) rather than gradient-specific. See [`SOULBOUND_IDENTITY.md`](./SOULBOUND_IDENTITY.md) if extant, or similar. <!-- FIXME: ./SOULBOUND_IDENTITY.md — no candidate found in docs/ tree. -->
+Defense: this attack exists in the current step-function mechanism too. Mitigation is SBT-gating (require soulbound identity to handshake) rather than gradient-specific. See [the SoulboundIdentity contract](../../contracts/identity/SoulboundIdentity.sol).
 
 ### Attack 4: Cost-based DoS
 

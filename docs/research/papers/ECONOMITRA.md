@@ -410,7 +410,7 @@ Implementation details and extended proofs are available in the VibeSwap documen
 
 ## See Also
 
-- [Economitra v1.0](../../DOCUMENTATION/ECONOMITRA.md) — Original framework document <!-- FIXME: ../../DOCUMENTATION/ECONOMITRA.md — multiple candidates: docs/concepts/monetary/ECONOMITRA.md, docs/research/papers/ECONOMITRA.md, NOTE: auto-repair would self-link -->
+- [Economitra v1.0](../../concepts/monetary/ECONOMITRA.md) — Original framework document
 - [Economitra v1.2](../../concepts/monetary/ECONOMITRA_V1.2.md) — Updated with trinomial stability
 - [Three-Token Economy](../../concepts/monetary/THREE_TOKEN_ECONOMY.md) — Token architecture
 - [Time-Neutral Tokenomics](../../concepts/monetary/TIME_NEUTRAL_TOKENOMICS.md) — Cohort fairness proofs

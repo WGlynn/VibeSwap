@@ -532,4 +532,3 @@ Reference implementation: [EfficientMMRinEVM](https://github.com/matt-nervos/Eff
 - [From MEV to GEV](from-mev-to-gev.md) — Nine-component GEV resistance architecture
 - [Recursive Batch Auctions](../../architecture/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure for multi-scale coordination
 - [Commit-Reveal (Nervos post)](../../marketing/forums/nervos/talks/commit-reveal-batch-auctions-post.md) — CKB cell model advantages
-- [How Commit-Reveal Eliminates MEV (blog)](../../blog/01_commit_reveal_mev.md) — Accessible walkthrough <!-- FIXME: ../../blog/01_commit_reveal_mev.md — no candidate found in docs/ tree. -->

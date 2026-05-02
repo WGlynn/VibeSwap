@@ -22,6 +22,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract VibeFeeDistributor is OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Constants ============
 
     uint256 public constant BPS_DENOMINATOR = 10000;

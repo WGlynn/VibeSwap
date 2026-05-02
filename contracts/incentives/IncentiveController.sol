@@ -339,19 +339,31 @@ contract IncentiveController is
         bytes32 poolId,
         address lp,
         uint256 liquidity
-    ) external override onlyAMM {
+    ) external override onlyAMM nonReentrant {
         // INT-R1-FT001: Checkpoint and auto-claim unclaimed proceeds before position shrinks.
         // Without this, removing LP forfeits unclaimed proceeds (they'd be absorbed by
         // remaining LPs — the exact share inflation bug this pattern prevents).
+        //
+        // C-OFR-1 (cross-fn reentrancy): VibeAMM decrements liquidityBalance BEFORE
+        // invoking this hook (see VibeAMM.removeLiquidity), so `currentLpBalance` is
+        // the POST-removal value. We checkpoint rewardDebt against `accumulated` BEFORE
+        // the external transfer (strict CEI) so a re-entrant claimAuctionProceeds() —
+        // which reads the same post-removal balance — sees `accumulated == debt` and
+        // returns NothingToClaim instead of double-paying. The added nonReentrant on
+        // this hook is defense-in-depth in case future call sites bypass the AMM lock.
         IAMMLiquidityQuery amm = IAMMLiquidityQuery(vibeAMM);
         uint256 currentLpBalance = amm.liquidityBalance(poolId, lp);
-        // currentLpBalance is BEFORE removal (AMM calls hook before updating balances)
         uint256 accumulated = (currentLpBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
         uint256 debt = rewardDebt[poolId][lp];
+
+        // CEI: write the new debt FIRST so the hook is reentrancy-safe relative to
+        // every other claim path that reads rewardDebt + AMM.liquidityBalance.
+        if (accumulated != debt) {
+            rewardDebt[poolId][lp] = accumulated;
+        }
+
         if (accumulated > debt) {
             uint256 pending = accumulated - debt;
-            // Transfer pending proceeds to LP (pull would be cleaner but this is only
-            // called from AMM's nonReentrant context, and the LP initiated the removal)
             (bool success, ) = lp.call{value: pending}("");
             if (!success) {
                 // C14-AUDIT-2: route failed auto-push to pull-queue instead of silent
@@ -362,10 +374,6 @@ contract IncentiveController is
                 emit AuctionProceedsForfeited(poolId, lp, pending);
             }
         }
-        // Set debt to new (post-removal) balance * accRewardPerShare
-        // SafeMath: currentLpBalance may be 0 if AMM doesn't track pre-hook balance
-        uint256 newBalance = currentLpBalance > liquidity ? currentLpBalance - liquidity : 0;
-        rewardDebt[poolId][lp] = (newBalance * accRewardPerShare[poolId]) / ACC_PRECISION;
 
         // Record unstake and get penalty
         if (address(loyaltyRewardsManager) != address(0)) {

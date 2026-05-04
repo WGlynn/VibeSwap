@@ -114,10 +114,29 @@ contract VibeSwapCore is
         uint256 timestamp;
     }
 
+    /// @notice Queued failed compliance recording for retry (C15-CC-F1)
+    /// @dev Mirrors FailedExecution for the clawback compliance catch path.
+    ///      Stores exactly the args forwarded to clawbackRegistry.recordTransaction so
+    ///      the retry path can replay the call without any caller-supplied reconstruction.
+    struct FailedCompliance {
+        bytes32 poolId;   // for event indexing only — not passed to recordTransaction
+        address trader;   // recordTransaction `from`
+        address ammAddr;  // recordTransaction `to` (snapshot of address(amm) at queue time)
+        uint256 amountIn; // recordTransaction `amount`
+        address tokenIn;  // recordTransaction `token`
+        bytes reason;
+        uint256 timestamp;
+    }
+
     // ============ Constants ============
 
     /// @notice Maximum number of failed executions to queue (don't block settlement)
     uint256 public constant MAX_FAILED_QUEUE = 1000;
+
+    /// @notice Maximum number of failed compliance recordings to queue (C15-CC-F1)
+    /// @dev Matches MAX_FAILED_QUEUE. Prevents gas-DoS via unbounded push under repeated
+    ///      registry outages. Swap-and-pop keeps the array dense (no phantom slots).
+    uint256 public constant MAX_FAILED_COMPLIANCE_QUEUE = 1000;
 
     /// @notice XC-003: Cross-chain refund timing constants
     /// @dev REFUND_TIMEOUT: Time after commit before refund can be requested
@@ -234,8 +253,14 @@ contract VibeSwapCore is
     ///         withdrawDeposit: deposits[u][t] can only be withdrawn when count == 0.
     mapping(address => mapping(address => uint256)) public pendingCrossChainCount;
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 1 for pendingCrossChainCount)
-    uint256[42] private __gap;
+    /// @notice Queue of failed compliance recordings for permissionless retry (C15-CC-F1)
+    /// @dev Dense array maintained by swap-and-pop — no phantom slots, no separate compaction needed.
+    ///      Length is bounded by MAX_FAILED_COMPLIANCE_QUEUE. Appended after pendingCrossChainCount
+    ///      to preserve UUPS upgrade safety (consumes 1 slot from __gap).
+    FailedCompliance[] public failedCompliances;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 2: pendingCrossChainCount + failedCompliances)
+    uint256[41] private __gap;
 
     // ============ Events ============
 
@@ -302,6 +327,10 @@ contract VibeSwapCore is
     // FIX #6b: Failed execution queue events (retry mechanism)
     event FailedExecutionQueued(uint256 indexed index, bytes32 indexed poolId, address indexed trader);
     event FailedExecutionRetried(uint256 indexed index, bool success);
+
+    // C15-CC-F1: Symmetric retry-queue events for failed compliance recordings
+    event FailedComplianceQueued(uint256 indexed index, bytes32 indexed poolId, address indexed trader);
+    event FailedComplianceRetried(uint256 indexed index, bool success);
 
     // SEC-1: Event for refunded orders in partial batch failures
     event OrderRefunded(
@@ -934,6 +963,7 @@ contract VibeSwapCore is
     /**
      * @dev Record cross-chain execution for incentive/compliance tracking.
      *      Mirrors _recordExecution but takes flat args instead of RevealedOrder.
+     *      C15-CC-F1: Both catches now queue for retry — symmetric treatment.
      */
     function _recordCrossChainExecution(
         bytes32 poolId,
@@ -956,6 +986,8 @@ contract VibeSwapCore is
                 trader, address(amm), amountIn, tokenIn
             ) {} catch (bytes memory reason) {
                 emit ComplianceCheckFailed(poolId, trader, reason);
+                // C15-CC-F1: Queue for permissionless retry — symmetric with incentive catch above.
+                _queueFailedCompliance(poolId, trader, address(amm), amountIn, tokenIn, reason);
             }
         }
     }
@@ -1483,7 +1515,7 @@ contract VibeSwapCore is
     /**
      * @notice Record execution in incentive controller and compliance registry
      * @dev Failed incentive recordings are queued for retry instead of silently swallowed.
-     *      Compliance failures are still event-only (non-retryable side effect).
+     *      C15-CC-F1: Compliance failures now also queue for permissionless retry — symmetric.
      */
     function _recordExecution(
         bytes32 poolId,
@@ -1504,6 +1536,8 @@ contract VibeSwapCore is
                 order.trader, address(amm), order.amountIn, order.tokenIn
             ) {} catch (bytes memory reason) {
                 emit ComplianceCheckFailed(poolId, order.trader, reason);
+                // C15-CC-F1: Queue for permissionless retry — symmetric with incentive catch above.
+                _queueFailedCompliance(poolId, order.trader, address(amm), order.amountIn, order.tokenIn, reason);
             }
         }
     }
@@ -1673,6 +1707,85 @@ contract VibeSwapCore is
         }
 
         return (cap, toRemove);
+    }
+
+    // ============ Failed Compliance Recovery (C15-CC-F1) ============
+
+    /**
+     * @notice Queue a failed clawback compliance recording for later permissionless retry.
+     * @dev Silently skips when at capacity so a stuck registry cannot DoS settlement.
+     *      Swap-and-pop in retryFailedCompliance keeps the array dense — no phantom slots,
+     *      no separate compaction step needed.
+     */
+    function _queueFailedCompliance(
+        bytes32 poolId,
+        address trader,
+        address ammAddr,
+        uint256 amountIn,
+        address tokenIn,
+        bytes memory reason
+    ) internal {
+        if (failedCompliances.length >= MAX_FAILED_COMPLIANCE_QUEUE) return;
+
+        failedCompliances.push(FailedCompliance({
+            poolId:    poolId,
+            trader:    trader,
+            ammAddr:   ammAddr,
+            amountIn:  amountIn,
+            tokenIn:   tokenIn,
+            reason:    reason,
+            timestamp: block.timestamp
+        }));
+
+        emit FailedComplianceQueued(failedCompliances.length - 1, poolId, trader);
+    }
+
+    /**
+     * @notice Retry a failed clawback compliance recording.
+     * @dev Permissionless — any caller can unblock a stuck entry once the registry recovers.
+     *      Uses swap-and-pop for O(1) dense removal (no phantom slots, no compaction step).
+     *      Reentrancy: entry is removed from the array BEFORE the external call so a
+     *      re-entering clawbackRegistry cannot double-remove the same entry.
+     *
+     * @param index Index into failedCompliances (must be < length)
+     *
+     * DISINTERMEDIATION: Grade A (permissionless). Retrying a compliance record is
+     * structurally safe to expose without access control — it replays an already-emitted
+     * ComplianceCheckFailed event's data and has no token-transfer or settlement-state side effects.
+     */
+    function retryFailedCompliance(uint256 index) external {
+        uint256 len = failedCompliances.length;
+        require(index < len, "Index out of bounds");
+        require(address(clawbackRegistry) != address(0), "No clawback registry");
+
+        // Load before removal (memory copy)
+        FailedCompliance memory fc = failedCompliances[index];
+
+        // Swap-and-pop: dense removal before external call prevents reentrancy double-remove.
+        uint256 last = len - 1;
+        if (index != last) {
+            failedCompliances[index] = failedCompliances[last];
+        }
+        failedCompliances.pop();
+
+        try clawbackRegistry.recordTransaction(
+            fc.trader, fc.ammAddr, fc.amountIn, fc.tokenIn
+        ) {
+            emit FailedComplianceRetried(index, true);
+        } catch {
+            // Re-queue if the registry is still unavailable. Emits a new queue event
+            // with an updated index (end of array) so observers see the live position.
+            _queueFailedCompliance(fc.poolId, fc.trader, fc.ammAddr, fc.amountIn, fc.tokenIn, fc.reason);
+            emit FailedComplianceRetried(index, false);
+        }
+    }
+
+    /**
+     * @notice Get the number of queued failed compliance recordings.
+     * @return count Array length (no phantom slots — swap-and-pop keeps array dense).
+     */
+    function getFailedComplianceCount() external view returns (uint256 count) {
+        return failedCompliances.length;
     }
 
     /**

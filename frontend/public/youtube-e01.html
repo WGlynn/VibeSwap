@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VibeSwap — EP 01 — Why does this exist?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --matrix-300: #4ade80;
+      --matrix-400: #22d65b;
+      --matrix-500: #00ff41;
+      --matrix-600: #00d937;
+      --matrix-900: #052e16;
+      --black-900: #0a0a0a;
+      --black-700: #1a1a1a;
+      --white-300: #c8c8c8;
+      --white-500: #888;
+      --terminal-cyan: #00d4ff;
+      --amber: #f59e0b;
+      --violet: #a855f7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      color: #fff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8vh 9vw 12vh;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+
+    .slide.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .op-signature {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(11px, 0.85vw, 14px);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--matrix-500);
+      margin-bottom: 36px;
+      opacity: 0.85;
+    }
+
+    .op-signature .arrow {
+      color: var(--white-500);
+      margin: 0 8px;
+    }
+
+    .op-signature .return {
+      color: var(--matrix-300);
+      opacity: 0.75;
+    }
+
+    .slide-title {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.5rem, 5.6vw, 4.6rem);
+      line-height: 1.04;
+      letter-spacing: -0.04em;
+      margin-bottom: 36px;
+      max-width: 22ch;
+    }
+
+    .slide-body {
+      font-size: clamp(1.1rem, 1.5vw, 1.55rem);
+      line-height: 1.55;
+      color: var(--white-300);
+      max-width: 70ch;
+    }
+
+    .slide-body p + p { margin-top: 22px; }
+
+    .slide-body strong {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .slide-body em {
+      color: var(--matrix-400);
+      font-style: normal;
+      font-weight: 600;
+    }
+
+    .slide-body .accent {
+      color: var(--matrix-500);
+      font-weight: 600;
+    }
+
+    /* Title slide */
+    .slide.title-slide { justify-content: center; }
+
+    .episode-marker {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(13px, 1.1vw, 18px);
+      text-transform: uppercase;
+      letter-spacing: 0.30em;
+      color: var(--matrix-500);
+      margin-bottom: 36px;
+    }
+
+    .title-mega {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: clamp(3.2rem, 7.8vw, 6rem);
+      line-height: 0.98;
+      letter-spacing: -0.045em;
+      margin-bottom: 36px;
+    }
+
+    .title-subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(14px, 1.2vw, 20px);
+      color: var(--white-300);
+      letter-spacing: 0.04em;
+      max-width: 60ch;
+      line-height: 1.55;
+    }
+
+    /* Pull quote / oneliner slide */
+    .pull-quote {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.4rem, 5.4vw, 4.4rem);
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      max-width: 22ch;
+    }
+
+    .pull-quote .accent { color: var(--matrix-500); }
+
+    .pull-quote-attr {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(13px, 1vw, 18px);
+      color: var(--white-500);
+      letter-spacing: 0.10em;
+      margin-top: 32px;
+    }
+
+    /* Two-col layout for methodology / philosophy slides */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: start;
+    }
+
+    .col-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(11px, 0.85vw, 14px);
+      text-transform: uppercase;
+      letter-spacing: 0.20em;
+      color: var(--matrix-500);
+      margin-bottom: 16px;
+      opacity: 0.85;
+    }
+
+    .col-statement {
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: clamp(1.3rem, 1.9vw, 1.95rem);
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+      color: #fff;
+      margin-bottom: 18px;
+    }
+
+    .col-detail {
+      font-size: clamp(0.95rem, 1.1vw, 1.15rem);
+      line-height: 1.6;
+      color: var(--white-300);
+    }
+
+    /* TOC list */
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 8px;
+      max-width: 90%;
+    }
+
+    .toc-list li {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.95rem, 1.15vw, 1.15rem);
+      padding: 14px 0;
+      border-bottom: 1px solid rgba(0,255,65,0.10);
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 24px;
+      align-items: baseline;
+    }
+
+    .toc-list li:first-child {
+      border-top: 1px solid rgba(0,255,65,0.18);
+    }
+
+    .toc-list li.current {
+      background: rgba(0,255,65,0.04);
+      padding-left: 16px;
+      margin-left: -16px;
+      border-radius: 4px;
+    }
+
+    .toc-list .ep {
+      color: var(--matrix-500);
+      letter-spacing: 0.18em;
+      font-weight: 600;
+    }
+
+    .toc-list li.current .ep {
+      color: var(--matrix-300);
+    }
+
+    .toc-list .topic {
+      color: #fff;
+    }
+
+    .toc-list li.current .topic::after {
+      content: ' ◀ you are here';
+      color: var(--matrix-500);
+      font-size: 0.85em;
+      letter-spacing: 0.15em;
+      opacity: 0.75;
+      margin-left: 8px;
+    }
+
+    /* Closing / next-up */
+    .next-up-block {
+      margin-top: 48px;
+      padding-top: 28px;
+      border-top: 1px solid rgba(0,255,65,0.25);
+      max-width: 70ch;
+    }
+
+    .next-up-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(11px, 0.85vw, 14px);
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: var(--matrix-500);
+      opacity: 0.85;
+      margin-bottom: 14px;
+    }
+
+    .next-up-text {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(1.4rem, 2.1vw, 2.1rem);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      color: #fff;
+    }
+
+    /* About-me slide */
+    .about-block {
+      max-width: 70ch;
+    }
+
+    .about-name {
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      letter-spacing: -0.04em;
+      margin-bottom: 16px;
+    }
+
+    .about-role {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(14px, 1.2vw, 20px);
+      color: var(--matrix-400);
+      letter-spacing: 0.10em;
+      margin-bottom: 32px;
+    }
+
+    .links-list {
+      list-style: none;
+      margin-top: 24px;
+    }
+
+    .links-list li {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(0.95rem, 1.1vw, 1.15rem);
+      padding: 8px 0;
+      color: var(--white-300);
+    }
+
+    .links-list .lbl {
+      color: var(--matrix-500);
+      display: inline-block;
+      min-width: 130px;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      font-size: 0.85em;
+    }
+
+    /* Footer */
+    .footer {
+      position: absolute;
+      bottom: 28px;
+      left: 9vw;
+      right: 9vw;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(10px, 0.75vw, 12px);
+      color: var(--white-500);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .footer-left { display: flex; align-items: center; gap: 12px; }
+
+    .breath {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--matrix-500);
+      border-radius: 50%;
+      animation: breath 2.4s ease-in-out infinite;
+    }
+
+    @keyframes breath {
+      0%, 100% { box-shadow: 0 0 4px var(--matrix-500); opacity: 0.55; }
+      50% { box-shadow: 0 0 18px var(--matrix-500); opacity: 1; }
+    }
+
+    .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--matrix-500));
+      transition: width 0.35s ease;
+      pointer-events: none;
+    }
+
+    /* Speaker notes */
+    aside.notes { display: none; }
+
+    #notes-overlay {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: 38vh;
+      background: rgba(0, 0, 0, 0.96);
+      color: var(--matrix-300);
+      padding: 26px 9vw 32px;
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(13px, 1vw, 16px);
+      line-height: 1.65;
+      border-top: 1px solid var(--matrix-900);
+      overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      z-index: 20;
+    }
+
+    #notes-overlay.visible { transform: translateY(0); }
+
+    #notes-overlay .notes-header {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--matrix-500);
+      margin-bottom: 14px;
+      opacity: 0.8;
+      text-transform: uppercase;
+    }
+
+    /* Help overlay (press ?) */
+    #help-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.92);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+    }
+
+    #help-overlay.visible { display: flex; }
+
+    .help-card {
+      background: var(--black-900);
+      border: 1px solid var(--matrix-900);
+      padding: 36px 48px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: var(--matrix-300);
+      line-height: 2;
+      max-width: 480px;
+    }
+
+    .help-card h3 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      color: var(--matrix-500);
+      margin-bottom: 18px;
+      text-transform: uppercase;
+    }
+
+    .help-card .key {
+      color: #fff;
+      background: rgba(0,255,65,0.08);
+      padding: 2px 8px;
+      border: 1px solid rgba(0,255,65,0.2);
+      border-radius: 3px;
+      margin-right: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .slide { padding: 6vh 6vw 10vh; }
+      .two-col { grid-template-columns: 1fr; gap: 36px; }
+      .footer { left: 6vw; right: 6vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <!-- Slide 1 :: TITLE -->
+    <section class="slide title-slide active" data-title="Title">
+      <div class="episode-marker">VibeSwap // EP 01</div>
+      <h1 class="title-mega">Why does<br>this exist?</h1>
+      <div class="title-subtitle">A teaching series on VibeSwap, Augmented Mechanism Design, and Cooperative Capitalism.</div>
+      <aside class="notes">
+        Welcome to the first episode of the VibeSwap series. We're going to spend the next several episodes walking through what VibeSwap is, why it exists, and how it works under the hood. But before any of the mechanics, we need to start with the question that motivated the whole project: why does this need to exist at all? That's what this episode is for.
+      </aside>
+    </section>
+
+    <!-- Slide 2 :: THE NUMBNESS -->
+    <section class="slide" data-title="The numbness">
+      <div class="op-signature">crypto.state(2014..2025)<span class="arrow">→</span><span class="return">user_loss</span></div>
+      <h2 class="slide-title">Crypto has been bleeding users for a decade.</h2>
+      <div class="slide-body">
+        <p>Bridge hacks. Rug pulls. Nine-figure exploits that dominate the news cycle for a week and disappear into the next one.</p>
+        <p>You know the pattern. So do I.</p>
+        <p><strong>The numbness is the part that hurts.</strong> The fact that we've come to expect this. The fact that another exploit barely registers anymore.</p>
+      </div>
+      <aside class="notes">
+        Bridge hacks, rug pulls, nine-figure exploits. We've all watched it for a decade. And honestly the worst part isn't the loss itself — it's the numbness. We've stopped expecting better. That's the problem this series is pushing back on, starting with the question of why VibeSwap exists at all.
+      </aside>
+    </section>
+
+    <!-- Slide 3 :: WHAT GOT LOST -->
+    <section class="slide" data-title="What got lost">
+      <div class="op-signature">decentralization.tradeoff()<span class="arrow">→</span><span class="return">enforcement_lost</span></div>
+      <h2 class="slide-title">We freed crypto from centralized power. We also freed the bad actors.</h2>
+      <div class="slide-body">
+        <p>The decentralization movement stripped out gatekeepers. Good. It also stripped out the enforcement layer that punishes wrongdoing.</p>
+        <p>No courts. No recovery systems. No cross-border cooperation against bad actors. So we live in an industry where hackers and malicious founders steal in broad daylight with almost no consequence.</p>
+        <p><span class="accent">Gresham's Law plays out in real time.</span> Good actors get driven out. Bad actors stay. The space slowly hollows.</p>
+      </div>
+      <aside class="notes">
+        Decentralization was the right call — it freed us from gatekeepers, from KYC walls, from being told who's allowed to participate. But it also dissolved the enforcement layer. There are no courts in DeFi. No recovery systems. No cross-border cooperation against the people exploiting users. And what happens in any system with no consequences for bad behavior? Gresham's Law: good actors get driven out, bad actors stay. The space hollows. That's where we are.
+      </aside>
+    </section>
+
+    <!-- Slide 4 :: THE FAILED FIX -->
+    <section class="slide" data-title="The failed fix">
+      <div class="op-signature">crypto.attempted_fix("code is law")<span class="arrow">→</span><span class="return">false</span></div>
+      <h2 class="slide-title">Crypto tried to fix this once. It didn't work.</h2>
+      <div class="slide-body">
+        <p>"Code is Law" was the original thesis: smart contract immutability would prevent misconduct. No need for courts — the contract IS the contract.</p>
+        <p>It didn't survive contact with reality. Smart contracts have bugs. Upgrades are practically necessary. Immutability turned out to be a constraint we couldn't actually keep.</p>
+        <p>We didn't replace the solution. <strong>We just stopped trying.</strong></p>
+      </div>
+      <aside class="notes">
+        We did try once. "Code is Law" was the early thesis — smart contract immutability would prevent misconduct, you wouldn't need courts because the contract itself was the rule. But that ran into reality fast. Smart contracts have bugs. Upgrades are necessary. Immutability turned out to be aspirational. And after Code-is-Law failed, we didn't come up with a replacement. We just stopped trying.
+      </aside>
+    </section>
+
+    <!-- Slide 5 :: VIBESWAP IN ONE LINE -->
+    <section class="slide" data-title="VibeSwap in one line">
+      <div class="op-signature">vibeswap.essence()<span class="arrow">→</span><span class="return">"structural honesty"</span></div>
+      <div class="pull-quote">
+        A DEX built so dishonesty is <span class="accent">structurally unprofitable.</span><br>
+        Designed, not patched.
+      </div>
+      <div class="pull-quote-attr">— what VibeSwap is, in one sentence</div>
+      <aside class="notes">
+        So here's VibeSwap in one line. It's a decentralized exchange built so that dishonesty isn't just discouraged or monitored — it's structurally unprofitable. Designed from the ground up around that principle, not patched on top of an extractive base. The rest of this series is going to unpack what that actually means in mechanism, in math, and in code. But the one-line version is that.
+      </aside>
+    </section>
+
+    <!-- Slide 6 :: THE METHODOLOGY -->
+    <section class="slide" data-title="The methodology">
+      <div class="op-signature">methodology.AMD()<span class="arrow">→</span><span class="return">augment_dont_replace</span></div>
+      <h2 class="slide-title">Augmented Mechanism Design.</h2>
+      <div class="two-col">
+        <div>
+          <div class="col-label">// Don't</div>
+          <div class="col-statement">Replace markets with central control.</div>
+          <div class="col-detail">Markets do information aggregation better than committees do. Replacing them loses too much.</div>
+        </div>
+        <div>
+          <div class="col-label">// Do</div>
+          <div class="col-statement">Augment them with math-enforced rules.</div>
+          <div class="col-detail">Add orthogonal protective layers — cryptography, fairness invariants, automated penalties — that close failure modes without disabling what already works.</div>
+        </div>
+      </div>
+      <div class="next-up-block" style="margin-top: 36px;">
+        <div class="next-up-label">// the test</div>
+        <div class="next-up-text" style="font-size: clamp(1.1rem, 1.5vw, 1.5rem); font-weight: 600; color: var(--white-300);">Pull the augmentation out. If the protocol still works — just dumber — it's augmentation. If it collapses, it's replacement.</div>
+      </div>
+      <aside class="notes">
+        Underneath VibeSwap is a methodology I call Augmented Mechanism Design. The idea is — don't replace markets with central control. Markets are actually really good at information aggregation, much better than any committee or algorithm. Replacing them loses too much. Instead, augment them — add orthogonal protective layers, math-enforced rules, that close the failure modes without disabling the parts that already work. The test for whether something is real AMD or fake AMD: pull the new piece out. If the protocol still works, just with worse properties, it's augmentation. If pulling it collapses the whole thing, it's replacement.
+      </aside>
+    </section>
+
+    <!-- Slide 7 :: THE PHILOSOPHY -->
+    <section class="slide" data-title="The philosophy">
+      <div class="op-signature">philosophy.coop_capitalism()<span class="arrow">→</span><span class="return">layer_separation</span></div>
+      <h2 class="slide-title">Cooperative Capitalism.</h2>
+      <div class="two-col">
+        <div>
+          <div class="col-label">// Cooperative layer (mutualize)</div>
+          <div class="col-statement">Risk.</div>
+          <div class="col-detail">Insurance pools, treasury reserves, loss protection — these belong on the cooperative layer, mutualized across everyone in the system.</div>
+        </div>
+        <div>
+          <div class="col-label">// Competitive layer (compete)</div>
+          <div class="col-statement">Value.</div>
+          <div class="col-detail">Arbitrage, liquidity provision, market discovery — these stay open to anyone who can create value. Free competition where it produces good outcomes.</div>
+        </div>
+      </div>
+      <div class="next-up-block" style="margin-top: 36px;">
+        <div class="next-up-label">// the principle</div>
+        <div class="next-up-text" style="font-size: clamp(1.1rem, 1.5vw, 1.5rem); font-weight: 600; color: var(--white-300);">Cooperation and competition aren't opposites. They operate on different layers — and the design of a system determines which layer each one lives on.</div>
+      </div>
+      <aside class="notes">
+        And the philosophy that AMD serves is what I call Cooperative Capitalism. The principle is layer separation. Mutualize the risk layer — insurance, treasury, loss protection — those should be cooperative, shared across everyone. Compete on the value layer — arbitrage, liquidity provision, market discovery — those stay free and open. Cooperation and competition aren't opposites. They live on different layers, and the design of the system determines which layer each one operates on. DeFi historically chose freedom and got extraction. TradFi chose protection and got gatekeeping. Cooperative Capitalism is the third path.
+      </aside>
+    </section>
+
+    <!-- Slide 8 :: SERIES TOC -->
+    <section class="slide" data-title="What this series teaches">
+      <div class="op-signature">series.toc()<span class="arrow">→</span><span class="return">9_episodes</span></div>
+      <h2 class="slide-title">What this series will teach you.</h2>
+      <ul class="toc-list">
+        <li class="current"><span class="ep">EP 01</span><span class="topic">Why does VibeSwap exist?</span></li>
+        <li><span class="ep">EP 02</span><span class="topic">MEV — and how commit-reveal makes it impossible</span></li>
+        <li><span class="ep">EP 03</span><span class="topic">Shapley values — splitting payouts when contributions overlap</span></li>
+        <li><span class="ep">EP 04</span><span class="topic">Cooperative mechanisms — insurance, treasury, IL protection</span></li>
+        <li><span class="ep">EP 05</span><span class="topic">Identity & reputation — Proof of Mind, soulbound identity</span></li>
+        <li><span class="ep">EP 06</span><span class="topic">Clawback Cascade — adversarial-judo defenses</span></li>
+        <li><span class="ep">EP 07</span><span class="topic">Cross-chain — omnichain trading without trusted bridges</span></li>
+        <li><span class="ep">EP 08</span><span class="topic">How to actually use VibeSwap — practical walkthrough</span></li>
+        <li><span class="ep">EP 09</span><span class="topic">The roadmap, the community, how to contribute</span></li>
+      </ul>
+      <aside class="notes">
+        This is the path. Nine episodes. We start where we are now — the why. Then in Episode 2 we get into MEV specifically, and how commit-reveal batch auctions make it structurally impossible. Episode 3 is Shapley values — the math behind fair distribution. Episode 4 walks through the cooperative mechanisms — insurance, treasury, impermanent loss protection. Episode 5 covers identity and reputation. Episode 6 is the adversarial-judo defenses, including Clawback Cascade. Episode 7 is cross-chain. Episode 8 is the practical walkthrough — how you actually use the thing. Episode 9 is the roadmap and how to contribute. By the end, you'll understand both the philosophy and the mechanism — and you'll know whether it's something you want to use or build on.
+      </aside>
+    </section>
+
+    <!-- Slide 9 :: ABOUT + NEXT -->
+    <section class="slide" data-title="About + next up">
+      <div class="op-signature">outro.next()<span class="arrow">→</span><span class="return">ep_02_mev</span></div>
+      <div class="about-block">
+        <div class="about-name">Will Glynn</div>
+        <div class="about-role">Open source contributor // VibeSwap</div>
+        <div class="slide-body">
+          <p>I do mechanism design for crypto protocols — the math underneath that decides who gets paid, who doesn't, and why. My research before VibeSwap was building on the Ethereum Foundation's Deep Funding work, where the Shapley methodology I'll cover later in this series started for me.</p>
+        </div>
+        <ul class="links-list">
+          <li><span class="lbl">Code</span> github.com/WGlynn/VibeSwap</li>
+          <li><span class="lbl">Papers</span> github.com/WGlynn/VibeSwap/tree/master/docs/research/papers</li>
+          <li><span class="lbl">Frontend</span> vibeswap.io</li>
+        </ul>
+      </div>
+      <div class="next-up-block">
+        <div class="next-up-label">// next episode</div>
+        <div class="next-up-text">EP 02 — MEV is not a bug. It's a feature of the substrate. Here's how to remove it without breaking the market.</div>
+      </div>
+      <aside class="notes">
+        Quick about-me before we wrap. My name's Will Glynn. I'm an open source contributor to VibeSwap. I work on mechanism design for crypto protocols — meaning the math underneath that decides who gets paid, who doesn't, and why. My pre-VibeSwap research was building on the Ethereum Foundation's Deep Funding work, which is where the Shapley methodology I'll cover in Episode 3 started for me. Code, papers, and the frontend are all linked on screen. And next episode we get into the substance — MEV. We'll look at why it isn't actually a bug, why it's a structural feature of how most chains work, and how commit-reveal batch auctions make it impossible without breaking the market. That's Episode 2. See you there.
+      </aside>
+    </section>
+
+  </div>
+
+  <div class="footer">
+    <div class="footer-left">
+      <span class="breath"></span>
+      <span>VibeSwap // EP 01 // Why does this exist?</span>
+    </div>
+    <div id="counter">01 / 09</div>
+  </div>
+
+  <div class="progress-bar" id="progress"></div>
+
+  <div id="notes-overlay">
+    <div class="notes-header">SPEAKER NOTES</div>
+    <div id="notes-content"></div>
+  </div>
+
+  <div id="help-overlay">
+    <div class="help-card">
+      <h3>Keyboard</h3>
+      <div><span class="key">→ / Space</span> Next slide</div>
+      <div><span class="key">←</span> Previous slide</div>
+      <div><span class="key">S</span> Toggle speaker notes</div>
+      <div><span class="key">Home / End</span> First / last slide</div>
+      <div><span class="key">?</span> Toggle this help</div>
+      <div><span class="key">F</span> Fullscreen</div>
+    </div>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const counter = document.getElementById('counter');
+    const progress = document.getElementById('progress');
+    const notesOverlay = document.getElementById('notes-overlay');
+    const notesContent = document.getElementById('notes-content');
+    const helpOverlay = document.getElementById('help-overlay');
+    let current = 0;
+    let notesVisible = false;
+
+    function showSlide(i) {
+      slides.forEach(s => s.classList.remove('active'));
+      slides[i].classList.add('active');
+      const idx = String(i + 1).padStart(2, '0');
+      const total = String(slides.length).padStart(2, '0');
+      counter.textContent = `${idx} / ${total}`;
+      progress.style.width = `${((i + 1) / slides.length) * 100}%`;
+      updateNotes();
+      try { history.replaceState(null, '', `#${i + 1}`); } catch (e) {}
+    }
+
+    function updateNotes() {
+      const slide = slides[current];
+      const notes = slide.querySelector('aside.notes');
+      notesContent.innerHTML = notes ? notes.innerHTML.trim() : '';
+    }
+
+    function next() { if (current < slides.length - 1) { current++; showSlide(current); } }
+    function prev() { if (current > 0) { current--; showSlide(current); } }
+    function toggleNotes() {
+      notesVisible = !notesVisible;
+      notesOverlay.classList.toggle('visible', notesVisible);
+    }
+    function toggleHelp() { helpOverlay.classList.toggle('visible'); }
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (helpOverlay.classList.contains('visible') && e.key !== '?') {
+        helpOverlay.classList.remove('visible');
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+      if (e.key.toLowerCase() === 's') toggleNotes();
+      if (e.key === 'Home') { current = 0; showSlide(0); }
+      if (e.key === 'End') { current = slides.length - 1; showSlide(current); }
+      if (e.key === '?') toggleHelp();
+      if (e.key.toLowerCase() === 'f') toggleFullscreen();
+    });
+
+    document.addEventListener('click', e => {
+      if (e.target.closest('aside.notes')) return;
+      if (e.target.closest('#notes-overlay')) return;
+      if (e.target.closest('#help-overlay')) return;
+      if (e.target.closest('a')) return;
+      next();
+    });
+
+    // Deep-link via hash (#1, #2, ...)
+    const hash = parseInt(window.location.hash.replace('#', ''), 10);
+    if (!isNaN(hash) && hash >= 1 && hash <= slides.length) {
+      current = hash - 1;
+    }
+
+    showSlide(current);
+  </script>
+</body>
+</html>

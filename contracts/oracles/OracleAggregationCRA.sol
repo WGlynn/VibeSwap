@@ -5,6 +5,15 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/IOracleAggregationCRA.sol";
+import "./interfaces/IIssuerReputationRegistry.sol";
+
+/// @dev Minimal view surface of IssuerReputationRegistry used by OracleAggregationCRA.
+///      `signerToIssuer` is a public mapping (auto-getter) not declared in
+///      IIssuerReputationRegistry; this interface augments the call surface without
+///      touching the registry contract itself.
+interface IIssuerRegistryView is IIssuerReputationRegistry {
+    function signerToIssuer(address signer) external view returns (bytes32);
+}
 
 /**
  * @title OracleAggregationCRA
@@ -142,12 +151,19 @@ contract OracleAggregationCRA is
         emit PriceCommitted(currentBatchId, msg.sender, commitHash);
     }
 
-    /// @dev Issuer authorization gate. Currently a permissive stub — full
-    /// integration with IssuerReputationRegistry lands in next commit.
-    function _isAuthorizedIssuer(address /*issuer*/) internal view returns (bool) {
-        // V1 permissive: any non-zero registry presence allows.
-        // Replaced with real registry check in next commit.
-        return issuerRegistry != address(0);
+    /// @dev Issuer authorization gate. When `issuerRegistry` is set, verifies that
+    ///      `issuer` is an ACTIVE, non-slashed issuer with reputation >= minReputation
+    ///      via IssuerReputationRegistry.verifyIssuer. Pre-wiring (issuerRegistry == 0)
+    ///      remains permissive for test environments and staged deployments.
+    function _isAuthorizedIssuer(address issuer) internal view returns (bool) {
+        if (issuerRegistry == address(0)) {
+            // Pre-wiring: no registry set — permissive (test / pre-init environments).
+            return true;
+        }
+        IIssuerRegistryView reg = IIssuerRegistryView(issuerRegistry);
+        bytes32 issuerKey = reg.signerToIssuer(issuer);
+        if (issuerKey == bytes32(0)) return false;
+        return reg.verifyIssuer(issuerKey, issuer);
     }
 
     function revealPrice(uint256 batchId, uint256 price, bytes32 nonce) external nonReentrant {

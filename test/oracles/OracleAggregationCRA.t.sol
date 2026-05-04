@@ -5,8 +5,24 @@ import "forge-std/Test.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../../contracts/oracles/OracleAggregationCRA.sol";
 import "../../contracts/oracles/interfaces/IOracleAggregationCRA.sol";
+import "../../contracts/oracles/interfaces/IIssuerReputationRegistry.sol";
 import "../../contracts/oracles/TruePriceOracle.sol";
 import "../../contracts/oracles/interfaces/ITruePriceOracle.sol";
+
+/// @dev Permissive stub registry: all non-zero addresses are treated as active issuers.
+///      Used by the existing test suite to preserve pre-C39-OCRA-1 behavior (no real stake).
+contract MockPermissiveRegistry {
+    // signerToIssuer: returns a deterministic non-zero key for any non-zero signer.
+    function signerToIssuer(address signer) external pure returns (bytes32) {
+        if (signer == address(0)) return bytes32(0);
+        return keccak256(abi.encodePacked("mock", signer));
+    }
+
+    // verifyIssuer: accept any key/signer pair where key != 0.
+    function verifyIssuer(bytes32 issuerKey, address /*signer*/) external pure returns (bool) {
+        return issuerKey != bytes32(0);
+    }
+}
 
 /**
  * @title OracleAggregationCRA tests — C39 FAT-AUDIT-2
@@ -33,8 +49,9 @@ contract OracleAggregationCRATest is Test {
         issuer1 = makeAddr("issuer1");
         issuer2 = makeAddr("issuer2");
         issuer3 = makeAddr("issuer3");
-        // Stub registry + TPO addresses — real wire-in tests come later.
-        stubRegistry = makeAddr("registry");
+        // Deploy a permissive mock registry so all issuers pass _isAuthorizedIssuer.
+        // Real stake-gated tests live in OracleAggregationCRA_IsAuthorized.t.sol (C39-OCRA-1).
+        stubRegistry = address(new MockPermissiveRegistry());
         stubTPO = makeAddr("tpo");
 
         OracleAggregationCRA impl = new OracleAggregationCRA();

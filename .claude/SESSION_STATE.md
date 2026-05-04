@@ -1,3 +1,65 @@
+# Session State — 2026-05-03 (rolled over from 2026-05-01)
+
+## ⚡ Active Intention (NEW PROTOCOL — declare before agent-spawn)
+
+> **Intention**: Install augmented dev loops on the standing TRP/RSI workflow. The bootstrap loop — the framework's debut is itself the work being done.
+
+Per `[P·augmented-dev-loops]`: ∀ TRP/RSI session ⇒ TWO orthogonal aug-layers required (intention + protection). Open-loop-without-intention is now a memory-tracked failure mode. Today's session is the first under this protocol; its intention is to install the protocol on itself.
+
+### Bootstrap loop backlog (this session's agents serve THIS intention)
+
+Each item below is a candidate scope for an agent in the augmented loop. Agents are spawned with intention-context: *"this cycle serves the augmented-dev-loops install by closing X."*
+
+- **B1 — Changeset-hash pre-commit gate.** Agent declares its expected file list + invariant claims (e.g., "no .sol modified outside contracts/oracles/") in a manifest BEFORE work starts. Pre-commit hook hashes actual changeset, refuses commit if drifts from declaration. Closes silent-scope-drift failure mode.
+- **B2 — Intention declaration template in SESSION_STATE.** This file gets a permanent `## ⚡ Active Intention` section template at the top of every block. Hook fail-loud if missing on session-open. Closes generic-productive failure mode.
+- **B3 — Agent reputation tracker.** Per-agent-class (sonnet vs opus, scope-size, cycle-type) running tally of clean-ship vs reverted-ship vs blocked-by-gate. JSON file `vibeswap/.claude/agent-reputation.json`. Used to scope-size next cycle's agents.
+- **B4 — Pre-review automated check pipeline.** Wraps the existing `forge test --match-path` + storage-layout diff + slither-on-changed-files into a single command run BEFORE human review. Block on failure. Reduces orchestrator-judgment surface.
+- **B5 — Lessons.md schema + bootstrap entries.** New file `vibeswap/.claude/lessons.md` with two sections: intention-failure (tried X achieved Y) and structural-failure (broke Z). Initial entries seeded from this session's bootstrap experience.
+- **B6 — Cycle-close retrospective protocol.** Spec the end-of-loop step: did agents serve declared intention? what's the delta between what we set out to do and what we did? lessons.md gets a row.
+
+### Constraint reminders for THIS bootstrap loop
+
+- Bootstrap is recursive. The protective gates we're building won't fire on THIS session's commits (they don't exist yet). So this session is intentionally the LAST one without those gates. Discipline-driven, not gate-enforced.
+- Per `[F·apply-named-primitives-immediately]`: each B-item that ships starts firing on the next session.
+- Per `[F·trp-agent-concurrency]`: max 2 concurrent opus subagents — ignore if using sonnet, which we are.
+- Per `[F·no-destructive-git-while-agents-running]`: no rebase/reset while agents have writes in flight.
+
+---
+
+## Block Header — 2026-05-03 — Full-auto TRP loop resume
+
+> *"work on vibeswap full auto TRP loop 3 agents + 1 every time a single agent completes, for a constant 3"* — Will, 2026-05-03
+
+### Entry trigger
+
+After JARVIS papers triad ship (jarvis-is-not-a-wrapper / how-jarvis-works / substrate-port to `WGlynn/JARVIS`) and the local clone rename to make sense (`~/jarvis/` → `~/jarvis-network/`, `~/jarvis-monorepo/` → `~/JARVIS/`), Will pivoted to VibeSwap with the constant-3 TRP loop pattern. Resumes the same shape used 2026-05-01 (3 + 1-on-completion replacement, per-commit review gate).
+
+### Loop seed scopes (initial wave)
+
+Picked from the XCM audit recommendations (`docs/audits/2026-05-01-xcm-pattern-applicability.md`) and the WAL pending Cycle 38:
+
+- **W1 / C39-OCRA-1** — wire `OracleAggregationCRA._isAuthorizedIssuer` to `IssuerReputationRegistry` (replace V1 permissive stub at `:147–151`)
+- **W2 / C15-CC-F1** — symmetric retry-queue for clawback compliance catch in `VibeSwapCore._recordCrossChainExecution` (mirror the incentiveController pattern)
+- **W3 / C15-WD-F1** (Cycle 38) — block `VibeSwapCore.withdrawDeposit` while cross-chain order in-flight (counter on commit ↑ / settle ↓; closes C15-AUDIT-1 residual surface)
+
+### Backlog ready for replacement spawns
+
+- W4: storage-layout regression-test infra for UUPS contracts (`forge inspect ... storage-layout` snapshot)
+- W5: sweep remaining empty `catch {}` sites outside cross-chain + oracle (XCM audit was scoped)
+- W6: docs — codify XCM-style structural-skip rule into the standing audit checklist (XCM audit rec #3)
+- W7: sweep remaining UUPS implementations for missing `_disableInitializers()` (extend the 5×C23 sweep)
+- W8: phantom-array-antipattern sweep — find any remaining append-only-with-flag-deactivation patterns
+- W9: VibeFeeRouter deprecation cleanup — pending Will's delete-vs-archive call (don't auto)
+
+### Constraint reminders this loop
+
+- Default forge profile only (no via_ir). Targeted tests only (`--match-path` / `--match-contract`). Max 3 forge processes — at cap.
+- Sonnet for parallel TRP agents (sidesteps `[TRP Agent Concurrency Cap]` opus-specific limit).
+- Don't touch Will's in-flight dirty work: `jarvis-bot/`, `docs/research/papers/jarvis-is-not-a-wrapper.md` (already mirrored), `.claude/post-mortems.md`, `.claude/glyph-kb-conversion-plan.md`, `docs/marketing/medium/pipeline/2026-05-XX_audit-fix-introduces-bug*`.
+- Per-completion: review diff → targeted forge tests → cycle-named commit → push to `origin/master` → spawn replacement.
+
+---
+
 # Session State — 2026-05-01 (rolled over from 2026-04-30 — major build burst + docs reorg + public-discourse mission shift)
 
 ## Block Header — 2026-05-01 — Major build burst (~80 commits, multi-theme)

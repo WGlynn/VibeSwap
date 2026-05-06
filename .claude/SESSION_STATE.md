@@ -1,6 +1,95 @@
+# Session State — 2026-05-06 (rolled over from 2026-05-03)
+
+## ⚡ Active Intention
+
+> **Intention**: Bidirectional reification at scale — reify GH discussion #18 (on-chain reasoning verification) into spec + interfaces + reference impls + tests + EIP draft + architecture overview, then sustain a 300-commit autonomous run across reification, primitives, gates, and bootstrap-loop backlog items.
+
+The dialogue with `kimberthilson-wq` on GH#18 produced concrete architecture. Per `[F·bidirectional-reification]` (named + saved this session), word and code are orthogonal modes of creation; neither is complete alone. The active intention bootstraps the reification primitive on its own origin turn.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+### Discussion #18 follow-up (GH/VibeSwap)
+- Threaded reply to `kimberthilson-wq`'s second comment posted with collaboration close + email (willglynn123@gmail.com)
+- Wait for reply / inbound email; if Kim engages, distributed-reasoner-markets and cross-domain witness sharing are the open questions to push on
+- Account-vetting flag still standing on `kimberthilson-wq` handle (-wq suffix pattern); engagement substance is on-topic so this isn't a block, just a note
+
+### Reasoning verification subsystem next moves
+- **Halmos attestation registry** — concrete contract for "this bytecode hash was formally verified" attestations, invalidated on upgrade. Tier-5 of the architecture, not yet shipped.
+- **Distributed reasoner market mechanism design** — Shapley + reasoning verification composition. Belongs in `docs/research/papers/` once primitives are clearer.
+- **Cross-domain witness sharing semantics** — namespace + aliasing rules for var-keys spanning protocols. EIP-A v2 candidate.
+- **Halmos run-on-CI** — actually wire the attestation pipeline so "formally verified" is automatic rather than an admin call.
+
+### Bootstrap loop backlog status (`[P·augmented-dev-loops]`)
+- B1 — Changeset-hash pre-commit gate — **PENDING** (design done conceptually, no implementation)
+- B2 — Intention declaration template — **DONE** (this block opens with it)
+- B3 — Agent reputation tracker JSON — **DONE** (`.claude/agent-reputation.json`)
+- B4 — Pre-review automated check pipeline — **PENDING** (forge --match-path + storage-layout-diff + slither wrapper)
+- B5 — Lessons.md schema + entries — **DONE** (3 entries added today: idle-after-reply, reification bootstrap, GH thread-shape)
+- B6 — Cycle-close retrospective protocol — **PENDING**
+
+### USD8 partnership (carried over)
+- Two messages sent to Rick (attack-surface stack + white-hat Lindy bounty); awaiting response
+- ATTACK_SURFACE_DEFENSES.md / WHITE_HAT_BOUNTY.md spec PRs in flight, ready when Rick greenlights direction
+
+### Pending design calls (carried over, mostly stale-but-still-open)
+- Substance gate watch-list: add `governance` signature when used in actor-context without bounded-by-physics-constitution disambiguator
+- Pass 9 of audit-suite: handshake validator integration into Lineage IDE-plugin audit-suite
+- Condensation hook (automated): manual proof-of-concept ran cleanly 2026-05-01; build the Stop hook + condensation script
+- MEMORY.md compression pass: previously flagged as exceeding soft limit; HIERO compression now active so check current size before re-flagging
+
+### Open items
+- Lineage repo remote — still no decision on private GitHub vs local-only
+- Lineage uncommitted work — `SUBSTRATE.md`, `commitment.py`, `COMMITMENT_PROTOCOL.md`, `POSITIONING.md`, `TENANCY_DESIGN.md`, `scripts/` — earlier-session work, decision pending
+
+---
+
+## Block Header — 2026-05-06 — GH#18 reification + 300-commit run
+
+### Entry trigger
+
+Will: "respond: https://github.com/WGlynn/VibeSwap/discussions/18" — opened on inbound discussion-thread engagement, pivoted into bidirectional reification primitive + sustained autonomous build burst.
+
+### What shipped this block
+
+**Reasoning verification subsystem (forward reification — word → code)**:
+- `docs/research/papers/on-chain-reasoning-verification.md` — three-tier architecture spec
+- `docs/research/papers/eip-draft-reasoning-grammar.md` — 4-EIP standardization draft (atom grammar, witness format, inference rules, ZK public inputs)
+- `contracts/governance/interfaces/IReasoningVerifier.sol` — Tier 2 verifier interface
+- `contracts/governance/interfaces/IReasoningContest.sol` — Tier 3 bonded fraud-proof interface
+- `contracts/governance/interfaces/IReasoningGateProof.sol` — Tier 4 ZK gate-pass interface
+- `contracts/governance/ReasoningVerifier.sol` — Tier 2 reference impl (stateless)
+- `contracts/governance/ReasoningContest.sol` — Tier 3 reference impl (UUPS)
+- `contracts/governance/StateOracle.sol` — keyed resolver registry impl
+- `test/ReasoningVerifier.t.sol` — 13 tests, exit 0
+- `test/ReasoningContest.t.sol` — 8 tests, exit 0
+- `test/StateOracle.t.sol` — 10 tests, exit 0
+- `docs/architecture/REASONING_VERIFICATION_OVERVIEW.md` — backward reification (code → text)
+
+**Memory primitives**:
+- `feedback_text-code-eternal-loop.md` — `[F·bidirectional-reification]` named + saved + bootstrapped
+- `feedback_diagnose-on-stop.md` — Stop-event interrogation hook-candidate
+- 3 prior-session orphans rescued: autonomous-production-default, no-credentials-in-claude-chat, jarvis-tg-bot-token-compromise
+
+**Augmented-loops infrastructure**:
+- `.claude/agent-reputation.json` — B3 closed
+- `.claude/lessons.md` — 3 new rows for B5 (was already initialized)
+- MEMORY.md link-rot fixed (2 broken refs)
+
+**Public discussion**:
+- Posted to GH#18 in two stages: (1) substantive reply with three-tier architecture, ZK gate-pass extension, Halmos attestation tier — threaded under Kim's first comment; (2) reply to Kim's second comment with three extensions (distributed reasoner markets, expressibility-as-gate, witness-as-on-chain-why) plus link-pointers to all shipped artifacts plus collaboration close + email
+
+### Active autonomous run
+
+- Target: 300 atomic commits across vibeswap, memory repo, and any related artifacts
+- Status: 22+ commits shipped at time of this state-write
+- Failure mode caught mid-session: idled ~1h13m after Kim reply; surfaced as `[F·diagnose-on-stop]`, hook-candidate proposed
+- Constraint: per CLAUDE.md, default forge profile only, `--match-path` only on tests, max 3 forge processes
+
+---
+
 # Session State — 2026-05-03 (rolled over from 2026-05-01)
 
-## ⚡ Active Intention (NEW PROTOCOL — declare before agent-spawn)
+## ⚡ Active Intention (PRIOR BLOCK)
 
 > **Intention**: Install augmented dev loops on the standing TRP/RSI workflow. The bootstrap loop — the framework's debut is itself the work being done.
 

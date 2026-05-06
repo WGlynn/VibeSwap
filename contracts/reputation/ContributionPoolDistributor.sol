@@ -82,7 +82,13 @@ contract ContributionPoolDistributor is
     uint256 public totalDistributed;
 
     /// @dev Reserved storage gap
-    uint256[48] private __gap;
+    // W5: durable failed-flag for DAG distribute catch.
+    // dag address => amount of VIBE stranded on this contract after a failed distribute().
+    // Permissionless retry via retryDAGDistribute(dag).
+    mapping(address => uint256) public strandedShares;
+
+    /// @dev Reserved storage gap for future upgrades (reduced from 48 to 47 for 1 new slot)
+    uint256[47] private __gap;
 
     // ============ Events ============
 
@@ -94,6 +100,9 @@ contract ContributionPoolDistributor is
         uint8 era
     );
     event DAGShareRouted(address indexed dag, uint256 amount, uint256 weight);
+    // W5: observability for stranded DAG shares + retries.
+    event DAGDistributeFailed(address indexed dag, uint256 amount);
+    event DAGDistributeRetried(address indexed dag, uint256 amount, bool success);
 
     // ============ Errors ============
 
@@ -247,8 +256,11 @@ contract ContributionPoolDistributor is
                 actuallyDistributed += share;
                 emit DAGShareRouted(dag, share, weight);
             } catch {
-                // Clear approval; keep share on distributor (V1 conservatism).
+                // W5: persist durable failed-flag so tokens are observable + retryable.
+                // Clear approval; accumulate in strandedShares for permissionless retry.
                 IERC20(address(vibeToken)).forceApprove(dag, 0);
+                strandedShares[dag] += share;
+                emit DAGDistributeFailed(dag, share);
             }
 
             unchecked { ++i; }
@@ -258,6 +270,34 @@ contract ContributionPoolDistributor is
         totalDistributed += actuallyDistributed;
 
         emit EpochDistributed(currEpoch, actuallyDistributed, n, totalWeight, era);
+    }
+
+    // ============ Retry ============
+
+    /**
+     * @notice Retry distributing previously stranded VIBE shares to a DAG.
+     * @dev Permissionless — any party observing DAGDistributeFailed can drive retry.
+     *      W5: mirrors C15-CC-F1 pattern (durable flag + permissionless retry).
+     * @param dag The DAG address whose distribute() previously failed.
+     */
+    function retryDAGDistribute(address dag) external nonReentrant {
+        uint256 amount = strandedShares[dag];
+        require(amount > 0, "ContributionPoolDistributor: no stranded shares for DAG");
+
+        // Clear before external call (reentrancy guard).
+        strandedShares[dag] = 0;
+
+        IERC20(address(vibeToken)).forceApprove(dag, amount);
+        try IDAG(dag).distribute(amount) {
+            totalDistributed += amount;
+            emit DAGShareRouted(dag, amount, 0); // weight=0: retry, not epoch-distribution
+            emit DAGDistributeRetried(dag, amount, true);
+        } catch {
+            // Re-strand: restore balance so retry can be called again later.
+            IERC20(address(vibeToken)).forceApprove(dag, 0);
+            strandedShares[dag] = amount;
+            emit DAGDistributeRetried(dag, amount, false);
+        }
     }
 
     // ============ Views ============

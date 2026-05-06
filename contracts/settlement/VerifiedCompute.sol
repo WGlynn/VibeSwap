@@ -73,6 +73,13 @@ abstract contract VerifiedCompute is
     /// @dev Reserved storage gap for future upgrades
     uint256[50] private __gap;
 
+    // ============ Constructor ============
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ Init ============
 
     function __VerifiedCompute_init(uint256 _disputeWindow, uint256 _bondAmount) internal onlyInitializing {

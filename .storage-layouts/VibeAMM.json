@@ -1,0 +1,292 @@
+{
+  "storage": [
+    {
+      "label": "globalPaused",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "functionPaused",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_mapping(t_bytes4,t_bool)"
+    },
+    {
+      "label": "guardians",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "breakerConfigs",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(BreakerConfig)_storage)"
+    },
+    {
+      "label": "breakerStates",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(BreakerState)_storage)"
+    },
+    {
+      "label": "requiresAttestedResume",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "certifiedAttestor",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "resumeAttestationThreshold",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "resumeAttestationCount",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "tripGeneration",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "_hasAttestedResume",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_mapping(t_address,t_bool)))"
+    },
+    {
+      "label": "attestedResumeOverridden",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "c39SecurityDefaultsInitialized",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "__gap",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    },
+    {
+      "label": "protocolFeeShare",
+      "slot": "55",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "pools",
+      "slot": "56",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(Pool)_storage)"
+    },
+    {
+      "label": "lpTokens",
+      "slot": "57",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "label": "liquidityBalance",
+      "slot": "58",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "treasury",
+      "slot": "59",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "authorizedExecutors",
+      "slot": "60",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "accumulatedFees",
+      "slot": "61",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "poolOracles",
+      "slot": "62",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(OracleState)_storage)"
+    },
+    {
+      "label": "trackedBalances",
+      "slot": "63",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "lastInteractionBlock",
+      "slot": "64",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "sameBlockInteraction",
+      "slot": "65",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "poolMaxTradeSize",
+      "slot": "66",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "protectionFlags",
+      "slot": "67",
+      "offset": 0,
+      "type": "t_uint8"
+    },
+    {
+      "label": "truePriceOracle",
+      "slot": "67",
+      "offset": 1,
+      "type": "t_contract(ITruePriceOracle)"
+    },
+    {
+      "label": "truePriceMaxStaleness",
+      "slot": "68",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "poolVWAP",
+      "slot": "69",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(VWAPState)_storage)"
+    },
+    {
+      "label": "poolProtectionConfig",
+      "slot": "70",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(ProtectionConfig)_storage)"
+    },
+    {
+      "label": "priceOracle",
+      "slot": "71",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "tokenUsdPrices",
+      "slot": "72",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "userPoolVolume",
+      "slot": "73",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_mapping(t_bytes32,t_uint256))"
+    },
+    {
+      "label": "userVolumeWindowStart",
+      "slot": "74",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "fibonacciBaseUnit",
+      "slot": "75",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "recentHighPrice",
+      "slot": "76",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "recentLowPrice",
+      "slot": "77",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "fibonacciWindowDuration",
+      "slot": "78",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "priorityRegistry",
+      "slot": "79",
+      "offset": 0,
+      "type": "t_contract(IPriorityRegistry)"
+    },
+    {
+      "label": "maxPoWFeeDiscount",
+      "slot": "80",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "usedFeePoWProofs",
+      "slot": "81",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "incentiveController",
+      "slot": "82",
+      "offset": 0,
+      "type": "t_contract(IIncentiveController)"
+    },
+    {
+      "label": "volatilityOracle",
+      "slot": "83",
+      "offset": 0,
+      "type": "t_contract(IVolatilityOracle)"
+    },
+    {
+      "label": "feeController",
+      "slot": "84",
+      "offset": 0,
+      "type": "t_contract(FeeController)"
+    },
+    {
+      "label": "lastTwapSnapshot",
+      "slot": "85",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "lastTwapSnapshotTime",
+      "slot": "86",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "__gap",
+      "slot": "87",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

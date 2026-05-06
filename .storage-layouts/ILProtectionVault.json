@@ -1,0 +1,64 @@
+{
+  "storage": [
+    {
+      "label": "volatilityOracle",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_contract(IVolatilityOracle)"
+    },
+    {
+      "label": "incentiveController",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "vibeAMM",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "positions",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_struct(LPPosition)_storage))"
+    },
+    {
+      "label": "tierConfigs",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_uint8,t_struct(TierConfig)_storage)"
+    },
+    {
+      "label": "reserves",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "poolQuoteTokens",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "label": "totalILPaid",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalPositionsRegistered",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "__gap",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

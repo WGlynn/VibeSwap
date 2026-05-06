@@ -1,0 +1,40 @@
+{
+  "storage": [
+    {
+      "label": "nextOrderId",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "_orders",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_struct(LimitOrder)_storage)"
+    },
+    {
+      "label": "_fills",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_struct(FillInfo)_storage)"
+    },
+    {
+      "label": "_userOrders",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "label": "isSettler",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "__gap",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "storage": [
+    {
+      "label": "tvlCap",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "emergencyMode",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "keeper",
+      "slot": "1",
+      "offset": 1,
+      "type": "t_address"
+    },
+    {
+      "label": "feeRecipient",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "lastRebalanceTime",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "secondaryAssets",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_array(t_address)dyn_storage"
+    },
+    {
+      "label": "assetConfigs",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(AssetConfig)_storage)"
+    },
+    {
+      "label": "depositRecords",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_array(t_struct(DepositRecord)_storage)dyn_storage)"
+    },
+    {
+      "label": "priceSnapshots",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_array(t_struct(SharePriceSnapshot)_storage)dyn_storage"
+    },
+    {
+      "label": "cachedTotalValue",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "lastValueUpdate",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "__gap",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

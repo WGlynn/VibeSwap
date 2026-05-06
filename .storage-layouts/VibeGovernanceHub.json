@@ -1,0 +1,118 @@
+{
+  "storage": [
+    {
+      "label": "vibeToken",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_contract(IERC20)"
+    },
+    {
+      "label": "stVibeToken",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_contract(IERC20)"
+    },
+    {
+      "label": "lpPositionSource",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "mindScoreSource",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "crossChainEndpoint",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "securityCouncil",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "proposalCount",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "proposalThreshold",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "deployedAt",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "govConfigs",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_enum(GovernanceType)41,t_struct(GovernanceConfig)_storage)"
+    },
+    {
+      "label": "proposals",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_struct(Proposal)_storage)"
+    },
+    {
+      "label": "hasVoted",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "commitBallots",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(CommitRevealBallot)_storage))"
+    },
+    {
+      "label": "delegations",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(DelegationInfo)_storage)"
+    },
+    {
+      "label": "delegatedWeight",
+      "slot": "14",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "convictionStart",
+      "slot": "15",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "convictionStake",
+      "slot": "16",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "trustedRemotes",
+      "slot": "17",
+      "offset": 0,
+      "type": "t_mapping(t_uint32,t_address)"
+    },
+    {
+      "label": "__gap",
+      "slot": "18",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

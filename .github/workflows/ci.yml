@@ -151,6 +151,13 @@ jobs:
       - name: Run unit tests (no fuzz/invariant — fast feedback)
         run: FOUNDRY_PROFILE=fast forge test -vvv --no-match-test "fuzz|invariant|Fuzz|Invariant"
 
+      - name: Storage layout regression (UUPS upgrade safety)
+        run: |
+          chmod +x script/check-storage-layout.sh
+          bash script/check-storage-layout.sh
+        # Fails loud on any storage slot drift vs committed .storage-layouts/ snapshots.
+        # UUPS slot collision = silent fund loss. Never mark continue-on-error here.
+
   # ============ Fuzz + Invariant (nightly deep coverage) ============
   contracts-fuzz:
     name: Fuzz & Invariant Tests

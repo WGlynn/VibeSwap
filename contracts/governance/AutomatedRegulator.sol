@@ -109,14 +109,21 @@ contract AutomatedRegulator is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Authorized monitors (can report activity)
     mapping(address => bool) public authorizedMonitors;
 
+    // W5: durable failed-flag for _autoFileCase catch.
+    // Set when registry.openCase reverts. violationId => still-pending.
+    // Cleared on successful retryFilingCase().
+    mapping(bytes32 => bool) public caseFilingFailed;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @dev Reserved storage gap for future upgrades (reduced from 50 to 49 for 1 new slot)
+    uint256[49] private __gap;
 
     // ============ Events ============
 
     event ViolationDetected(bytes32 indexed violationId, address indexed wallet, ViolationType violationType, SeverityLevel severity);
     event CaseAutoFiled(bytes32 indexed violationId, bytes32 indexed caseId, address indexed wallet);
+    // W5: observability for failed case filings + retries.
+    event CaseFilingFailed(bytes32 indexed violationId, address indexed wallet);
+    event CaseFilingRetried(bytes32 indexed violationId, bool success, bytes32 caseId);
     event WalletClusterIdentified(address indexed master, address[] puppets);
     event RuleUpdated(ViolationType indexed violationType, uint256 threshold, SeverityLevel severity);
     event SanctionAdded(address indexed wallet);
@@ -354,8 +361,34 @@ contract AutomatedRegulator is OwnableUpgradeable, UUPSUpgradeable {
             v.caseId = caseId;
             emit CaseAutoFiled(violationId, caseId, wallet);
         } catch {
-            // Not authorized yet — emit with zero caseId so off-chain can track
-            emit CaseAutoFiled(violationId, bytes32(0), wallet);
+            // W5: persist durable failed-flag instead of emitting with zero caseId.
+            // Violation stays actionTaken=true (prevents duplicate trigger) but caseFilingFailed
+            // exposes the gap to any observer. Permissionless retry via retryFilingCase().
+            caseFilingFailed[violationId] = true;
+            emit CaseFilingFailed(violationId, wallet);
+        }
+    }
+
+    /**
+     * @notice Retry filing a compliance case that failed in _autoFileCase.
+     * @dev Permissionless — any party observing CaseFilingFailed can drive retry.
+     *      W5: mirrors C15-CC-F1 pattern (durable flag + permissionless retry).
+     * @param violationId The violation whose case filing previously failed.
+     */
+    function retryFilingCase(bytes32 violationId) external {
+        require(caseFilingFailed[violationId], "AutomatedRegulator: no failed filing for this violation");
+
+        DetectedViolation storage v = violations[violationId];
+        require(v.detectedAt != 0, "AutomatedRegulator: violation not found");
+
+        ViolationRule storage rule = rules[v.violationType];
+        try registry.openCase(v.wallet, v.evidenceValue, address(0), rule.description) returns (bytes32 caseId) {
+            v.caseId = caseId;
+            caseFilingFailed[violationId] = false;
+            emit CaseAutoFiled(violationId, caseId, v.wallet);
+            emit CaseFilingRetried(violationId, true, caseId);
+        } catch {
+            emit CaseFilingRetried(violationId, false, bytes32(0));
         }
     }
 

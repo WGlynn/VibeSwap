@@ -245,7 +245,7 @@ The theoretical full emission (~21,008,798 VIBE) slightly exceeds MAX_SUPPLY by 
 
 | Pattern | Count | Status |
 |---------|-------|--------|
-| UUPS `_disableInitializers()` | 31/31 | All constructors protected |
+| UUPS `_disableInitializers()` | 217/217 | All constructors protected (W7: VerifiedCompute family — abstract base + 4 concrete subclasses added 2026-05-06) |
 | UUPS `_authorizeUpgrade(onlyOwner)` | 31/31 | All upgrade paths gated |
 | OZ v5 namespaced storage (ERC-7201) | N/A | No `__gap` needed |
 | `receive() external payable` contracts | 17 | All have withdrawal paths |

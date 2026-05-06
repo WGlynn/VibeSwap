@@ -1,0 +1,77 @@
+{
+  "$schema_version": "0.1",
+  "$origin": "[P·augmented-dev-loops] backlog item B3, 2026-05-06",
+  "$description": "Per-agent-class running tally of clean-ship vs reverted-ship vs blocked-by-gate. Drives next-cycle agent scope-sizing. Updated by orchestrator at end of each cycle.",
+  "$dimensions": [
+    "model — sonnet | opus | haiku",
+    "scope_size — small (1 file) | medium (3-5 files) | large (cross-module)",
+    "cycle_type — TRP | RSI | docs | reify | sweep"
+  ],
+  "$invariants": [
+    "clean_ship + reverted_ship + blocked_by_gate = total cycles attempted",
+    "scope_size promotion requires clean_ship_rate >= 0.85 over last 10 cycles",
+    "scope_size demotion fires automatically on reverted_ship in 3 of last 10 cycles"
+  ],
+  "tallies": {
+    "sonnet": {
+      "small": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "RSI":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "reify": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      },
+      "medium": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "RSI":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "reify": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      },
+      "large": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "RSI":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "reify": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      }
+    },
+    "opus": {
+      "small": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "RSI":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "reify": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      },
+      "medium": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "RSI":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "reify": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      },
+      "large": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "RSI":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "reify": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      }
+    },
+    "haiku": {
+      "small": {
+        "TRP":   { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "docs":  { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 },
+        "sweep": { "clean_ship": 0, "reverted_ship": 0, "blocked_by_gate": 0, "total": 0 }
+      }
+    }
+  },
+  "history": [],
+  "$update_protocol": [
+    "On cycle close: orchestrator appends a row to history with {timestamp, model, scope_size, cycle_type, outcome}.",
+    "outcome ∈ {clean_ship, reverted_ship, blocked_by_gate}.",
+    "Rebuild tallies aggregation from history; do not edit tallies directly.",
+    "scope_size auto-promote / auto-demote rules fire on rolling-10-cycle window per (model, cycle_type)."
+  ]
+}

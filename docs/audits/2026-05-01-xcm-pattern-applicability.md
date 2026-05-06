@@ -384,3 +384,7 @@ The two **needs-attention** items are not XCM-pattern findings:
 ---
 
 *Audit performed read-only. No `.sol` files modified. No tests run. Suggested commit: `docs(audit): XCM-pattern applicability sweep on cross-chain + oracle code (post-Polkadot-disclosure 2026-05-01)`.*
+
+---
+
+**Checklist cross-link**: Recommendation #3 above was codified into the standing audit checklist as §1 (Cross-Chain Message Handling) in [`docs/developer/AUDIT_CHECKLIST.md`](../developer/AUDIT_CHECKLIST.md) — W6 TRP cycle, 2026-05-06.

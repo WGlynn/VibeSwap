@@ -1,6 +1,6 @@
 # The Audit Caught One Bug. The Audit Fix Introduced Another.
 
-Polkadot disclosed a bug last week that gave any signed account on Asset Hub root access to the Polkadot relay chain. The mechanism was XCM — the cross-chain messaging executor — and the specific instruction was `InitiateTransfer`. The relevant code, from `polkadot/xcm/xcm-executor/src/lib.rs`:
+On March 19th, Polkadot disclosed a bug that gave any signed account on Asset Hub root access to the Polkadot relay chain. The mechanism was XCM — the cross-chain messaging executor — and the specific instruction was `InitiateTransfer`. The relevant code, from `polkadot/xcm/xcm-executor/src/lib.rs`:
 
 ```rust
 if preserve_origin {

@@ -31,6 +31,10 @@ Each primitive has a verified code citation. Primitives that are domain-specific
 - [Revert Wipes Counter — Non-Reverting Twin](./revert-wipes-counter-non-reverting-twin.md) — when you need a metric on a code path that reverts, ship a non-reverting twin entry-point with status-code returns. (Strengthen #3)
 - [Phantom-Array Cleanup-DoS](./phantom-array-cleanup-dos.md) — bounded write-side + unbounded cleanup-side = block-gas DoS. Fix is pagination + idempotent partial-progress, not cap-and-revert. (C48-F2)
 
+### Verification primitives
+
+- [Verify by Witness, Not by Execution](./verify-by-witness-not-by-execution.md) — prover supplies a satisfying assignment off-chain; verifier substitutes and checks O(n). Avoids running solvers inside the contract. (2026-05-06, reasoning verification subsystem)
+
 ### Process primitives
 
 - [Observability Before Tuning](./observability-before-tuning.md) — a parameter cannot be tuned with confidence until measured; ship the audit metric in its own PR before any tuning change. (Strengthen #3)

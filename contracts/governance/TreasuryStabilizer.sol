@@ -34,6 +34,10 @@ contract TreasuryStabilizer is
     event DAOTreasuryUpdated(address indexed previous, address indexed current);
     event VolatilityOracleUpdated(address indexed previous, address indexed current);
 
+    // W5: durable observability for withdrawDeployment failures + retries.
+    event WithdrawalFailed(bytes32 indexed failKey, address indexed token, bytes32 indexed poolId, uint256 lpAmount);
+    event WithdrawalRetried(bytes32 indexed failKey, bool success, uint256 received);
+
     // ============ Constants ============
 
     uint256 public constant BPS_PRECISION = 10000;
@@ -66,9 +70,17 @@ contract TreasuryStabilizer is
     uint32 public shortTermPeriod;
     uint32 public longTermPeriod;
 
+    // W5: durable failed-flag for withdrawDeployment catch.
+    // Key = keccak256(token, poolId, lpAmount, block.timestamp) set when removeBackstopLiquidity reverts.
+    // Permissionless retry via retryWithdrawDeployment().
+    mapping(bytes32 => bool) public withdrawalFailed;
+    // Key => (token, poolId, lpAmount) so retry can reconstruct call args.
+    mapping(bytes32 => address) public withdrawalFailedToken;
+    mapping(bytes32 => bytes32) public withdrawalFailedPoolId;
+    mapping(bytes32 => uint256) public withdrawalFailedLpAmount;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    /// @dev Reserved storage gap for future upgrades (reduced from 50 to 46 for 4 new slots)
+    uint256[46] private __gap;
 
     // ============ Errors ============
 
@@ -329,9 +341,56 @@ contract TreasuryStabilizer is
             received = amount;
         } catch {
             received = 0;
+            // W5: persist durable failed-flag so owner can observe + retry.
+            // Key uniquified by timestamp so multiple failed calls don't collide.
+            bytes32 failKey = keccak256(abi.encodePacked(token, poolId, lpAmount, block.timestamp));
+            withdrawalFailed[failKey] = true;
+            withdrawalFailedToken[failKey] = token;
+            withdrawalFailedPoolId[failKey] = poolId;
+            withdrawalFailedLpAmount[failKey] = lpAmount;
+            emit WithdrawalFailed(failKey, token, poolId, lpAmount);
         }
 
         emit BackstopWithdrawn(token, poolId, received);
+    }
+
+    /**
+     * @notice Retry a previously failed withdrawDeployment call.
+     * @dev Permissionless — any party observing WithdrawalFailed can drive retry.
+     *      W5: mirrors C15-CC-F1 pattern (durable flag + permissionless retry).
+     * @param failKey The key emitted in WithdrawalFailed.
+     */
+    function retryWithdrawDeployment(bytes32 failKey) external nonReentrant returns (uint256 received) {
+        require(withdrawalFailed[failKey], "TreasuryStabilizer: no such failed withdrawal");
+
+        address token = withdrawalFailedToken[failKey];
+        bytes32 poolId = withdrawalFailedPoolId[failKey];
+        uint256 lpAmount = withdrawalFailedLpAmount[failKey];
+
+        // Recompute slippage bounds at retry time.
+        IVibeAMM.Pool memory pool = vibeAMM.getPool(poolId);
+        uint256 expectedOut0;
+        uint256 expectedOut1;
+        if (pool.totalLiquidity > 0) {
+            expectedOut0 = (lpAmount * pool.reserve0) / pool.totalLiquidity;
+            expectedOut1 = (lpAmount * pool.reserve1) / pool.totalLiquidity;
+        }
+        uint256 minOut0 = (expectedOut0 * 95) / 100;
+        uint256 minOut1 = (expectedOut1 * 95) / 100;
+
+        try daoTreasury.removeBackstopLiquidity(poolId, lpAmount, minOut0, minOut1) returns (uint256 amount) {
+            received = amount;
+            // Clear the flag on success.
+            withdrawalFailed[failKey] = false;
+            delete withdrawalFailedToken[failKey];
+            delete withdrawalFailedPoolId[failKey];
+            delete withdrawalFailedLpAmount[failKey];
+            emit WithdrawalRetried(failKey, true, received);
+            emit BackstopWithdrawn(token, poolId, received);
+        } catch {
+            received = 0;
+            emit WithdrawalRetried(failKey, false, 0);
+        }
     }
 
     // ============ View Functions ============

@@ -435,6 +435,102 @@ contract TreasuryStabilizerTest is Test {
         assertEq(received, 0);
     }
 
+    // ============ W5: withdrawDeployment failed-flag + retry ============
+
+    // Declare events locally for vm.expectEmit (can't reference contract type events directly in tests)
+    event WithdrawalFailed(bytes32 indexed failKey, address indexed token, bytes32 indexed poolId, uint256 lpAmount);
+    event WithdrawalRetried(bytes32 indexed failKey, bool success, uint256 received);
+
+    /// @notice W5 regression: failed-flag must be set and WithdrawalFailed emitted when removeBackstopLiquidity reverts.
+    function test_W5_withdrawDeployment_failedFlagSet() public {
+        treasury.setShouldRevertRemove(true);
+        bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+
+        // Record logs to capture failKey
+        vm.recordLogs();
+        uint256 received = stabilizer.withdrawDeployment(address(token), poolId, 10 ether);
+        assertEq(received, 0, "W5: received must be 0 on failure");
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 expectedTopic = keccak256("WithdrawalFailed(bytes32,address,bytes32,uint256)");
+        bool found;
+        bytes32 failKey;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == expectedTopic) {
+                found = true;
+                failKey = logs[i].topics[1];
+                break;
+            }
+        }
+        assertTrue(found, "W5: WithdrawalFailed event not emitted");
+        assertTrue(stabilizer.withdrawalFailed(failKey), "W5: failed flag not set in storage");
+        assertEq(stabilizer.withdrawalFailedToken(failKey), address(token), "W5: token mismatch");
+        assertEq(stabilizer.withdrawalFailedPoolId(failKey), poolId, "W5: poolId mismatch");
+        assertEq(stabilizer.withdrawalFailedLpAmount(failKey), 10 ether, "W5: lpAmount mismatch");
+    }
+
+    /// @notice W5 regression: successful retry clears the failed flag and emits WithdrawalRetried(success=true).
+    function test_W5_withdrawDeployment_retrySucceeds() public {
+        treasury.setShouldRevertRemove(true);
+        bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        amm.setPool(poolId, 1000 ether, 1000 ether);
+
+        // First: fail the withdrawal to set the flag.
+        vm.recordLogs();
+        stabilizer.withdrawDeployment(address(token), poolId, 10 ether);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        bytes32 expectedTopic = keccak256("WithdrawalFailed(bytes32,address,bytes32,uint256)");
+        bytes32 failKey;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == expectedTopic) {
+                failKey = logs[i].topics[1];
+                break;
+            }
+        }
+        require(failKey != bytes32(0), "W5: WithdrawalFailed not emitted");
+        assertTrue(stabilizer.withdrawalFailed(failKey), "W5: failed flag not set");
+
+        // Now allow the treasury to succeed.
+        treasury.setShouldRevertRemove(false);
+
+        uint256 received = stabilizer.retryWithdrawDeployment(failKey);
+        assertEq(received, 100 ether, "W5: retry should receive treasury amount");
+        assertFalse(stabilizer.withdrawalFailed(failKey), "W5: failed flag not cleared after successful retry");
+    }
+
+    /// @notice W5 regression: retry when still failing leaves flag set and emits WithdrawalRetried(success=false).
+    function test_W5_withdrawDeployment_retryStillFails() public {
+        treasury.setShouldRevertRemove(true);
+        bytes32 poolId = keccak256(abi.encodePacked(address(token), "MAIN"));
+        amm.setPool(poolId, 1000 ether, 1000 ether);
+
+        vm.recordLogs();
+        stabilizer.withdrawDeployment(address(token), poolId, 10 ether);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        bytes32 expectedTopic = keccak256("WithdrawalFailed(bytes32,address,bytes32,uint256)");
+        bytes32 failKey;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == expectedTopic) {
+                failKey = logs[i].topics[1];
+                break;
+            }
+        }
+        require(failKey != bytes32(0), "W5: WithdrawalFailed not emitted");
+
+        // Retry while still failing.
+        stabilizer.retryWithdrawDeployment(failKey);
+        // Flag remains set.
+        assertTrue(stabilizer.withdrawalFailed(failKey), "W5: flag should remain set when retry fails");
+    }
+
+    /// @notice W5 regression: retrying a non-existent failKey reverts.
+    function test_W5_withdrawDeployment_retryNonExistentReverts() public {
+        vm.expectRevert("TreasuryStabilizer: no such failed withdrawal");
+        stabilizer.retryWithdrawDeployment(keccak256("nonexistent"));
+    }
+
     // ============ Emergency Mode ============
 
     function test_setEmergencyMode() public {

@@ -5,7 +5,9 @@
 - **Branch**: VibeSwap `master` (push to `origin`). Range `7720cb32..HEAD` and counting.
 - **Status**: ACTIVE. Run in progress; targeting 300 atomic commits across vibeswap + memory repo + any adjacent artifacts. Forge tests passing on every reasoning-subsystem suite (31 tests across 3 files, exit 0).
 
-**What shipped this epoch (vibeswap repo, 15+ commits at time of WAL-write)**:
+**Latest tally**: 48+ atomic commits across vibeswap (~38) + JARVIS (4) + memory (6).
+
+**What shipped this epoch (vibeswap repo, 38+ commits at time of WAL-write)**:
 - Spec: `docs/research/papers/on-chain-reasoning-verification.md` (three-tier architecture + ZK + Halmos)
 - EIP draft: `docs/research/papers/eip-draft-reasoning-grammar.md` (4-EIP standardization)
 - Interfaces: `IReasoningVerifier`, `IReasoningContest`, `IReasoningGateProof`
@@ -15,6 +17,21 @@
 - B3: `.claude/agent-reputation.json` — per-agent-class tally schema closed
 - B5: `.claude/lessons.md` — 3 new rows (idle-after-reply, reification bootstrap, GH thread-shape)
 - SESSION_STATE: 2026-05-06 block header replaces stale 2026-04-29 TOP PRIORITY
+- B1 spec: `.claude/protocols/changeset-hash-gate.md` (closes B1)
+- B4 spec: `.claude/protocols/pre-review-pipeline.md` (closes B4)
+- B6 spec: `.claude/protocols/cycle-close-retrospective.md` (closes B6)
+- Autopilot bypass: `~/.claude/hooks/autopilot-allow.py` + `.claude/protocols/autopilot-bypass.md` (live next session)
+- Demo consumer: `contracts/governance/examples/ReasonedVault.sol` + 6 tests
+- Concept docs: `EXPRESSIBILITY_AS_THE_GATE`, `DISTRIBUTED_REASONER_MARKETS`, `WITNESS_AS_ON_CHAIN_WHY` (3 design patterns from GH#18 dialogue)
+- Primitive docs: `verify-by-witness-not-by-execution`, `infrastructural-inversion-via-shared-interface` (2 new generalizable patterns)
+- Architecture overviews (backward reification of untexted subsystems):
+  - `INTENT_MARKETS_OVERVIEW` (memecoin launch, 2 contracts)
+  - `DEPIN_OVERVIEW` (4 contracts: device network, InfoFi, medical vault, private compute)
+  - `QUANTUM_OVERVIEW` (4 contracts: Lamport, PostQuantumShield, QuantumGuard, QuantumVault)
+  - `COMPUTE_SUBSIDY_OVERVIEW` (2 contracts: subsidy manager + interface)
+  - `COMPLIANCE_OVERVIEW` (4 contracts: ClawbackRegistry, ClawbackVault, ComplianceRegistry, FederatedConsensus)
+  - `HOOKS_OVERVIEW` (V4-style hook layer)
+  - `AGENTS_OVERVIEW` (15-contract AI-agent subsystem)
 
 **Memory repo (5+ commits)**:
 - `F·autonomous-production-default` rescue (orphan from prior session)

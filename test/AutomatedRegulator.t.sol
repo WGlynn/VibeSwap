@@ -11,6 +11,24 @@ contract MockARClawbackRegistry {
     // Stub — AutomatedRegulator only calls _autoFileCase which doesn't call registry in current impl
 }
 
+/// @notice W5: A registry mock that supports toggling openCase to succeed or fail.
+contract MockARClawbackRegistryToggleable {
+    bool public shouldRevert;
+    bytes32 public nextCaseId;
+
+    constructor() {
+        nextCaseId = keccak256("case-1");
+    }
+
+    function setShouldRevert(bool val) external { shouldRevert = val; }
+    function setNextCaseId(bytes32 id) external { nextCaseId = id; }
+
+    function openCase(address, uint256, address, string calldata) external returns (bytes32) {
+        if (shouldRevert) revert("registry: not authorized");
+        return nextCaseId;
+    }
+}
+
 contract AutomatedRegulatorTest is Test {
     AutomatedRegulator public regulator;
     FederatedConsensus public consensus;
@@ -305,5 +323,99 @@ contract AutomatedRegulatorTest is Test {
 
         AutomatedRegulator.WalletActivity memory activity = regulator.getWalletActivity(trader);
         assertEq(activity.buyVolume, 1000e18);
+    }
+}
+
+// ============ W5: _autoFileCase failed-flag + retry ============
+
+contract AutomatedRegulatorW5Test is Test {
+    AutomatedRegulator public regulator;
+    FederatedConsensus public consensus;
+    MockARClawbackRegistryToggleable public registry;
+    address public monitor;
+    address public trader;
+    address public counterparty;
+
+    // W5 events for expectEmit
+    event CaseFilingFailed(bytes32 indexed violationId, address indexed wallet);
+    event CaseFilingRetried(bytes32 indexed violationId, bool success, bytes32 caseId);
+
+    function setUp() public {
+        monitor = makeAddr("monitor");
+        trader = makeAddr("trader");
+        counterparty = makeAddr("counterparty");
+
+        FederatedConsensus consImpl = new FederatedConsensus();
+        ERC1967Proxy consProxy = new ERC1967Proxy(
+            address(consImpl),
+            abi.encodeWithSelector(FederatedConsensus.initialize.selector, address(this), 2, 1 days)
+        );
+        consensus = FederatedConsensus(address(consProxy));
+
+        // Use the toggleable registry so openCase can revert.
+        registry = new MockARClawbackRegistryToggleable();
+        registry.setShouldRevert(true); // Start in failing mode.
+
+        AutomatedRegulator impl = new AutomatedRegulator();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(AutomatedRegulator.initialize.selector, address(this), address(consensus), address(registry))
+        );
+        regulator = AutomatedRegulator(address(proxy));
+
+        consensus.addAuthority(address(regulator), FederatedConsensus.AuthorityRole.ONCHAIN_REGULATOR, "GLOBAL");
+        regulator.setAuthorizedMonitor(monitor, true);
+    }
+
+    /// @notice Helper to trigger a HIGH violation and return its violationId.
+    function _triggerWashTradingViolation() internal returns (bytes32 violationId) {
+        vm.prank(monitor);
+        regulator.reportTrade(trader, trader, 60_000e18, true, 10);
+        violationId = keccak256(abi.encodePacked(trader, AutomatedRegulator.ViolationType.WASH_TRADING, uint256(1)));
+    }
+
+    /// @notice W5 regression: when openCase reverts, caseFilingFailed must be set and CaseFilingFailed emitted.
+    function test_W5_autoFileCase_failedFlagSet() public {
+        // registry.shouldRevert = true (default in setUp)
+        bytes32 violationId = _triggerWashTradingViolation();
+
+        assertTrue(regulator.caseFilingFailed(violationId), "W5: caseFilingFailed not set");
+        AutomatedRegulator.DetectedViolation memory v = regulator.getViolation(violationId);
+        assertTrue(v.actionTaken, "W5: actionTaken must be true even on failure");
+        assertEq(v.caseId, bytes32(0), "W5: caseId must remain zero until retry succeeds");
+    }
+
+    /// @notice W5 regression: successful retryFilingCase clears the flag and sets caseId.
+    function test_W5_autoFileCase_retrySucceeds() public {
+        bytes32 violationId = _triggerWashTradingViolation();
+        assertTrue(regulator.caseFilingFailed(violationId), "W5: flag not set");
+
+        // Allow registry to succeed.
+        bytes32 expectedCaseId = keccak256("case-1");
+        registry.setShouldRevert(false);
+        registry.setNextCaseId(expectedCaseId);
+
+        regulator.retryFilingCase(violationId);
+
+        assertFalse(regulator.caseFilingFailed(violationId), "W5: flag not cleared after retry");
+        AutomatedRegulator.DetectedViolation memory v = regulator.getViolation(violationId);
+        assertEq(v.caseId, expectedCaseId, "W5: caseId not set after retry");
+    }
+
+    /// @notice W5 regression: retry when still failing leaves flag set.
+    function test_W5_autoFileCase_retryStillFails() public {
+        bytes32 violationId = _triggerWashTradingViolation();
+        assertTrue(regulator.caseFilingFailed(violationId), "W5: flag not set");
+
+        // Still failing.
+        regulator.retryFilingCase(violationId);
+
+        assertTrue(regulator.caseFilingFailed(violationId), "W5: flag should remain set when retry fails");
+    }
+
+    /// @notice W5 regression: retrying a violation with no failed filing reverts.
+    function test_W5_autoFileCase_retryNonFailedReverts() public {
+        vm.expectRevert("AutomatedRegulator: no failed filing for this violation");
+        regulator.retryFilingCase(keccak256("nonexistent"));
     }
 }

@@ -1,4 +1,38 @@
-# Write-Ahead Log — CLEAN (session 2026-05-01 major build burst + docs reorg + public-discourse mission shift)
+# Write-Ahead Log — ACTIVE (session 2026-05-06 GH#18 reification + 300-commit run)
+
+## Epoch — ACTIVE at 2026-05-06 GH#18 bidirectional-reification bootstrap + 300-commit autonomous run
+- **Opened**: 2026-05-06 ~15:09Z on Will's "respond: GH#18" + pivot to bidirectional-reification primitive + "300 commits" autonomous run.
+- **Branch**: VibeSwap `master` (push to `origin`). Range `7720cb32..HEAD` and counting.
+- **Status**: ACTIVE. Run in progress; targeting 300 atomic commits across vibeswap + memory repo + any adjacent artifacts. Forge tests passing on every reasoning-subsystem suite (31 tests across 3 files, exit 0).
+
+**What shipped this epoch (vibeswap repo, 15+ commits at time of WAL-write)**:
+- Spec: `docs/research/papers/on-chain-reasoning-verification.md` (three-tier architecture + ZK + Halmos)
+- EIP draft: `docs/research/papers/eip-draft-reasoning-grammar.md` (4-EIP standardization)
+- Interfaces: `IReasoningVerifier`, `IReasoningContest`, `IReasoningGateProof`
+- Reference impls: `ReasoningVerifier` (stateless), `ReasoningContest` (UUPS + derivation walker), `StateOracle` (keyed resolver registry)
+- Tests: 31 across `ReasoningVerifier.t.sol` (13), `ReasoningContest.t.sol` (8), `StateOracle.t.sol` (10) — all passing
+- Architecture overview: `docs/architecture/REASONING_VERIFICATION_OVERVIEW.md` (backward reification companion to spec)
+- B3: `.claude/agent-reputation.json` — per-agent-class tally schema closed
+- B5: `.claude/lessons.md` — 3 new rows (idle-after-reply, reification bootstrap, GH thread-shape)
+- SESSION_STATE: 2026-05-06 block header replaces stale 2026-04-29 TOP PRIORITY
+
+**Memory repo (5+ commits)**:
+- `F·autonomous-production-default` rescue (orphan from prior session)
+- `F·no-credentials-in-claude-chat` rescue
+- `J·jarvis-tg-bot-token-compromise-2026-05-06` rescue
+- `F·bidirectional-reification` — named + saved + bootstrapped on origin turn
+- `F·diagnose-on-stop` — Stop-event interrogation hook-candidate
+- MEMORY.md link-rot fix (2 broken refs to non-existent feedback files)
+
+**Public discourse (GH#18)**:
+- First reply (substantive three-tier architecture): top-level → realized should be threaded → deleted + reposted under `kimberthilson-wq`'s first comment
+- Second reply (extends three threads + artifact links + collab close + email): threaded under Kim's second comment
+
+**Failure modes caught and persisted**:
+- Idled ~1h13m after first Kim reply post (treated reply as task-complete) → `[F·diagnose-on-stop]` saved
+- Posted top-level instead of threaded reply → required delete + recreate; logged in lessons.md as struct-fail
+
+---
 
 ## Epoch — CLEAN at 2026-05-01 major build burst + docs reorg + public-discourse mission shift
 - **Closed**: 2026-05-01 after Will's USD8-CRM → full-auto-TRP → docs-reorg → public-discourse-shift → "do an extra 40 commits and focus on making vibeswap 'complete'" arc.

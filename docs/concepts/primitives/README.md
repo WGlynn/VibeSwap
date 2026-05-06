@@ -35,6 +35,10 @@ Each primitive has a verified code citation. Primitives that are domain-specific
 
 - [Verify by Witness, Not by Execution](./verify-by-witness-not-by-execution.md) — prover supplies a satisfying assignment off-chain; verifier substitutes and checks O(n). Avoids running solvers inside the contract. (2026-05-06, reasoning verification subsystem)
 
+### Migration / authority primitives
+
+- [Infrastructural Inversion via Shared Interface](./infrastructural-inversion-via-shared-interface.md) — off-chain and on-chain authorities vote through identical signature; substrate migration becomes a parameter shift, not a code change. (FederatedConsensus)
+
 ### Process primitives
 
 - [Observability Before Tuning](./observability-before-tuning.md) — a parameter cannot be tuned with confidence until measured; ship the audit metric in its own PR before any tuning change. (Strengthen #3)

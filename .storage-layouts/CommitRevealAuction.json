@@ -1,0 +1,142 @@
+{
+  "storage": [
+    {
+      "label": "poolConfigs",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(Config)_storage)"
+    },
+    {
+      "label": "complianceRegistry",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "reputationOracle",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_contract(IReputationOracle)"
+    },
+    {
+      "label": "poolCount",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "lastInteractionBlock",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "currentBatchId",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_uint64"
+    },
+    {
+      "label": "batchStartTime",
+      "slot": "5",
+      "offset": 8,
+      "type": "t_uint64"
+    },
+    {
+      "label": "batches",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_struct(Batch)_storage)"
+    },
+    {
+      "label": "commitments",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(OrderCommitment)_storage)"
+    },
+    {
+      "label": "revealedOrders",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_array(t_struct(RevealedOrder)_storage)dyn_storage)"
+    },
+    {
+      "label": "batchSecrets",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_array(t_bytes32)dyn_storage)"
+    },
+    {
+      "label": "priorityOrderIndices",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "label": "authorizedSettlers",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "pendingRefunds",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "treasury",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "powBaseValue",
+      "slot": "14",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "usedPoWProofs",
+      "slot": "15",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "batchRevealEndBlock",
+      "slot": "16",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_uint256)"
+    },
+    {
+      "label": "pendingSlashedFunds",
+      "slot": "17",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "userSlashedAmounts",
+      "slot": "18",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "_xChainRecipients",
+      "slot": "19",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "label": "crossChainRecipientByOrder",
+      "slot": "20",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_mapping(t_uint256,t_address))"
+    },
+    {
+      "label": "__gap",
+      "slot": "21",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

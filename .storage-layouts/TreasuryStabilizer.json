@@ -1,0 +1,94 @@
+{
+  "storage": [
+    {
+      "label": "vibeAMM",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_contract(IVibeAMM)"
+    },
+    {
+      "label": "daoTreasury",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_contract(IDAOTreasury)"
+    },
+    {
+      "label": "volatilityOracle",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_contract(IVolatilityOracle)"
+    },
+    {
+      "label": "tokenConfigs",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(StabilizerConfig)_storage)"
+    },
+    {
+      "label": "tokenMarketStates",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(MarketState)_storage)"
+    },
+    {
+      "label": "deploymentHistory",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_array(t_struct(DeploymentRecord)_storage)dyn_storage)"
+    },
+    {
+      "label": "emergencyMode",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "tokenMainPool",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bytes32)"
+    },
+    {
+      "label": "shortTermPeriod",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_uint32"
+    },
+    {
+      "label": "longTermPeriod",
+      "slot": "8",
+      "offset": 4,
+      "type": "t_uint32"
+    },
+    {
+      "label": "withdrawalFailed",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "withdrawalFailedToken",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "label": "withdrawalFailedPoolId",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bytes32)"
+    },
+    {
+      "label": "withdrawalFailedLpAmount",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "__gap",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "storage": [
+    {
+      "label": "lzEndpoint",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "auction",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "peers",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_uint32,t_bytes32)"
+    },
+    {
+      "label": "processedMessages",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "messageCount",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_uint32,t_uint256)"
+    },
+    {
+      "label": "lastResetTime",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_uint32,t_uint256)"
+    },
+    {
+      "label": "maxMessagesPerHour",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "pendingCommits",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(CrossChainCommit)_storage)"
+    },
+    {
+      "label": "liquidityState",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(LiquiditySync)_storage)"
+    },
+    {
+      "label": "bridgedDeposits",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "bridgedDepositTimestamp",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "bridgedDepositFunded",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "totalBridgedDeposits",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "bridgedDepositExpiry",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "claimableDeposits",
+      "slot": "14",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "claimableDepositOwner",
+      "slot": "15",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "label": "authorized",
+      "slot": "16",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "localEid",
+      "slot": "17",
+      "offset": 0,
+      "type": "t_uint32"
+    },
+    {
+      "label": "craCommitIds",
+      "slot": "18",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bytes32)"
+    },
+    {
+      "label": "vibeSwapCore",
+      "slot": "19",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "settlementFailed",
+      "slot": "20",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "failedSettlementEstimatedOut",
+      "slot": "21",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "failedSettlementPoolId",
+      "slot": "22",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bytes32)"
+    },
+    {
+      "label": "__gap",
+      "slot": "23",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "storage": [
+    {
+      "label": "nextProposalId",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "approvalThreshold",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "councilMembers",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_array(t_address)dyn_storage"
+    },
+    {
+      "label": "isCouncilMember",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "monthlyLimit",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_enum(Category)29,t_uint256)"
+    },
+    {
+      "label": "monthlySpent",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_enum(Category)29,t_uint256))"
+    },
+    {
+      "label": "proposals",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_struct(SpendingProposal)_storage)"
+    },
+    {
+      "label": "hasApproved",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_bool))"
+    },
+    {
+      "label": "totalRevenue",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "__gap",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

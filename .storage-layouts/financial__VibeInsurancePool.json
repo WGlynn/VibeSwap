@@ -1,0 +1,88 @@
+{
+  "storage": [
+    {
+      "label": "policies",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_struct(CoveragePolicy)_storage)"
+    },
+    {
+      "label": "policyCount",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "claims",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_struct(Claim)_storage)"
+    },
+    {
+      "label": "claimCount",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "hasVotedOnClaim",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_uint256,t_mapping(t_address,t_bool))"
+    },
+    {
+      "label": "underwriters",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(UnderwriterPosition)_storage)"
+    },
+    {
+      "label": "totalUnderwritten",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalShares",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "activeCoverage",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_enum(RiskCategory)30,t_uint256)"
+    },
+    {
+      "label": "premiumRateBps",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_enum(RiskCategory)30,t_uint256)"
+    },
+    {
+      "label": "maxCoverageRatioBps",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalPremiums",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalPayouts",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "__gap",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "storage": [
+    {
+      "label": "markets",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(Market)_storage)"
+    },
+    {
+      "label": "marketAssets",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_array(t_address)dyn_storage"
+    },
+    {
+      "label": "positions",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_mapping(t_address,t_struct(UserPosition)_storage))"
+    },
+    {
+      "label": "reserves",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "shapleyWeights",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "totalShapleyWeight",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "shapleyLastUpdate",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "__gap",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

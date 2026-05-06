@@ -1,0 +1,274 @@
+{
+  "storage": [
+    {
+      "label": "globalPaused",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "functionPaused",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_mapping(t_bytes4,t_bool)"
+    },
+    {
+      "label": "guardians",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "breakerConfigs",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(BreakerConfig)_storage)"
+    },
+    {
+      "label": "breakerStates",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(BreakerState)_storage)"
+    },
+    {
+      "label": "requiresAttestedResume",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "certifiedAttestor",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "resumeAttestationThreshold",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "resumeAttestationCount",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "tripGeneration",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "_hasAttestedResume",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_uint256,t_mapping(t_address,t_bool)))"
+    },
+    {
+      "label": "attestedResumeOverridden",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "c39SecurityDefaultsInitialized",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "__gap",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    },
+    {
+      "label": "auction",
+      "slot": "55",
+      "offset": 0,
+      "type": "t_contract(ICommitRevealAuction)"
+    },
+    {
+      "label": "amm",
+      "slot": "56",
+      "offset": 0,
+      "type": "t_contract(IVibeAMM)"
+    },
+    {
+      "label": "treasury",
+      "slot": "57",
+      "offset": 0,
+      "type": "t_contract(IDAOTreasury)"
+    },
+    {
+      "label": "router",
+      "slot": "58",
+      "offset": 0,
+      "type": "t_contract(CrossChainRouter)"
+    },
+    {
+      "label": "supportedTokens",
+      "slot": "59",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "deposits",
+      "slot": "60",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "pendingSwaps",
+      "slot": "61",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(SwapParams)_storage)"
+    },
+    {
+      "label": "crossChainOrders",
+      "slot": "62",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(CrossChainOrder)_storage)"
+    },
+    {
+      "label": "paused",
+      "slot": "63",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "userRateLimits",
+      "slot": "64",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(RateLimit)_storage)"
+    },
+    {
+      "label": "maxSwapPerHour",
+      "slot": "65",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "blacklisted",
+      "slot": "66",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "whitelistedContracts",
+      "slot": "67",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "requireEOA",
+      "slot": "68",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "commitCooldown",
+      "slot": "69",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "lastCommitTime",
+      "slot": "70",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "guardian",
+      "slot": "71",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "clawbackRegistry",
+      "slot": "72",
+      "offset": 0,
+      "type": "t_contract(ClawbackRegistry)"
+    },
+    {
+      "label": "wbar",
+      "slot": "73",
+      "offset": 0,
+      "type": "t_contract(IwBAR)"
+    },
+    {
+      "label": "batchTraderCommitId",
+      "slot": "74",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_mapping(t_address,t_bytes32))"
+    },
+    {
+      "label": "incentiveController",
+      "slot": "75",
+      "offset": 0,
+      "type": "t_contract(IIncentiveController)"
+    },
+    {
+      "label": "_cumulativeValidated",
+      "slot": "76",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "timelockController",
+      "slot": "77",
+      "offset": 0,
+      "type": "t_address"
+    },
+    {
+      "label": "failedExecutions",
+      "slot": "78",
+      "offset": 0,
+      "type": "t_array(t_struct(FailedExecution)_storage)dyn_storage"
+    },
+    {
+      "label": "_orderDepositors",
+      "slot": "79",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_mapping(t_uint256,t_address))"
+    },
+    {
+      "label": "_orderRevealCount_DEPRECATED",
+      "slot": "80",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_uint256)"
+    },
+    {
+      "label": "batchExecuted",
+      "slot": "81",
+      "offset": 0,
+      "type": "t_mapping(t_uint64,t_bool)"
+    },
+    {
+      "label": "pendingCrossChainCount",
+      "slot": "82",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "failedCompliances",
+      "slot": "83",
+      "offset": 0,
+      "type": "t_array(t_struct(FailedCompliance)_storage)dyn_storage"
+    },
+    {
+      "label": "__gap",
+      "slot": "84",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    },
+    {
+      "label": "commitOwners",
+      "slot": "125",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_address)"
+    }
+  ]
+}

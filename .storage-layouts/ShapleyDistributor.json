@@ -1,0 +1,226 @@
+{
+  "storage": [
+    {
+      "label": "games",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_struct(CooperativeGame)_storage)"
+    },
+    {
+      "label": "gameParticipants",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_array(t_struct(Participant)_storage)dyn_storage)"
+    },
+    {
+      "label": "shapleyValues",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "claimed",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_bool))"
+    },
+    {
+      "label": "weightedContributions",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "totalWeightedContrib",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "noveltyMultiplierBps",
+      "slot": "6",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "qualityWeights",
+      "slot": "7",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_struct(QualityWeight)_storage)"
+    },
+    {
+      "label": "authorizedCreators",
+      "slot": "8",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "minParticipants",
+      "slot": "9",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "maxParticipants",
+      "slot": "10",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "useQualityWeights",
+      "slot": "11",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "claimWindow",
+      "slot": "12",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "priorityRegistry",
+      "slot": "13",
+      "offset": 0,
+      "type": "t_contract(IPriorityRegistry)"
+    },
+    {
+      "label": "gameScopeId",
+      "slot": "14",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bytes32)"
+    },
+    {
+      "label": "genesisTimestamp",
+      "slot": "15",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalGamesCreated",
+      "slot": "16",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "gamesPerEra",
+      "slot": "17",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "halvingEnabled",
+      "slot": "18",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "totalValueDistributed",
+      "slot": "19",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalCommittedBalance",
+      "slot": "20",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "eraDistributed",
+      "slot": "21",
+      "offset": 0,
+      "type": "t_mapping(t_uint8,t_uint256)"
+    },
+    {
+      "label": "bondingCurve",
+      "slot": "22",
+      "offset": 0,
+      "type": "t_contract(IABCHealthCheck)"
+    },
+    {
+      "label": "bondingCurveSealed",
+      "slot": "22",
+      "offset": 20,
+      "type": "t_bool"
+    },
+    {
+      "label": "sybilGuard",
+      "slot": "23",
+      "offset": 0,
+      "type": "t_contract(ISybilGuard)"
+    },
+    {
+      "label": "shapleyVerifier",
+      "slot": "24",
+      "offset": 0,
+      "type": "t_contract(IShapleyVerifier)"
+    },
+    {
+      "label": "gameQualityWeights",
+      "slot": "25",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_struct(QualityWeight)_storage))"
+    },
+    {
+      "label": "keeperCommitment",
+      "slot": "26",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_mapping(t_address,t_bytes32)))"
+    },
+    {
+      "label": "keeperCommitTime",
+      "slot": "27",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_mapping(t_address,t_uint256)))"
+    },
+    {
+      "label": "revealRound",
+      "slot": "28",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_mapping(t_address,t_uint256))"
+    },
+    {
+      "label": "_keeperRevealedValue",
+      "slot": "29",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_bool)"
+    },
+    {
+      "label": "_revealCountByValue",
+      "slot": "30",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "certifiedKeeper",
+      "slot": "31",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "keeperRevealThreshold",
+      "slot": "32",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "keeperRevealDelay",
+      "slot": "33",
+      "offset": 0,
+      "type": "t_uint256"
+    },
+    {
+      "label": "ownerSetterDisabled",
+      "slot": "34",
+      "offset": 0,
+      "type": "t_bool"
+    },
+    {
+      "label": "__gap",
+      "slot": "35",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

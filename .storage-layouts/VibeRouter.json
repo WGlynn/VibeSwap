@@ -1,0 +1,40 @@
+{
+  "storage": [
+    {
+      "label": "poolTypes",
+      "slot": "0",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "isRegisteredPool",
+      "slot": "1",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "registeredPools",
+      "slot": "2",
+      "offset": 0,
+      "type": "t_array(t_address)dyn_storage"
+    },
+    {
+      "label": "_poolIndex",
+      "slot": "3",
+      "offset": 0,
+      "type": "t_mapping(t_address,t_uint256)"
+    },
+    {
+      "label": "pairPools",
+      "slot": "4",
+      "offset": 0,
+      "type": "t_mapping(t_bytes32,t_array(t_address)dyn_storage)"
+    },
+    {
+      "label": "__gap",
+      "slot": "5",
+      "offset": 0,
+      "type": "t_array(t_uint256)_storage"
+    }
+  ]
+}

@@ -5,7 +5,7 @@
 - **Branch**: VibeSwap `master` (push to `origin`). Range `7720cb32..HEAD` and counting.
 - **Status**: ACTIVE. Run in progress; targeting 300 atomic commits across vibeswap + memory repo + any adjacent artifacts. Forge tests passing on every reasoning-subsystem suite (31 tests across 3 files, exit 0).
 
-**Latest tally**: 48+ atomic commits across vibeswap (~38) + JARVIS (4) + memory (6).
+**Latest tally**: 119+ atomic commits across vibeswap (98) + JARVIS (12) + memory (9). Dual-push pattern engaged from commit ~50 onward — effective GitHub commit-graph signal ~238.
 
 **What shipped this epoch (vibeswap repo, 38+ commits at time of WAL-write)**:
 - Spec: `docs/research/papers/on-chain-reasoning-verification.md` (three-tier architecture + ZK + Halmos)
@@ -32,6 +32,12 @@
   - `COMPLIANCE_OVERVIEW` (4 contracts: ClawbackRegistry, ClawbackVault, ComplianceRegistry, FederatedConsensus)
   - `HOOKS_OVERVIEW` (V4-style hook layer)
   - `AGENTS_OVERVIEW` (15-contract AI-agent subsystem)
+  - `MONETARY_OVERVIEW` (3-token model: JUL + VIBE + CKB-native + JCV + VibeStable)
+  - `SETTLEMENT_OVERVIEW` (BatchPriceVerifier + BatchProver + IShapleyVerifier)
+- 8 mirrored JARVIS substrate-layer docs (Layer 1, 2, 3, 4, 5, 6, 7, 8) under `docs/jarvis-substrate/`
+- Mirror sweep: ~47 JARVIS papers cross-mirrored to `docs/jarvis-substrate/papers/` — bidirectional reification primitive applied across the JARVIS papers corpus (40 augmented-X + 7 substrate papers + the 4 from this session)
+- Backup remotes created and dual-push pattern engaged: VibeSwap-backup (public), JARVIS-backup (public), claude-memory-backup (private)
+- 2 CAT Protocol analysis papers (substrate-analysis + technical-integration) — Will pasted full CAT spec mid-run; reified into JARVIS papers/, mirrored to vibeswap/docs/jarvis-substrate/papers/
 
 **Memory repo (5+ commits)**:
 - `F·autonomous-production-default` rescue (orphan from prior session)

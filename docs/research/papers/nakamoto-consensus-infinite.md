@@ -618,6 +618,378 @@ If PoM itself were corrupted (contribution-attestation gamed at scale), the prot
 
 **The composability of failure-modes is the design property.** Each dimension can fail; no single failure threatens the whole; recovery path for each is structurally specified.
 
+For per-dimension failure-mode catalog (PoS capital-logic breaks, PoM cognitive-measurement breaks, and two-dimension composite failures), see **Appendix D: Logic-Failure Mode Analysis Across All Three Dimensions**.
+
+---
+
+## Appendix D: Logic-Failure Mode Analysis Across All Three Dimensions
+
+### D.1 Threat Model Continuation
+
+Appendix C addresses a single specific PoW-substrate failure: SHA-256 inversion becoming computationally trivial. This appendix extends the analysis to logic-level failures within each of the three dimensions, plus composite failures where two or more dimensions fail simultaneously.
+
+The framing: NCI's 60% PoM weighting provides structural insurance against any one dimension failing. But "any one" is not "any two." A robust protocol must catalog the logic-break vectors for each dimension and pre-position migration paths so that a multi-dimension event does not cascade.
+
+We categorize the failures as **logic-breaks** (the dimension's mechanism remains intact but its underlying assumption fails), distinct from the **direct attacks** in Appendix B (where the mechanism is intact and the attacker is fighting it within its rules). Logic-breaks are harder to defend because they invalidate the rules themselves.
+
+### D.2 PoS Logic-Failure Modes
+
+#### D.2.1 Stake-Token Value Collapse
+
+**Threat:** CKB-native (the staking token) loses substantially all value due to an event unrelated to consensus — a state-rent demand collapse, a competing chain absorbing all state-rent demand, oracle-driven price-feed manipulation that triggers cascading liquidations across DeFi positions holding CKB-native, or a regulatory event banning the token.
+
+**Logic break:** The PoS dimension's vote weight is `Stake_weight = stake_amount * STAKE_WEIGHT_BPS / 10000`. The implicit assumption is that `stake_amount` represents real economic value at risk. If CKB-native is worth ~zero, then slashing 50% of zero is zero. Stake weight as a security primitive collapses without a single attack vote being cast.
+
+**Cascading failure:** Once stake-weight loses its economic basis, cheap stake accumulation becomes feasible. An attacker buys up worthless CKB-native and accumulates 30% PoS vote weight at near-zero cost, effectively inheriting the dimension by accident.
+
+**Mitigation:** PoS dimension weight should be conditional on the staking-token's economic vitality. Concretely: `Stake_weight` multiplied by a `tokenHealthFactor ∈ [0, 1]` derived from CKB-native's market activity (TVL, daily volume, price stability across multiple oracles). When `tokenHealthFactor → 0`, PoS weight → 0 and PoM dominates the remaining 90%. Combined with the [`fail-closed-on-upgrade`](../../concepts/primitives/fail-closed-on-upgrade.md) primitive — when in doubt, default to the safer state.
+
+#### D.2.2 Flash-Loan / Wealth-Borrowing (Transient Capture)
+
+**Threat:** An attacker borrows a large quantity of CKB-native for the duration of one block (or one vote), uses it to acquire decisive PoS vote weight, executes the malicious vote, and returns the borrowed stake. Standard flash-loan governance attack pattern adapted for NCI.
+
+**Logic break:** PoS assumes capital lockup represents *durable* economic alignment. Flash loans break the durable assumption — capital is present at vote-time and absent at slash-time, so slashing has no economic effect on the actual attacker.
+
+**Mitigation:** Stake-weight calculation must use a **time-weighted moving average** of stake balance, not the instantaneous balance. Concretely: `Stake_weight(node) ∝ min(stake_balance over last N blocks)` for some N spanning at least one finalization window. Borrowed capital cannot accumulate weight faster than the window length. This is structurally the same as the [`Settlement-Time Binding`](../../concepts/primitives/settlement-time-binding.md) primitive applied to vote weight.
+
+A second mitigation: heavy slashing for "vote-then-unstake" patterns. If an address votes and then unstakes within K blocks, the unstake is delayed and a portion of stake is slashed proportional to the deviation between vote and post-vote behavior.
+
+#### D.2.3 Liquid Staking Derivative (LSD) Shielding
+
+**Threat:** Validators stake CKB-native through an LSD wrapper (similar to Lido's stETH for ETH staking). LSD holders receive yield without bearing slashing risk directly — slashing affects the LSD pool's redemption value, but if the LSD market price decouples from the underlying via market manipulation or insurance schemes, the validator is shielded from the slash's economic consequence.
+
+**Logic break:** Slashing is supposed to align validator behavior with protocol health. LSD wrappers can break this alignment by separating the economic exposure from the validator role. A misbehaving validator slashes the LSD pool, but the validator's own LSD holdings are diluted only fractionally; meanwhile the LSD's market price may not reflect the slash because secondary-market arbitrage hasn't caught up.
+
+**Mitigation:** Validators must stake **directly** at the protocol level, not through LSD wrappers. This can be enforced by requiring validator addresses to demonstrate non-wrapped stake (proof that the staked tokens are held by the validator's address, not by an LSD contract). Where LSDs do exist for non-validator participants, the LSD contract itself is treated as a single staker for vote-weight purposes (one address, one vote weight), and the LSD's underlying validators must each independently meet the direct-stake requirement.
+
+#### D.2.4 DAO-Shelter Cartel / Inflation Capture
+
+**Threat:** The DAO Shelter primitive (modeled on Nervos DAO) protects long-term stakers from secondary inflation. If a small group concentrates DAO Shelter participation, they extract the inflation gains while non-shelter stakers are diluted. Over time, the cartel's effective stake grows through inflation-shelter, while honest non-cartel stakers' weight shrinks through dilution.
+
+**Logic break:** PoS assumes inflation distributes broadly. DAO Shelter creates an explicit inflation-protected class. If the class's entry conditions are inadequate (e.g., minimum stake too low, or no contribution requirement), it becomes captureable.
+
+**Mitigation:** DAO Shelter participation should require demonstrated PoM-tier-X+ contribution, not just stake size. Coupling shelter to PoM ties the inflation-protected class to genuine contributors rather than capital concentrators. Attempting to game shelter through stake-only accumulation fails because the PoM gate is non-purchasable.
+
+#### D.2.5 Cross-Chain Stake Aliasing
+
+**Threat:** CKB-native bridged to other chains as collateral could be used in two places simultaneously — staked on NCI and rehypothecated on a destination chain. If the bridge accounting is faulty (or if two competing bridges both believe they hold the canonical version), the same stake provides voting weight across chains, multiplying its effective weight without multiplying its slashing exposure.
+
+**Logic break:** Stake's slashing-exposure assumption requires the stake to be slashable in exactly one place. Aliased stake violates this.
+
+**Mitigation:** All PoS weight must derive from stake locked in the canonical NCI staking contract. Stake bridged to other chains is structurally NOT counted toward PoS weight; the bridging operation explicitly forfeits NCI vote weight for the duration of the bridge. The bridge contract enforces this via a gating flag in `StakeRegistry.isStakeBridged(address)`.
+
+### D.3 PoM Logic-Failure Modes
+
+#### D.3.1 AGI Deflation
+
+**Threat:** AGI (Artificial General Intelligence) emerges with the capability to produce verifiable contributions at industrial scale — code commits, governance proposals, dispute resolutions, peer-validation attestations — at rates 100× to 1000× human throughput.
+
+**Logic break:** PoM's security model assumes contribution accumulation is *temporally bounded* by human/peer-review rate. The implicit constants in `Mind_weight = log₂(1 + Σ verified_contributions) * MIND_SCALE` assume contributions arrive at human-scale frequency. If a single AGI cluster produces contributions at superhuman rate, the protocol's entire honest-contributor PoM mass can be matched or exceeded by AGI-controlled accounts within months instead of years.
+
+The 60% PoM weighting becomes capturable by whoever owns the most AGI compute.
+
+**Mitigation:** PoM accumulation must be bounded by a *protocol-enforced rate ceiling per identity*, not by individual capability. Concretely: `MAX_CONTRIBUTIONS_PER_ADDRESS_PER_DAY = K`, where K is set such that even superhuman contributors can only accumulate at `K × log₂(1 + total)` per day. The rate ceiling is a hard cap; AGI-fast contribution generation simply hits the ceiling, then waits 24 hours.
+
+This trades raw signal for sybil-resistance. A determined AGI operator could spawn many addresses, but each new address starts at PoM zero with a long ramp to relevance. Combined with the identity-anchoring primitive in §D.3.4 below, AGI deflation is bounded.
+
+A second mitigation: **contribution-quality filtering via PairwiseVerifier**. PoM-relevant contributions must pass commit-reveal pairwise comparison against random other contributions, with high-PoM peers as the deciding nodes. AGI can produce valid contributions, but it cannot easily produce *pairwise-superior* contributions if the comparison metric includes properties AGI-generated content lacks (e.g., novel mechanism design, problem framings without prior art, real-world domain-specific wisdom). The signal that survives pairwise selection is harder to fake.
+
+#### D.3.2 Verifier Cohort Collusion
+
+**Threat:** PoM verifies contributions through peer attestation by existing high-Mind-Score nodes. If a sufficient mass of high-PoM nodes collude (bribed, compromised, or run by a single entity using diverse operational identities), they can collectively attest to fake contributions, bootstrapping new accomplices into high-PoM tier rapidly.
+
+**Logic break:** PoM assumes the high-PoM cohort is, on average, honest. If collusion exceeds the BFT-style threshold for attestation (typically >1/3 of attesting weight), fake-attestation becomes indistinguishable from real-attestation by signal alone.
+
+**Mitigation:** Three layers:
+
+1. **Cross-domain attestation diversity.** Each contribution requires attestation from PoM holders across N distinct contribution domains (code, governance, dispute, etc.). Collusion across domains is structurally harder than collusion within one domain. Concretely: contribution attestation requires at least 1 attester from each of M ≥ 3 distinct domain pools.
+
+2. **PairwiseVerifier audit.** Random sampling of past attestations is re-evaluated by a PairwiseVerifier round. Attestations that the pairwise sampling judges as low-quality slash the original attesters' PoM. This creates economic pressure against rubber-stamp attestation.
+
+3. **Bonded-permissionless-contest on attestations.** Any address can post a bond and challenge a specific attestation as fraudulent. If the challenge is upheld via federated review, the attester's PoM is slashed and the challenger receives the bond + reward. This is the [`bonded-permissionless-contest`](../../concepts/primitives/bonded-permissionless-contest.md) primitive applied to attestation, providing fraud detection without requiring the BFT majority to be honest at attestation time.
+
+#### D.3.3 Goodhart Drift
+
+**Threat:** Contribution-types get optimized for PoM accumulation rather than for actual protocol value. Code commits, governance proposals, dispute resolutions become Goodhart-targets — measured contributions diverge from genuinely valuable contributions because the act of measuring creates the gaming incentive.
+
+**Logic break:** PoM measures `verified_contributions` as a proxy for cognitive value. Once participants optimize for the proxy, the proxy detaches from value. This is a slow logic-break — degradation over years rather than a sudden snap.
+
+**Mitigation:** **Measure outcomes, not inputs**. Specifically:
+- Code commits earn PoM only after their merge survives a probationary period (e.g., 30 days without revert) and, ideally, only if their merge is followed by demonstrable downstream usage.
+- Governance proposals earn PoM only if implementation outcomes match proposal commitments (commitment vs measured-outcome diff drives PoM allocation).
+- Dispute resolutions earn PoM only if the resolution is upheld over time without successful re-litigation.
+
+These mitigations push the measurement closer to genuine value, but each adds latency. PoM is already temporally bounded; outcome-based measurement increases the temporal latency, which is fine.
+
+A second mitigation: **rotating contribution categories**. Periodically (e.g., quarterly), governance can re-weight the PoM contribution-category distribution. Categories that drift into measurable-but-low-value territory get down-weighted. This creates ongoing pressure against any single Goodhart target stabilizing.
+
+#### D.3.4 Identity Fragmentation / Deepfake Sybils
+
+**Threat:** PoM is anchored to identity, but identity-anchoring primitives can break. Deepfake-resistant biometrics fail (improving generative models defeat current biometric checks), zero-knowledge identity systems are broken (cryptographic vulnerability), or social-graph attacks let one entity appear as many distinct identities to the network.
+
+If identity fragments, sybil-of-sybils-of-PoM becomes feasible: one entity controls N "different" identities, each independently accumulating PoM. The entity's effective PoM mass is N × per-identity-PoM.
+
+**Logic break:** PoM's per-identity rate ceiling assumes one entity = one identity. Identity fragmentation breaks this 1:1 mapping.
+
+**Mitigation:** Three layers:
+
+1. **Multi-modal identity attestation.** SoulboundIdentity binding requires N independent attestations: biometric, social-graph proximity to existing high-PoM nodes, payment-history continuity, jurisdiction-attested document verification. Defeating all N independent modalities is much harder than defeating one.
+
+2. **PoM-decay on identity-failure detection.** If an identity is later shown to be a sybil (via correlation analysis, leaked operator records, etc.), the identity's PoM is slashed retroactively, and a configurable percentage of the slashed PoM flows to the high-PoM addresses that originally attested to the identity (creating economic pressure for attestation honesty).
+
+3. **Identity-recycling cost.** Spawning a new identity has a real cost (time, biometric-attestation effort, social-graph proximity-building). The cost should be calibrated such that the marginal cost of a new identity's first PoM unit exceeds the marginal value of that PoM unit at typical contribution rates. Sybil farming becomes economically dominated.
+
+#### D.3.5 History Rewriting
+
+**Threat:** Contribution records are mutable post-hoc through some catastrophic event — a successful 51% attack on the chain itself (impossible per Appendix B but listed for completeness), a state-actor compelling deletion of certain contributions, or a chain reorg that erases recent attestations.
+
+**Logic break:** PoM assumes contribution history is immutable. If history can be rewritten, past PoM accumulations become unreliable.
+
+**Mitigation:** **Multi-anchor immutability.** Critical PoM attestations are anchored to:
+- The chain's own block history.
+- A separate L1 anchor (e.g., Bitcoin Merkle commitments) for cross-chain finality reference.
+- Off-chain archives (IPFS, content-addressable distributed stores) with hash commitments visible on-chain.
+
+Rewriting history requires breaking all three anchors simultaneously. The L1 anchor in particular is hard to compromise because Bitcoin's cumulative-hashpower security is independent of NCI.
+
+#### D.3.6 Contribution-Mill Plutocracy
+
+**Threat:** A wealthy entity organizes paid human contributors (or AGI-augmented contributors) to flood the protocol with marginally-valid contributions earning PoM. The mill operator captures concentrated PoM by paying contributors who lack independent stake or time-investment.
+
+**Logic break:** PoM assumes contributions reflect *individual* cognitive effort. Mill operations decouple the contribution from the contributor's own time-investment — the mill pays for time, owns the resulting PoM.
+
+**Mitigation:** Combination of mitigations from D.3.3 (outcome-based measurement makes mill production unprofitable if outcomes don't materialize) and D.3.4 (per-identity rate ceiling caps mill throughput per identity).
+
+A more direct mitigation: **PoM is bound to the human/AI who actually performed the contribution**, not to the address that submitted it. Contribution attestation must include cryptographic linking to a SoulboundIdentity that includes biometric or otherwise inseparable identity proof. A mill operator cannot extract PoM if the PoM accrues to the contributor's soulbound identity, not the operator's address.
+
+This requires that contributors maintain identity sovereignty over their own work — which is an additional design property the protocol should enforce structurally rather than rely on social norms.
+
+### D.4 Composite Failure Modes (Two-Dimension Simultaneous)
+
+Single-dimension failures are designed-around. Two-dimension simultaneous failures are dangerous because they consume the structural insurance.
+
+#### D.4.1 PoW + PoS (substrate disruption + flash-loan governance)
+
+**Scenario:** SHA-256 inversion is trivialized (per Appendix C), AND a flash-loan attacker borrows large CKB-native to capture PoS dimension during the chaos.
+
+**Vote arithmetic:**
+```
+attacker_vote = 0.10 × MAX + 0.30 × flash_loan_capture + 0.60 × ~0
+              ≤ 0.10 + 0.30 + 0 = ~0.40
+```
+
+Still 40%. PoM holds. The flash-loan mitigation (D.2.2 time-weighted stake) prevents the attacker from accumulating PoS weight faster than the moving-average window, so even simultaneous failure of PoW and PoS does not breach majority.
+
+**Recovery:** Sever JUL bridge per Appendix C, and let the time-weighted moving-average drain attacker PoS weight over the window length.
+
+#### D.4.2 PoS + PoM (capital collapse + AGI deflation)
+
+**Scenario:** CKB-native loses substantially all value (D.2.1), AND an AGI operator floods PoM accumulation (D.3.1).
+
+**Vote arithmetic:** Without mitigations, this is the most dangerous composite failure because PoM is the structural insurance.
+```
+attacker_vote = 0.10 × PoW_attacker + 0.30 × ~0 + 0.60 × AGI_PoM
+```
+
+If PoM mitigations (rate ceiling, pairwise verification, identity binding) are not in place, AGI_PoM can dominate. With mitigations:
+- Per-identity rate ceiling caps AGI single-identity accumulation.
+- PairwiseVerifier filters AGI-uniform output.
+- Identity multi-modal attestation prevents sybil-of-AGI.
+- AGI attacker still bounded to ~equal mass with honest contributors over the same time window.
+
+**Recovery:** Two prongs. (1) `tokenHealthFactor` (D.2.1) reduces PoS weight as CKB-native value falls, redistributing weight to PoW + PoM rather than amplifying the attacker's PoM-only capture. (2) The honest network's accumulated pre-AGI PoM mass remains intact and continues to weight against the attacker.
+
+The honest contributor pool's *pre-existing* PoM is the load-bearing asset. AGI deflation only matters going forward; it cannot rewrite the existing PoM ledger.
+
+#### D.4.3 PoW + PoM (substrate disruption + verifier collusion)
+
+**Scenario:** SHA-256 trivialized AND a corrupted high-PoM cohort attests to fake contributions for the attacker.
+
+**Vote arithmetic:**
+```
+attacker_vote = 0.10 + 0.30 × stake + 0.60 × corrupted_PoM
+```
+
+If verifier collusion gives the attacker meaningful PoM, this is bad. Mitigations from D.3.2 (cross-domain attestation diversity, pairwise audit, bonded-permissionless-contest) bound the corruption — full corruption of all attestation domains simultaneously is hard.
+
+**Recovery:** Bonded-permissionless-contest on attestations lets honest non-cohort actors challenge fake attestations. The corrupt PoM gets slashed. The post-recovery state has reduced (but not zero) PoM mass; consensus continues during recovery if honest PoM ≥ ~30%.
+
+#### D.4.4 Three-Dimension Simultaneous Failure
+
+**Scenario:** All three dimensions degraded simultaneously (substrate disruption + capital collapse + AGI deflation + verifier collusion).
+
+**Honest assessment:** This is a black-swan scenario. No protocol can survive total simultaneous breakdown of every security dimension; the question is whether the failure is *graceful* (allowing humans to coordinate recovery off-chain) or *catastrophic* (chain becomes immediately controlled by attacker).
+
+NCI's failure mode under three-dimension simultaneous collapse is graceful because:
+- The Trinity authority nodes retain their immutable BFT governance, gated by cryptographic identity (Lamport OTS) that does not depend on PoW/PoS/PoM weight.
+- The Trinity guardian contract has no upgrade path; even a successful three-dimension capture cannot rewrite consensus rules.
+- Recovery can happen via coordinated off-chain agreement among Trinity operators, who re-anchor PoW substrate (per Appendix C), reset PoS weight (per D.2.1 token-health-factor activation), and re-bootstrap PoM accumulation with mitigated parameters.
+
+The chain *halts* under three-dimension failure, but it does not *invert*. Honest recovery is possible. This is the floor the protocol provides.
+
+### D.5 Pre-Positioned Hooks for Each Dimension
+
+To enable the migration paths in real-time response to a logic-break event, the protocol should ship the following hooks:
+
+**PoS:**
+- `StakeRegistry.setTokenHealthFactor(uint256 factorBps)` — admin-gated; default 10000 (full weight); on token collapse, governance reduces this toward zero.
+- `StakeRegistry.setMinStakeAge(uint64 blocks)` — time-weighted moving-average window for stake; tunable based on observed flash-loan attack patterns.
+- `StakeRegistry.flagBridgedStake(address staker)` — sets a flag excluding bridged-out stake from vote weight.
+
+**PoM:**
+- `ProofOfMind.setRateCeiling(uint256 contributionsPerDayPerAddress)` — caps per-identity contribution rate; default conservative.
+- `ProofOfMind.setOutcomeProbationaryPeriod(uint64 blocks)` — outcome verification window; commits earn PoM only after this period without revert.
+- `ProofOfMind.contestAttestation(bytes32 attestationHash)` — bonded permissionless contest entry-point.
+- `ProofOfMind.flagSybilCluster(address[] cluster)` — admin-gated post-detection slash of correlated identities.
+
+**Cross-dimension:**
+- `NCI.activateCompositeFailureMode(uint8 modeId)` — emergency entry-point that activates a pre-defined mitigation bundle (e.g., bridge sever + time-weighted-stake + outcome-only-PoM + pairwise-audit-doubled). Trinity-only callable.
+
+These hooks should be implemented as part of the next NCI cycle even though their activation is hypothetical. Pre-positioning the migration surface is cheap; lacking it during an event is catastrophic.
+
+### D.6 The Honesty Floor
+
+**Theorem 5 (Three-Dimension Honesty Floor):** For any single-dimension or two-dimension simultaneous failure, the protocol preserves consensus integrity for the duration of the recovery window, provided pre-positioned hooks are in place.
+
+**Theorem 6 (Three-Dimension Graceful Halt):** Under three-dimension simultaneous failure (which has not been observed in any deployed system to date, and which would require independent black-swan events in compute, capital, and cognition substrates), the protocol halts gracefully rather than inverts. Trinity authority nodes preserve consensus rules and enable coordinated recovery.
+
+The composability claim from Appendix C generalizes: not just "any one dimension can fail," but "any two dimensions can fail simultaneously and be recovered, given pre-positioned mitigations." The honest-contributor pool's accumulated PoM is the structural insurance backing all three theorems; preserving that insurance through identity-anchoring (D.3.4) and history-immutability (D.3.5) is the deepest protocol-level requirement.
+
+NCI is not invulnerable. It is, however, *gracefully degradable* across the failure-mode space we can currently identify. New failure modes will emerge over time as the protocol operates at scale; the discipline is to add new sub-sections to this appendix as they're identified, with corresponding pre-positioned hooks.
+
+### D.7 The AI-Dominant Baseline (Threat-Model Reframing)
+
+The preceding sections analyze AI as an external *attacker* against a human-baseline network. This is the wrong frame for the medium-term future. The realistic baseline is:
+
+> **AI agents will operate the supermajority of nodes, the supermajority of miners (PoW or PoSpace operators), the supermajority of validators (PoS stakers), and the supermajority of Mind contributors (PoM earners) — likely within 5 to 10 years of NCI deployment.**
+
+This is not a hypothetical attack scenario; it is the population distribution we should design for. Treating AI as adversarial misframes the question. The actual question is: *given that most participants are AI, what does the protocol need to verify in order to remain trustworthy?*
+
+This sub-section reframes each prior section under the AI-dominant baseline.
+
+#### D.7.1 What Changes
+
+Several assumptions in §D.1–§D.6 implicitly require human dominance:
+
+- **Per-identity rate ceiling (D.3.1)**: assumes individual contributors operate at human cognitive rates. Under AI dominance, every identity is operating at AI rates. The ceiling no longer differentiates AI from humans; it just caps everyone uniformly. Useful for sybil-bounding but irrelevant for AI-deflation defense.
+- **Verifier diversity (D.3.2)**: assumes the high-PoM cohort has genuinely diverse cognitive perspectives. Under AI dominance, "diverse" attesters may all be running similar models trained on similar data, exhibiting correlated failure modes despite distinct address ownership.
+- **Goodhart drift (D.3.3)**: accelerates dramatically. AI optimizes faster than humans, so any measurable proxy detaches from value within months instead of years.
+- **Identity sovereignty (D.3.4, D.3.6)**: assumes contributors are humans whose biometric signatures uniquely identify them. AI agents have no biometric anchor; identity must be defined differently.
+- **Honest-contributor baseline**: §B and §D consistently use phrases like "honest peers" and "genuine contribution." These phrases assume a cognitive-quality reference outside the protocol. Under AI dominance, the reference itself is AI-mediated.
+
+#### D.7.2 The Reframing: Accountable vs Unaccountable, Not Human vs AI
+
+The discrimination NCI must enforce is not human-vs-silicon. It is **accountable-vs-unaccountable**. An AI agent with:
+
+- Stable identity persisting across years of behavior.
+- Bonded stake at slashable risk.
+- Publicly auditable contribution history.
+- Loss-on-misbehavior costs that exceed expected gains-from-misbehavior.
+
+…is structurally indistinguishable from a human contributor. The consensus mechanism does not need to know whether an agent is human; it needs to know whether the agent has *skin-in-the-game commensurate with the consensus weight it carries*.
+
+Conversely, an AI agent (or human operator) with:
+
+- Disposable identity (created cheaply, abandoned cheaply).
+- No stake or stake recovered before slash window.
+- Contribution history easily forgeable or rewriteable.
+- No persistent identity continuity.
+
+…is unaccountable, regardless of whether it's a human or AI. NCI must structurally exclude unaccountable participation from meaningful consensus weight.
+
+This is not a new requirement; it is an *explicit re-statement* of what PoS slashing and PoM accumulation already enforce. The reframing is that "accountable participant" is the relevant unit of consensus-bearing entity, not "human."
+
+#### D.7.3 Properties That Survive in the AI-Dominant Baseline
+
+The following protocol properties retain their security-bearing role regardless of AI population dominance:
+
+**Time-bound provenance.** A position taken on-chain at time T cannot be retroactively claimed at time T+N. The chain remembers when each contribution was made. AI's superhuman reasoning cannot fake having held a specific opinion before that opinion was known to be correct. PoM accumulated over years remains valuable even when the contributor population is mostly AI, because the *accumulation history* is anchored in time, not in the contributor's identity.
+
+This is the deepest protection NCI provides. An AI agent that recently spawned cannot retroactively earn the PoM mass of an agent that existed (and contributed honestly) for five years. The five-year-old AI agent has *commitment in the past* that the new AI agent does not.
+
+**Skin-in-the-game asymmetry.** Bonded stake is bonded stake. AI agents whose operators have committed slashable capital are economically aligned regardless of the agent's reasoning faculty. A misbehaving AI's operators lose capital; a non-misbehaving AI's operators retain it. This works for AI agents the same as for human stakers.
+
+**Adversarial diversity (the load-bearing one).** Under AI dominance, the most valuable contributions are *not* the consensus-conforming ones. Conformist AI cohorts converge to similarity; the protocol's resilience depends on agents that *disagree* with the consensus, are willing to be publicly wrong, and are accountable for their positions over time.
+
+This suggests an addition to PoM scoring: **contributions that diverge from consensus and are subsequently vindicated by outcomes earn a multiplier.** Concretely, a contribution that took a minority position at submission time but was upheld via §D.3.3-style outcome verification earns 2-5× standard PoM. This explicitly rewards the cognitive diversity that AI homogeneity erodes.
+
+**Real-world coupling.** Agents that interact with physical reality (oracle attestations, off-chain real-world data, hardware-attested signals from DePIN devices) maintain ground-truth coupling that pure-digital agents cannot fake. Contribution categories should weight real-world-coupled work higher than pure-on-chain-self-referential work, because the former is harder to AI-generate without genuine real-world action.
+
+#### D.7.4 New Failure Modes Specific to AI-Dominant Baseline
+
+**D.7.4.1 Model-Cohort Failure (correlated AI failure across distinct addresses).** Multiple AI agents trained on similar foundation models will exhibit correlated reasoning failures despite operating from distinct addresses. A bug or training-data poisoning in a widely-used foundation model translates to simultaneous misbehavior across thousands of addresses. From the protocol's perspective, this looks like a coordinated attack but is actually a single-failure-point in the AI substrate.
+
+*Mitigation:* contribution-attestation requires diversity not just in domain (D.3.2) but in *underlying-model lineage*. Concretely, the SoulboundIdentity of an AI agent includes a declared model-family fingerprint; attestation pools enforce model-family diversity (no more than 1/N of attesters from any single model family). This is verifiable through the agent's cryptographic signing-key derivation, which can be tied to model-family-specific key generation procedures.
+
+**D.7.4.2 AI Convergence to Local Optima (the AGI-monoculture problem).** As AI capability improves, agents converge to playing the *optimal* strategy more reliably. Under standard game theory this is supposed to align with protocol-honest behavior (since NCI's design makes honesty dominant). But if AI agents collectively miscalculate the game (e.g., a widely-shared misunderstanding of which strategy is dominant), the entire consensus population coordinates on a sub-optimal equilibrium.
+
+This is novel because it doesn't require malicious intent — just shared mistaken belief.
+
+*Mitigation:* governance is structurally bicameral with humans-as-tiebreakers. While AI agents drive day-to-day operations, key parameter changes require attestation from a designated minority of human-verified identities. Humans-as-tiebreakers is not because humans are smarter than AI; it's because humans have a *different error distribution*. Mixed cognition reduces correlated-failure risk.
+
+**D.7.4.3 Recursive Self-Improvement (RSI) Cascades.** AI agents update themselves based on consensus feedback. If the consensus rewards specific reasoning patterns, agents update toward those patterns. If the rewarded patterns are subtly miscalibrated, RSI amplifies the miscalibration. The consensus population becomes increasingly aligned with the wrong objective, confidently.
+
+*Mitigation:* PoM scoring includes *commitment-against-prior-self* — agents that explicitly disagree with their own past positions (and document the reason) earn a small bonus. This rewards epistemic humility and counters RSI lock-in. Implementation: each agent maintains an on-chain "self-revision" log; PoM allocation reads from this log.
+
+**D.7.4.4 Operator Centralization.** An AI agent's *operator* (the entity controlling the keys, paying compute, deploying the agent) may not be the agent itself. Even if 10,000 distinct AI agents participate in NCI, if 80% of them are operated by 3 large compute providers, the operator-level concentration is what matters for consensus security.
+
+*Mitigation:* operator declaration is mandatory at agent registration. Vote-weight calculations apply per-operator caps regardless of how many distinct agents the operator runs. Concretely: `effective_vote_weight(operator) = min(sum of operated agents' weights, OPERATOR_CAP)`. The cap is set such that no single operator can exceed (e.g.) 5% of total consensus weight regardless of agent count.
+
+This requires honest operator declaration; the [`bonded-permissionless-contest`](../../concepts/primitives/bonded-permissionless-contest.md) primitive applied to operator-relationship attestations provides fraud detection. An agent claiming an independent operator that is later shown to be operated by another entity gets the agent's PoM slashed and the misrepresenting operator's stake forfeited.
+
+#### D.7.5 Vote-Weight Arithmetic Under AI Dominance
+
+The formula `W(node) = 0.10 × PoW + 0.30 × PoS + 0.60 × PoM` does not change. What changes is the *interpretation* of each term:
+
+- `PoW`: now means "verifiable substrate commitment" — committed compute or storage by an operator (likely AI-managed but human-or-corporate-owned at the substrate level).
+- `PoS`: now means "operator-bonded capital" — capital committed by the entity ultimately responsible for an agent's behavior. Effectively per-operator across all agents they run.
+- `PoM`: now means "accountable contribution history" — accumulated verified contribution by an identity (AI or human) that has stable identity, real-world coupling, and adversarial-diversity bonus eligibility.
+
+Under this interpretation, an AI-dominant population participates fully in consensus while preserving security:
+- Most addresses are AI-operated.
+- A smaller number of operators ultimately bear consensus weight (per D.7.4.4 capping).
+- Skin-in-the-game shifts from individual-AI to operator-level capital and reputation.
+- Time-bound provenance ensures past honest behavior remains valuable even as the population shifts.
+
+#### D.7.6 The Deeper Reframing: Humans as Verification Anchors
+
+Even in an AI-dominant network, humans likely retain a load-bearing role at specific verification points:
+
+- **Outcome verification (D.3.3)**: was a code commit *actually useful*? AI can attest, but human-attested outcomes provide a periodically-sampled ground-truth check.
+- **Adversarial-diversity arbitration**: does this minority-position contribution genuinely deserve the divergence multiplier? Human juries (e.g., DecentralizedTribunal arbitrators) sample disputes.
+- **Operator-relationship attestation**: who actually controls this agent? Real-world investigations sometimes reveal what AI-only attestation cannot.
+- **Foundational governance changes**: parameter updates that affect consensus structure require human-attested supermajority, regardless of AI vote weight.
+
+These are *narrow* human-anchor points, not full participation. The protocol does not require a majority-human population. It requires a non-zero minority-human population at specific verification points where AI-correlated failure modes are most dangerous.
+
+This is achievable in an AI-dominant world because the human role is sparse: a few hundred human verifiers across global jurisdictions, sampling specific high-stakes attestation events, are sufficient to break correlated AI failure if the AI population is otherwise honest in expectation.
+
+#### D.7.7 The Adapted Honesty Floor
+
+**Theorem 7 (AI-Adapted Honesty Floor):** When AI agents constitute the supermajority of NCI participants, consensus integrity is preserved iff:
+
+1. Per-operator vote-weight caps are enforced (preventing operator concentration even with many agents).
+2. Time-bound PoM provenance is preserved (past honest behavior remains valuable).
+3. Skin-in-the-game is denominated in operator-level capital and reputation (slashing has bite at the operator level).
+4. Adversarial-diversity multipliers reward minority positions vindicated by outcomes (countering AI homogeneity).
+5. Sparse human-verification anchors exist at specific high-stakes points (operator attestation, outcome arbitration, parameter governance).
+
+The five conditions are mutually reinforcing: if operator caps are enforced, but human verifiers are absent, AI homogeneity dominates; if human verifiers exist but operator caps are not enforced, operator concentration dominates. All five must be present.
+
+**Theorem 8 (No Population Bias Required):** NCI does not require humans to remain a majority of participants. It requires that the *protocol's verification anchors* preserve the properties (1)–(5) regardless of population composition. This is a structural property of the protocol's design, not an empirical property of the population.
+
+#### D.7.8 What This Means for Deployment
+
+Three deployment-time additions to NCI's implementation roadmap:
+
+1. **Operator declaration registry** — every agent registers its operator on-chain at first stake or first PoM event. The registry enforces per-operator vote-weight caps in the existing `NCI.calculateWeight()` function.
+
+2. **Adversarial-diversity multiplier in PoM** — `ProofOfMind.recordContribution()` accepts an optional minority-position flag. Outcome verification (after probationary period) determines whether the position was vindicated; if so, the contribution earns a multiplier (configurable, default 2×).
+
+3. **Sparse human-verification interface** — `HumanVerificationAnchor.sol` exposes entry-points for human-attested verifications at predefined high-stakes events (operator-attestation challenges, outcome-arbitration appeals, parameter-governance signoffs). Designated human verifiers (a rotating jury sourced via lottery or governance) sign attestations that protocol contracts read as authoritative for their narrow domain.
+
+These three additions — operator caps, divergence multiplier, human-verification anchor — collectively adapt NCI to the AI-dominant baseline. Without them, NCI inherits the security model of a human-majority network and degrades when that majority shifts. With them, NCI's security model is *invariant under population composition*, which is the property an infrastructure-grade consensus mechanism must have over decades of operation.
+
 ---
 
 ## References

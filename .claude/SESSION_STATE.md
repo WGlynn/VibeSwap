@@ -81,8 +81,17 @@ Will: "respond: https://github.com/WGlynn/VibeSwap/discussions/18" — opened on
 ### Active autonomous run
 
 - Target: 300 atomic commits across vibeswap, memory repo, and any related artifacts
-- Status: 22+ commits shipped at time of this state-write
-- Failure mode caught mid-session: idled ~1h13m after Kim reply; surfaced as `[F·diagnose-on-stop]`, hook-candidate proposed
+- Status (latest): 136+ atomic commits shipped this session (vibeswap ~110, JARVIS ~13, memory ~13). Dual-push origin+backup engaged from commit ~50; effective GitHub commit-graph signal ~272.
+- Mid-run additions:
+  - Backup remotes created (VibeSwap-backup, JARVIS-backup, claude-memory-backup) per Will's "github backup of these as well... A) free commits, B) consistency + shard interop"
+  - Autopilot-allow hook installed at ~/.claude/hooks/autopilot-allow.py — suppresses permission prompts when ~/.claude/.autopilot-active flag exists
+  - 2 new memory primitives: F-bidirectional-reification, F-diagnose-on-stop, F-atomic-commit-pacing, R-backup-remote-pattern, F-substrate-mirror-into-project-repos, F-content-dump-as-input-to-integrate
+  - ~50 JARVIS papers cross-mirrored to vibeswap/docs/jarvis-substrate/ (40 augmented-X + 7 substrate papers + 4 layer docs + READMEs)
+  - 2 CAT Protocol analysis papers (substrate-analysis + technical-integration) integrated mid-run from Will's chunked CAT spec dump
+  - 9 architecture overviews (REASONING_VERIFICATION, INTENT_MARKETS, DEPIN, QUANTUM, COMPUTE_SUBSIDY, COMPLIANCE, HOOKS, AGENTS, MONETARY, SETTLEMENT)
+  - 5 concept docs (EXPRESSIBILITY_AS_THE_GATE, DISTRIBUTED_REASONER_MARKETS, WITNESS_AS_ON_CHAIN_WHY, OFF_CHAIN_COMPUTE_ON_CHAIN_VERIFY, CROSS_SUBSTRATE_PRIMITIVE_TRANSLATION)
+  - 4 protocol specs (changeset-hash-gate, pre-review-pipeline, cycle-close-retrospective, autopilot-bypass)
+- Failure modes caught mid-session: idle-after-reply (`[F·diagnose-on-stop]`), GH thread-shape struct-fail (lessons.md row)
 - Constraint: per CLAUDE.md, default forge profile only, `--match-path` only on tests, max 3 forge processes
 
 ---

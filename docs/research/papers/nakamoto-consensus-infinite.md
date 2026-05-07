@@ -280,6 +280,8 @@ ECDSA (which is vulnerable to quantum computers via Shor's algorithm) is used on
 
 **Property:** NCI's consensus security is not degraded by quantum computers. Only hash function security matters, and doubling the hash output (256-bit → 512-bit) provides equivalent post-quantum security.
 
+For the analogous resilience analysis under classical-substrate disruption (a hypothetical event that breaks SHA-256 itself, e.g., a wave-interference computer that effectively trivializes hash inversion), see **Appendix C: PoW Substrate Substitution**.
+
 ---
 
 ## 8. Comparison with Existing Consensus Mechanisms
@@ -348,7 +350,7 @@ CONTRIBUTE VALUE (verified cognitive work)
 
 Energy (JUL) crystallizes into collateral (CKB-native) which funds the state layer. Contribution earns governance weight (VIBE) which cannot be purchased at any price. The one-way bridge ensures PoW energy is permanently converted — you cannot unstake back to hashpower.
 
-## 10. Implementation
+## 11. Implementation
 
 NCI is implemented as a set of Solidity smart contracts on the VibeSwap Operating System (VSOS):
 
@@ -374,7 +376,7 @@ Source code: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
 
 ---
 
-## 10. Conclusion
+## 12. Conclusion
 
 Nakamoto Consensus ∞ represents a fundamental advance in distributed consensus theory. By introducing Mind as a third consensus dimension, time itself becomes the ultimate security guarantee. The longer the network operates, the more secure it becomes — with no theoretical upper bound.
 
@@ -475,6 +477,146 @@ Each probability term is either zero or negligibly small. Their product is effec
 ```
 
 **The rational strategy space contains only one element: honest participation.**
+
+---
+
+## Appendix C: PoW Substrate Substitution
+
+### C.1 The Threat Model
+
+Section 7 covers post-quantum security against Shor's algorithm — quantum computers that efficiently factor / discrete-log the public-key primitives underpinning ECDSA. NCI is already resilient there because it uses hash-based signatures (Lamport, Merkle Signature Scheme) for consensus-critical operations; quantum computers offer only a quadratic speedup against hash inversion (Grover's algorithm), so doubling hash output preserves the security margin.
+
+This appendix addresses a stronger and structurally distinct threat: **a classical or analog computational substrate that effectively trivializes hash inversion at Layer 1**. Examples in the speculative literature include:
+
+- Wave-interference compute claiming to solve NP-hard problems via geometric consensus in optical cavities.
+- Adiabatic / annealing systems claimed to invert hash functions in time independent of the input space.
+- Substrate-level changes that violate currently-conjectured complexity-class boundaries (P=NP via physics).
+
+We make no claim about the empirical viability of any specific proposal in this class. The relevant question is *if* such a substrate ships and *if* it materially trivializes SHA-256 inversion, what survives and what breaks in NCI?
+
+### C.2 Direct Impact on the PoW Dimension
+
+If SHA-256 inversion becomes computationally free, the PoW dimension's spam-filter property collapses:
+
+```
+PoW_weight(node) = log₂(1 + cumulative_valid_solutions)
+```
+
+becomes uniformly maximal across all nodes who hold the new substrate. The `log₂` decay means the dimension still bounds — even infinite solutions yield only `log₂(∞)` weight, which in practice tops out at a configured `MAX_POW_WEIGHT` constant. The 10% allocation to PoW becomes a **flat 10% bonus available to anyone**, neutralizing rather than centralizing.
+
+This is the design intent. The 10% weighting was chosen so that PoW's failure mode (capture or trivialization) cannot, by itself, threaten consensus integrity. It can be neutralized; it cannot be weaponized for majority capture.
+
+### C.3 Indirect Impact: The JUL → CKB-native Bridge
+
+The more dangerous failure path is contagion through the `JULBridge`. JUL is mineable; CKB-native is mintable by burning JUL through the bridge at a governance-set rate. Pre-substrate-disruption, the bridge's economic security rests on JUL having real cost to mine. Post-disruption:
+
+- Adversary mines free JUL via the new substrate.
+- Burns through `JULBridge` to mint CKB-native at the governance-set rate.
+- CKB-native scarcity collapses; PoS dimension (30% of vote weight) is now buyable for ~zero.
+
+**Mitigation: emergency bridge severance.** The `JULBridge` contract MUST expose a `pauseConversion()` admin entry that can be invoked by Trinity authority nodes within hours of substrate-disruption detection. Pre-disruption CKB-native holdings are preserved via on-chain snapshot at the disruption-detection block height.
+
+This is not a special-case hack; it follows the existing [`fail-closed-on-upgrade`](../../concepts/primitives/fail-closed-on-upgrade.md) primitive shape — when substrate properties shift, automatically default to the safer (more restrictive) state.
+
+### C.4 The PoM Dimension Is Untouched
+
+PoM's load-bearing properties:
+
+- **Non-transferable** — substrate-disruption does not affect transferability; PoM is structural, not computational.
+- **Cumulative over wall-clock time** — faster compute does not accelerate verification latency, peer-validation throughput, or the network's contribution-rate ceiling. PoM accumulation is bounded by *human and protocol* timescales, not silicon.
+- **Peer-validated** — verification by existing high-Mind-Score nodes is unaffected by changes to hash hardness.
+- **Logarithmic** — marginal score per contribution decays regardless of how fast contributions are computed.
+
+```
+Mind_weight(node) = log₂(1 + Σ verified_contributions) * MIND_SCALE
+```
+
+The arithmetic remains intact: the substrate-disrupted attacker cannot manufacture `verified_contributions`, because verification requires existing PoM-bearing peers' attestation. Substrate disruption gives the attacker faster math; PoM doesn't care about math.
+
+### C.5 Vote-Weight Arithmetic Under Disruption
+
+**Bridge severed promptly (Trinity acts within hours):**
+
+```
+attacker_vote = 0.10 × MAX_POW + 0.30 × pre_disruption_stake + 0.60 × ~0
+              ≤ 0.10 + (small) + 0 = ~0.40 maximum
+```
+
+40% < 50%. Even a maximally-resourced attacker who already held substantial pre-disruption stake cannot reach majority. Honest nodes' PoM mass dominates.
+
+**Bridge NOT severed (PoS dimension fully captured):**
+
+```
+attacker_vote = 0.10 + 0.30 + 0.60 × ~0
+              = 0.40
+```
+
+Still 40%. Catastrophic for the economy (CKB-native scarcity destroyed) but consensus integrity is preserved by PoM alone. The 60% weighting is precisely the temporal-security backbone that makes this true.
+
+### C.6 PoW Substrate Substitution
+
+The above shows consensus survives substrate-disruption. But the long-run question is: does the *protocol* survive as designed, or does it degrade to a 90%-PoM-weighted system permanently?
+
+The answer is to **re-anchor JUL's mineable scarcity to a substrate that the disruption does not trivialize**. The clean choice is bandwidth/storage — a Proof-of-Space (PoSpace) or Proof-of-Replication (PoRep) primitive replacing SHA-256 hashing as JUL's mining target. Storage and bandwidth are physical-resource scarcities whose hardness is not a function of computational complexity class:
+
+- A wave-interference computer that solves NP-hard problems still cannot duplicate physical storage at zero cost.
+- Bandwidth is bounded by the speed of light and finite physical link capacity; no computational substrate trivializes it.
+- Storage requires real persistent media; faster math does not add disk space.
+
+Migration sketch:
+
+```
+JUL_v2 mining = PoSpace-style:
+  - Miner commits N TB of dedicated storage with a unique commitment per byte.
+  - Periodic challenges require miner to produce verifiable proofs of storage
+    at committed bytes (random sampling, à la Filecoin's PoRep / PoSt).
+  - Block reward proportional to (committed storage) × (verified retention time).
+```
+
+The 10% spam-filter weighting in `W(node)` keeps its meaning — instead of "you spent compute," PoW now means "you committed verifiable storage." The substrate changed; the role didn't.
+
+### C.7 Why Bandwidth/Storage Preserves the 3-Token Argument
+
+Section 9 argued that the three tokens form a basis for the consensus space — three linearly independent vectors spanning the security surface. Re-anchoring JUL to PoSpace preserves this basis:
+
+| Token | Dimension | Pre-disruption scarcity | Post-disruption scarcity |
+|-------|-----------|------------------------|--------------------------|
+| **JUL** | PoW (10%) | SHA-256 mining (energy-pegged) | PoSpace mining (storage/bandwidth-pegged) |
+| **CKB-native** | PoS (30%) | Burned JUL → minted CKB-native | Same (with bridge re-priced for new JUL economics) |
+| **VIBE** | PoM (60%) | Shapley distribution of contribution | Unchanged |
+
+Each token's *role* in the basis stays the same. Only JUL's *underlying scarcity* substrates substitute.
+
+The substrate-substitution preserves the orthogonality argument from §9. JUL remains hash-mineable (now space-mineable); CKB-native remains transferable + inflationary state-rent capital; VIBE remains non-transferable + cap-bounded contribution reward. The dimensions stay independent. The 10/30/60 weighting stays valid.
+
+### C.8 Pre-Positioned Hooks for Migration
+
+For the substitution to be invocable in real-time response to a substrate event, the protocol should pre-position three implementation hooks:
+
+1. **`Joule.setMiningPrimitive(uint8 primitiveId)`** — admin-gated function that switches the mining-validation path between SHA-256 and PoSpace primitives. Default: SHA-256. On substrate-disruption: governance vote to switch.
+2. **`JULBridge.pauseConversion()`** — emergency bridge severance, callable by Trinity authority majority within minutes of detection.
+3. **`JULBridge.repriceConversion(uint256 newRateBps)`** — once new mining primitive is live, the bridge can reopen at a re-priced rate appropriate for the new scarcity (typically much higher JUL-burn-per-CKB-mint to reflect the new mining cost).
+
+These hooks should ship as part of the next NCI implementation cycle, even though the disruption event is hypothetical and may never occur. Pre-positioning the migration surface costs almost nothing; lacking it during a real event would cost the entire economy.
+
+### C.9 What Bandwidth/Storage Does NOT Solve
+
+PoSpace re-anchors JUL's *mining* scarcity. Two adjacent properties are not preserved automatically:
+
+- **Energy peg**: SHA-256 mining anchored JUL's price to electricity cost, providing a real-world floor. PoSpace's "energy" basis is different — disk power, network costs, physical media depreciation. The PI controller defending the energy peg would need re-tuning to defend a storage peg (or a hybrid peg). This is a parameter-tuning exercise, not a structural redesign.
+- **Geographic distribution**: SHA-256 mining centralized to cheap-electricity geographies (Iceland, Texas, Sichuan). PoSpace mining tends to centralize differently — toward cheap-storage geographies and bulk hardware operators. The decentralization profile shifts; it doesn't necessarily worsen, but it's different and worth measuring post-migration.
+
+These are second-order concerns. The first-order property (consensus integrity under substrate-disruption) is preserved by the substitution.
+
+### C.10 Substrate-Disruption as Stress Test, Not Existential Threat
+
+The deeper observation: NCI was designed assuming that *any one* of its three computational dimensions could fail (compute trivialized, capital concentrated, contribution gamed) without consensus collapsing. The 60% PoM weighting is the structural insurance that makes this true. Substrate-disruption is the canonical example of PoW failure; the analysis here generalizes.
+
+If, instead, PoS were captured (mass capital concentration event), the same analysis applies with the dimensions swapped — PoW + PoM = 70% would carry consensus, and CKB-native could be re-anchored to a different staking primitive (e.g., reputation-weighted slashable bond).
+
+If PoM itself were corrupted (contribution-attestation gamed at scale), the protocol would face a deeper threat — but the bonded-permissionless-contest primitive (Appendix B.5, see also [`bonded-permissionless-contest`](../../concepts/primitives/bonded-permissionless-contest.md)) provides the escalation path: any high-Mind-Score node can post a fraud proof against a corrupted attestation, slashing the bad actor's PoM. PoM-as-gamed is a recoverable failure if detection is reasonably prompt.
+
+**The composability of failure-modes is the design property.** Each dimension can fail; no single failure threatens the whole; recovery path for each is structurally specified.
 
 ---
 

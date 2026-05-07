@@ -5,7 +5,7 @@
 - **Branch**: VibeSwap `master` (push to `origin`). Range `7720cb32..HEAD` and counting.
 - **Status**: ACTIVE. Run in progress; targeting 300 atomic commits across vibeswap + memory repo + any adjacent artifacts. Forge tests passing on every reasoning-subsystem suite (31 tests across 3 files, exit 0).
 
-**Latest tally**: 119+ atomic commits across vibeswap (98) + JARVIS (12) + memory (9). Dual-push pattern engaged from commit ~50 onward — effective GitHub commit-graph signal ~238.
+**Latest tally**: 151+ atomic commits across vibeswap (~125) + JARVIS (~13) + memory (~13). Dual-push pattern engaged from commit ~50 onward — effective GitHub commit-graph signal ~302+. Pace heuristic captured as memory primitive: ~2 min/commit average across mixed types, sustained over 5h.
 
 **What shipped this epoch (vibeswap repo, 38+ commits at time of WAL-write)**:
 - Spec: `docs/research/papers/on-chain-reasoning-verification.md` (three-tier architecture + ZK + Halmos)

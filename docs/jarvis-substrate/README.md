@@ -26,6 +26,16 @@ Three reasons:
 | `08-filesystem-as-substrate_autonomous-run-as-filesystem-event.md` | JARVIS/08-filesystem-as-substrate/ | 300-commit run as OSCH stress test |
 | `papers/closing-the-cognitive-airgap.md` | JARVIS/papers/ | companion to airgap-problem-onepager covering cognitive direction |
 | `papers/bidirectional-reification.md` | JARVIS/papers/ | methodology paper on word ↔ code as orthogonal modes of creation |
+| `papers/cat-protocol-substrate-analysis.md` | JARVIS/papers/ | CAT Protocol substrate reading through JARVIS lenses |
+| `papers/cat-protocol-technical-integration.md` | JARVIS/papers/ | CAT Protocol implementation patterns + cross-substrate notes |
+| `papers/airgap-problem-onepager.md` | JARVIS/papers/ | foundational airgap thesis (off-chain reality direction) |
+| `papers/eight-substrates.md` | JARVIS/papers/ | overview of the 8-layer substrate stack |
+| `papers/hiero.md` | JARVIS/papers/ | capstone paper on hieroglyphic operator-density memory format |
+| `papers/how-jarvis-works.md` | JARVIS/papers/ | system explanation of JARVIS substrate orchestration |
+| `papers/jarvis-has-a-sense-of-time.md` | JARVIS/papers/ | session-clock + boot-directive temporal awareness |
+| `papers/jarvis-is-not-a-wrapper.md` | JARVIS/papers/ | protocol-innovation framing — JARVIS is substrate, not LLM wrapper |
+| `papers/substrate-port.md` | JARVIS/papers/ | how substrate primitives port across LLM providers |
+| `papers/augmented-*.md` (40 papers) | JARVIS/papers/ | augmented mechanism design applied to N domains: AI alignment, AI training data, animal welfare, antitrust, auditing, carbon markets, care economy, climate adaptation, content moderation, cybersecurity, dev loops, disaster recovery, drug policy, education, elections, estate inheritance, food supply, gig labor, healthcare, housing, infrastructure, insurance, internet governance, journalism, justice, mental health, migration, mortgage credit, music royalties, online identity, open source, patents, pensions, pharma, real estate brokerage, research funding, RWA, spectrum, tax policy, validators, workforce training |
 
 ## Sync discipline
 

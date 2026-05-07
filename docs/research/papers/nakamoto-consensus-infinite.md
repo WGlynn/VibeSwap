@@ -990,6 +990,276 @@ Three deployment-time additions to NCI's implementation roadmap:
 
 These three additions — operator caps, divergence multiplier, human-verification anchor — collectively adapt NCI to the AI-dominant baseline. Without them, NCI inherits the security model of a human-majority network and degrades when that majority shifts. With them, NCI's security model is *invariant under population composition*, which is the property an infrastructure-grade consensus mechanism must have over decades of operation.
 
+For the operational counterpart — how NCI detects, responds to, and recovers from failures of the kind enumerated in §D.1–D.7 — see **Appendix E: Autonomous Recovery, Lean Governance, and Continuous Failure-Mode Rehearsal**.
+
+---
+
+## Appendix E: Autonomous Recovery, Lean Governance, and Continuous Failure-Mode Rehearsal
+
+### E.1 Inevitability Posture: Why "Will Fail" Beats "Won't Fail"
+
+The preceding appendices catalog failure modes and propose mitigations. The framing implicitly treats failures as *contingencies*: things that *might* happen and that we *might* respond to.
+
+This framing is wrong for an infrastructure-grade consensus mechanism intended to operate over decades. Over a sufficiently long timescale, every named failure mode WILL occur at least once. Substrate disruption, capital collapse, AGI deflation, verifier collusion, identity fragmentation, history-rewriting attempts, mill-plutocracy concentrations, model-cohort failures, RSI cascades, operator centralization — these are not hypothetical adversaries. They are the empirical population of failure events the protocol must handle on a real timeline.
+
+The shift in posture:
+
+| Old framing | New framing |
+|-------------|-------------|
+| "What if X breaks?" | "When X breaks." |
+| Mitigations as if-needed contingencies | Recovery paths as always-on infrastructure |
+| Slow deliberative governance for response | Autonomous response where safe, lean governance where not |
+| Fallbacks designed but undeployed | Fallbacks pre-deployed and dormant |
+| Quarterly security review | Continuous failure-mode rehearsal |
+
+This appendix specifies the recovery infrastructure that makes the inevitability posture operational.
+
+### E.2 Health Monitors: One Per Dimension, Always-On
+
+Every consensus dimension has an associated **health monitor** that runs on every block and emits a normalized health score in `[0, 1]` where `1` is fully healthy and `0` is fully degraded.
+
+**PoW health monitor (`PoWHealthOracle.sol`):**
+- Hash difficulty trend (sudden order-of-magnitude drops indicate substrate disruption)
+- Mining-population entropy (concentration in single operator triggers degradation flag)
+- Block-time deviation from target (substrate disruption may cause artificially fast blocks)
+- Computed score: `pow_health ∈ [0, 1]`
+
+**PoS health monitor (`PoSHealthOracle.sol`):**
+- Stake-token market activity (TVL, daily volume, price stability across N independent oracles)
+- Stake distribution Gini coefficient (sudden concentration triggers alert)
+- Slashing-event frequency (anomalous spikes indicate attack or coordination failure)
+- Liquidity-derivative wrapping percentage (high LSD coverage signals D.2.3 risk)
+- Computed score: `pos_health ∈ [0, 1]`
+
+**PoM health monitor (`PoMHealthOracle.sol`):**
+- Contribution-rate distribution across identities (anomalous spikes signal D.3.1 / D.3.6)
+- Cross-domain attestation diversity (collapse signals D.3.2 collusion)
+- Outcome-verification delta (Goodhart drift surfaces as outcome-vs-input divergence)
+- Identity-multimodal-attestation freshness (deepfake risk surface)
+- Operator concentration (D.7.4.4 risk surface)
+- Computed score: `pom_health ∈ [0, 1]`
+
+The three monitors run continuously. The protocol always knows the current health of every dimension. There is no "we'll check on it later" — the monitors are part of the consensus tick.
+
+A meta-monitor (`HealthOracleHealth.sol`) verifies that each primary monitor itself emits a heartbeat each block; a stalled monitor is itself a structural failure that triggers cascade. *Monitors monitor each other; the monitor-of-monitors is part of the Trinity guardian and is itself non-upgradeable.*
+
+### E.3 Autonomous Trigger Primitives
+
+When a health monitor crosses a threshold, the protocol *automatically* activates a pre-coded mitigation. No governance vote is required for activation. Activation is bounded in scope so that an autonomous response cannot do more harm than the failure it's responding to.
+
+**Threshold tiers:**
+- `health > 0.8`: nominal, no action
+- `0.5 < health ≤ 0.8`: WARN — monitor more frequently, log to Emergency Council inbox
+- `0.2 < health ≤ 0.5`: DEGRADE — autonomous mitigation activates (e.g., reduce dimension's vote weight, switch to fallback primitive), Emergency Council notified
+- `health ≤ 0.2`: HALT — dimension's vote weight set to zero, Emergency Council convened, full governance review queued
+
+**Concrete autonomous actions** keyed by trigger:
+
+| Trigger | Autonomous action | Reversible? |
+|---------|-------------------|-------------|
+| `pow_health < 0.5` | `Joule.setMiningPrimitive(POSPACE)` switches to fallback PoSpace mining | Yes, by Council |
+| `pos_health < 0.5` | `StakeRegistry.setTokenHealthFactor(low)` reduces PoS weight contribution | Yes, by Council |
+| `pos_health < 0.2` | `JULBridge.pauseConversion()` severs JUL→CKB-native bridge | Yes, by Council |
+| `pom_health < 0.5` | `ProofOfMind.activateOutcomeOnlyMode()` requires post-probationary outcome verification before PoM accrues | Yes, by Council |
+| `pom_health < 0.2` | `ProofOfMind.freezeAttestations()` halts new attestations, requires Council ratification before resuming | Yes, by Council |
+| Multiple dimensions DEGRADE simultaneously | `NCI.activateCompositeFailureMode(modeId)` activates pre-defined mitigation bundle | Yes, by full governance |
+
+Each autonomous action is logged with full context (block, monitor reading, trigger threshold, action taken). The audit trail is permanent.
+
+### E.4 Pre-Deployed Dormant Fallbacks
+
+For each consensus dimension, an alternative mechanism is *pre-deployed and dormant*. Activation is one transaction (the autonomous trigger from §E.3 or a Council vote). The fallback does not need to be designed-and-deployed during the failure event; that's too late.
+
+**PoW fallback: PoSpace primitive (`JoulePoSpace.sol`)**
+- Deployed at genesis, dormant.
+- Anchored to verifiable storage commitments (à la Filecoin PoRep).
+- `Joule.setMiningPrimitive(POSPACE)` switches mining-validation to this contract.
+- Block reward, difficulty, and emission curve pre-tuned to match SHA-256 PoW economics at switchover.
+
+**PoS fallback: reputation-bonded staking (`PoMStakeProxy.sol`)**
+- Deployed at genesis, dormant.
+- When CKB-native value collapses, this contract activates to allow staking via *PoM-tier-X+ reputation bonds* — high-PoM contributors put their reputation at stake instead of fungible token capital.
+- Slashing reduces PoM rather than transferring tokens.
+- Provides PoS dimension's economic-alignment property without requiring the staking token to retain market value.
+
+**PoM fallback: outcome-only PoM (`OutcomeOnlyPoM.sol`)**
+- Deployed at genesis, dormant in normal operation, automatically enforces stricter rules under degraded health.
+- All PoM contributions enter a probationary state; PoM accrues only after outcome-verification succeeds.
+- Latency is higher; abuse is harder. Used during attestation-collusion or AGI-deflation events.
+
+**Verification fallback: human-verification quorum (`HumanVerificationAnchor.sol`)**
+- Deployed at genesis, normally invoked sparsely.
+- Under three-dimension simultaneous failure (D.4.4), this becomes the load-bearing verification surface.
+- A globally-distributed jury of pre-vetted human verifiers signs off on critical operations until autonomous mechanisms are restored.
+
+### E.5 Layered Recovery Hierarchy
+
+Recovery proceeds in four tiers, each with strict bounds on what it can do and how fast.
+
+**Tier 0 — Autonomous (block-time response).**
+- Health monitor crosses threshold → autonomous trigger fires → mitigation activates within one block.
+- Scope: ONLY pre-defined actions in §E.3. No new actions can be invented at this tier.
+- Reversible by Tier 1 within 24 hours.
+
+**Tier 1 — Emergency Council (1–6 hour response).**
+- 5–7 elected members, geographically and jurisdictionally distributed.
+- Convenes via on-chain signal; can act with 4-of-7 (or 3-of-5) signature within hours.
+- Powers: extend, modify, or revert Tier-0 actions; activate fallback primitives in unanticipated configurations; freeze additional surfaces if an unforeseen failure is detected.
+- Bounded scope: cannot modify consensus rules, cannot move treasury funds, cannot change Trinity authority membership.
+- Reversible by Tier 2 within 30 days.
+
+**Tier 2 — Full Governance (1–30 day response).**
+- Standard NCI governance vote.
+- Can ratify Tier-1 actions, reverse them, or institute new permanent mitigations.
+- Can update the autonomous-trigger thresholds in §E.3 based on observed performance.
+- Can rotate Emergency Council membership.
+
+**Tier 3 — Trinity Guardian (catastrophic-only).**
+- Immutable BFT authority node consensus.
+- Powers: only invoked under three-dimension simultaneous failure (D.4.4) or under detected compromise of Tier 1 + Tier 2 simultaneously.
+- Can coordinate off-chain recovery, including chain re-anchor, emergency fork, or guardian-imposed parameter reset.
+- This tier is the floor: it exists so the protocol cannot be permanently inverted, but its invocation is a generational event.
+
+The four tiers form a *graceful escalation path*. Routine failures handled at Tier 0. Novel failures handled at Tier 1. Permanent changes ratified at Tier 2. Existential failures handled at Tier 3.
+
+### E.6 Emergency Council Design
+
+The Emergency Council is the load-bearing institution that bridges autonomous response to full governance. Its design properties:
+
+**Membership.** 5–7 members, sourced via three independent channels to prevent capture:
+- 2 members elected by full governance (PoM-weighted voting).
+- 2 members elected by Trinity authority node operators.
+- 2 members elected by stake-weighted voting (PoS).
+- 1 member co-opted by the other 6 (rotating tiebreaker).
+
+Cross-channel sourcing ensures no single dimension can capture the council. The PoM-elected members would not be elected by stake-only voters and vice versa.
+
+**Term length.** 18 months, staggered so 1/3 of seats rotate every 6 months. Continuous freshness; no hostage to single-cohort capture.
+
+**Voting threshold.** 4-of-7 for Tier-1 actions. Lower thresholds (3-of-7) for purely-revert actions (undoing prior Council mistakes). Higher thresholds (6-of-7) for activating new fallback configurations not in the pre-deployed library.
+
+**Action latency.** Designed for 1–6 hour response. Members are required to maintain on-chain liveness (regular heartbeat); non-responsive members are flagged and replaced within 7 days.
+
+**Scope restrictions.** Council CANNOT:
+- Modify consensus rules.
+- Change the autonomous-trigger thresholds (governance only).
+- Move funds from treasury or operator accounts.
+- Add or remove Trinity authority node members.
+- Modify their own membership rules.
+
+Council CAN:
+- Toggle dormant fallbacks on/off within the pre-deployed library.
+- Adjust active-failure-mode flags within bounded scopes.
+- Extend or revert autonomous actions from §E.3.
+- Issue public attestations of detected failure modes (informational, but binding on protocol observers).
+
+**Compensation.** Members receive a small flat stipend in CKB-native for liveness, plus event-based bonuses for resolved failure-mode actions. Compensation should be enough to make the role worth taking but not enough to attract pure-rent-seekers.
+
+**Oversight.** Every Council action is publicly logged. Tier 2 governance can review and reverse. A Council member with 2+ reversed actions during their term is automatically ineligible for re-election.
+
+### E.7 Continuous Failure-Mode Rehearsal
+
+Recovery infrastructure that is never tested degrades. The protocol must include continuous rehearsal of failure modes to verify that recovery paths still work.
+
+**Daily rehearsal:** randomly selected health monitors are tested with synthetic-degraded inputs to verify that the autonomous-trigger logic fires correctly. Failures trigger Council notification.
+
+**Weekly rehearsal:** one randomly-selected fallback primitive is activated on a *shadow chain* (a parallel chain that mirrors NCI state but is non-binding). The shadow-chain activation tests the full handoff: real health monitors detect the shadow's degraded state, the autonomous trigger fires, the fallback activates, and recovery proceeds. Differences from expected behavior are surfaced to the Council.
+
+**Quarterly rehearsal:** full multi-dimension failure simulation. The shadow chain experiences synthetic PoW + PoS + PoM degradation simultaneously. Three-dimension recovery paths are exercised. Trinity Guardian invocation is rehearsed (without actually invoking on the live chain).
+
+**Annual rehearsal:** full hostile red-team. External security firms attempt to defeat the recovery infrastructure on the shadow chain. Findings are publicly disclosed and addressed.
+
+These rehearsals are protocol-mandated, not optional. The operating budget for them is a fixed percentage of treasury (e.g., 0.5% annually). If rehearsals stop, full governance is automatically convened to determine whether the rehearsal program should resume or be replaced.
+
+The point: a recovery path that has been rehearsed in the last 90 days is dramatically more reliable than one that has been documented in a paper but never run. Documentation is necessary but not sufficient.
+
+### E.8 Circuit Breaker Discipline
+
+Every dimension of NCI's vote weight is governed by a circuit breaker. If a dimension's health drops below threshold, its weight contribution is reduced *automatically and proportionally*, with weight redistributed to the surviving dimensions.
+
+**Concretely:**
+```solidity
+function effectiveWeight(node) returns (uint256) {
+    uint256 powW   = 0.10 * pow_health  * pow_score(node);
+    uint256 posW   = 0.30 * pos_health  * pos_score(node);
+    uint256 pomW   = 0.60 * pom_health  * pom_score(node);
+
+    uint256 total = powW + posW + pomW;
+    uint256 health_total = 0.10 * pow_health + 0.30 * pos_health + 0.60 * pom_health;
+
+    // Renormalize so vote weight always sums to 1.0 across dimensions
+    return (total * 1e18) / health_total;
+}
+```
+
+Properties:
+- When all dimensions healthy (`health = 1`): weights are 10/30/60 as designed.
+- When PoW degrades to `pow_health = 0.1`: PoW contribution drops to ~1%; PoS + PoM absorb the redistribution. Effective weights become ~3/30/60, renormalized.
+- When PoS collapses entirely: PoW + PoM = 70% (renormalized to 100% across the surviving dimensions). PoM dominates ~85% of effective weight.
+- The renormalization is automatic. No vote required.
+
+This is the structural property: vote weight always sums to 100% of *healthy* dimensions, never of all dimensions. Failed dimensions don't dilute the survivors; they're excluded automatically.
+
+Consequence: an attack on a single dimension automatically reduces that dimension's voting power, making the attack progressively less rewarding as it succeeds. **The attack itself triggers the defense.**
+
+### E.9 Theorem 9: Autonomous Recovery Theorem
+
+**Theorem 9 (Autonomous Recovery):** For any single-dimension failure mode F enumerated in §D.1–D.7, the protocol detects F within at most W blocks (where W is the health-monitor window length, typically 100–1000 blocks), activates the appropriate autonomous mitigation within 1 block of detection, and achieves consensus integrity at the new (degraded) operating point within W + 1 blocks total.
+
+**Proof sketch:** Health monitors run on every block (E.2). Degradation thresholds are calibrated such that any failure mode F surfaces in `pow_health`, `pos_health`, or `pom_health` within W blocks of onset. Crossing a threshold triggers the §E.3 autonomous action in the same block. Circuit-breaker renormalization (E.8) ensures vote weight redistributes automatically. Consensus operates correctly at the new effective-weights distribution starting the next block.
+
+**Corollary:** No single failure mode requires governance intervention to maintain consensus integrity. Governance intervention is needed only for novel failures or for re-enabling degraded mechanisms after recovery.
+
+### E.10 Theorem 10: Antifragility Property
+
+**Theorem 10 (Antifragility):** Each invocation of the recovery infrastructure increases the protocol's robustness against future invocations of the same failure mode.
+
+**Proof sketch:** Three mechanisms compose:
+1. **Logged audit trail:** every autonomous trigger and Council action is permanently recorded. Future failure-mode analysis has full historical data.
+2. **Threshold recalibration:** governance reviews logged events and adjusts §E.3 thresholds based on real performance. Thresholds get progressively better-calibrated.
+3. **Rehearsal expansion:** observed failure modes get added to the §E.7 rehearsal program. Future occurrences of similar modes face more thoroughly-rehearsed recovery.
+
+The combined effect: the protocol *gains from each failure event*. Failures are not just survived; they are absorbed into the protocol's institutional memory and made into permanent improvements.
+
+This is the antifragility property in Taleb's sense — disorder strengthens the system rather than weakening it. NCI's recovery infrastructure is designed to make this a structural property, not an aspirational goal.
+
+### E.11 What the Protocol Does NOT Promise
+
+Honest acknowledgment of limits:
+
+- **Not invulnerable.** Some failures will succeed in disrupting consensus for hours or days before recovery completes. The protocol minimizes these windows but does not eliminate them.
+- **Not invincible to coordinated multi-tier capture.** If Emergency Council, full governance, AND Trinity Guardian are simultaneously compromised by a single coordinated effort, the protocol can be permanently broken. The defense is the institutional separation of these tiers (different sourcing channels, different members, different timescales), not absolute invulnerability.
+- **Not perfect at threshold calibration.** Health-monitor thresholds will sometimes trigger false positives (autonomous action fires when no real failure occurred) or false negatives (failure occurs but threshold not crossed). The Council exists to correct these in real time; the rehearsal program exists to recalibrate over time.
+- **Not zero-latency.** Even within Tier 0, autonomous response is one-block latency, not zero. Within that block, an attacker may execute. The protocol's safety property is *eventual recovery within bounded time*, not instantaneous invulnerability.
+
+### E.12 The Inevitability Posture, Operationalized
+
+The shift from "what if X breaks" to "when X breaks" produces concrete protocol additions, not just rhetoric:
+
+| New artifact | What it does |
+|--------------|--------------|
+| `PoWHealthOracle.sol` | continuously scores PoW dimension health |
+| `PoSHealthOracle.sol` | continuously scores PoS dimension health |
+| `PoMHealthOracle.sol` | continuously scores PoM dimension health |
+| `HealthOracleHealth.sol` | monitors-of-monitors, ensures health oracles themselves remain alive |
+| `JoulePoSpace.sol` | dormant PoSpace fallback, activates on PoW failure |
+| `PoMStakeProxy.sol` | dormant reputation-bonded staking fallback, activates on PoS failure |
+| `OutcomeOnlyPoM.sol` | dormant strict PoM mode, activates on PoM degradation |
+| `HumanVerificationAnchor.sol` | sparse human-attested verification surface for high-stakes events |
+| `EmergencyCouncil.sol` | 5–7 member rapid-response council with bounded powers |
+| `RehearsalScheduler.sol` | continuous failure-mode rehearsal on shadow chain |
+| Circuit-breaker logic in `NakamotoConsensusInfinity.sol` | automatic vote-weight renormalization based on health |
+
+These artifacts are sketched here as *design space*, not as an implementation commitment. The order of operations, threshold calibrations, member counts, and specific contract interfaces all require validation before they ship — through prototype implementations, adversarial review, and the rehearsal program described in §E.7. What this appendix lays out is the *shape* the recovery infrastructure must take, not its final binding form.
+
+Implementation will happen incrementally as NCI matures and as observed failure modes refine the priorities. Some artifacts (health monitors, basic circuit breakers) are likely first; others (Emergency Council with full multi-channel sourcing, continuous rehearsal program, multi-tier governance hierarchy) are deeper institutional designs that benefit from operational experience before being locked in. When deployed partially, the dependency-ordering must be considered: deploying autonomous triggers without the corresponding fallback primitives is structurally incoherent; deploying fallbacks without the health monitors that activate them creates dormant infrastructure with no path to invocation.
+
+The deeper claim: a consensus mechanism that does not assume its own mechanisms will fail is structurally incomplete. NCI's design intent under the inevitability posture is what this appendix articulates. The §D enumerated failure modes are not lists of bad things that might happen; they are *use cases that should inform the recovery infrastructure NCI eventually deploys*.
+
+Failure becomes a normal operating condition the protocol handles in stride, not an emergency that demands extraordinary response. This is the property infrastructure-grade consensus must have over decades of operation against an evolving adversary distribution that includes substrate disruption, capital collapse, AGI deflation, and threat vectors that have not yet been imagined.
+
+NCI's value is not "won't break." It is "fails gracefully, recovers autonomously, degrades predictably, improves through every event." This appendix lays out the design space within which that property is achievable; subsequent NCI cycles instantiate the design.
+
 ---
 
 ## References

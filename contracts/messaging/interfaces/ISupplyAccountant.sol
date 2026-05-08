@@ -72,6 +72,7 @@ interface ISupplyAccountant {
     error UnknownNonce(uint64 chainId, uint256 nonce);
     error NegativeOutbound(address token, uint64 dstChainId);
     error InvariantBroken(address token, bytes32 tag);
+    error AmountZero();
 
     // ============ Writers (hub-only) ============
 

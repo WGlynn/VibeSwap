@@ -81,6 +81,11 @@ interface IMessagingValidatorRegistry {
     error UnauthorizedSlasher();
     error UnknownValidator(uint32 index);
     error UnknownEpoch(uint64 epoch);
+    /// @notice Self-audit H-1: emitted when rotateSet is called inside the
+    ///         rate-limit window since the previous rotation.
+    error RotationTooFrequent(uint64 nowTs, uint64 nextAllowedTs);
+    /// @notice Self-audit M-1: top-up rejected because the validator is exiting.
+    error ValidatorExiting(uint32 index);
 
     // ============ Lifecycle ============
 

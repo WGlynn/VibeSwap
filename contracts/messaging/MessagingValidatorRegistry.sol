@@ -50,6 +50,10 @@ contract MessagingValidatorRegistry is
     uint96 public constant DEFAULT_BOND_FLOOR = 32 ether;
     uint64 public constant DEFAULT_ACTIVATION_DELAY = 7 days;
     uint64 public constant DEFAULT_UNBONDING_DELAY = 14 days;
+    /// @notice Self-audit H-1: minimum interval between rotateSet calls. Prevents
+    ///         a griefer from spamming rotations and burying useful epochs in
+    ///         noise. Tunable by governance.
+    uint64 public constant DEFAULT_ROTATION_INTERVAL = 10 minutes;
 
     /// @notice BLS12-381 G1 compressed pubkey length.
     uint256 private constant BLS_PUBKEY_LEN = 48;
@@ -63,6 +67,10 @@ contract MessagingValidatorRegistry is
     uint64 public activationDelaySeconds;
     uint64 public unbondingDelaySeconds;
     uint32 public maxSetSizeValue;
+
+    /// @notice Self-audit H-1: minimum interval between rotateSet calls.
+    uint64 public rotationIntervalSeconds;
+    uint64 public lastRotationAt;
 
     /// @notice All validators by stable index. Indices are not reused after exit.
     mapping(uint32 => Validator) internal validators;
@@ -117,6 +125,7 @@ contract MessagingValidatorRegistry is
         activationDelaySeconds = DEFAULT_ACTIVATION_DELAY;
         unbondingDelaySeconds = DEFAULT_UNBONDING_DELAY;
         maxSetSizeValue = MAX_SET_SIZE;
+        rotationIntervalSeconds = DEFAULT_ROTATION_INTERVAL;
 
         // Index 0 is reserved as "unregistered" sentinel.
         nextIndex = 1;
@@ -168,6 +177,11 @@ contract MessagingValidatorRegistry is
         Validator storage v = validators[index];
         if (v.operator == address(0)) revert UnknownValidator(index);
         if (v.slashed) revert UnknownValidator(index);
+        // Self-audit M-1: reject top-ups during unbonding. Adding bond after
+        // exit-init would silently lock new funds in the same unbonding queue,
+        // a UX trap that's also a refactor liability — anyone reasoning about
+        // bond movement during exit would have to remember this asymmetry.
+        if (v.exitInitiatedAt != 0) revert ValidatorExiting(index);
 
         bondToken.safeTransferFrom(msg.sender, address(this), amount);
         v.bondAmount += amount;
@@ -231,6 +245,16 @@ contract MessagingValidatorRegistry is
         Validator storage v = validators[index];
         if (v.operator == address(0)) revert UnknownValidator(index);
 
+        // Self-audit M-2: early-return when there is nothing left to slash.
+        // Without this, slash() on an already-finalized validator (bondAmount=0)
+        // would still execute the "below floor" branch and re-emit
+        // ValidatorExitInitiated with a fresh timestamp — confusing off-chain
+        // monitors and producing event noise.
+        if (v.bondAmount == 0) {
+            emit ValidatorSlashed(index, offenseTag, 0);
+            return 0;
+        }
+
         amountSlashed = requestedAmount > v.bondAmount ? v.bondAmount : requestedAmount;
         v.bondAmount -= amountSlashed;
 
@@ -263,6 +287,18 @@ contract MessagingValidatorRegistry is
     ///      cellsReport flow, plus on-chain BLS aggregation verification using
     ///      EIP-2537 precompiles.
     function rotateSet() external returns (uint64 newEpoch) {
+        // Self-audit H-1: rate-limit rotations to prevent spam-grief that
+        // would inflate the epoch space and force downstream verifiers to
+        // track sub-second epoch churn. First-ever rotation is exempt
+        // (lastRotationAt == 0). Owner can bypass via forceRotateSet().
+        if (lastRotationAt != 0 && block.timestamp < lastRotationAt + rotationIntervalSeconds) {
+            revert RotationTooFrequent(
+                uint64(block.timestamp),
+                lastRotationAt + rotationIntervalSeconds
+            );
+        }
+        lastRotationAt = uint64(block.timestamp);
+
         // First, sweep any newly-activated validators into the active set.
         _activateMatured();
 
@@ -299,6 +335,11 @@ contract MessagingValidatorRegistry is
 
     function setUnbondingDelay(uint64 newDelay) external onlyOwner {
         unbondingDelaySeconds = newDelay;
+    }
+
+    /// @notice Self-audit H-1: configure rotation rate limit.
+    function setRotationInterval(uint64 newInterval) external onlyOwner {
+        rotationIntervalSeconds = newInterval;
     }
 
     function setProofOfMisbehavior(address newPom) external onlyOwner {

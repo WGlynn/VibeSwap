@@ -115,14 +115,26 @@ contract SupplyAccountant is
         _;
     }
 
-    modifier onlyHubOrToken(address token) {
-        if (msg.sender != messagingHub && msg.sender != token) revert UnauthorizedWriter();
-        _;
-    }
-
     modifier registeredToken(address token) {
         if (!registeredTokens[token]) revert UnknownToken(token);
         _;
+    }
+
+    /// @dev Self-audit C-1: previously `onlyHubOrToken(address token)` accepted
+    ///      a caller-supplied `token` argument and checked `msg.sender == token`.
+    ///      That allowed an attacker to pass their own address and pass the auth
+    ///      check; the saving grace was the `registeredToken` modifier filtering
+    ///      unregistered addresses. Modifier-stacking defense is brittle —
+    ///      a refactor that simplifies the auth check would silently open a
+    ///      hole. This rewrite collapses to a single explicit check that doesn't
+    ///      use any caller-supplied argument in the auth predicate.
+    function _authorizeSupplyWriter(address token) internal view {
+        if (
+            msg.sender != messagingHub
+            && !(registeredTokens[msg.sender] && msg.sender == token)
+        ) {
+            revert UnauthorizedWriter();
+        }
     }
 
     // ============ Admin ============
@@ -148,6 +160,12 @@ contract SupplyAccountant is
         uint256 nonce,
         uint256 amount
     ) external onlyHub registeredToken(token) {
+        // Self-audit C-3: explicit zero-amount rejection. Previously the
+        // duplicate-nonce check (`row.amount != 0`) doubled as a row-existence
+        // check; if a zero-amount row ever leaked through, a subsequent
+        // legitimate burn at the same nonce would silently overwrite it.
+        if (amount == 0) revert AmountZero();
+
         OutboundRow storage row = outboundRows[token][dstChainId][nonce];
         if (row.amount != 0) revert DuplicateNonce(dstChainId, nonce);
 
@@ -219,9 +237,9 @@ contract SupplyAccountant is
     /// @inheritdoc ISupplyAccountant
     function syncLocalSupply(address token, uint256 newLocalSupply)
         external
-        onlyHubOrToken(token)
         registeredToken(token)
     {
+        _authorizeSupplyWriter(token);
         localSupplyByToken[token] = newLocalSupply;
         emit LocalSupplyChanged(token, newLocalSupply);
     }

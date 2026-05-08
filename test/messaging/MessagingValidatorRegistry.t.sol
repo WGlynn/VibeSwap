@@ -262,6 +262,57 @@ contract MessagingValidatorRegistryTest is Test {
         assertGt(uint256(snap.merkleRoot), 0);
     }
 
+    // ============ Self-audit fixes (H-1, M-1, M-2) ============
+
+    function test_rotateSet_rateLimitsRepeatRotations() public {
+        _register(op1, pk1, BOND);
+        vm.warp(block.timestamp + registry.activationDelay() + 1);
+
+        registry.rotateSet(); // first rotation always allowed
+
+        // Immediate second call reverts.
+        vm.expectRevert();
+        registry.rotateSet();
+
+        // After interval elapses, succeeds.
+        vm.warp(block.timestamp + registry.rotationIntervalSeconds() + 1);
+        registry.rotateSet();
+        assertEq(registry.currentEpoch(), 2);
+    }
+
+    function test_topUpBond_rejectedOnExitingValidator() public {
+        uint32 idx = _register(op1, pk1, BOND);
+        vm.warp(block.timestamp + registry.activationDelay() + 1);
+
+        vm.prank(op1);
+        registry.initiateExit(idx);
+
+        vm.startPrank(op1);
+        bond.approve(address(registry), 5 ether);
+        vm.expectRevert(
+            abi.encodeWithSelector(IMessagingValidatorRegistry.ValidatorExiting.selector, idx)
+        );
+        registry.topUpBond(idx, 5 ether);
+        vm.stopPrank();
+    }
+
+    function test_slash_returnsZeroOnAlreadyZeroBond() public {
+        uint32 idx = _register(op1, pk1, BOND);
+
+        // Slash everything first.
+        vm.prank(pom);
+        registry.slash(idx, bytes32("forged"), BOND);
+        assertEq(registry.getValidator(idx).bondAmount, 0);
+
+        // Second slash on the now-empty validator: returns 0, no state mutation.
+        uint64 exitBefore = registry.getValidator(idx).exitInitiatedAt;
+        vm.prank(pom);
+        uint96 slashed = registry.slash(idx, bytes32("liveness"), 1 ether);
+
+        assertEq(slashed, 0, "slash on zero-bond returns zero");
+        assertEq(registry.getValidator(idx).exitInitiatedAt, exitBefore, "should not re-touch exit timestamp");
+    }
+
     function test_thresholdForEpoch_isCeilTwoThirdsPlusOne() public {
         // Register 6 validators; threshold should be ⌈2*6/3⌉+1 = 5
         address op4 = makeAddr("op4"); bond.mint(op4, 100 ether);

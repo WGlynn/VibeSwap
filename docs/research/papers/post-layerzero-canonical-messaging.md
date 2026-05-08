@@ -1,6 +1,6 @@
 # Post-LayerZero Canonical Messaging — A Burn-and-Mint Architecture for VibeSwap
 
-**Status**: Spec draft (v0.1) — 2026-05-08
+**Status**: Spec draft (v0.2) — 2026-05-08
 **Author**: VibeSwap research
 **Successor to**: `contracts/messaging/CrossChainRouter.sol` (LayerZero V2 OApp wrapper)
 **Companion docs**:
@@ -311,16 +311,32 @@ Total: ~2250 LOC of new Solidity, leveraging ~10x that in existing audited primi
 
 ## 13. Open Questions
 
-| # | Question | Why it matters |
+| # | Question | Status (v0.2) |
 |---|---|---|
-| Q1 | Validator client implementation: build in-house Rust client, or fork an existing PoS client (Lighthouse/Teku-style)? | Time-to-ship vs long-term maintenance |
-| Q2 | BLS curve: BLS12-381 (Ethereum-native) vs BLS12-377 (cheaper proofs but less standard) | Gas cost vs ecosystem alignment |
-| Q3 | Aggregator selection: deterministic shuffle (proposed) vs stake-weighted leader rotation vs VRF | Censorship resistance vs liveness |
-| Q4 | Validator inclusion: permissionless w/ bond, or governance-curated v1? | Decentralization vs initial security |
-| Q5 | Source-chain finality on Solana: accept fork-choice finality (~13s) or wait for finalized commitment (~30s)? | Latency target on non-EVM chains |
-| Q6 | Cross-chain order auto-refund window: should this be governance-tunable per chain or fixed? | UX vs operational flexibility |
-| Q7 | Insurance pool sizing: what's the right target reserve as a fraction of in-flight messaging volume? | Capital efficiency vs solvency margin |
-| Q8 | Migration to ZK light client (v2.5+): which proof system (Succinct SP1, RISC0, custom)? | Trust-minimization roadmap |
+| Q1 | Validator client implementation: build in-house Rust client, or fork an existing PoS client (Lighthouse/Teku-style)? | **Open** — resourcing decision |
+| Q2 | BLS curve: BLS12-381 vs BLS12-377 | **Resolved → BLS12-381** (see §13.1) |
+| Q3 | Aggregator selection: deterministic shuffle vs stake-weighted leader vs VRF | **Resolved → deterministic shuffle** (see §13.1) |
+| Q4 | Validator inclusion: permissionless w/ bond, or governance-curated v1? | **Recommended → curated v1, permissionless v1.5** (see §13.2) |
+| Q5 | Source-chain finality on Solana | **Resolved → soft (fork-choice ~13s) + hard (finalized ~30s)** (see §13.1) |
+| Q6 | Refund window: per-chain tunable vs fixed | **Resolved → per-chain tunable, 1h default** (see §13.1) |
+| Q7 | Insurance pool reserve sizing | **Recommended → 5–10% of in-flight, treasury-toppable** (see §13.2) |
+| Q8 | ZK proof system pick (v2.5+) | **Deferred** — too early; revisit at v2 ship |
+
+### 13.1 Resolved technical decisions
+
+**Q2 — BLS curve = BLS12-381.** Ethereum-native (EIP-2537 precompile path), standard for Ethereum consensus and existing zkBridge work, no extra cryptographic library to audit. BLS12-377 wins for ZK-recursion contexts (Aleo, Celo) but we're not in one for v1. The curve choice decouples cleanly from the v2.5+ ZK-light-client upgrade — the verifier interface is swappable.
+
+**Q3 — Aggregator selection = deterministic shuffle, per-nonce rotation.** Reuses VibeSwap's already-audited `DeterministicShuffle` library (no new randomness substrate). Per-nonce rotation gives uniform aggregator load. Stake-weighted leader concentrates aggregator authority on largest bonds (decentralization-hostile). VRF adds a RANDAO-style infrastructure dependency we don't need — the censorship-resistance property comes from the 60s aggregator-window + permissionless takeover, not from the unpredictability of who's chosen.
+
+**Q5 — Solana finality = two-tier policy.** Soft tier accepts fork-choice finality (~13s, processed/confirmed commitment) for burns under `softFinalityThreshold`. Hard tier waits for `finalized` commitment (~30s, supermajority root) for high-value burns. Same shape as the Ethereum 1-conf vs 32-conf split. Validators slashed for signing attestations on subsequently-orphaned slots either way.
+
+**Q6 — Refund window = per-chain tunable, 1h default.** Different source chains have different RPC reliability and finality characteristics; one global timeout is wrong. `ChainConfig.livenessTimeout` is the storage handle, governance-tunable. 1h is the safe default; mature deployments may tighten to 15–30 min.
+
+### 13.2 Recommendations pending partner input
+
+**Q4 — recommend curated v1, permissionless v1.5.** Bootstrap security + reputation matters more than decentralization optics on day 1. Curated v1: 16 validators (VibeSwap-aligned operators + staking partners). Track record + slashing data accumulates over ~3 months of mainnet operation. Transition to permissionless-with-bond at v1.5 once we have empirical slashing distributions. Counter-argument: curated set is a regulatory and political target. Mitigated by the hard cap (16) being a starting point, not a permanent ceiling.
+
+**Q7 — recommend 5–10% of in-flight messaging volume.** Reserve sized as a fraction of `Σ outboundBurned` across all chains. Treasury top-up rule kicks in if reserve falls below 5%; soft cap at 10% to avoid over-locking treasury capital. Funded initially from messaging fees (small basis-point tax on cross-chain transfers, distributed via Shapley between validators and the insurance pool). Numbers tuned post-launch from empirical loss frequency.
 
 ## 14. Future Work — ZK Light Client Path
 

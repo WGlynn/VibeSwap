@@ -1,10 +1,26 @@
-# Session State — 2026-05-07 (rolled over from 2026-05-06 mid-run; 21+ hour session ending)
+# Session State — 2026-05-07 → 2026-05-08 (rolled over; 21h+ active)
 
-## ⚡ Active Intention (THIS SESSION — closing)
+## ⚡ Active Intention (CURRENT — 2026-05-08 burst)
 
-> **Intention**: Multi-level persistence framework production-readiness. Harmonize all existing state-persistence layers (memory + WAL + API death shield + auto-checkpoint + memory-sync-pull + dual-push + HIERO + diagnose-on-stop + autopilot-allow) into one composable system, with phrase-trigger + every-3-prompts + state-transition auto-save. Goal: never lose a single byte across crash / context-clear / API death.
+> **Intention**: Post-LayerZero canonical messaging architecture, replacing the LZ V2 OApp dependency in response to the April 2026 KelpDAO/LZ DVN-RPC compromise. VibeSwap as canonical issuer, PoS validator network with BLS threshold attestations, on-chain economic security via ClawbackCascade. Reuses ShardOperatorRegistry, ShapleyDistributor, PoM, BatchInvariantVerification primitives. Genesis on Ethereum, clean-slate launch, ~25s typical latency. Phased v1 (VibeSwap-issued tokens) → v2 (CCTP USDC) → v3 (lock-and-mint long tail). ZK light-client upgrade path designed-in.
 
 ## ⚠ NEXT SESSION — TOP PRIORITY
+
+### Post-LayerZero messaging — continue v0.3 implementation
+
+Active line: continue the impl chain past the foundation already shipped (token + accountant + validator registry, all with passing tests). Next pieces in order:
+1. **AttestationVerifier impl** — BLS12-381 threshold verification using EIP-2537 precompile path; expected ~600 LOC + ~15 tests.
+2. **MessagingHub orchestrator impl** — integrates token + accountant + verifier + registry; the four-flow surface (initiateBurn / receiveAttestation / recoverBurn / confirmDelivery); expected ~700 LOC + ~25 tests covering atomic ordering and cross-component invariants.
+3. **MessagingPoM** — three offense detectors (forged, reorg, liveness); plugs into ClawbackCascade.
+4. **CrossChainRouter swap-out** — migrate `contracts/messaging/CrossChainRouter.sol` callers to the new MessagingHub interface; mark LZ router deprecated.
+5. **v0.2 spec hardening** — close Q1 (validator client choice), Q4 (curated vs permissionless), Q7 (insurance pool sizing) once Will weighs in.
+
+Current status — all dual-pushed origin + backup:
+- Spec: `docs/research/papers/post-layerzero-canonical-messaging.md` v0.2 (379+26 lines, 14 sections + 3 appendices)
+- 5 interfaces: `contracts/messaging/interfaces/I{VibeSwapCanonicalToken, SupplyAccountant, MessagingValidatorRegistry, AttestationVerifier, MessagingHub}.sol`
+- 3 impls: `MessagingValidatorRegistry.sol` (462 LOC), `VibeSwapCanonicalToken.sol`, `SupplyAccountant.sol`
+- 3 test suites: 50 tests passing total (16 + 17 + 17)
+- 9 atomic commits, last `26dd9196`
 
 ### Multi-Level Persistence Framework (MLPF) — production-ready
 - **Status**: foundational save-session-state hook installed this session; full framework articulated as memory primitive; next-session work is operationalization across all triggers.

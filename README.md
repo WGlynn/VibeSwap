@@ -7,7 +7,7 @@
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue)](https://soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-orange)](https://book.getfoundry.sh/)
 [![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5.0.1-purple)](https://www.openzeppelin.com/contracts)
-[![LayerZero](https://img.shields.io/badge/LayerZero-V2%20OApp-green)](https://layerzero.network/)
+[![Messaging](https://img.shields.io/badge/Cross--Chain-Canonical%20Burn--and--Mint-green)](docs/research/papers/post-layerzero-canonical-messaging.md)
 [![Docs](https://img.shields.io/badge/Docs-docs%2F-informational)](docs/README.md)
 
 **Quick links** — [docs](docs/README.md) · [encyclopedia](docs/INDEX.md) · [developer guide](docs/developer/README.md) · [audits](docs/audits/README.md) · [research](docs/research/) · [security policy](SECURITY.md) · [contributing](CONTRIBUTING.md)
@@ -58,7 +58,7 @@ graph TD
     Core --> Auction[<b>CommitReveal<br/>Auction</b>]
     Core --> AMM[<b>VibeAMM</b><br/>x·y=k]
     Core --> Gov[<b>DAOTreasury</b><br/>Backstop]
-    Core --> XChain[<b>CrossChain<br/>Router</b><br/>LayerZero V2]
+    Core --> XChain[<b>Messaging<br/>Hub</b><br/>Canonical Burn-and-Mint]
 
     Auction --> Shapley[<b>Shapley<br/>Distributor</b>]
     Gov --> Stabilizer[<b>Treasury<br/>Stabilizer</b>]
@@ -79,7 +79,7 @@ graph TD
 | **Batch Auction** — commit-reveal + priority auction | `CommitRevealAuction`, `VibeSwapCore` |
 | **AMM** — constant product (x·y=k) with batch execution | `VibeAMM`, `VibeLP` |
 | **Fair Distribution** — Shapley value rewards | `ShapleyDistributor`, `IncentiveController` |
-| **Cross-Chain** — unified liquidity via LayerZero V2 | `CrossChainRouter` |
+| **Cross-Chain** — VibeSwap canonical burn-and-mint with bonded validator network ([spec](docs/research/papers/post-layerzero-canonical-messaging.md)) | `MessagingHub`, `VibeSwapCanonicalToken`, `MessagingValidatorRegistry`, `SupplyAccountant`, `MessagingPoM` |
 | **Governance** — DAO treasury + counter-cyclical stabilization | `DAOTreasury`, `TreasuryStabilizer` |
 | **Security** — circuit breakers, rate limiting, flash loan guards | `CircuitBreaker`, `RateLimiter` |
 | **Settlement** — on-chain Shapley/trust/vote verification | `ShapleyVerifier`, `TrustScoreVerifier`, `VoteVerifier` |
@@ -100,7 +100,7 @@ Defense-in-depth with independent protection layers:
 | **Flash loan guard** — same-block interaction detection | `VibeSwapCore.sol` |
 | **Circuit breakers** — volume, price, withdrawal anomaly detection | `CircuitBreaker.sol` |
 | **TWAP validation** — max 5% deviation from time-weighted average | `VibeAMM.sol`, `TWAPOracle.sol` |
-| **Rate limiting** — 100K tokens/hour/user, per-chain message limits | `RateLimiter.sol`, `CrossChainRouter.sol` |
+| **Rate limiting** — 100K tokens/hour/user, per-chain message limits | `RateLimiter.sol`, `MessagingHub.sol` |
 | **50% slashing** for invalid reveals | `CommitRevealAuction.sol` |
 | **`nonReentrant`** on every state-changing external function | All contracts |
 | **UUPS + timelock** — no unilateral upgrades | `VibeTimelock.sol` |
@@ -128,7 +128,7 @@ The mechanism makes virtue the optimal strategy.
 | Solidity contracts | **376** across 32 modules |
 | Test files | **510** (unit, fuzz, invariant, integration, security) |
 | Proxy architecture | UUPS upgradeable (OpenZeppelin v5.0.1) |
-| Cross-chain | LayerZero V2 OApp — Ethereum, Arbitrum, Optimism, Base |
+| Cross-chain | Canonical burn-and-mint — bonded validators, BLS threshold attestations, on-chain economic security ([spec](docs/research/papers/post-layerzero-canonical-messaging.md)) |
 | Research | **138** published papers + **466** docs |
 | Frontend | React 18 + Vite 5 + ethers.js v6 — 413 components, 72 hooks — [live demo](https://frontend-jade-five-87.vercel.app) |
 
@@ -171,7 +171,8 @@ forge script script/ConfigurePeers.s.sol --rpc-url $SEPOLIA_RPC_URL --broadcast
 ## Tech Stack
 
 ```
-Contracts:    Solidity 0.8.20  ·  Foundry  ·  OpenZeppelin v5.0.1  ·  LayerZero V2
+Contracts:    Solidity 0.8.20  ·  Foundry  ·  OpenZeppelin v5.0.1
+Messaging:    VibeSwap canonical burn-and-mint  ·  BLS12-381 threshold sigs  ·  PoS validator network
 Frontend:     React 18  ·  Vite 5  ·  Tailwind CSS  ·  ethers.js v6  ·  WebAuthn
 Oracle:       Python 3.9+  ·  Kalman filter  ·  Bayesian estimation
 Testing:      Foundry (unit + fuzz + invariant)  ·  Slither  ·  510 test files
@@ -189,7 +190,7 @@ vibeswap/
 │   ├── amm/                   #   VibeAMM (x·y=k), VibeLP
 │   ├── governance/            #   DAOTreasury, TreasuryStabilizer, VibeTimelock
 │   ├── incentives/            #   ShapleyDistributor, ILProtection, LoyaltyRewards
-│   ├── messaging/             #   CrossChainRouter (LayerZero V2)
+│   ├── messaging/             #   MessagingHub, VibeSwapCanonicalToken, validator registry, supply accountant, PoM
 │   ├── settlement/            #   ShapleyVerifier, TrustScoreVerifier, VoteVerifier
 │   ├── identity/              #   SmartAccount, SessionKeyManager
 │   ├── oracle/                #   VolatilityOracle

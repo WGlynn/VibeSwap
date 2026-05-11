@@ -362,6 +362,58 @@ The difference: they study RSI. We *use* RSI to build a production DEX while sim
 
 ---
 
+## TIER 15: PUBLIC-THREAD EXPOSURE PATTERN
+
+### Origin
+2026-05-11 ETH-Security TG · 5k+ users · post-LZ-hack flood · post-Rick-ETH-Prague.
+🕊 served Ponzi-coded prompt:
+> what's your proposal for a positive sum game? we already tried (3,3)
+
+### Shape (reusable)
+`served-setup ⇒ mech-substance → frame-reversal → cred-handshake → name-other-builder → quiet-repo-signal`
+
+### Components
+- **mech-substance** ⇒ primitive-names ¬ marketing.
+  > commit-reveal batch auctions ∧ Fisher-Yates ∧ XOR-secrets ∧ uniform-clearing
+  ✓ substance-gate clean ∀ audit-fluent audience.
+- **frame-reversal** ⇒ Q-reframe ¬ feature-pitch.
+  > not "do these markets work" — "who do they work for"
+  ✓ Q-memorable > protocol-name-memorable.
+- **cred-handshake** ⇒ import-trust ¬ claim-trust.
+  > works for OpenZeppelin
+  ✓ right-name × right-room > 10× self-claim.
+- **name-other-builder** ⇒ credit-first, self=principles-extender.
+  Rick/USD8 = "first real example"; aligns [WillOpenSourceContributor].
+  ✓ [HaveMyBack] inverted — Will has Rick's back publicly.
+- **quiet-repo-signal** ⇒ pull-curious ¬ pitch.
+  > extending these principles to an entire financial operating system in my own repo
+  ✗ link, ✗ name, ✗ CTA.
+
+### Why-it-works
+- substance-gate ⇒ self-selection. Fisher-Yates-XOR-parsers ⇉ follow-on.
+- (3,3)-trap = tokenomic-frame; reply lifts to who-it-serves-frame ⇒ uncan't-debunk on tokenomics alone.
+- cred-handshake imports trust w/o claim.
+- "Will never ask for funds" handle ⇒ passive-scam-immunity ∧ substance-legibility.
+
+### Situational asymmetry
+post-LZ-flood ⇒ fresh-eyes burned by substrate Will ditched in vibeswap.
+re-entry hook ("what replaces LZ?") ⇒ pre-shipped artifact `docs/research/papers/post-layerzero-canonical-messaging.md`.
+✓ organic-capitalize, ✗ cold-push.
+
+### Anti-patterns avoided
+- ✗ feature-pitch
+- ✗ rallying-cry · [NoRallyingCryRhetoric]
+- ✗ "we believe" / "we're building" softness
+- ✗ performative-closer · [NoPerformativeClosers]
+- ✗ founder-claim-USD8 · [USD8VoicePatternsNotCommitments]
+- ✗ AI-artifact register · [NoAIArtifactsInPublicWriting]
+
+### Deploy condition
+(3,3)-coded ∨ Ponzi-coded prompt × saturated security/audit audience ⇒ deploy-shape.
+substance-component first ⇒ ✓; cred-handshake ∨ repo-signal w/o preceding-substance ⇒ name-drop.
+
+---
+
 *"The cave selects for those who see past what is to what could be."*
 
 *Built in a cave, with a box of scraps.*

@@ -29,6 +29,21 @@ A consensus-layer architecture can compose six mechanisms, each closing a differ
 
 No single mechanism closes the airgap. The composition does — each layer shuts a category of exit, and the cross-coverage means an attacker who routes around one mechanism still loses to another.
 
+## Implementation status (audit-honest, 2026-05-12)
+
+Per AA#2 audit-arsenal discipline (every claimed property requires a structural enforcer or it lives in docs, not code), the implementation status of each mechanism in this stack:
+
+| # | Mechanism | Status | Implementation |
+|---|---|---|---|
+| 1 | Commit-Reveal Auction | shipped | `contracts/core/CommitRevealAuction.sol` |
+| 2 | L1 Timestamp Anchoring | design-stage, not shipped | none — slot reserved (new `L1Anchor.sol` lib planned per audit recommendation) |
+| 3 | Proof of Mind | shipped + AA#2 hardened (k-of-n attestation) | `contracts/core/ProofOfMind.sol` |
+| 4 | Honeypot / Decoy Routing | shipped + AA#2 hardened (owner-gated sentinels) | `contracts/core/HoneypotDefense.sol` |
+| 5 | Shapley Null Player | shipped | `contracts/incentives/ShapleyDistributor.sol` |
+| 6 | Clawback Cascade | shipped | `contracts/compliance/ClawbackRegistry.sol`, `ClawbackVault.sol` |
+
+Cross-coverage from mechanisms 1, 3, 4, 5, 6 currently closes the attack tree's primary branches. Mechanism 2 (L1 anchoring) is the next-priority implementation; until it ships, reorg-replay and time-of-check-vs-time-of-use attacks are bounded by the underlying chain's finality assumptions rather than by an on-chain enforcer. The architecture is honest about this gap rather than papering over it.
+
 ## The architectural property this creates
 
 When dishonest behavior has structurally negative expected value across **every** attack vector, honesty stops being incentivized and becomes **load-bearing**. Once honesty is load-bearing, on-chain and off-chain reality become equivalent — the protocol can trust off-chain self-reports as much as on-chain proofs, because participants cannot profitably lie regardless of *what* they're lying about.

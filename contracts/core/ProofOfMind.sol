@@ -63,6 +63,15 @@ contract ProofOfMind {
     uint256 public constant SLASH_DOWNTIME = 500;       // 5% for extended downtime
     uint256 public constant SLASH_INVALID_POW = 1000;   // 10% for invalid PoW
 
+    /// @notice Minimum number of distinct active-node attestations to finalize a
+    ///         mind contribution. AA#2 CRIT-1 closure (2026-05-12): prior to this
+    ///         primitive, ANY single active node could mint arbitrary mindScore to
+    ///         any contributor via recordContribution(contributor, hash, max).
+    ///         Now: a contribution finalizes only after MIN_ATTESTERS distinct
+    ///         active nodes have attested the same (contributor, hash, mindValue)
+    ///         tuple. Single-node self-mint becomes structurally impossible.
+    uint256 public constant MIN_ATTESTERS = 3;
+
     // ============ State ============
 
     struct MindNode {
@@ -120,6 +129,20 @@ contract ProofOfMind {
     mapping(bytes32 => bool) public verifiedContributions;
     mapping(address => uint256) public contributionCount;
 
+    /// @notice Pending attestations indexed by (contributionHash, contributor).
+    /// @dev Tracks the proposed mindValue and how many distinct active nodes
+    ///      have attested. Once attesterCount reaches MIN_ATTESTERS, the
+    ///      contribution finalizes and the contributor's mindScore updates.
+    struct AttestationState {
+        uint256 proposedMindValue;
+        uint256 attesterCount;
+        bool finalized;
+    }
+    mapping(bytes32 => mapping(address => AttestationState)) public attestationState;
+    /// @notice Per-attester flag: prevents the same node attesting the same
+    ///         (hash, contributor) twice. Keyed by (hash, contributor, attester).
+    mapping(bytes32 => mapping(address => mapping(address => bool))) public hasAttested;
+
     /// @notice Meta nodes (read-only P2P nodes, no voting power)
     mapping(address => MetaNode) public metaNodes;
     address[] public metaNodeList;
@@ -138,6 +161,13 @@ contract ProofOfMind {
     event NodeJoined(address indexed node, uint256 stake, uint256 initialMindScore);
     event NodeExited(address indexed node, uint256 stakeReturned);
     event MindContribution(address indexed node, bytes32 contributionHash, uint256 newMindScore);
+    event ContributionAttested(
+        address indexed contributor,
+        bytes32 indexed contributionHash,
+        address indexed attester,
+        uint256 mindValue,
+        uint256 attesterCount
+    );
     event PowSolved(address indexed node, uint256 roundId, uint256 nonce, uint256 difficulty);
     event VoteCast(address indexed node, uint256 roundId, bytes32 value, uint256 weight);
     event RoundFinalized(uint256 roundId, bytes32 winningValue, uint256 totalWeight);
@@ -160,6 +190,11 @@ contract ProofOfMind {
     error CannotSlashBelowMinimum();
     error InvalidContribution();
     error NotTrinityNode();
+    /// @notice Reverted when a node tries to attest the same (hash, contributor) twice.
+    error AlreadyAttested();
+    /// @notice Reverted when an attestation's proposed mindValue does not match
+    ///         the first attester's value for the same (hash, contributor) tuple.
+    error AttestationValueMismatch(uint256 expected, uint256 proposed);
 
     // ============ Modifiers ============
 
@@ -227,18 +262,70 @@ contract ProofOfMind {
     // ============ Mind Score (PoM) ============
 
     /**
-     * @notice Record a verified cognitive contribution (increases mind score)
-     * @dev Contributions are verified by trinity consensus before recording
+     * @notice Attest a cognitive contribution. Finalizes (and applies mind score
+     *         update) once MIN_ATTESTERS distinct active nodes have attested the
+     *         same (contributor, contributionHash, mindValue) tuple.
+     *
+     * @dev AA#2 CRIT-1 closure (2026-05-12): prior to this primitive, ANY single
+     *      active node could call this function with `(self, randomHash, max)`
+     *      and grant themselves arbitrary mindScore — repeated calls with
+     *      distinct hashes compounded the gain without bound. The k-of-n
+     *      attestation requirement closes that vector: an attacker now needs
+     *      to control MIN_ATTESTERS distinct active-node addresses with valid
+     *      stakes AND get all of them to agree on the same value before any
+     *      mindScore credit lands.
+     *
+     *      Each attester must:
+     *      - be an active node (onlyActiveNode modifier)
+     *      - not have already attested this (hash, contributor) tuple
+     *      - propose the same mindValue as the first attester
+     *
+     *      After MIN_ATTESTERS distinct attestations, the contribution finalizes
+     *      atomically: verifiedContributions[hash] is marked true, the log-scaled
+     *      mindScore is added to the contributor, contributionCount increments.
+     *      Subsequent attestations on the same finalized contribution are
+     *      no-ops (early return).
+     *
+     *      Sybil note: the structural cost of a self-attestation attack scales
+     *      with the cost of registering MIN_ATTESTERS distinct active nodes
+     *      (MIN_STAKE × MIN_ATTESTERS) and the social cost of coordinating them.
+     *      Strengthening node-registration sybil resistance amplifies this gate.
+     *
+     * @param contributor The address whose mindScore will be credited
      * @param contributionHash Hash of the contribution (code, data, task result)
-     * @param mindValue The cognitive value of this contribution (set by consensus)
+     * @param mindValue The cognitive value being attested
      */
     function recordContribution(
         address contributor,
         bytes32 contributionHash,
         uint256 mindValue
     ) external onlyActiveNode {
-        // Only trinity nodes can record contributions (they verified it)
-        if (!verifiedContributions[contributionHash]) {
+        // Already finalized → no-op (idempotent, matches previous semantics).
+        if (verifiedContributions[contributionHash]) return;
+
+        AttestationState storage att = attestationState[contributionHash][contributor];
+        if (att.finalized) return;
+
+        // Reject duplicate attestations from the same node.
+        if (hasAttested[contributionHash][contributor][msg.sender]) revert AlreadyAttested();
+
+        // First attester sets the proposed value; subsequent attesters must match.
+        if (att.attesterCount == 0) {
+            att.proposedMindValue = mindValue;
+        } else if (att.proposedMindValue != mindValue) {
+            revert AttestationValueMismatch(att.proposedMindValue, mindValue);
+        }
+
+        hasAttested[contributionHash][contributor][msg.sender] = true;
+        att.attesterCount++;
+
+        emit ContributionAttested(
+            contributor, contributionHash, msg.sender, mindValue, att.attesterCount
+        );
+
+        // Threshold reached → finalize and apply mindScore update atomically.
+        if (att.attesterCount >= MIN_ATTESTERS) {
+            att.finalized = true;
             verifiedContributions[contributionHash] = true;
 
             MindNode storage node = mindNodes[contributor];

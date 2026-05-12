@@ -80,39 +80,161 @@ contract ProofOfMindTest is Test {
         pom.exitNetwork();
     }
 
-    // ============ Mind Score (PoM) ============
+    // ============ Mind Score (PoM) — AA#2 CRIT-1 k-of-n attestation ============
 
-    function test_recordContribution() public {
-        vm.prank(node1);
-        pom.joinNetwork{value: 1 ether}(0);
+    /// @dev Helper: join all three test nodes and return them as attesters.
+    function _joinThreeAttesters() internal returns (address[3] memory) {
+        vm.prank(node1); pom.joinNetwork{value: 1 ether}(0);
+        vm.prank(node2); pom.joinNetwork{value: 1 ether}(0);
+        vm.prank(node3); pom.joinNetwork{value: 1 ether}(0);
+        return [node1, node2, node3];
+    }
 
+    function test_recordContribution_requiresMinAttesters() public {
+        _joinThreeAttesters();
         bytes32 contribHash = keccak256("code_commit_1");
 
+        // First attestation: no finalization yet
+        vm.prank(node2);
+        pom.recordContribution(node1, contribHash, 100);
+        (, , uint256 mindAfter1, , , , , , ) = pom.mindNodes(node1);
+        assertEq(mindAfter1, 0, "Single attester must not finalize");
+        assertEq(pom.contributionCount(node1), 0);
+        assertFalse(pom.verifiedContributions(contribHash));
+
+        // Second attestation: still no finalization
+        vm.prank(node3);
+        pom.recordContribution(node1, contribHash, 100);
+        (, , uint256 mindAfter2, , , , , , ) = pom.mindNodes(node1);
+        assertEq(mindAfter2, 0, "Two attesters must not finalize");
+
+        // Third attestation: threshold reached, finalizes
         vm.prank(node1);
         pom.recordContribution(node1, contribHash, 100);
-
-        (, , uint256 mind, , , , , , ) = pom.mindNodes(node1);
-        assertGt(mind, 0, "Mind score should increase");
+        (, , uint256 mindAfter3, , , , , , ) = pom.mindNodes(node1);
+        assertGt(mindAfter3, 0, "Mind score should increase at threshold");
         assertEq(pom.contributionCount(node1), 1);
         assertTrue(pom.verifiedContributions(contribHash));
     }
 
-    function test_duplicateContributionIgnored() public {
+    /// @dev The core AA#2 CRIT-1 attack vector: single node tries to self-mint
+    ///      arbitrary mindScore. Pre-fix this succeeded; post-fix it stalls
+    ///      forever at attesterCount=1.
+    function test_recordContribution_singleNodeCannotSelfMint() public {
         vm.prank(node1);
         pom.joinNetwork{value: 1 ether}(0);
 
-        bytes32 contribHash = keccak256("same_work");
+        bytes32 contribHash = keccak256("self_mint_attempt");
 
         vm.prank(node1);
+        pom.recordContribution(node1, contribHash, type(uint256).max);
+
+        (, , uint256 mind, , , , , , ) = pom.mindNodes(node1);
+        assertEq(mind, 0, "Self-attestation must not credit mindScore");
+        assertFalse(pom.verifiedContributions(contribHash));
+
+        // Cannot re-attest as the same node
+        vm.prank(node1);
+        vm.expectRevert(ProofOfMind.AlreadyAttested.selector);
+        pom.recordContribution(node1, contribHash, type(uint256).max);
+    }
+
+    function test_recordContribution_revertsOnValueMismatch() public {
+        _joinThreeAttesters();
+        bytes32 contribHash = keccak256("disputed_value");
+
+        // First attester proposes 100
+        vm.prank(node2);
         pom.recordContribution(node1, contribHash, 100);
 
-        (, , uint256 mindAfter1, , , , , , ) = pom.mindNodes(node1);
+        // Second attester tries 200 → revert
+        vm.prank(node3);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProofOfMind.AttestationValueMismatch.selector,
+                uint256(100),
+                uint256(200)
+            )
+        );
+        pom.recordContribution(node1, contribHash, 200);
+    }
 
-        vm.prank(node1);
-        pom.recordContribution(node1, contribHash, 100); // duplicate
+    function test_recordContribution_revertsDuplicateAttesterSameTuple() public {
+        _joinThreeAttesters();
+        bytes32 contribHash = keccak256("dup_attester");
 
-        (, , uint256 mindAfter2, , , , , , ) = pom.mindNodes(node1);
-        assertEq(mindAfter1, mindAfter2, "Duplicate should not increase score");
+        vm.prank(node2);
+        pom.recordContribution(node1, contribHash, 100);
+
+        vm.prank(node2);
+        vm.expectRevert(ProofOfMind.AlreadyAttested.selector);
+        pom.recordContribution(node1, contribHash, 100);
+    }
+
+    function test_recordContribution_finalizedCallIsNoop() public {
+        _joinThreeAttesters();
+        bytes32 contribHash = keccak256("once_done");
+
+        vm.prank(node2); pom.recordContribution(node1, contribHash, 100);
+        vm.prank(node3); pom.recordContribution(node1, contribHash, 100);
+        vm.prank(node1); pom.recordContribution(node1, contribHash, 100);
+        // Finalized.
+
+        (, , uint256 mindBefore, , , , , , ) = pom.mindNodes(node1);
+        uint256 countBefore = pom.contributionCount(node1);
+
+        // Join a fourth node and try to attest after finalization → no-op (silent)
+        address node4 = makeAddr("node4");
+        vm.deal(node4, 100 ether);
+        vm.prank(node4); pom.joinNetwork{value: 1 ether}(0);
+
+        vm.prank(node4);
+        pom.recordContribution(node1, contribHash, 100); // already finalized
+        (, , uint256 mindAfter, , , , , , ) = pom.mindNodes(node1);
+        assertEq(mindAfter, mindBefore, "Post-finalize attestation must not credit");
+        assertEq(pom.contributionCount(node1), countBefore);
+    }
+
+    function test_recordContribution_revertsNonActiveCaller() public {
+        _joinThreeAttesters();
+        bytes32 contribHash = keccak256("outsider");
+
+        address outsider = makeAddr("outsider");
+        vm.prank(outsider);
+        vm.expectRevert(ProofOfMind.NotActive.selector);
+        pom.recordContribution(node1, contribHash, 100);
+    }
+
+    function test_recordContribution_independentContributorsAccumulateSeparately() public {
+        _joinThreeAttesters();
+        bytes32 contribHash = keccak256("shared_hash");
+
+        // Three attest contribution credited to node1
+        vm.prank(node2); pom.recordContribution(node1, contribHash, 100);
+        vm.prank(node3); pom.recordContribution(node1, contribHash, 100);
+        vm.prank(node1); pom.recordContribution(node1, contribHash, 100);
+
+        (, , uint256 mind1, , , , , , ) = pom.mindNodes(node1);
+        (, , uint256 mind2, , , , , , ) = pom.mindNodes(node2);
+        assertGt(mind1, 0);
+        assertEq(mind2, 0, "node2 was an attester, not the contributor");
+    }
+
+    function test_recordContribution_attesterCountIncrementsAcrossDistinctNodes() public {
+        _joinThreeAttesters();
+        bytes32 contribHash = keccak256("counter_test");
+
+        vm.prank(node2); pom.recordContribution(node1, contribHash, 100);
+        (uint256 v1, uint256 c1, bool f1) = pom.attestationState(contribHash, node1);
+        assertEq(v1, 100); assertEq(c1, 1); assertFalse(f1);
+
+        vm.prank(node3); pom.recordContribution(node1, contribHash, 100);
+        (uint256 v2, uint256 c2, bool f2) = pom.attestationState(contribHash, node1);
+        assertEq(v2, 100); assertEq(c2, 2); assertFalse(f2);
+
+        vm.prank(node1); pom.recordContribution(node1, contribHash, 100);
+        (uint256 v3, uint256 c3, bool f3) = pom.attestationState(contribHash, node1);
+        assertEq(v3, 100); assertEq(c3, 3); assertTrue(f3);
     }
 
     // ============ Consensus Rounds ============

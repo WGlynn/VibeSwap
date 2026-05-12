@@ -33,6 +33,51 @@ contract HoneypotDefenseTest is Test {
         hp.reportAnomaly(attacker, "pow_rate", 20);
     }
 
+    // ============ AA#2 CRIT-2 Part A: registerSentinel is owner-gated ============
+
+    /// @dev Pre-fix: ANY address could self-register as a sentinel, then drive
+    ///      the trap lifecycle against any victim. Post-fix: only the contract
+    ///      owner can register sentinels.
+    function test_registerSentinel_revertsNotOwner() public {
+        address randomAttacker = makeAddr("randomAttacker");
+        vm.prank(randomAttacker);
+        // Ownable v5 reverts with custom error OwnableUnauthorizedAccount
+        vm.expectRevert();
+        hp.registerSentinel(randomAttacker);
+        assertFalse(hp.sentinels(randomAttacker), "Self-registration must fail");
+    }
+
+    function test_attackerCannotSelfRegisterAndDrain() public {
+        // Reproduce the exact attack chain from AA#2 audit:
+        //   attacker registers self → reportAnomaly → escalate threat → ...
+        // After AA#2 Part A, the first step alone reverts; the chain never starts.
+        vm.prank(attacker);
+        vm.expectRevert();
+        hp.registerSentinel(attacker);
+
+        vm.prank(attacker);
+        vm.expectRevert(HoneypotDefense.NotSentinel.selector);
+        hp.reportAnomaly(attacker, "pow_rate", 999);
+    }
+
+    function test_removeSentinel_ownerCanRevoke() public {
+        // sentinel is registered in setUp. Remove and verify revocation.
+        hp.removeSentinel(sentinel);
+        assertFalse(hp.sentinels(sentinel), "Sentinel must be revoked");
+
+        // Revoked sentinel can no longer call onlySentinel paths
+        vm.prank(sentinel);
+        vm.expectRevert(HoneypotDefense.NotSentinel.selector);
+        hp.reportAnomaly(attacker, "pow_rate", 20);
+    }
+
+    function test_removeSentinel_revertsNotOwner() public {
+        vm.prank(attacker);
+        vm.expectRevert();
+        hp.removeSentinel(sentinel);
+        assertTrue(hp.sentinels(sentinel), "Non-owner removal must fail");
+    }
+
     // ============ Anomaly Detection ============
 
     function test_reportAnomalyBelowThreshold() public {

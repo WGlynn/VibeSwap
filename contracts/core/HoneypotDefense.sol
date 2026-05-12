@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @title HoneypotDefense — Cryptographic Siren Attack Trap
  * @notice Game-theoretic defense that makes attackers THINK they're succeeding.
@@ -48,7 +50,7 @@ pragma solidity ^0.8.20;
  *
  *   "He thought he was hacking the system. The system was hacking him." — Will
  */
-contract HoneypotDefense {
+contract HoneypotDefense is Ownable {
     // ============ Constants ============
 
     /// @notice Anomaly detection thresholds
@@ -144,6 +146,7 @@ contract HoneypotDefense {
     event AttackRevealed(address indexed attacker, uint256 computeWasted, uint256 stakeLost);
     event EvidencePublished(address indexed attacker, string evidenceHash);
     event SentinelRegistered(address indexed sentinel);
+    event SentinelRemoved(address indexed sentinel);
     event ThreatEscalated(address indexed attacker, ThreatLevel newLevel);
 
     // ============ Errors ============
@@ -163,16 +166,41 @@ contract HoneypotDefense {
 
     // ============ Constructor ============
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         defenseActive = true;
     }
 
     // ============ Sentinel Management ============
 
-    function registerSentinel(address sentinel) external {
-        // In production: only TrinityGuardian consensus can add sentinels
+    /**
+     * @notice Register a sentinel authorized to call onlySentinel functions.
+     * @dev AA#2 CRIT-2 closure (2026-05-12): prior to this gate, ANY caller
+     *      could self-register as a sentinel, then drive the entire trap
+     *      lifecycle against arbitrary victims (reportAnomaly → createShadow-
+     *      State → recordStakeLocked → revealTrap → recycleResources to
+     *      attacker-controlled treasury). Now only the owner can register
+     *      sentinels.
+     *
+     *      Owner should be a TrinityGuardian multisig in production. The
+     *      single-EOA owner case is bootstrap-only; transferring ownership
+     *      to a multisig is the Phase-B disintermediation step. A future
+     *      hardening (AA#2 CRIT-2 Part B) replaces onlySentinel with k-of-n
+     *      sentinel attestation on every state-mutating entry point —
+     *      defense-in-depth even when a single sentinel is compromised.
+     */
+    function registerSentinel(address sentinel) external onlyOwner {
         sentinels[sentinel] = true;
         emit SentinelRegistered(sentinel);
+    }
+
+    /**
+     * @notice Revoke a previously-registered sentinel. Owner only.
+     * @dev Mirrors registerSentinel for governance hygiene — a compromised
+     *      sentinel can be ejected without redeploying the contract.
+     */
+    function removeSentinel(address sentinel) external onlyOwner {
+        sentinels[sentinel] = false;
+        emit SentinelRemoved(sentinel);
     }
 
     // ============ Anomaly Detection ============

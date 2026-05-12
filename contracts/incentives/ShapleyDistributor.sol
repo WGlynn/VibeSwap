@@ -1893,6 +1893,39 @@ contract ShapleyDistributor is
 
     receive() external payable {}
 
+    // ============ Axiom Version (AA#2 CRIT-3b) ============
+
+    /**
+     * @notice Identifier for the axiom set this implementation enforces.
+     * @dev Hard-coded constant compiled into the bytecode. Two implementations
+     *      that enforce the same axiom set return the same hash; any change to
+     *      the axiom set (adding, removing, or modifying an axiom) requires
+     *      changing the string fed into keccak256, which produces a different
+     *      hash. The _authorizeUpgrade gate refuses upgrades whose proposed
+     *      implementation does not return the same axiomVersion as the current
+     *      one. This makes "Physics > Constitution > Governance" structurally
+     *      enforced at the upgrade boundary: a governance vote that elects an
+     *      implementation labelled as a different axiom set is rejected before
+     *      the proxy ever delegates to it.
+     *
+     *      Five axioms enforced:
+     *        - linearity
+     *        - symmetry
+     *        - efficiency
+     *        - null-player
+     *        - pairwise-proportionality
+     *
+     *      A future implementation that adds a sixth axiom (or removes one)
+     *      MUST change this string, signalling the migration intent. A new
+     *      requiredAxiomVersion would need to be set by a separately authorized
+     *      governance action before the upgrade gate accepts it.
+     */
+    function axiomVersion() public pure virtual returns (bytes32) {
+        return keccak256(
+            "vibeswap-shapley-axiom-set:linearity|symmetry|efficiency|null-player|pairwise-proportionality"
+        );
+    }
+
     // ============ UUPS ============
 
     /**
@@ -1909,8 +1942,25 @@ contract ShapleyDistributor is
      *
      *      "If something is clearly unfair, amending the code is a
      *       responsibility, a credo, a law, a canon."
+     *
+     *      AA#2 CRIT-3b gate (2026-05-12): the new implementation must expose
+     *      axiomVersion() and return the same hash as the current implementation.
+     *      A governance vote that elects an implementation with a different
+     *      axiom set (signaled by a different hash) is rejected here, before
+     *      the proxy ever delegates to it. This closes the gap where the
+     *      math layer was upgradable to any implementation without preserving
+     *      Shapley invariants.
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         require(newImplementation.code.length > 0, "Not a contract");
+
+        bytes32 currentHash = this.axiomVersion();
+        (bool ok, bytes memory ret) = newImplementation.staticcall(
+            abi.encodeWithSignature("axiomVersion()")
+        );
+        require(ok, "axiom-version call failed");
+        require(ret.length == 32, "axiom-version bad return");
+        bytes32 newHash = abi.decode(ret, (bytes32));
+        require(newHash == currentHash, "axiom-version mismatch");
     }
 }

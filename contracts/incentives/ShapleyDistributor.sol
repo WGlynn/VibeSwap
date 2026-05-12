@@ -826,6 +826,17 @@ contract ShapleyDistributor is
         // Step 3: Enforce Lawson Fairness Floor + Step 4: Force efficiency
         _applyFloorAndEfficiency(distributableValue, participants, weights, shares);
 
+        // AA#2 CRIT-3c (2026-05-12): structural enforcement of axiom 5.
+        // Strict pairwise-proportionality holds among non-floor-bumped pairs.
+        // The Lawson floor deliberately overrides strict proportionality for
+        // participants whose proportional share falls below 1% — that is the
+        // documented exception, preserved here so the floor isn't bricked.
+        // Prior to this require, verifyPairwiseFairness was an external-view-
+        // only spectator: a game whose final shares violated axiom 5 among
+        // non-floor pairs would settle silently. Now: such a game reverts at
+        // settlement time, before any state is committed downstream.
+        _enforceAxiom5(distributableValue, weights, shares, totalWeightedContrib[gameId]);
+
         // Final assignment
         for (uint256 i = 0; i < n; i++) {
             shapleyValues[gameId][participants[i].participant] = shares[i];
@@ -897,6 +908,47 @@ contract ShapleyDistributor is
             if (i != dustRecipient) distributed += shares[i];
         }
         shares[dustRecipient] = totalValue - distributed;
+    }
+
+    /// @dev AA#2 CRIT-3c: inline axiom-5 (pairwise-proportionality) enforcer.
+    ///      O(n²) pair check. Skips floor-bumped participants — by Lawson design,
+    ///      floor-bumped pairs do not satisfy strict pairwise-proportionality
+    ///      (they satisfy a different invariant: every honest contributor gets
+    ///      ≥ 1%). Among non-floor pairs, |φᵢ × wⱼ − φⱼ × wᵢ| ≤ tolerance must
+    ///      hold or settlement reverts.
+    ///
+    ///      Tolerance: n × (w_i + w_j) per pair. Derivation: cross-multiplication
+    ///      of integer-divided shares produces a residual of at most (w_i + w_j)
+    ///      for non-dust pairs. The dust recipient absorbs up to (n-1) wei of
+    ///      cumulative rounding from other participants, which amplifies the
+    ///      bound to (w_dust + n × w_other) for pairs involving it. n × (w_i +
+    ///      w_j) covers both cases. Tighter than the global totalWeightedContrib
+    ///      tolerance used by the public verifyPairwiseFairness view, but precise
+    ///      enough to catch real axiom violations (e.g., post-floor share-ratio
+    ///      drift that exceeds rounding-only precision).
+    ///
+    ///      The _outerToleranceUnused parameter is kept on the signature for
+    ///      future calibration without further API churn.
+    function _enforceAxiom5(
+        uint256 totalValue,
+        uint256[] memory weights,
+        uint256[] memory shares,
+        uint256 /* _outerToleranceUnused */
+    ) internal pure {
+        uint256 n = shares.length;
+        uint256 floorAmount = (totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
+        for (uint256 i = 0; i < n; i++) {
+            if (shares[i] == floorAmount) continue;
+            for (uint256 j = i + 1; j < n; j++) {
+                if (shares[j] == floorAmount) continue;
+                uint256 perPairTolerance = n * (weights[i] + weights[j]);
+                PairwiseFairness.FairnessResult memory r =
+                    PairwiseFairness.verifyPairwiseProportionality(
+                        shares[i], shares[j], weights[i], weights[j], perPairTolerance
+                    );
+                require(r.fair, "axiom 5 violated for non-floor pair");
+            }
+        }
     }
 
     // ============ Settlement Layer Integration ============

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../contracts/governance/GovernanceGuard.sol";
+import "../contracts/governance/IGovernanceProposalVerifier.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 // ============ Mock Target ============
@@ -26,11 +27,37 @@ contract MockGGTarget {
     }
 }
 
+// ============ Mock Proposal Verifier ============
+
+/// @dev Configurable IGovernanceProposalVerifier for testing the CRIT-3 fix
+///      (AA#2 audit closure). Default: returns (true, "") for everything.
+contract MockProposalVerifier is IGovernanceProposalVerifier {
+    bool public defaultFair = true;
+    mapping(address => bool) public unfairTargets;
+    string public unfairReason = "test: target marked unfair";
+    bytes32 private _axiomVersion = keccak256("test-axiom-v1");
+
+    function setDefaultFair(bool _fair) external { defaultFair = _fair; }
+    function setUnfairTarget(address t, bool unfair) external { unfairTargets[t] = unfair; }
+    function setUnfairReason(string calldata reason) external { unfairReason = reason; }
+    function setAxiomVersion(bytes32 v) external { _axiomVersion = v; }
+
+    function verifyProposal(address target, uint256, bytes calldata)
+        external view returns (bool, string memory)
+    {
+        if (unfairTargets[target]) return (false, unfairReason);
+        return (defaultFair, defaultFair ? "" : unfairReason);
+    }
+
+    function axiomVersion() external view returns (bytes32) { return _axiomVersion; }
+}
+
 // ============ Test Contract ============
 
 contract GovernanceGuardTest is Test {
     GovernanceGuard public guard;
     MockGGTarget public target;
+    MockProposalVerifier public verifier;
 
     // ============ Actors ============
 
@@ -51,6 +78,7 @@ contract GovernanceGuardTest is Test {
     event ProposalCancelled(bytes32 indexed proposalId, address indexed canceller);
     event VetoGuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
     event EmergencyGuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
+    event ProposalVerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
     event ProposerUpdated(address indexed account, bool authorized);
 
     // ============ Constants ============
@@ -77,6 +105,13 @@ contract GovernanceGuardTest is Test {
         // Authorize proposer
         vm.prank(owner);
         guard.setProposer(proposer, true);
+
+        // Deploy + wire the autonomous proposal verifier (AA#2 CRIT-3 closure).
+        // Default mock returns (true, "") for everything — execute() succeeds
+        // unless a specific test marks a target unfair via verifier.setUnfairTarget.
+        verifier = new MockProposalVerifier();
+        vm.prank(owner);
+        guard.setProposalVerifier(address(verifier));
 
         // Deploy target
         target = new MockGGTarget();
@@ -603,5 +638,169 @@ contract GovernanceGuardTest is Test {
     ) public view {
         bytes32 h1 = guard.hashProposal(_target, _value, _data, _desc);
         assertTrue(h1 != bytes32(0));
+    }
+
+    // ============ Proposal Verifier (AA#2 — Autonomous Axiom Check) ============
+
+    function test_setProposalVerifier_setsAddress() public {
+        MockProposalVerifier newVerifier = new MockProposalVerifier();
+        vm.prank(owner);
+        guard.setProposalVerifier(address(newVerifier));
+        assertEq(guard.proposalVerifier(), address(newVerifier));
+    }
+
+    function test_setProposalVerifier_emitsEvent() public {
+        MockProposalVerifier newVerifier = new MockProposalVerifier();
+        vm.expectEmit(true, true, false, false);
+        emit ProposalVerifierUpdated(address(verifier), address(newVerifier));
+        vm.prank(owner);
+        guard.setProposalVerifier(address(newVerifier));
+    }
+
+    function test_setProposalVerifier_revertsZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert(GovernanceGuard.ZeroAddress.selector);
+        guard.setProposalVerifier(address(0));
+    }
+
+    function test_setProposalVerifier_revertsNotOwner() public {
+        MockProposalVerifier newVerifier = new MockProposalVerifier();
+        vm.prank(nobody);
+        vm.expectRevert();
+        guard.setProposalVerifier(address(newVerifier));
+    }
+
+    /// @dev Fail-closed: a fresh guard with no verifier wired cannot execute.
+    function test_execute_revertsWhenVerifierNotSet() public {
+        // Deploy a fresh proxy WITHOUT wiring the verifier
+        GovernanceGuard impl = new GovernanceGuard();
+        bytes memory initData = abi.encodeCall(
+            GovernanceGuard.initialize,
+            (owner, vetoGuardian, emergencyGuardian)
+        );
+        ERC1967Proxy freshProxy = new ERC1967Proxy(address(impl), initData);
+        GovernanceGuard freshGuard = GovernanceGuard(payable(address(freshProxy)));
+
+        vm.prank(owner);
+        freshGuard.setProposer(proposer, true);
+
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        vm.prank(proposer);
+        freshGuard.propose(address(target), 0, data, "Fresh proposal");
+
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+        vm.expectRevert(GovernanceGuard.ProposalVerifierNotSet.selector);
+        freshGuard.execute(address(target), 0, data, "Fresh proposal");
+    }
+
+    /// @dev Verifier says !fair → execute() reverts with ProposalUnfair(reason).
+    function test_execute_revertsWhenVerifierUnfair() public {
+        _proposeDefault();
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
+        verifier.setDefaultFair(false);
+        verifier.setUnfairReason("axiom 5 violated by floor adjustment");
+
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                GovernanceGuard.ProposalUnfair.selector,
+                "axiom 5 violated by floor adjustment"
+            )
+        );
+        guard.execute(address(target), 0, data, "Set value to 42");
+    }
+
+    /// @dev Per-target unfair marking — verifier can refuse specific targets.
+    function test_execute_revertsWhenTargetMarkedUnfair() public {
+        _proposeDefault();
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
+        verifier.setUnfairTarget(address(target), true);
+
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                GovernanceGuard.ProposalUnfair.selector,
+                "test: target marked unfair"
+            )
+        );
+        guard.execute(address(target), 0, data, "Set value to 42");
+    }
+
+    /// @dev Proposal that passes verifier executes normally.
+    function test_execute_succeedsWhenVerifierFair() public {
+        _proposeDefault();
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
+        // Default mock returns fair=true
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        guard.execute(address(target), 0, data, "Set value to 42");
+        assertEq(target.value(), 42);
+    }
+
+    /// @dev Initialization does NOT require a verifier — only execute does.
+    ///      This allows phased deployment: deploy guard, transfer admins, wire
+    ///      verifier last, then propose-and-execute paths come online.
+    function test_initialize_doesNotRequireVerifier() public {
+        GovernanceGuard impl = new GovernanceGuard();
+        bytes memory initData = abi.encodeCall(
+            GovernanceGuard.initialize,
+            (owner, vetoGuardian, emergencyGuardian)
+        );
+        // No revert expected — initialize is independent of verifier wiring
+        ERC1967Proxy freshProxy = new ERC1967Proxy(address(impl), initData);
+        GovernanceGuard freshGuard = GovernanceGuard(payable(address(freshProxy)));
+        assertEq(freshGuard.proposalVerifier(), address(0));
+    }
+
+    /// @dev Verifier swap mid-flight: new verifier governs next execution.
+    function test_execute_swappedVerifierGovernsNextProposal() public {
+        _proposeDefault();
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
+        // Swap to a verifier that refuses everything
+        MockProposalVerifier strictVerifier = new MockProposalVerifier();
+        strictVerifier.setDefaultFair(false);
+        strictVerifier.setUnfairReason("strict mode: all proposals rejected");
+        vm.prank(owner);
+        guard.setProposalVerifier(address(strictVerifier));
+
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                GovernanceGuard.ProposalUnfair.selector,
+                "strict mode: all proposals rejected"
+            )
+        );
+        guard.execute(address(target), 0, data, "Set value to 42");
+    }
+
+    /// @dev Verifier check fires AFTER timelock check but BEFORE state mutation.
+    ///      Order matters: timelock-incomplete proposals must reject before
+    ///      paying the verifier-call gas.
+    function test_execute_verifierCheckAfterTimelock() public {
+        _proposeDefault();
+
+        verifier.setDefaultFair(false);
+
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        // Pre-timelock: TimelockNotElapsed wins over ProposalUnfair
+        vm.expectRevert(GovernanceGuard.TimelockNotElapsed.selector);
+        guard.execute(address(target), 0, data, "Set value to 42");
+    }
+
+    /// @dev Veto path still works alongside autonomous verifier — they are
+    ///      independent gates (manual + structural).
+    function test_execute_vetoStillBlocksEvenWithFairVerifier() public {
+        bytes32 proposalId = _proposeDefault();
+
+        vm.prank(vetoGuardian);
+        guard.veto(proposalId, "manual override");
+
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+        bytes memory data = abi.encodeCall(MockGGTarget.setValue, (42));
+        vm.expectRevert(GovernanceGuard.ProposalAlreadyVetoed.selector);
+        guard.execute(address(target), 0, data, "Set value to 42");
     }
 }

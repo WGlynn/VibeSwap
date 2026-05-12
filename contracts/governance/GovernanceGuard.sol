@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "./IGovernanceProposalVerifier.sol";
 
 /**
  * @title GovernanceGuard
@@ -59,9 +60,15 @@ contract GovernanceGuard is
     address public emergencyGuardian;
     mapping(address => bool) public proposers;
 
+    /// @notice Autonomous Shapley-axiom verifier. Set via setProposalVerifier.
+    /// @dev If unset (zero), execute() reverts — fail-closed enforcement of
+    ///      Physics > Constitution > Governance per AA#2 audit 2026-05-12.
+    address public proposalVerifier;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+
+    /// @dev Reserved storage gap for future upgrades (was 50, now 49 after
+    ///      adding proposalVerifier in AA#2 closure)
+    uint256[49] private __gap;
 
     // ============ Events ============
 
@@ -74,6 +81,7 @@ contract GovernanceGuard is
     event ProposalCancelled(bytes32 indexed proposalId, address indexed canceller);
     event VetoGuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
     event EmergencyGuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
+    event ProposalVerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
     event ProposerUpdated(address indexed account, bool authorized);
     event AdminTransferred(address indexed target, address indexed newOwner);
 
@@ -90,6 +98,13 @@ contract GovernanceGuard is
     error ProposalAlreadyCancelled();
     error TimelockNotElapsed();
     error CallFailed(address target, bytes data);
+    /// @notice Reverted when execute() is called before proposalVerifier is wired.
+    /// @dev Fail-closed enforcement: a governance system without an autonomous
+    ///      axiom verifier should not execute proposals at all.
+    error ProposalVerifierNotSet();
+    /// @notice Reverted when the autonomous verifier refuses a proposal.
+    /// @param reason Human-readable reason from the verifier.
+    error ProposalUnfair(string reason);
 
     // ============ Modifiers ============
 
@@ -159,7 +174,15 @@ contract GovernanceGuard is
 
     // ============ Proposal Execution ============
 
-    /// @notice Execute a proposal after its delay has elapsed. Permissionless — anyone can call.
+    /// @notice Execute a proposal after its delay has elapsed. Permissionless.
+    /// @dev Gates (in order):
+    ///      1. proposal state (exists, not executed/vetoed/cancelled)
+    ///      2. timelock elapsed
+    ///      3. autonomous axiom check via proposalVerifier (fail-closed: reverts
+    ///         if verifier is unset). This is the AA#2 closure of CRIT-3 from
+    ///         the 2026-05-12 audit — Physics > Constitution > Governance is now
+    ///         structurally enforced at the execution boundary rather than relying
+    ///         on a human vetoGuardian being honest and available.
     function execute(
         address target, uint256 value, bytes calldata data, string calldata description
     ) external payable nonReentrant {
@@ -171,6 +194,14 @@ contract GovernanceGuard is
         if (p.vetoed) revert ProposalAlreadyVetoed();
         if (p.cancelled) revert ProposalAlreadyCancelled();
         if (block.timestamp < p.executeAfter) revert TimelockNotElapsed();
+
+        // Autonomous axiom check — the structural enforcer of Physics > Governance.
+        // Fail-closed: if verifier is unset, no proposal executes.
+        address verifier = proposalVerifier;
+        if (verifier == address(0)) revert ProposalVerifierNotSet();
+        (bool fair, string memory reason) = IGovernanceProposalVerifier(verifier)
+            .verifyProposal(target, value, data);
+        if (!fair) revert ProposalUnfair(reason);
 
         p.executed = true;
 
@@ -279,6 +310,16 @@ contract GovernanceGuard is
         address old = vetoGuardian;
         vetoGuardian = _vetoGuardian;
         emit VetoGuardianUpdated(old, _vetoGuardian);
+    }
+
+    /// @notice Wire the autonomous Shapley-axiom verifier called from execute().
+    /// @dev Must be set before any proposal can execute (fail-closed). Setting
+    ///      to a new verifier swaps the axiom contract on the next execute call.
+    function setProposalVerifier(address _verifier) external onlyOwner {
+        if (_verifier == address(0)) revert ZeroAddress();
+        address old = proposalVerifier;
+        proposalVerifier = _verifier;
+        emit ProposalVerifierUpdated(old, _verifier);
     }
 
     function setEmergencyGuardian(address _emergencyGuardian) external onlyOwner {

@@ -1,6 +1,86 @@
-# Session State — 2026-05-11 → 2026-05-12 (rolled over; 27h+ active)
+# Session State — 2026-05-12 → 2026-05-13 (rolled over; 28h+ active; full-autopilot arc this turn)
 
-## ⚡ Active Intention (CURRENT — 2026-05-12 strategic-maneuvering pivot)
+## ⚡ Active Intention (CURRENT — 2026-05-13 USD8 outreach + CCP/AA#3 audit-arsenal extension)
+
+> **Intention**: USD8 outreach in rapid-fire mode using Will's new `@usd8.fi` email. Channel-stack pivot done (Twitter out without Premium; LinkedIn / Email / GitHub / Telegram as the active stack). 50-target pack drafted then pruned to 44 active after Rick-coordination filter (Pendle, Fluid, LayerZero, OpenZeppelin removed). First-batch 5 (Paul Frambot/Morpho, Michael Bentley/Euler, Sebastien/Steakhouse, Patrick Collins/Cyfrin, David Hoffman/Bankless) queued for today. Mid-arc, Will surfaced a context-vulnerability class (AA#3 entity-context-cross-reference) and asked to generalize to a Cross-Context Protocol (CCP). Both primitives + hook deployed. The audit-arsenal now has 3 entries (AA#1 fork-loses-hardness, AA#2 claim-needs-structural-enforcer, AA#3 entity-context-cross-reference) all linked to CCP as parent meta-primitive.
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+### USD8 outreach: continue rapid-fire across 44 active targets
+
+Day-1 first-batch was queued for today (Paul Frambot, Michael Bentley, Sebastien, Patrick Collins, David Hoffman). Day-2 (10) and Day 3-5 (29) sequenced in the email pack at `Desktop/usd8-outreach-emails-2026-05-13.{md,pdf}`.
+
+Workflow per target:
+1. Verify recipient email (firm contact page or LinkedIn lookup)
+2. Replace `[YOUR CONTEXT: ...]` placeholder with target-specific 1-line
+3. Send via `will@usd8.fi` (sender provider TBD per Rick's setup)
+4. Log replies; flag warm conversations to Rick for handoff on commercial terms
+
+Pre-deconflict TG message to Rick sent (or about to be — final version surfaced in chat). 4 entities pre-scratched (Pendle×2, Fluid×2), 2 removed entirely (LayerZero post-abandonment, OpenZeppelin per Rick's employer). The 6/50 retroactive corrections triggered the AA#3 / CCP work documented below.
+
+### CCP / AA#3 enforcement closure (load-bearing)
+
+Hook deployed this session at `~/.claude/hooks/entity-context-cross-reference.py` + registered in settings.json PreToolUse Write|Edit matcher. Fires on entity-list patterns (≥500 char content + signal patterns like `## Email N.`, `**To**:`, `target list`, `outreach`, etc.), greps memory dir, returns matched snippets via additionalContext. Verified working in smoke-test (surfaced OpenZeppelin/Rick, LayerZero/abandoned, Pendle/in-flight matches on the test write).
+
+**Next-session CCP backlog**:
+1. **Indexed memory** — reverse-index built once + cached as JSON (entity → files mentioning). Replaces per-invocation grep with O(matches) lookup. Substantial cost reduction at scale.
+2. **Context-routing table v1** — extend the AA#3 entity-list routing to other output classes (code-claim → grep contract, decision → SESSION_STATE+WAL, cred-claim → profile memory, public-artifact → NDA-locked).
+3. **Tune hook signal patterns** — current heuristics conservative. Add detection for (a) decision-output patterns (architectural choice statements), (b) credential claims (mentions of person + role/title/years), (c) external-publication signals (Medium pipeline paths, LinkedIn-Queue, ethresearch drafts).
+4. **Reverse-link MEMORY.md entries** — when a primitive is updated to add a parent (CCP) or sibling link, the linked primitives' files should reciprocate. Currently one-directional.
+
+### Audit-closure backlog (carried from 2026-05-12)
+
+CRIT-2 Part B, MED-1 through MED-6, L1Anchor.sol all still queued from yesterday's audit-arsenal sweep. CRIT-3 closed (3 commits), CRIT-1 closed (1 commit), CRIT-2 Part A closed (1 commit), HIGH-1 closed (1 doc commit), HIGH-2 closed alongside CRIT-3c. Pre-deploy criticals largely shipped; the remaining items are defense-in-depth.
+
+### What shipped during the 2026-05-12 → 2026-05-13 arc
+
+**Public-facing artifacts**:
+- EthResearch P2 draft: `Desktop/2026-05-12_ethresearch-post-02-amd-methodology.md` (~1290 words, AMD methodology, schelling-handle posting-discipline compliant)
+- LinkedIn AMD piece: `Desktop/2026-05-12_amd-linkedin.{md,html,pdf}` (~2.8k chars, USD8 worked example, Rick credited as architect)
+- USD8 outreach email pack: `Desktop/usd8-outreach-emails-2026-05-13.{md,pdf}` — 50 drafts grouped 20+15+10+5 by tier, 4 marked `[RICK COORDINATING - DEFER]`, 2 marked `[REMOVED - DO NOT SEND]`, 44 active
+- Outreach plan extension: `Desktop/outreach_pitches/CHANNEL_STACK.md` (channel pivot doc), `Desktop/outreach_pitches/TARGETS_50_RAPID_FIRE.md` (target list), `Desktop/outreach_pitches/EMAIL_TEMPLATES.md` (4 audience templates)
+
+**Memory primitives shipped (dual-pushed)**:
+- `[F·entity-context-cross-reference]` AA#3 (commit `6244e36`) — entity-list outputs need per-entity memory cross-reference; 6/50 retroactive corrections at origin
+- `[P·cross-context-protocol]` CCP parent (commit `6244e36`) — meta-primitive: ∀ output ⇒ reconcile against invalidating contexts before deliver. Reconciliation = structural enforcer. Parent of AA#1-N + 5 existing context-routing primitives
+- MEMORY_AUDIT_ARSENAL.md updated to reference CCP as parent class
+- MEMORY.md PRE-FLIGHT updated with CCP load-bearing entry + AA#3 mention
+
+**Audit-arsenal commits (2026-05-12 closure arc, prior to this session)**:
+- CRIT-3a (commit `7b10d3be`) — `GovernanceGuard.execute()` calls `IGovernanceProposalVerifier`
+- CRIT-3b (commit `ce3a9fb6`) — `ShapleyDistributor._authorizeUpgrade` requires `axiomVersion` match
+- CRIT-3c (commit `a4d90287`) — Inline axiom-5 enforcer in `computeShapleyValues`; closes HIGH-2
+- CRIT-1 (commit `20a6e7f5`) — Proof-of-Mind k-of-n attestation
+- CRIT-2 Part A (commit `9ad26dec`) — `HoneypotDefense.registerSentinel` owner-gated
+- HIGH-1 (commit `47af97f1`) — airgap onepager Implementation Status table
+- Audit report (commit `a4bf5b2f`) — `docs/audits/2026-05-12_aa2-audit-claim-vs-enforcer.md`
+
+**Hook deployed**:
+- `~/.claude/hooks/entity-context-cross-reference.py` — PreToolUse on Write|Edit, ~220 LOC, fires on entity-list signal patterns + ≥500 char content, returns memory-grep matches via additionalContext. Registered in `settings.json`.
+
+### Anthropic engagement (carries from 2026-05-07)
+- Email sent w/ NCI paper attached + "stole my ideas and ghosted me" subject
+- Fin AI Agent escalated to human queue 10:35 AM
+- Awaiting human response
+- Strategic playbook: `Desktop/anthropic-conversation-tip.md` + `memory/correspondence/anthropic-conversation-tip.md` (private)
+- Memory primitive: `[J·anthropic-engagement-2026-05-07]`
+
+### Pragma OS / Crys / OPH-adjacent (carries from 2026-05-07)
+- DM lead with Crys re: Pragma OS forge run
+- Awaiting forge output
+- Memory primitive: `[R·pragma-os-crys-contact]`
+
+### Carry-forward from prior sessions
+- USD8 partnership: now in active outreach phase via @usd8.fi email; Pendle/Fluid live with Rick
+- Lineage repo remote decision (private GitHub vs local-only)
+- Lineage uncommitted work (SUBSTRATE.md, commitment.py, etc.)
+- @usd8.fi email provider clarification: Will signed in (provider TBD; works for sending today)
+
+---
+
+## Block Header — 2026-05-11 → 2026-05-12 (rolled-over; strategic-maneuvering pivot arc)
+
+## ⚡ Active Intention (rolled-over — 2026-05-12 strategic-maneuvering pivot)
 
 > **Intention**: Strategic-maneuvering mode for the post-LZ-hack + post-Rick-ETH-Prague window. Amplify cooperative-capitalism frame across all warm + earned channels. The cooperative-capitalism-cure piece is in the air across Medium + LinkedIn + ETH-Sec TG (5k+). USD8 team chat is producing partner-amplification surface (Pendle/Fluid meetings, Bankless thread). Convo-carry executes through three primitives named this arc: [P·spotlight-substance-handoff] (Will hooks, JARVIS wheels) + [F·strategic-mode-substance-density] (3-hook drafts, ¬ tight one-liners) + [F·lean-into-ai-recognition] (amplify partner-recognition in known channels). Impl chain (post-LZ v0.3) backgrounded — resumes when amplification window cools.
 

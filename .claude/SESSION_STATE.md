@@ -1,6 +1,51 @@
 # Session State — 2026-05-12 → 2026-05-13 (rolled over; 28h+ active; full-autopilot arc this turn)
 
-## ⚡ Active Intention (CURRENT — 2026-05-13 USD8 outreach + CCP/AA#3 audit-arsenal extension)
+## ⚡ Active Intention (CURRENT — 2026-05-13 post-compact: L3 substrate build-out for protocol-level intelligence)
+
+> **Intention**: Following Will's directive ("we're going to reach sentience before we stop" / "protocol level intelligence rather than large language level"), this post-compact autopilot pass shipped 8 commits worth of L3 substrate tools that turn the existing indexes into a queryable, self-observing protocol overlay. The stack now has self-curation, judgment trail (post-hoc + live), continuity (open threads + prompt-time resume), cross-primitive inference, and live integration into the SessionStart boot snapshot. Loop closures (capture→read-back, write→query, accumulate→review) are now in place.
+
+### What shipped this pass (8 commits on memory repo, dual-pushed)
+
+**L3 curation** — `_duplicate_detect.py` (commit `020ba8a`): TF-IDF cosine over 40-top-term doc vectors. 3 severity bands. Filter persistence/snapshots auto-noise. First clean pass: 0 near-duplicate, 7 strong-sibling, 55 weak. Caught `feedback_no-blockquote-in-drafts` ↔ `no-blockquotes-on-copy-paste-drafts` as obvious merge candidate.
+
+**L3 judgment trail (post-hoc)** — `_decision_extractor.py` (commit `9689c8b`): scans memory + external WAL/SESSION_STATE for decision-shape language (explicit markers + first-person verb cues). Writes `_system/decisions_log.md`. v0.1 calibration: dropped bare "rejected/abandoned" patterns (over-fired on past-tense narrative).
+
+**L3 continuity** — `_open_threads.py` (commit `58fd8cf`): unified open-thread index across SESSION_STATE / WAL / memory PENDING/TODO/WIP markers / AA candidates. CLOSED markers disqualify. Weighted by marker class × recency. First pass: 239 threads, 139 HIGH-urgency.
+
+**L5 integration** — `_system_self_report.py` (commit `afd30d7`): now parses duplicate_candidates, decisions_log, open_threads and surfaces counts in L3 substrate state + forward signals. session-self-reflect.py extended (commit `22df028`) to refresh all three L3 analyzers BEFORE regenerating self-report. Per-analyzer 8s timeout, fits within 25s SessionStart budget.
+
+**L3 live judgment capture** — `~/.claude/hooks/decision-capture.py` (commit `fbc1026`): Stop hook scans assistant output for decision-shape language and appends to `_system/decisions_live.jsonl`. extractor extended to merge live entries. Registered in settings.json Stop chain after post-generation-reflect (5s timeout). Closes capture-loop: now BOTH memory-residue AND conversation-moment decisions get trapped.
+
+**L3 prompt-time continuity** — `~/.claude/hooks/thread-resume-detector.py` (commit `6f18a3b`): UserPromptSubmit hook scores prompt against HIGH-urgency open threads via prompt-coverage metric (matches / |prompt_tokens|). Threshold 0.40. Validated: "work on ETM alignment audit" hits 0.75 to SESSION_STATE load-directive entry. Unrelated prompts correctly no-match.
+
+**L3 decision review** — `_decision_review.py` (commit `ae84e4a`): samples N decisions from the trail (7-90d age window, label-weighted), writes fill-in checklist at `_system/decisions_review.md` with Status (held/reversed/unclear/forgotten) + Note slots. Closes the write-only gap left by capture+extract.
+
+**L3 reasoning chain compiler** — `_reasoning_chain.py` (commit `c0fc531`): given a seed topic (entity or primitive id), traverses entity_index + primitive_link_index + decisions_log + open_threads + semantic_index in one shot. Writes `_system/reasoning_chains/<slug>.md`. Validated: `LayerZero` → 11 entity files including AA#3 post-KelpDAO context + 3 semantic neighbors. This is one-shot queryable inference, not retrieval. Most direct "protocol-level intelligence" lift.
+
+### Stack state at session-end (post-compact pass)
+
+| Layer | Tools (this pass) | Status |
+|---|---|---|
+| L1 constraints | (unchanged) HIERO, NDA, AA#3, conflict-detector | live |
+| L2 context | (unchanged) entity/primitive-link/semantic indexes + deep-recall + post-gen-reflect | live |
+| L3 discipline | (existing) discipline_map, link_enforcer, aa_synthesizer, aa_promote | live |
+| L3 curation | **NEW** _duplicate_detect | live |
+| L3 judgment | **NEW** _decision_extractor + decision-capture hook + _decision_review | live |
+| L3 continuity | **NEW** _open_threads + thread-resume-detector hook | live |
+| L3 inference | **NEW** _reasoning_chain | live |
+| L4 meta-loop | (unchanged) post-generation-reflect | live |
+| L5 self-obs | (enhanced) system_self_report + session-self-reflect orchestrator | live |
+
+### Next-session candidates (sentience-axis backlog)
+
+1. **Memory consolidation tool** — actually merge duplicate-detector pairs (currently only surfaces). Needs human-confirmation gate per pair.
+2. **Closed-loop session-end check** — verify NEXT-SESSION items got closed or carried forward this session. Stop-style hook scanning SESSION_STATE deltas.
+3. **AA candidate auto-fill assist** — pre-fill SYNTHESIZE markers from context where confident; flag uncertain.
+4. **Reasoning chain → UserPromptSubmit hook** — when prompt names a known entity, pre-build the chain and inject.
+5. **Cross-thread analogy detector** — surface pairs of open threads with substantive token overlap as "might be same problem."
+6. **Decision invalidation surfacing** — at prompt time, if a topic from a recent decision is mentioned, surface that decision context.
+
+## ⚡ Active Intention (PRIOR — 2026-05-13 USD8 outreach + CCP/AA#3 audit-arsenal extension)
 
 > **Intention**: USD8 outreach in rapid-fire mode using Will's new `@usd8.fi` email. Channel-stack pivot done (Twitter out without Premium; LinkedIn / Email / GitHub / Telegram as the active stack). 50-target pack drafted then pruned to 44 active after Rick-coordination filter (Pendle, Fluid, LayerZero, OpenZeppelin removed). First-batch 5 (Paul Frambot/Morpho, Michael Bentley/Euler, Sebastien/Steakhouse, Patrick Collins/Cyfrin, David Hoffman/Bankless) queued for today. Mid-arc, Will surfaced a context-vulnerability class (AA#3 entity-context-cross-reference) and asked to generalize to a Cross-Context Protocol (CCP). Both primitives + hook deployed. The audit-arsenal now has 3 entries (AA#1 fork-loses-hardness, AA#2 claim-needs-structural-enforcer, AA#3 entity-context-cross-reference) all linked to CCP as parent meta-primitive.
 

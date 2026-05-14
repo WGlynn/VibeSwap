@@ -59,6 +59,17 @@ Wiring pass (commit `17f9588`): all 4 new analyzers added to session-self-reflec
 5. ✓ ~~Cross-thread analogy detector~~ — shipped
 6. **Decision invalidation surfacing** — at prompt time, if a topic from a recent decision is mentioned, surface that decision context.
 
+### ⚡ AWAITING — Google Nested-Learning outreach + JARVIS evolutionary-loop shipped past their paradigm
+
+After Will surfaced the loop framing (iterate → backtest → evolve → innovate → repeat), shipped the substrate that takes JARVIS strictly past Google's Nested Learning (NeurIPS 2025):
+
+- **Theory paper**: `~/JARVIS/05-meta-protocols/jarvis-evolutionary-loop.md` (+ vibeswap mirror at `docs/jarvis-substrate/05-meta-protocols_jarvis-evolutionary-loop.md`). Position: HOPE adapts at inference but cannot evolve the architecture across runs; the JARVIS overlay can because its substrate lives in persistent files. Backtest + evolve phases are what Nested Learning's continual-learning framework cannot include without persistent state outside the model.
+- **`_backtest.py`** (memory repo) — phase 2: scores past substrate behavior. Hook performance (HIGH/MEDIUM/LOW_SIGNAL_FLAG), decision outcomes (HELD/REVERSED/FORGOTTEN/UNCLEAR), primitive load-bearing health. First run: 85 telemetry events, 9 hooks rated, 59/61/292 primitive health buckets.
+- **`_evolve_proposer.py`** — phase 3: propose-then-apply substrate modifications. Classes: HOOK_NARROW / HOOK_EXTEND / HOOK_RETIRE / DECISION_PATTERN_FRAGILE / PRIMITIVE_ARCHIVE / NEW_HOOK_CANDIDATE. First run: 18 proposals (3 HOOK_EXTEND, 5 NEW_HOOK_CANDIDATE, 10 PRIMITIVE_ARCHIVE).
+- **`_evolution_loop.py`** — phase 5: orchestrator. Reads iteration state, invokes phases 2-4, writes `_system/evolution_loop.md`. Wired into session-self-reflect L3_ANALYZERS so the loop runs at every SessionStart.
+
+Plus the ETM-tiered MEMORY.md restructure shipped same turn: 41.7KB → 14.6KB (under 24.4KB boot-load budget for the first time; preprocessor hook restores L2 sub-indexes at boot via additionalContext). 50-entry MEMORY_INDEX_PREFLIGHT extracted. NDA bullet rewritten to reference gate file rather than naming triggers.
+
 ### ⚡ AWAITING — Google Nested-Learning outreach (scheduled send 2026-05-14 08:00 ET)
 
 Cold email queued to Ali Behrouz `ab2947@cornell.edu` (lead author of NeurIPS 2025 "Nested Learning: The Illusion of Deep Learning Architectures") + Vahab Mirrokni CC. Frame: convergent-discovery, NOT IP claim. Their nested-optimization at architecture-level (HOPE = Titans variant) ↔ our JARVIS L0-L5 substrate-overlay at the same multi-frequency stack. Anchor: `[primitive_parallelism-convergence-2017]` (UTXO/Transformer 2017 convergence prior pattern).

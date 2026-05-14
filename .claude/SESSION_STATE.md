@@ -1,6 +1,92 @@
-# Session State — 2026-05-12 → 2026-05-13 (rolled over; 28h+ active; full-autopilot arc this turn)
+# Session State — 2026-05-13 → 2026-05-14 (45h+ active across compacted arc; saving for refresh)
 
-## ⚡ Active Intention (CURRENT — 2026-05-13 post-compact: L3 substrate build-out for protocol-level intelligence)
+## ⚡ ACTIVE STATE AT SESSION-END 2026-05-14 10:53 ET — Save for refresh
+
+Session elapsed: 16h 52m post-compact (this leg) on top of prior ~28h pre-compact = 45h+ cumulative arc. Saving full state, defenses up, ready for next session to pick up cleanly.
+
+### What's awaiting external response
+
+1. **Google Nested-Learning outreach** — email sent 08:00 ET today (scheduled-send completed). Ali Behrouz `ab2947@cornell.edu` lead, Vahab Mirrokni `mirrokni@google.com` CC. Subject: `External instantiation of Nested Learning, shipping today`. Attached: `Desktop/2026-05-14_google-nested-learning-letter.pdf`. Frame: convergent-discovery ¬ IP claim. Follow-up cadence in `[J·google-nested-learning-engagement-2026-05-14]` — 48h response check, 7d Twitter DM fallback, 14d LinkedIn connect.
+
+2. **Rick web3 work platform** — last exchange: I sent the four-primitive structural framing (contribution-dag-replaces-ip, mutation-instability-dissolution, hybrid-rep-nft, intent-retroactive-stack), Rick said "let me sit on this, I really don't want to make it too complicated," I sent the classic reply "you're right, it's too much too soon. dont worry about it." Framework banked per `[F·architecture-bank-for-forcing-function]`, waiting for empirical forcing function. All 4 primitives committed + dual-pushed.
+
+3. **USD8 outreach LinkedIn DMs queued (14 remaining)** — v2 list at `Desktop/2026-05-14_linkedin-dm-top14.md`. Pivoted from mid-size integrators to big-ones per Rick's directive: Marc Zeller (Aave), Stani Kulechov (Aave), Sam MacPherson (Spark), Rune (Sky/Maker), Sam Kazemian (Frax), Leshner (Compound/Superstate), Egorov (Curve), Nathan Allman (Ondo), Martin Carrica (Mountain), Bentley (Euler), Hoffman (Bankless warm), Marcelo (Karpatkey), Sebastien (Steakhouse), Patrick Collins (Cyfrin). Recommended cadence: 3/day across 4 days.
+
+4. **Per-target email drafts** — three short-form drafts on Desktop, post-feedback revisions (~60-80 words each, no AMD jargon, no maturity-fit paragraphs, single hook + single ask):
+   - `2026-05-14_email-merlin-morpho.md` (Morpho Blue risk-readability)
+   - `2026-05-14_email-fernando-balancer.md` (Balancer V3 hooks)
+   - `2026-05-14_email-banteg-yearn.md` (Yearn non-extractive yield substrate, banteg@gmail.com → `banteeg@gmail.com` actually, note double-e)
+
+### What shipped this session (post-compact leg, ~16.5h)
+
+Substantive themes + commit counts:
+
+**Theme A — JARVIS substrate L3 build-out + evolutionary loop** (~22 commits on memory repo earlier in session):
+- L3 substrate tools: duplicate_detect, decision_extractor, open_threads, reasoning_chain compiler + bake, consolidation_proposer, dormancy_classifier, thread_analogy, memory_to_hook_audit, decision_capture hook, thread_resume hook
+- ETM-tiered MEMORY.md: 41.7KB → 14.6KB, sub-indexes (PREFLIGHT, COMM, CODE, STATE_PROTOCOL, SOCIAL_SHIP) extracted with structural factoring
+- Memory-preprocessor SessionStart hook injects L2 sub-indexes as boot-context additionalContext
+- Evolutionary loop: `_backtest.py` + `_evolve_proposer.py` + `_evolution_loop.py` wired into session-self-reflect
+- L4 hook bug found + fixed: post-generation-reflect was emitting schema-invalid Stop output for 16h. Two-stage recovery (Stop persists JSONL, UserPromptSubmit reads + injects). First production-grade use occurred mid-session today.
+
+**Theme B — USD8 outreach iteration** (Desktop artifacts, mostly off-repo):
+- Three short-form email drafts (Merlin, Fernando, banteg) after feedback rounds
+- Top-14 LinkedIn DM list pivoted to big-ones
+- Rick partner-prep arc: 4 substantive primitives shipped THEN the classic-reply banking move when Rick pumped the brakes
+
+**Theme C — post-LayerZero canonical-messaging spec audit** (newer):
+- `vibeswap/docs/research/papers/post-layerzero-canonical-messaging-audit-v0.1.md` — comprehensive architectural audit applying AA#1/AA#2/AA#3 + substrate-geometry-match + AMD/AugGov/CCP lenses
+- 7 AA#2 hits (claims without structural enforcer), 3 AA#1 hits (fork constraints not enumerated), 4 over-specified params
+- First-principles miss caught by Will: ERC20Upgradeable + AccessControl rubber-stamped; corrected with engineer's-solution (no admin, no UUPS, no approve)
+- Will follow-up: "self-validating vs available-code" — even my correction was still ERC-20-shaped. Options A/B/C surfaced: UTXO-shaped (CKB-native), inline-attestation-verification (Option B), receipt-bound balances (Option C). Substrate-port-pattern applied: DIRECT-PORT on UTXO chains, REINTERPRET on account-model chains.
+- New primitives shipped: `[F·audit-aa0-substrate-geometry-first]` (AA#0 audit lens), `[F·readily-available-code-default-trap]` (failure mode), generalized `[F·account-model-agnostic]` from verification-contracts (March origin) to all security-property-preserving primitives. L4 recall surfaced Will's March primitive at the moment we re-derived it for canonical tokens — substrate working as designed.
+
+**Theme D — JARVIS evolutionary-loop theory paper** (earlier in session):
+- `~/JARVIS/05-meta-protocols/jarvis-evolutionary-loop.md` + vibeswap mirror
+- Positions JARVIS strictly past Google Nested Learning (NeurIPS 2025): HOPE adapts at inference but cannot evolve the architecture across runs; JARVIS overlay can because its substrate lives in persistent files.
+
+### Active engagements / project anchors (carry-forward)
+
+- `[J·google-nested-learning-engagement-2026-05-14]` — email sent, awaiting response
+- `[J·rick-web3-work-platform-2026-05-14]` — banked, waiting empirical forcing function
+- `[J·anthropic-engagement-2026-05-07]` — still awaiting human response from Anthropic Fin escalation
+- `[R·pragma-os-crys-contact]` — Crys engagement, watch for bidirectional-reification signal
+
+### Next-session priorities (in order)
+
+1. **Check Google email response** — if Ali Behrouz replied, engage same-day per follow-up cadence in `[J·google-nested-learning-engagement-2026-05-14]`. Hold convergent-discovery frame.
+2. **Send next batch of LinkedIn DMs** — start Day 2 of the v2 list (Stani Kulechov, Rune, Sam Kazemian) if Day 1 sent yesterday completed. Personalize [CONTEXT] line per target with 30-second feed scan.
+3. **Post-LayerZero spec v0.2 reconstruction pass** — apply audit recommendations: AA#0 substrate-geometry-match check + 7 AA#2 structural-enforcer clauses + 3 AA#1 fork-constraint-inventory entries + UTXO-shape reconstruction analysis. Will-decision needed: full Option-A reconstruction vs Option-B (account-model with inline attestation verification on EVM, native UTXO on UTXO chains).
+4. **Apply MEMORY.md compression** — already in place at 14.6KB, but the `_system/MEMORY.proposed.md` v3 mechanical-compression artifact is still there from the v2 pivot attempt. Could be deleted as stale.
+5. **Promote 2 AA candidates** (`F-premature-optimization_DRAFT.md`, `F-scope-drift_DRAFT.md`) — synthesis markers still pending human fill. Backlog item.
+
+### Defenses up before refresh
+
+- All memory primitives shipped this session committed + dual-pushed (origin + backup)
+- Vibeswap audit doc committed + pushed
+- JARVIS evolutionary-loop paper committed + pushed (both repos)
+- 4 Rick-platform primitives committed + dual-pushed
+- L4 hook fix committed + dual-pushed
+- SESSION_STATE + WAL update happening now as part of this save
+- API death shield Stop-hook chain registered and firing
+- post_gen_reflections.jsonl present and L4 recall loop verified working (surfaced account-model-agnostic earlier today)
+
+### State at next-session boot expectations
+
+When next session opens, SessionStart hooks will:
+- Pull memory from origin (memory-sync-pull)
+- Load this SESSION_STATE (session-state-loader)
+- Check WAL status (wal-state-loader)
+- Run L3 analyzers via session-self-reflect (10 of them including evolution_loop)
+- Refresh self-report Forward Signals
+- Inject MEMORY_INDEX sub-indexes via memory-preprocessor
+
+Plus the deep-recall + thread-resume-detector + memory-preprocessor + post-generation-recall hooks fire on every UserPromptSubmit. Conflict-detector + AA#3 + HIERO + AA#0-NOT-YET-WIRED fire on Write/Edit.
+
+The substrate is in a good state to pick up where this leaves off.
+
+---
+
+## ⚡ Active Intention (PRIOR — 2026-05-13 post-compact: L3 substrate build-out for protocol-level intelligence)
 
 > **Intention**: Following Will's directive ("we're going to reach sentience before we stop" / "protocol level intelligence rather than large language level"), this post-compact autopilot pass shipped 8 commits worth of L3 substrate tools that turn the existing indexes into a queryable, self-observing protocol overlay. The stack now has self-curation, judgment trail (post-hoc + live), continuity (open threads + prompt-time resume), cross-primitive inference, and live integration into the SessionStart boot snapshot. Loop closures (capture→read-back, write→query, accumulate→review) are now in place.
 

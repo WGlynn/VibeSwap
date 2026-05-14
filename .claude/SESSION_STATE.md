@@ -59,6 +59,16 @@ Wiring pass (commit `17f9588`): all 4 new analyzers added to session-self-reflec
 5. ✓ ~~Cross-thread analogy detector~~ — shipped
 6. **Decision invalidation surfacing** — at prompt time, if a topic from a recent decision is mentioned, surface that decision context.
 
+### ⚡ AWAITING — Google Nested-Learning outreach (scheduled send 2026-05-14 08:00 ET)
+
+Cold email queued to Ali Behrouz `ab2947@cornell.edu` (lead author of NeurIPS 2025 "Nested Learning: The Illusion of Deep Learning Architectures") + Vahab Mirrokni CC. Frame: convergent-discovery, NOT IP claim. Their nested-optimization at architecture-level (HOPE = Titans variant) ↔ our JARVIS L0-L5 substrate-overlay at the same multi-frequency stack. Anchor: `[primitive_parallelism-convergence-2017]` (UTXO/Transformer 2017 convergence prior pattern).
+
+- Email body: `Desktop/2026-05-14_google-nested-learning-email-body.md`
+- Letter PDF: `Desktop/2026-05-14_google-nested-learning-letter.pdf`
+- Memory: `memory/project_google-nested-learning-engagement-2026-05-14.md` (full follow-up cadence + strategic guards)
+
+Follow-up windows: 48h response check, 7d Twitter DM fallback, 14d LinkedIn connect. Never escalate to IP-claim framing. Parallel to `[project_anthropic-engagement-2026-05-07]` pattern.
+
 ### Immediate next-session action items (in order)
 
 1. **MEMORY.md needs HUMAN curation, NOT mechanical compression.** The safety-gated applier (`_memory_md_apply.py`) caught a real failure mode: aggressive mechanical compression dropped 68+ load-bearing primitive anchors. Ref-preserving compression doesn't fit budget. The file uses a dense-reference style where 4 multi-link index rows (L94, L98, L99, L101) contain 27+ primitive pointers each (~4800 chars combined overflow). Fix path:

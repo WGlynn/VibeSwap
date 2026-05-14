@@ -36,14 +36,37 @@
 | L4 meta-loop | (unchanged) post-generation-reflect | live |
 | L5 self-obs | (enhanced) system_self_report + session-self-reflect orchestrator | live |
 
-### Next-session candidates (sentience-axis backlog)
+### Post-midnight extension (2026-05-14 ~01:50-02:00, 5 more commits)
 
-1. **Memory consolidation tool** — actually merge duplicate-detector pairs (currently only surfaces). Needs human-confirmation gate per pair.
+Continued the autopilot pass past midnight. Shipped 5 additional substrates:
+
+- **_consolidation_proposer.py** (commit `fdf8702`) — turns duplicate-detector pairs into review-ready merge proposals at `_system/consolidation_proposals/*.md`. First pass: 7 proposals from STRONG_SIBLING pairs. NOT a mutator; each proposal contains the exact apply command for after human approval.
+- **_memory_md_pruner.py** (commit `ebfbadd`) — diagnoses MEMORY.md budget overflow. Found 41,741 bytes vs 24,400 hard load budget = 17,341 over. 89 of 96 bullets >200 chars. Surfaces as Forward Signal.
+- **_memory_md_compress.py** (commit `81c7c2b`) — mechanical compressor. Trims each overflow bullet to fit ≤200 chars while preserving `[Name](file.md)` anchors + appending `… see file.md` pointers. Output: `_system/MEMORY.proposed.md` (24,744 bytes — just 344 over budget; one or two manual trims close the gap). Ready to apply via `cp _system/MEMORY.proposed.md MEMORY.md`.
+- **_dormancy_classifier.py** (commit `749a653`) — triage of 329 dormant primitives into LINK (4) / REVIEW (39) / ARCHIVE (286). The 4 LINK candidates have high-confidence siblings ready to link into MEMORY.md.
+- **_thread_analogy.py** (commit `0ad5f8c`) — finds pairs of open threads with token overlap ≥0.40. 6 pairs surfaced; 2 are real cross-file content drift findings (identical bullet across `feedback_partner-facing-additive-framing` and `primitive_dont-make-will-look-dumb`).
+
+Wiring pass (commit `17f9588`): all 4 new analyzers added to session-self-reflect L3_ANALYZERS so they run every boot. system_self_report Forward Signals extended with 4 new auto-surfaces.
+
+**State at end of pass**: 9 Forward Signals auto-broadcast at every SessionStart. Most load-bearing one: the MEMORY.md compressed proposal is ready to apply — one `cp` command unblocks every future session's full memory load.
+
+### Next-session candidates (remaining backlog)
+
+1. ✓ ~~Memory consolidation tool~~ — shipped as proposer
 2. **Closed-loop session-end check** — verify NEXT-SESSION items got closed or carried forward this session. Stop-style hook scanning SESSION_STATE deltas.
 3. **AA candidate auto-fill assist** — pre-fill SYNTHESIZE markers from context where confident; flag uncertain.
 4. **Reasoning chain → UserPromptSubmit hook** — when prompt names a known entity, pre-build the chain and inject.
-5. **Cross-thread analogy detector** — surface pairs of open threads with substantive token overlap as "might be same problem."
+5. ✓ ~~Cross-thread analogy detector~~ — shipped
 6. **Decision invalidation surfacing** — at prompt time, if a topic from a recent decision is mentioned, surface that decision context.
+
+### Immediate next-session action items (in order)
+
+1. **Apply MEMORY.md compression** — `cp memory/_system/MEMORY.proposed.md memory/MEMORY.md` then trim ~344 more bytes manually to fit the 24,400 hard budget. UNBLOCKS every future session.
+2. **Review consolidation proposals** — 7 merge candidates at `memory/_system/consolidation_proposals/`. Easiest win: `feedback_no-blockquote-in-drafts` (prose) → `feedback_no-blockquotes-on-copy-paste-drafts` (HIERO canonical).
+3. **Link the 4 LINK-bucket dormant primitives** into MEMORY.md (see `memory/_system/dormancy_review.md`).
+4. **Resolve thread analogies** — 6 pairs in `memory/_system/thread_analogies.md`; 2 are real cross-file content drift.
+
+After curation pass: ARCHIVE bucket of 286 dormant primitives is the next surface (much larger effort, can be batched).
 
 ## ⚡ Active Intention (PRIOR — 2026-05-13 USD8 outreach + CCP/AA#3 audit-arsenal extension)
 

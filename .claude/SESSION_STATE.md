@@ -61,12 +61,20 @@ Wiring pass (commit `17f9588`): all 4 new analyzers added to session-self-reflec
 
 ### Immediate next-session action items (in order)
 
-1. **Apply MEMORY.md compression** — `cp memory/_system/MEMORY.proposed.md memory/MEMORY.md` then trim ~344 more bytes manually to fit the 24,400 hard budget. UNBLOCKS every future session.
+1. **MEMORY.md needs HUMAN curation, NOT mechanical compression.** The safety-gated applier (`_memory_md_apply.py`) caught a real failure mode: aggressive mechanical compression dropped 68+ load-bearing primitive anchors. Ref-preserving compression doesn't fit budget. The file uses a dense-reference style where 4 multi-link index rows (L94, L98, L99, L101) contain 27+ primitive pointers each (~4800 chars combined overflow). Fix path:
+   - Read `memory/_system/memory_md_pruning_proposals.md` for the per-line view
+   - For each LONG single-link prose bullet (~85 lines): trim manually OR move detail to topic file
+   - For the ~4 multi-link index rows: consider splitting into separate index files (e.g., `MEMORY_INDEX_CODE.md`, `MEMORY_INDEX_COMM.md`) referenced from MEMORY.md root
+   - Re-run `_memory_md_pruner.py` after edits to verify under budget
 2. **Review consolidation proposals** — 7 merge candidates at `memory/_system/consolidation_proposals/`. Easiest win: `feedback_no-blockquote-in-drafts` (prose) → `feedback_no-blockquotes-on-copy-paste-drafts` (HIERO canonical).
-3. **Link the 4 LINK-bucket dormant primitives** into MEMORY.md (see `memory/_system/dormancy_review.md`).
+3. **Link the 4 LINK-bucket dormant primitives** into MEMORY.md (see `memory/_system/dormancy_review.md`). Coordinate with #1: the new entries should fit within compressed budget.
 4. **Resolve thread analogies** — 6 pairs in `memory/_system/thread_analogies.md`; 2 are real cross-file content drift.
 
 After curation pass: ARCHIVE bucket of 286 dormant primitives is the next surface (much larger effort, can be batched).
+
+### What the safety gate proved
+
+The `_memory_md_apply.py` safety gate is doing the most important work of this whole pass: it refuses to silently corrupt the index. Future autopilot sessions can confidently `python _memory_md_apply.py` and trust the gate to either apply cleanly or refuse with specific diagnostics. The mutation path is no longer "trust me" — it's "trust the verification."
 
 ## ⚡ Active Intention (PRIOR — 2026-05-13 USD8 outreach + CCP/AA#3 audit-arsenal extension)
 

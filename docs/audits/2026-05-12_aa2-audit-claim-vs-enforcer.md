@@ -15,7 +15,7 @@
 | 1b | L1 Timestamp Anchor | UNENFORCED ✗ | HIGH — mechanism missing entirely |
 | 1c | Proof-of-Mind | UNENFORCED ✗ | **CRITICAL** — single-node mints arbitrary mindValue |
 | 1d | Siren Protocol | UNENFORCED ✗ | **CRITICAL** — open `registerSentinel` → drain |
-| 1e | Shapley Null Player | PARTIAL ⚠ | MED — SybilGuard gated on `!= 0` |
+| 1e | Shapley Null Player | STRUCTURAL ✓ | MED — closed 2026-05-15 |
 | 1f | Clawback Cascade | PARTIAL ⚠ | MED-HIGH — trusts FederatedConsensus |
 | 2 | MEV Elimination | PARTIAL ⚠ | MED — proposer blockhash bias |
 | 3 | Augmented Governance | UNENFORCED ✗ | **CRITICAL** — Physics>Gov is doc-only |
@@ -82,8 +82,10 @@
 ### MED-1: Commit-Reveal cross-chain estimate skip
 `CommitRevealAuction.sol:491-492` sets `estimatedTradeValue: 0` for cross-chain commits, bypassing the 2× tolerance check. Only `MIN_DEPOSIT` floor at `:1014-1022` enforces sizing. Trade of `< 0.02 ETH × 5% = 0.001 ETH` is essentially uncollateralized.
 
-### MED-2: Shapley Null Player gated on guard presence
+### MED-2: Shapley Null Player gated on guard presence — **CLOSED 2026-05-15**
 `_applyFloorAndEfficiency:864-865` SybilGuard check is `address(sybilGuard) != address(0)` — when guard is unset, sybils with `scarcityScore=1, stabilityScore=1` earn the LAWSON_FAIRNESS_FLOOR.
+
+**Closure** (commit `91b02a52`): fail-loud sybil gate. When any participant would be floor-eligible AND `sybilGuard` is unset, `_applyFloorAndEfficiency` reverts `SybilGuardRequiredForFloor()`. Trade-off vs silent fail-closed: silent-disable would violate P-001 (honest small LPs lose floor); fail-loud forces deploy-config correctness while preserving both the Lawson Floor invariant and sybil-resistance. Tests in `test/incentives/ShapleyDistributorMed2SybilFloor.t.sol` (5/5).
 
 ### MED-3: Clawback Cascade trusts FederatedConsensus
 `ClawbackRegistry.sol:325-328` — `openCase` requires `consensus.isActiveAuthority(msg.sender)`. 51% authority capture → malicious case opening → fund freeze via `_flagWallet`. Inherits FederatedConsensus's Sybil-resistance assumption.

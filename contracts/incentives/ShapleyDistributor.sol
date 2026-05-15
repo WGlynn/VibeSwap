@@ -472,6 +472,8 @@ contract ShapleyDistributor is
     error CommitmentMismatch();
     error AlreadyRevealedThisRound();
     error KeeperRevealThresholdZero();
+    // AA#2 MED-2: fail-loud sybil gate on Lawson Floor
+    error SybilGuardRequiredForFloor();
 
     // ============ Modifiers ============
 
@@ -864,17 +866,25 @@ contract ShapleyDistributor is
 
         // Step 3: Enforce Lawson Fairness Floor (1% minimum for non-zero contributors)
         // Named after Jayme Lawson — nobody who showed up and acted honestly walks away empty.
-        // SYBIL GUARD: only verified identities get the floor boost when guard is active.
+        //
+        // AA#2 MED-2 (2026-05-15): fail-loud sybil gate.
+        // Pre-fix: when sybilGuard was unset, any weight>0 participant earned the floor
+        // → sybil split (N accounts × floor) was profitable (200/200 adversarial rounds).
+        // Fix: if any participant would be floor-eligible AND sybilGuard is unset, REVERT.
+        // This forces deploy-config to set the guard; preserves both P-001 (honest small
+        // contributors get the floor when verified) and sybil-resistance.
         {
             uint256 floorDeficit = 0;
             uint256 nonFloorWeight = 0;
             bool hasSybilGuard = address(sybilGuard) != address(0);
 
             for (uint256 i = 0; i < n; i++) {
-                bool eligibleForFloor = weights[i] > 0 && shares[i] < floorAmount;
-                if (hasSybilGuard && eligibleForFloor) {
-                    eligibleForFloor = sybilGuard.isUniqueIdentity(participants[i].participant);
+                bool wouldBeFloorEligible = weights[i] > 0 && shares[i] < floorAmount;
+                if (wouldBeFloorEligible && !hasSybilGuard) {
+                    revert SybilGuardRequiredForFloor();
                 }
+                bool eligibleForFloor = wouldBeFloorEligible
+                    && sybilGuard.isUniqueIdentity(participants[i].participant);
                 if (eligibleForFloor) {
                     floorDeficit += floorAmount - shares[i];
                     shares[i] = floorAmount;

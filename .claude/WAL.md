@@ -1,3 +1,47 @@
+# Write-Ahead Log — ACTIVE (session 2026-05-15 autopilot leg)
+
+## Epoch — ACTIVE at 2026-05-15 autopilot leg (vibeswap + memory)
+
+- **Opened**: 2026-05-15 ~13:17 ET on Will's `run autopilot` after Hayden/Devin/saucepoint
+  outreach research handoff.
+- **Branches**: VibeSwap `master` push to `origin`. Memory `main` dual-push origin + backup.
+- **Status**: ACTIVE. 7 commits shipped this leg, all pushed.
+
+**Vibeswap commits this leg (origin)**:
+- `91b02a52` — `fix(shapley): AA#2 MED-2 — fail-loud sybil gate on Lawson Floor`
+  + `test/incentives/ShapleyDistributorMed2SybilFloor.t.sol` (5/5 pass, 98/98 across
+  4 Shapley suites no regressions)
+- `3b5526c0` — `audit: mark MED-2 closed in AA#2 audit-arsenal doc`
+- `3d2d35d4` — `state: SESSION_STATE 2026-05-15 autopilot leg block`
+
+**Memory commits this leg (dual-pushed origin + backup)**:
+- `f9cdac7` — `fix(memory): link-rot — update 3 stale refs to match canonical filenames`
+- `ff208b5` — `feat(memory): CCP indexed-memory — entity_index builder + clean regen`
+- `a4ab300` — `consolidate: merge no-blockquote-in-drafts → no-blockquotes-on-copy-paste-drafts`
+
+**Audit-closure progress (`docs/audits/2026-05-12_aa2-audit-claim-vs-enforcer.md`)**:
+- ✅ MED-2 (this leg) — Shapley Null Player / Lawson Floor sybil gate
+- Already closed in prior session: CRIT-1, CRIT-2 Part A, CRIT-3a/b/c, HIGH-1, HIGH-2
+- Remaining: CRIT-2 Part B, MED-1, MED-3, MED-4, MED-5, MED-6 (all design-heavy,
+  warrant Will-decision before next attempt)
+
+**Memory hygiene this leg**:
+- 3 link-rot refs fixed (MEMORY.md + MEMORY_AUDIT_ARSENAL.md)
+- entity_index.json rebuilt from 1458 noisy → 309 curated entities + builder script
+  shipped at `_system/entity_index_builder.py` for future regens
+- 1 consolidation applied (no-blockquote primitives merged)
+- Residual: `primitive_dont-make-will-look-dumb.md` line 25 still points to old
+  slug `F·no-blockquote-in-drafts`; NDA gate blocked staging (pre-existing meta-ref
+  to Eridu in same file, not introduced by edit). Manual unblock or Will-bypass next session.
+
+**Failure modes caught**:
+- `git add -A` swept in auto-modified L3 files containing NDA keyword → use explicit
+  paths only when staging in memory dir
+- MED-1 attempted then deferred — xchain estimate plumbing has semantic-change
+  implications (xchain leverage cap) warranting Will-decision over autopilot
+
+---
+
 # Write-Ahead Log — ACTIVE (session 2026-05-06 GH#18 reification + 300-commit run)
 
 ## Epoch — ACTIVE at 2026-05-06 GH#18 bidirectional-reification bootstrap + 300-commit autonomous run

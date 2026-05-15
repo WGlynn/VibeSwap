@@ -1,3 +1,97 @@
+# Session State — 2026-05-15 autopilot leg (current) → 2026-05-13/14 (archived below)
+
+## ⚡ ACTIVE STATE 2026-05-15 13:30 ET — autopilot leg in progress
+
+Session opened 11:11 ET on Thursday-to-Friday roll. Will engaged outreach work
+(Telegram exchanges, Hayden/Devin/saucepoint outreach research) then handed
+autopilot. Background V4 hook research agent + Devin contact lookup ran in
+parallel earlier; both back, results in chat (not yet persisted as memory).
+
+### What shipped this leg (memory repo + vibeswap)
+
+**Memory repo (dual-pushed origin + backup)**:
+- `fix(memory): link-rot — update 3 stale refs to match canonical filenames`
+  (commit `f9cdac7`) — MEMORY.md + MEMORY_AUDIT_ARSENAL.md ref-updates:
+  - `P·cross-context-protocol` → `O·cross-context-protocol` (path-legend O·=protocol_)
+  - `F·fork-loses-hardness` → `P·audit-fork-loses-hardness`
+  - `F·no-ai-artifacts` → `F·no-ai-artifacts-in-public-writing`
+  Detected by link-rot-detector at session boot. Files existed under canonical
+  names; only display-text refs were stale.
+- `feat(memory): CCP indexed-memory — entity_index builder + clean regen`
+  (commit `ff208b5`) — `_system/entity_index_builder.py` (~160 LOC). Replaces
+  hand-built 1458-entity stale index with rebuilt 309 entries. KNOWN_FIRMS
+  allowlist + KNOWN_PEOPLE single-word allowlist (Hayden, Devin, Saucepoint,
+  Bunni, Atrium, etc.) + extended STOPWORD_PHRASES filter. AA#3 hook
+  auto-falls-back to live grep when index mtime stale (>5 min behind newest .md).
+
+**Vibeswap (pushed to origin master)**:
+- `fix(shapley): AA#2 MED-2 — fail-loud sybil gate on Lawson Floor`
+  (commit `91b02a52`) — `_applyFloorAndEfficiency` now reverts
+  `SybilGuardRequiredForFloor()` when any participant would be floor-eligible
+  AND sybilGuard is unset. Closes Layer-3 sybil-split attack (200/200 rounds).
+  Trade-off: Option C (fail-loud) over Option A (fail-closed silent) per
+  [F·p001-extraction-gate] — silent floor-disable would violate the Lawson
+  Floor invariant; fail-loud forces deploy-config correctness while preserving
+  both P-001 and sybil-resistance. Tests: 5/5 in
+  `test/incentives/ShapleyDistributorMed2SybilFloor.t.sol`. Regression:
+  ShapleyDistributor.t.sol 69/69, AxiomVersionGate 9/9, FractalShapley 15/15 —
+  zero regressions.
+- `audit: mark MED-2 closed in AA#2 audit-arsenal doc` (commit `3b5526c0`).
+
+### Pre-autopilot user moves this session
+
+- Wallet recovery lookup → demo'd to griff.eth in usd8.fi TG (Yannick "easy for
+  family = easy for criminal" objection answered structurally with the 7-layer
+  AGI defense doc + 5 recovery methods).
+- Hayden DM-blocked on LinkedIn AND X → reframed to Devin Walsh
+  (Uniswap Foundation, @devinawalsh, uPort/identity background) + saucepoint
+  + Bunni + Atrium/UHI as warmer entry points. Three plug-point hypotheses
+  for USD8 × V4 hooks surfaced via background agent — Cover-Pool Fee Tributary,
+  Risk-Signal-Gated Premium (this is the filter-coincidence primitive in V4
+  clothing), Coverage-Backed LP wrap. No production insurance/coverage hook
+  exists in V4 as of early 2026 — that's the gap.
+
+### Audit-closure backlog (current)
+
+- ✅ MED-2 closed (this session)
+- CRIT-2 Part B — k-of-n on all `onlySentinel` state mutations (design-heavy)
+- MED-1 — xchain estimatedTradeValue=0 tolerance bypass. Defensible Option A
+  fix requires plumbing `estimatedTradeValue` through CrossChainRouter +
+  source-chain side. Option B fallback (derive estimate from msg.value at
+  XCHAIN_LEVERAGE_CAP) is mid-scope; semantic change to xchain leverage
+  semantics warrants Will-decision rather than autopilot.
+- MED-3, MED-4, MED-5, MED-6 — all design-heavy (FederatedConsensus trust,
+  VDF seed, progressive slash, Joule PI clamp).
+- HIGH-1 / L1Anchor.sol — claim-vs-impl: implement OR remove from claim list.
+
+### Next-session priorities (in order)
+
+1. **Check Google email response** (now 28h+ from send) — if Ali Behrouz
+   replied, engage same-day per `[J·google-nested-learning-engagement-2026-05-14]`.
+2. **Send Hayden/Devin/saucepoint outreach** — Devin X DM first (highest EV),
+   Hayden LinkedIn connection request with note, saucepoint DM. Atrium/UHI
+   partnership conversation for the cohort prize idea ("loss-internalization
+   hooks").
+3. **Continue USD8 LinkedIn DM batches** — Day 2 of v2 list if Day 1 completed.
+4. **MED-1 Will-decision**: full Option-A xchain estimate plumbing vs Option-B
+   leverage-cap derived estimate vs leave-as-is (collateral check provides
+   implicit 20× cap).
+5. **CRIT-2 Part B**: enumerate all `onlySentinel` state mutations, propose
+   k-of-n attestation pattern.
+6. **39 evolution proposals** — HOOK_NARROW + DECISION_PATTERN_FRAGILE first
+   (substrate self-modification candidates from JARVIS evolutionary loop).
+
+### Defenses up
+
+- All commits this leg pushed (memory dual-pushed origin + backup; vibeswap
+  origin only per CLAUDE.md `Push to origin only`).
+- AA#3 entity_index.json freshly rebuilt with cleaner allowlist; AA#3 hook
+  uses it via cached load path with mtime-staleness fallback.
+- Audit doc `docs/audits/2026-05-12_aa2-audit-claim-vs-enforcer.md` updated
+  to reflect MED-2 STRUCTURAL ✓ closure.
+
+---
+
 # Session State — 2026-05-13 → 2026-05-14 (45h+ active across compacted arc; saving for refresh)
 
 ## ⚡ ACTIVE STATE AT SESSION-END 2026-05-14 10:53 ET — Save for refresh

@@ -1,6 +1,68 @@
-# Write-Ahead Log — ACTIVE (session 2026-05-15 autopilot leg)
+# Write-Ahead Log — ACTIVE (session 2026-05-17/18 protocol-stack leg)
 
-## Epoch — ACTIVE at 2026-05-15 autopilot leg (vibeswap + memory)
+## Epoch — ACTIVE at 2026-05-17/18 protocol-stack leg (hooks + memory + partner-drafts)
+
+- **Opened**: 2026-05-17 07:09 ET (Sunday) on session-start. 1d 3h elapsed wall-clock at this entry (2026-05-18 ~10:25 ET).
+- **Branches**: NONE pushed this leg. Memory `main` and VibeSwap `master` untouched on remotes; all work local-only.
+- **Status**: ACTIVE. Will AFK as of ~2026-05-18 10:12 ET; autopilot maintenance housework in progress.
+
+**Work shipped this leg (NONE pushed to remote — local-only)**:
+
+Hooks (new, at `~/.claude/hooks/`):
+- `atomic-reflection-gate.py` — PostToolUse error/timeout + PreToolUse Agent. v0 → v0.1 narrow-detection fix after own-creation false positive.
+- `em-dash-augmentation-gate.py` — PostToolUse Write/Edit on partner-facing paths. Validated end-to-end on Bernhard reply.
+- `partner-draft-formalize-gate.py` — UserPromptSubmit on partner-draft intent. Shipped after Tom-reply-inline lapse.
+
+Hooks (tuned, at `~/.claude/hooks/`):
+- `conflict-detector.py` — NARRATIVE_NOISE_ENTITIES exclusion (Will, VibeSwap, JARVIS, USD8) + negation window 80→40 + clause-boundary check. Smoke-tested. Real conflicts still detected; false positives on user/project identifiers eliminated.
+
+Memory primitives (new + updated, at `~/.claude/projects/C--Users-Will/memory/`):
+- `feedback_advocate-with-receipts.md` (new)
+- `feedback_atomic-self-reflection-gate.md` (new)
+- `feedback_em-dash-filter-for-conversations.md` (new)
+- `feedback_formalize-replies-to-docs.md` (updated; lapse pattern + hook design)
+- `reference_kim-berthilson.md` (new; he/him + TRION + engagement state)
+- `reference_pragma-os-crys-contact.md` (substantial update; URL + Witness + 4-substrate convergence)
+
+Settings:
+- `~/.claude/settings.json` — 3 new hook registrations (atomic-reflection, em-dash, formalize-draft)
+
+Partner-facing drafts (at `Desktop/`):
+- `kim-trion-reply-2026-05-17-v2.md` — SENT 2026-05-18 morning
+- `tom-witness-reply-2026-05-18.md` — PENDING SEND (active responder)
+- `bernhard-omega-reply-2026-05-18.md` — ON HOLD (queue until Tom thread settles; "her"→"his" pronoun fix outstanding)
+
+State files:
+- `vibeswap/.claude/SESSION_STATE.md` — new ACTIVE STATE block prepended, 2026-05-15 leg demoted to PRIOR LEG
+- `vibeswap/.claude/WAL.md` — THIS entry
+
+**Vibeswap commits this leg**: 0 (no contracts touched; meta/protocol work only)
+
+**Audit-closure progress (`docs/audits/2026-05-12_aa2-audit-claim-vs-enforcer.md`)**:
+- No changes this leg. Carried from 2026-05-15:
+  - ✅ MED-2, CRIT-1, CRIT-2 Part A, CRIT-3a/b/c, HIGH-1, HIGH-2
+  - Remaining: CRIT-2 Part B, MED-1, MED-3, MED-4, MED-5, MED-6
+- NEW: doc-vs-code lag identified. Audit doc table still says "Pre-deploy / Not yet" for CRIT-3a/b/c but enforcement code IS deployed (Explore agent verified `ShapleyDistributor._authorizeUpgrade`, `GovernanceGuard.execute → IGovernanceProposalVerifier`, `computeShapleyValues → _enforceAxiom5` at file:line). Reconcile audit doc next session.
+
+**Failure modes caught + folded into structure**:
+- Lapse: 3+ partner-facing drafts produced inline in chat without saving to disk (Rick TG poll-reply iterations, Tom witness reply). Will: "lapses are normal in cognition no problem, just want to be sure that the lapse counts for something going forward". Fix: `partner-draft-formalize-gate.py` hook converts the rule from memory-advisory to gate-enforced.
+- Pronoun assumption: assumed Kim was female from the name; Will corrected. Fix: `reference_kim-berthilson.md` saved with he/him + assumption-from-name anti-pattern.
+- Self-reflection on decision-moments: when Explore-agent delegated to route around glob timeout, didn't extract the timeout primitive first. Will: "atomic self reflection at every decision from now on. gate it". Fix: `atomic-reflection-gate.py` hook.
+- Em-dashes in partner-facing drafts: AI-tell that needed manual scrubbing across 3 drafts. Will: "create a gate that only happens for conversations with humans. augmentation gate." Fix: `em-dash-augmentation-gate.py` hook.
+
+**Pragma Research engagement state**:
+- Tom Lindeman: live TG group, POC offer for Witness, fundraise-side feedback explicitly asked for. Reply pending send addressing Claude Code adapter gap.
+- Bernhard Mueller: dropped OMEGA optical-factoring page; 4-substrate convergence reply on hold queued behind Tom thread.
+- Live product domain: coherence.pragmaresearch.ai (floatingpragma.io is research-side; commercial products only at pragmaresearch.ai).
+
+**Defenses up**:
+- No memory or vibeswap commits this leg. All work local. Per "don't push without explicit Will-instruction this turn" — would normally dual-push memory origin + backup per [reference_backup-remote-pattern], but Will's autopilot scope was "maintenance housework" not "commit-and-push."
+- Conflict-detector noise tuned out (Will/VibeSwap/JARVIS/USD8 false positives eliminated).
+- 3 augmentation gates compose: formalize-draft fires UserPromptSubmit → save to disk → em-dash gate scans the Write → atomic-reflection-gate catches any failures along the way.
+
+---
+
+## Epoch — ARCHIVED 2026-05-15 autopilot leg (vibeswap + memory)
 
 - **Opened**: 2026-05-15 ~13:17 ET on Will's `run autopilot` after Hayden/Devin/saucepoint
   outreach research handoff.

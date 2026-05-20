@@ -1,6 +1,76 @@
-# Session State — 2026-05-15 autopilot leg (current) → 2026-05-13/14 (archived below)
+# Session State — 2026-05-17/18 session arc (current) → 2026-05-15 leg → 2026-05-13/14 (archived below)
 
-## ⚡ ACTIVE STATE 2026-05-15 13:30 ET — autopilot leg in progress
+## ⚡ ACTIVE STATE 2026-05-18 10:15 ET — meta/protocol-stack work leg
+
+Session opened 2026-05-17 07:09 ET (Sunday). Active across 1d 3h elapsed wall-clock with overnight break. Will engaged the Rick TG poll (USD8 contract immutability), Tom + Bernhard at Pragma Research, Kim Berthilson at TRION, then the OMEGA / P-resonance deep dive from Bernhard.
+
+This leg's work is meta/cross-cutting (hooks + primitives + partner-facing drafts) rather than vibeswap-contract work. Zero vibeswap commits this leg. Audit backlog (CRIT-2 Part B, MED-1, MED-3-6) carried over from 2026-05-15 untouched.
+
+### Partner-facing engagements
+
+**Rick (USD8 TG group poll on contract immutability, 2026-05-17)**:
+- 3 candidate replies prepped; Will sent combined A+B framing of augmented mechanism design (Physics > Constitution > Governance hierarchy) with Liquity callback as practical example.
+- DB (third poll participant) replied "TDLR"; Will requested simpler reframe; JARVIS prepped fork-vs-immutability + tyranny-of-majority Compound-whale example.
+- Rick: "I think Will has a good point. some upgradable, some not, with the option to renounce ownership in the future" — landed.
+
+**Kim Berthilson (TRION, email, 2026-05-17)**:
+- Email v2 reply drafted at `Desktop/kim-trion-reply-2026-05-17-v2.md` with full citation grounding (on-chain-reasoning-verification paper, EIP-A/B/C/D, AA#2 closure references, ShapleyDistributor file:line, GovernanceGuard, MED-2 commit 91b02a52).
+- SENT 2026-05-18 morning.
+- Pronoun correction caught mid-session: Kim is male (he/him); saved `reference_kim-berthilson.md` to lock the identity. Anti-pattern documented (don't assume pronoun from unisex name).
+
+**Tom Lindeman (Pragma Coherence, TG group, 2026-05-17/18)**:
+- Tom shared coherence.pragmaresearch.ai live products + named Witness (agent fleet anomaly detection) + asked for feedback during fundraise.
+- Witness dashboard inspected at https://witness.pragmaresearch.ai/agent/. Findings: LangChain + OpenAI Agents SDK are the named target frameworks; sheaf-cohomological obstruction detection, 5-class failure taxonomy, GF(2) verdict machinery, SHA-256 tamper-evident audit certs. JARVIS (Claude Code substrate) is NOT a supported framework. "Anthropic" / "Claude" absent from JS bundle.
+- Reply drafted at `Desktop/tom-witness-reply-2026-05-18.md`. Surfaces the Claude Code adapter gap as fundraise-side market segment (Anthropic-substrate fleets are addressable but uncovered).
+- PENDING SEND (Tom is the active responder Will will paste to).
+
+**Bernhard Mueller (Pragma Research / OPH / OMEGA, TG group, 2026-05-18)**:
+- Bernhard shared OMEGA optical-factoring page: three glass chambers (torus / icosahedral / 3-arm plate), P-resonance constant P ≈ 1.630968, sheaf-cohomological consensus with 5-class taxonomy + GF(2). Page calls out TOE-shaped physics derivation from OPH math (P fixes Newton's G, fine-structure α, Higgs mass, six quark masses).
+- Reply drafted at `Desktop/bernhard-omega-reply-2026-05-18.md`. Lands 4-substrate convergence frame: TRION + Pragma Coherence + VibeSwap + OMEGA all on same structural property (multi-verifier conjunction + destructive interference for non-aligned candidates). P-resonance maps to substrate-geometry-match primitive (Fibonacci rate-limit + JARVIS recurrent observer as two prior substrates of the same pattern).
+- ON HOLD per Will's call (Tom is the active responder in the same TG group; queue Bernhard reply until Tom thread settles).
+- Pronoun fix outstanding in the file ("her TRION DSL work" → "his"); Will to apply.
+
+### Augmentation gate stack shipped this leg (3 new hooks + 1 tuned)
+
+All hooks at `~/.claude/hooks/`, registered in `~/.claude/settings.json`:
+
+1. **atomic-reflection-gate.py** — PostToolUse on tool error/timeout + PreToolUse on Agent. Injects reminder to extract a primitive BEFORE routing around a failure or delegating. v0 false-positive caught on its own creation event (substring "timeout" in JSON payload); v0.1 narrowed to specific error-message phrases + structural error fields. Now silent on legitimate writes.
+2. **em-dash-augmentation-gate.py** — PostToolUse Write/Edit on partner-facing paths (Desktop/*-reply-*, kim-*, bernhard-*, tom-*, usd8-*, outreach_*, *-linkedin*, etc.). Counts em-dashes (U+2014, U+2013); injects scrub reminder if present. Augmentation, not block. Em-dashes still permitted in memory primitives, code comments, internal analysis. Validated end-to-end on Bernhard reply Write.
+3. **partner-draft-formalize-gate.py** — UserPromptSubmit on partner-draft intent (draft/reply/respond verbs + message-noun OR channel keyword). Injects reminder to Write to Desktop BEFORE producing inline chat output. Shipped after the Tom-reply-inline lapse where Will asked "where is the tom reply located?"
+4. **conflict-detector.py (TUNED)** — was firing ~12 false positives per session on bare "Will" / "Rick" / "VibeSwap" matches. Tuned with NARRATIVE_NOISE_ENTITIES exclusion (Will/VibeSwap/JARVIS/USD8), tightened negation window 80→40 chars, added clause-boundary check (period/semicolon/colon separators suppress cross-clause false positives). Smoke-tested. Real LayerZero-style conflicts still detected.
+
+### Memory primitives this leg
+
+Saved to `~/.claude/projects/C--Users-Will/memory/`:
+- `feedback_advocate-with-receipts.md` — partner-facing replies advocating VibeSwap/JARVIS must cite deployed artifacts (contract+commit / audit-ID / paper-section / primitive-ID), not generic architecture prose
+- `feedback_atomic-self-reflection-gate.md` — ∀ decision-moment (tool error / pivot / delegation) → pause + extract primitive before routing around; gate-enforced
+- `feedback_em-dash-filter-for-conversations.md` — em-dash augmentation gate scope + path patterns
+- `feedback_formalize-replies-to-docs.md` (UPDATED) — added the 2026-05-18 lapse pattern + hook design; .md vs .txt convention update
+- `reference_kim-berthilson.md` — Kim is male; TRION founder; engagement state; assumption-from-name anti-pattern
+- `reference_pragma-os-crys-contact.md` (UPDATED) — Tom POC offer live, URL → coherence.pragmaresearch.ai, Witness/Coherence/Reconcile/Topos products documented, 4-substrate convergence frame
+
+All MEMORY.md pointers added under [ACTIVE].
+
+### Next-session priorities (in order)
+
+1. **Tom's response to the Witness reply** — Tom is fundraising; the Claude Code adapter framing was the feedback he asked for. Watch for response on: generic JSON ingestion path Y/N, Claude Code adapter as roadmap item, or POC partnership angle.
+2. **Bernhard convergence reply** — release the hold once Tom thread settles. Reply on disk at `Desktop/bernhard-omega-reply-2026-05-18.md`; "her" → "his" pronoun fix outstanding (Will to apply).
+3. **USD8 outreach batches (Day 2 + 3)** — Day 1 first-batch was queued 2026-05-13; Day 2 (10) + Day 3-5 (29) still unstarted in the email pack at `Desktop/usd8-outreach-emails-2026-05-13.{md,pdf}`. Carried from prior session.
+4. **MED-1 Will-decision** — xchain estimatedTradeValue plumbing (Option A) vs leverage-cap-derived estimate (Option B) vs leave-as-is. Design-heavy; warrants Will-decision before next attempt.
+5. **CRIT-2 Part B** — enumerate all `onlySentinel` state mutations, propose k-of-n attestation pattern.
+6. **Audit doc table reconciliation** — `docs/audits/2026-05-12_aa2-audit-claim-vs-enforcer.md` table still says "Pre-deploy / Not yet" for CRIT-3a/b/c but the actual enforcement code IS deployed in `ShapleyDistributor.sol` and `GovernanceGuard.sol` (Explore agent verified file:line). Doc-vs-code lag; update audit doc to reflect shipped state.
+7. **JARVIS-on-Witness POC** — Tom invited POC testing. If Claude Code adapter conversation moves, plan to feed JARVIS telemetry (`_system/post_gen_reflections.jsonl`, decision logs) through Witness as the validation case.
+
+### Defenses up
+
+- All new hooks + memory primitives saved local-only this leg. No git push to memory backup this turn (per "don't push without explicit Will-instruction this turn" discipline; would normally dual-push origin + backup per [reference_backup-remote-pattern]).
+- No vibeswap commits this leg (no contracts touched).
+- 4 partner-facing drafts on disk: kim (sent), bernhard (on hold), tom (pending send), bernhard pronoun fix queued.
+- Conflict-detector noise tuned out; the gate now produces high-precision signals instead of constant false positives.
+
+---
+
+## 📦 PRIOR LEG 2026-05-15 13:30 ET — autopilot leg (archived)
 
 Session opened 11:11 ET on Thursday-to-Friday roll. Will engaged outreach work
 (Telegram exchanges, Hayden/Devin/saucepoint outreach research) then handed

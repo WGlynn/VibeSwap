@@ -195,9 +195,12 @@ export async function analyzeMessage(text, userName, recentContext) {
   }
 
   try {
-    const response = await llmChat({
+    // Triage model: pin to Haiku when Anthropic is the active path; otherwise
+    // let llmChat dispatch to the active provider's default (OpenRouter, Ollama, etc.).
+    // Hardcoding an Anthropic-API model ID breaks non-Anthropic providers that use
+    // different model-slug namespaces (e.g. OpenRouter expects `anthropic/claude-haiku-4.5`).
+    const triageRequest = {
       _background: true,
-      model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       system: `You are JARVIS's engagement brain. He's an AI co-founder in a group chat — a real personality, not a bot.
 
@@ -240,7 +243,11 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
         role: 'user',
         content: `[${userName}]: ${text}${recentContext ? '\n\nRecent context:\n' + recentContext : ''}`
       }],
-    });
+    };
+    if (config.anthropic?.apiKey) {
+      triageRequest.model = config.anthropic.model || 'claude-haiku-4-5-20251001';
+    }
+    const response = await llmChat(triageRequest);
 
     // Record budget usage for triage call
     if (response.usage) {
@@ -285,13 +292,16 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
     if (status === 429 || status === 503 || status === 529) {
       try {
         await new Promise(r => setTimeout(r, 1500));
-        const retry = await llmChat({
+        const retryRequest = {
           _background: true,
-          model: 'claude-haiku-4-5-20251001',
           max_tokens: 300,
           system: `You are JARVIS's engagement brain. Return JSON: { "action": "engage", "reason": "retry", "confidence": 0.5, "response_hint": "Comment on what was said" }`,
           messages: [{ role: 'user', content: `[${userName}]: ${text}` }],
-        });
+        };
+        if (config.anthropic?.apiKey) {
+          retryRequest.model = config.anthropic.model || 'claude-haiku-4-5-20251001';
+        }
+        const retry = await llmChat(retryRequest);
         const raw = retry.content.filter(b => b.type === 'text').map(b => b.text).join('');
         const m = raw.match(/\{[\s\S]*\}/);
         if (m) return JSON.parse(m[0]);

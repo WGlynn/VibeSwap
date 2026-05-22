@@ -1489,14 +1489,14 @@ function getProviderConfig(providerName) {
     model: (() => {
       switch (providerName) {
         case 'claude': return config.llm?.model || config.anthropic?.model;
-        case 'openai': return 'gpt-5.4';
-        case 'gemini': return 'gemini-2.5-flash';
-        case 'deepseek': return 'deepseek-chat';
-        case 'ollama': return config.llm?.model || 'llama3.1';
-        case 'cerebras': return 'llama-3.3-70b';
-        case 'groq': return 'llama-3.3-70b-versatile';
-        case 'openrouter': return 'qwen/qwen3.6-plus:free';
-        case 'mistral': return 'mistral-small-latest';
+        case 'openai': return process.env.OPENAI_MODEL || 'gpt-5.4';
+        case 'gemini': return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        case 'deepseek': return process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+        case 'ollama': return process.env.OLLAMA_MODEL || config.llm?.model || 'llama3.1';
+        case 'cerebras': return process.env.CEREBRAS_MODEL || 'llama-3.3-70b';
+        case 'groq': return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+        case 'openrouter': return process.env.OPENROUTER_MODEL || 'qwen/qwen3.6-plus:free';
+        case 'mistral': return process.env.MISTRAL_MODEL || 'mistral-small-latest';
         case 'together': return 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
         case 'sambanova': return 'Meta-Llama-3.3-70B-Instruct';
         case 'fireworks': return 'accounts/fireworks/models/llama-v3p3-70b-instruct';
@@ -1612,18 +1612,22 @@ function classifyComplexity(request) {
     const isOpenAIModel = modelName.startsWith('gpt');
     const isGeminiModel = modelName.startsWith('gemini');
 
-    if (isClaudeModel && !getCircuitBreaker('claude').allowRequest()) {
-      // Claude is down/exhausted — don't force explicit, let router handle it
-      request._strippedModel = request.model; // Remember for logging
-      delete request.model;
-      return request._background ? 'simple' : 'moderate';
-    }
-    if (isOpenAIModel && !getCircuitBreaker('openai').allowRequest()) {
+    // Strip the model when its native provider is either (a) not initialized at all
+    // (e.g. ANTHROPIC_API_KEY unset, so claude is not in providerPool), or
+    // (b) initialized but circuit-broken / exhausted. In either case forcing the
+    // model name through to a foreign provider produces an HTTP 400 (e.g. OpenRouter
+    // rejects bare Anthropic-API IDs like `claude-haiku-4-5-20251001`).
+    if (isClaudeModel && (!providerPool.has('claude') || !getCircuitBreaker('claude').allowRequest())) {
       request._strippedModel = request.model;
       delete request.model;
       return request._background ? 'simple' : 'moderate';
     }
-    if (isGeminiModel && !getCircuitBreaker('gemini').allowRequest()) {
+    if (isOpenAIModel && (!providerPool.has('openai') || !getCircuitBreaker('openai').allowRequest())) {
+      request._strippedModel = request.model;
+      delete request.model;
+      return request._background ? 'simple' : 'moderate';
+    }
+    if (isGeminiModel && (!providerPool.has('gemini') || !getCircuitBreaker('gemini').allowRequest())) {
       request._strippedModel = request.model;
       delete request.model;
       return request._background ? 'simple' : 'moderate';

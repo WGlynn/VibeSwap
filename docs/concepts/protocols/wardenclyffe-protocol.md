@@ -448,9 +448,9 @@ Together   → api.together.xyz/v1       (Llama-3.3-70B-Instruct-Turbo)
 
 ## References
 
-- [Wardenclyffe Paper](../../llm-hashcash/docs/wardenclyffe-paper.md) — Full academic treatment <!-- FIXME: ../../llm-hashcash/docs/wardenclyffe-paper.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- [Wardenclyffe Paper](https://github.com/WGlynn/LLM-HASHCASH/blob/main/docs/wardenclyffe-paper.md) — Full academic treatment (sibling repo)
 - [Sybil Resistance Spec](./wardenclyffe-sybil-resistance.md) — AgentRegistry integration
-- [CKB Synergy](../../../.claude/nervos-intel.md) — PoW shared state + MMR <!-- FIXME: ../../../.claude/nervos-intel.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
-- [llm-provider.js](../../jarvis-bot/src/llm-provider.js) — Reference implementation
-- [ergon.ts](../../llm-hashcash/src/services/ergon.ts) — PoW primitives
-- [challenges.ts](../../llm-hashcash/src/services/challenges.ts) — Cognitive challenge types
+- CKB Synergy — PoW shared state + MMR (Nervos integration; see [docs.nervos.org](https://docs.nervos.org/) for protocol primitives)
+- [llm-provider.js](../../../jarvis-bot/src/llm-provider.js) — Reference implementation
+- [ergon.ts](https://github.com/WGlynn/LLM-HASHCASH/blob/main/src/services/ergon.ts) — PoW primitives (sibling repo)
+- [challenges.ts](https://github.com/WGlynn/LLM-HASHCASH/blob/main/src/services/challenges.ts) — Cognitive challenge types (sibling repo)

@@ -341,7 +341,7 @@ Specific files and hook locations where V3 layers compose:
 | Memory preprocessor (SessionStart) | shipped | `~/.claude/hooks/memory-preprocessor.py` |
 | jarvis-network runtime | shipped, production | `github.com/WGlynn/jarvis-network` |
 | Archive substrate (jsonl) | shipped | `jarvis-network/src/archive.js` |
-| Archive query tools (6) | shipped | `jarvis-network/src/archive.js` |
+| Archive query tools (6 LLM-callable) | shipped | `vibeswap/jarvis-bot/src/tools-archive.js` (jarvis-network exposes the archive via `commands.js` direct-call interface; the 6 named tools live in the heavy-side repo) |
 | Triage classifier | shipped | `jarvis-network/src/triage.js` |
 | Multi-provider claude-client | shipped | `jarvis-network/src/claude-client.js` |
 | Reply pacer | shipped | `jarvis-network/src/handler.js` |
@@ -356,7 +356,7 @@ Specific files and hook locations where V3 layers compose:
 | **Gate-fire log file** | spec-only — file not yet on disk | `memory/_system/wwwd_gate_fires.jsonl` (to instantiate) |
 | **Runtime integration into jarvis-network + vibeswap/jarvis-bot** | spec-only | `triage.js`/`intelligence.js`, `handler.js`/`index.js` integration points |
 
-Sixteen substrate components shipped. Five remaining for V3 closure, all in the WWWD wire-up layer: the gate hook, the log writer, the correction-detector hook, the corpus-refresh hook, and the runtime integration into both jarvis-network and vibeswap/jarvis-bot.
+Sixteen substrate components shipped. Six remaining for V3 closure, all in the WWWD wire-up + propagation layer: the gate hook, the log writer, the correction-detector hook, the corpus-refresh hook, the gate-fire log file, and the runtime integration into both jarvis-network and vibeswap/jarvis-bot.
 
 ---
 
@@ -370,6 +370,7 @@ V3 is structurally functional when:
 4. **Spec-only at V3-naming time**: the trend line on corrections-per-gate-fire over sessions is downward (requires criterion 2 to be implemented first; until the log accumulates real data, this is a target property, not a measurable one)
 5. jarvis-network's `triage.js` and outbound-message paths route through WWWD before executing
 6. A handoff test passes: Will walks away for a full session, returns, and the produced artifacts are indistinguishable from Will-supervised output
+7. **Audit substrate (RSAW) operates on V3 itself**: per `primitive_recursive-self-audit-via-wwwd`, every shipped V3 substrate doc is RSAW-audited within 24 hours of shipping, with fixes propagated across all three mirrors (JARVIS canonical, vibeswap, jarvis-network). The closed loop V3 → RSAW → V3-fixed is the substrate's self-improvement property.
 
 Six properties. Zero are currently functional at V3-naming time — all six require the wire-up phase. The WWWD spec and memory primitive are written (specification artifacts exist), but the runtime hooks, log file, integration points, and correction-write-back machinery are all unbuilt. Spec'd in writing is not the same as deployed; conflating those would be a `claim-needs-structural-enforcer` violation against ourselves. Criterion 4 is additionally explicitly forward-looking — even after the hooks ship, the convergence trend will require sessions of accumulated data before becoming measurable.
 

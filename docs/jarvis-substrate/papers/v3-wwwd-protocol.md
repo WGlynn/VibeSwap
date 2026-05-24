@@ -35,8 +35,12 @@ A decision-point invokes WWWD when ANY of the following hold:
 5. The action involves spending Will's attention (asks, escalations, surface-to-Will)
 6. A gate fired and the scope is genuinely ambiguous
 7. A choice has multiple Will-defensible answers that lead to different downstream consequences
+8. **Interpretation precedence**: when an input has multiple plausible referents (which "this" is meant), the choice of referent shapes everything downstream
+9. **Read-order as framing**: when the sequence of file-reads or context-loads will bias the interpretation, the order itself is a decision
+10. **Deployment-phase-adjusted severity**: when a finding's severity depends on whether the affected code is deployed-and-active vs spec-only vs archived; the phase context changes the call
+11. **Artifact-template resolution**: when a request cites an artifact or template, decide whether to materialize the cited form exactly or to infer-and-adapt; the choice is load-bearing for whether the output matches what Will expected
 
-Trigger set is open at the top. New decision-classes get added when WWWD fails to catch a mismatch that Will subsequently corrects.
+Trigger set is open at the top. New decision-classes get added when WWWD fails to catch a mismatch that Will subsequently corrects. (Triggers 8-11 were added 2026-05-24 from the V3 self-audit Cycle 1C — decision classes that came up in the session but were not in the original seven-trigger set.)
 
 ### The five-step gate
 
@@ -44,7 +48,7 @@ When a trigger fires:
 
 **Step 1 — PAUSE.** Before executing the default action, hold. The default action is whatever Claude-cognition would produce without WWWD. The pause is structural; it does not require a conscious "let me think" prompt — it is the gate firing.
 
-**Step 2 — ENUMERATE corpus.** Pull the Will-corpus slices relevant to this decision. Priority order:
+**Step 2 — ENUMERATE corpus.** Pull the Will-corpus slices relevant to this decision via the existing JARVIS discovery infrastructure. The gate reuses `~/.claude/hooks/deep-recall.py` (TF-IDF / embedding similarity over the corpus) which reads `memory/_system/semantic_index.json` to surface top-N similar primitives. This is the same path that already fires on UserPromptSubmit; WWWD-gate invokes it from a different trigger context. Priority order:
 1. Direct Will-quotes from the current conversation (most-recent corrections dominate)
 2. Memory primitives explicitly governing this decision-class (voice, feedback, posture)
 3. VibeSwap codebase decisions (Will-made choices in code)

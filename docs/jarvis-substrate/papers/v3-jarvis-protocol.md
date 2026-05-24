@@ -18,8 +18,8 @@ The two attestation surfaces are economically unified. One stake serves both. Bo
 
 **L2 — Bot Runtime Substrate.** The deployable bot architecture, distinct from any single implementation of it. Two production implementations exist with overlapping conceptual surface but no shared source code:
 
-- `jarvis-network` (lean, single-instance customer-deployable, 14 source files, used by Rick at USD8): `github.com/WGlynn/jarvis-network` (public)
-- `vibeswap/jarvis-bot` (heavy multi-region sharded mind network, 297 source files, used as Will's fleet): inside `github.com/WGlynn/VibeSwap` (public)
+- `jarvis-network` (lean, single-instance customer-deployable, 12 `.js` files in `src/`, used by Rick at USD8): `github.com/WGlynn/jarvis-network` (public)
+- `vibeswap/jarvis-bot` (heavy multi-region sharded mind network, 134 `.js` files in `src/`, used as Will's fleet): inside `github.com/WGlynn/VibeSwap` (public)
 
 Both implement the same conceptual contract: Telegram surface, archive-grounded reasoning, anti-fabrication persona rules, archive query tools, multi-provider LLM routing. They diverge at the deployment-shape axis. V3 ships across both.
 
@@ -137,9 +137,9 @@ Spec-only at V3-naming time:
 
 The runtime layer is the deployable bot architecture itself, not any single repo. Two implementations ship in production, with overlapping conceptual surface but no shared source code:
 
-**`jarvis-network`** (`github.com/WGlynn/jarvis-network`, public). Lean single-instance customer-deployable bot. 14 source files, 746K total disk size. The clean customer-onboarding surface. Used by Rick for the USD8 Telegram channel. JARVIS 2.0 in branding terms.
+**`jarvis-network`** (`github.com/WGlynn/jarvis-network`, public). Lean single-instance customer-deployable bot. 12 `.js` files in `src/`, 746K total disk size. The clean customer-onboarding surface. Used by Rick for the USD8 Telegram channel. JARVIS 2.0 in branding terms.
 
-**`vibeswap/jarvis-bot`** (inside `github.com/WGlynn/VibeSwap`, public). Heavy multi-region sharded mind network. 297 source files, 130M total. Multi-shard Byzantine fault-tolerant deployment across Fly.io regions (EU, AP, SA, archive, ollama variants). Used as Will's fleet for VibeSwap-community-facing JARVIS instances.
+**`vibeswap/jarvis-bot`** (inside `github.com/WGlynn/VibeSwap`, public). Heavy multi-region sharded mind network. 134 `.js` files in `src/`, 130M total. Multi-shard Byzantine fault-tolerant deployment across Fly.io regions (EU, AP, SA, archive, ollama variants). Used as Will's fleet for VibeSwap-community-facing JARVIS instances.
 
 The two implementations diverge at the deployment-shape axis. They share zero source files (verified). Both implement the same conceptual contract: Telegram surface, archive-grounded reasoning, anti-fabrication persona rules, multi-provider LLM routing. V3 ships across both — the gate fires at the conceptual interface, not at a specific file.
 
@@ -148,7 +148,7 @@ The two implementations diverge at the deployment-shape axis. They share zero so
 The repo's `ARCHITECTURE.md` captures the 2.0 design:
 
 - Canonical on-disk archive: every chat message appended to jsonl on receipt; substrate for grounded reporting and identity authority
-- Archive query tools: six LLM-callable tools (`archive_search`, `archive_user_messages`, `archive_user_profile`, `archive_day`, `archive_recent`, `archive_roster`) that let the model query ground truth instead of confabulating
+- Archive query tools: in `vibeswap/jarvis-bot`, six LLM-callable tools (`archive_search`, `archive_user_messages`, `archive_user_profile`, `archive_day`, `archive_recent`, `archive_roster`) in `src/tools-archive.js` let the model query ground truth instead of confabulating. In `jarvis-network`, the archive substrate exists in `src/archive.js` but is exposed via direct function calls from `commands.js` rather than as named LLM tool-use interfaces. Same grounding property, different exposure surface.
 - Deterministic templates: digests, stats, structured output render from archive data with zero LLM generation
 - Reply pacer: rolling-window latency tracker sends placeholder past mean+2σ, edits to real reply
 - Sharded architecture: horizontal by chat ID, functional by tool bundle
@@ -289,7 +289,9 @@ Specific files and hook locations where V3 layers compose:
 
 - **Corpus read**: WWWD's enumerate-step reads HIERO primitive files by name. The priority list (current-conversation > recent primitives > older primitives > VibeSwap code > partner-drafts) is enforced at corpus-load time.
 - **Correction write**: when Will corrects a WWWD-gated output, the correction enters the corpus as a new HIERO-format feedback primitive. The write passes through hiero-gate.py for format compliance.
-- **Gate-fire log**: WWWD's structured log (jsonl format proposed) lives in `~/.claude/projects/<project>/memory/_system/wwwd_gate_fires.jsonl`. Each line: `{timestamp, trigger, candidate, projection, executed, correction}`.
+- **Gate-fire log**: WWWD's structured log (jsonl format proposed) lives in `~/.claude/projects/<project>/memory/_system/wwwd_gate_fires.jsonl`. Each line: `{timestamp, decision_class, trigger, candidate, projection, executed, gate_revision_occurred, corpus_sources_used, correction}`. `decision_class` is required for pattern crystallization (`pattern × N+ ⇒ surface candidate`). `gate_revision_occurred` is a boolean required for theater detection (a gate that never revises is performative). `corpus_sources_used` is the list of memory files the projection drew on, required for routing corrections back to the right primitives.
+
+- **Correction write-back**: Will's corrections arrive through conversation, not a structured API. A new Stop-event hook (`wwwd-correction-detector.py`) scans the most recent Will-message for correction markers ("no", "not that", "actually", "let me clarify", explicit revision verbs) and writes the correction back to the most recent gate-fire entry's `correction` field. The hook is paired with a SessionStart hook (`wwwd-corpus-refresh.py`) that reads accumulated corrections and updates the corpus priority cache.
 
 ### Configuration
 
@@ -362,13 +364,13 @@ Twelve substrate components shipped. Four remaining for V3 closure, all in the W
 V3 is structurally functional when:
 
 1. WWWD gate hook is registered in `~/.claude/settings.json` and fires on every Write|Edit and Agent dispatch
-2. The gate-fire log exists at `memory/_system/wwwd_gate_fires.jsonl` and accumulates entries
+2. The gate-fire log exists at `memory/_system/wwwd_gate_fires.jsonl` and accumulates entries with the full schema (decision_class, trigger, candidate, projection, executed, gate_revision_occurred, corpus_sources_used, correction)
 3. Will-corrections in the log trigger HIERO-format feedback primitive writes that enter the corpus
-4. The trend line on corrections-per-gate-fire over sessions is downward
+4. **Spec-only at V3-naming time**: the trend line on corrections-per-gate-fire over sessions is downward (requires criterion 2 to be implemented first; until the log accumulates real data, this is a target property, not a measurable one)
 5. jarvis-network's `triage.js` and outbound-message paths route through WWWD before executing
 6. A handoff test passes: Will walks away for a full session, returns, and the produced artifacts are indistinguishable from Will-supervised output
 
-Six properties. Two are present (gate hook spec'd, integration spec'd). Four require the wire-up phase.
+Six properties. Two are present (gate hook spec'd, integration spec'd). Four require the wire-up phase. Criterion 4 is explicitly forward-looking — claiming it as measurable today would be a `claim-needs-structural-enforcer` violation against ourselves.
 
 ---
 

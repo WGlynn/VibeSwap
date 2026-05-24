@@ -35,6 +35,353 @@ const PACK = [
   },
 ]
 
+// ============ Deeper-kernel graphics ============
+
+function GfxTuringLoop() {
+  // Tape cells representing the persistent state surface, with a read head
+  // sweeping across. Below, the loop body in ASCII.
+  const cells = ['SESSION_STATE', 'WAL', 'MEMORY', 'HOOKS', 'PRIMITIVES', 'GATES', 'LOG']
+  return (
+    <div className="font-mono min-h-[280px]">
+      {/* tape */}
+      <div className="relative">
+        <div className="flex gap-1 mb-2">
+          {cells.map((c, i) => (
+            <motion.div
+              key={c}
+              initial={{ opacity: 0, y: 4 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-15% 0px' }}
+              transition={{ delay: i * 0.06, duration: 0.25 }}
+              className="flex-1 border border-matrix-900/40 bg-black-900/80 px-2 py-2 text-center text-[8px] uppercase tracking-[0.18em] text-matrix-300"
+            >
+              {c}
+            </motion.div>
+          ))}
+        </div>
+        {/* read head */}
+        <motion.div
+          initial={{ x: 0, opacity: 0 }}
+          animate={{ x: ['0%', '85%', '0%'], opacity: 1 }}
+          transition={{ x: { duration: 4, repeat: Infinity, ease: 'easeInOut' }, opacity: { duration: 0.4 } }}
+          className="absolute -top-3 left-0 w-[14%] h-[3px] bg-matrix-500"
+          style={{ boxShadow: '0 0 12px rgba(0,255,65,0.7)' }}
+        />
+      </div>
+
+      {/* loop body */}
+      <div className="mt-6 text-[10px] leading-relaxed text-matrix-300 whitespace-pre">
+{`while (true) {
+   state  = read(persistent_substrate);
+   delta  = gates.fire(state, tool_call);
+   next   = execute(delta);
+   write(persistent_substrate, next);
+   if (sufficient(next)) halt;
+}`}
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-15% 0px' }}
+        transition={{ delay: 1, duration: 0.3 }}
+        className="mt-4 text-[9px] uppercase tracking-[0.30em] text-matrix-400"
+      >
+        state · transitions · halting → Turing-complete
+      </motion.div>
+    </div>
+  )
+}
+
+function GfxRSICycles() {
+  // Spiral of audit cycles converging inward.
+  // Each cycle finds N issues, fixes them, then next cycle audits the fixes
+  // plus the methodology itself. Convergence = zero new findings.
+  const cycles = [
+    { r: 44, n: 'C1', findings: 15, color: '#00ff41', op: 0.9 },
+    { r: 36, n: 'C2', findings: 30, color: '#00ff41', op: 0.7 },
+    { r: 28, n: 'C3', findings: 11, color: '#00d4ff', op: 0.7 },
+    { r: 20, n: 'C4', findings: 4,  color: '#00d4ff', op: 0.6 },
+    { r: 12, n: 'C5', findings: 1,  color: '#00d4ff', op: 0.5 },
+    { r: 5,  n: '✓',  findings: 0,  color: '#00ff41', op: 1 },
+  ]
+  return (
+    <div className="relative w-full min-h-[280px] font-mono">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" className="w-full h-[280px]">
+        {cycles.map((c, i) => (
+          <motion.circle
+            key={c.n}
+            cx="50" cy="50" r={c.r}
+            fill="none"
+            stroke={c.color}
+            strokeWidth="0.4"
+            strokeOpacity={c.op}
+            strokeDasharray="2 1.5"
+            initial={{ pathLength: 0 }}
+            whileInView={{ pathLength: 1 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: i * 0.2, duration: 0.8 }}
+          />
+        ))}
+        <motion.circle
+          cx="50" cy="50" r="2.5"
+          fill="#00ff41"
+          initial={{ scale: 0 }}
+          whileInView={{ scale: 1 }}
+          viewport={{ once: true, margin: '-15% 0px' }}
+          transition={{ delay: 1.5, duration: 0.4, type: 'spring' }}
+        />
+      </svg>
+      {cycles.map((c, i) => {
+        // Labels along the right side of each ring
+        const yPct = 50 + (c.r * 0.85)
+        return (
+          <motion.div
+            key={c.n + '-label'}
+            initial={{ opacity: 0, x: 4 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: 0.4 + i * 0.18, duration: 0.3 }}
+            style={{ left: '52%', top: `${yPct}%` }}
+            className="absolute -translate-y-1/2 text-[9px] font-mono uppercase tracking-[0.18em]"
+          >
+            <span style={{ color: c.color }}>{c.n}</span>
+            <span className="text-white-300/70 ml-2">
+              {c.findings > 0 ? `${c.findings} findings` : 'convergence'}
+            </span>
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+}
+
+function GfxCKB() {
+  // Common Knowledge Base — layered counts that animate up to their values.
+  const layers = [
+    { name: 'MEMORY.md',  count: '31.6KB', detail: 'index · 100% DE-score', color: '#00ff41', target: 100, suffix: '%' },
+    { name: 'primitives', count: 172,      detail: 'reusable cognition patterns',  color: '#00ff41', target: 172, suffix: '' },
+    { name: 'feedback',   count: 138,      detail: 'correction-derived rules',     color: '#00d4ff', target: 138, suffix: '' },
+    { name: 'projects',   count: 48,       detail: 'active work-state',            color: '#00d4ff', target: 48,  suffix: '' },
+    { name: 'user',       count: 14,       detail: 'operator-profile context',     color: '#a855f7', target: 14,  suffix: '' },
+    { name: 'references', count: 11,       detail: 'external pointers',            color: '#a855f7', target: 11,  suffix: '' },
+  ]
+  return (
+    <div className="font-mono min-h-[280px]">
+      <div className="space-y-2">
+        {layers.map((l, i) => (
+          <motion.div
+            key={l.name}
+            initial={{ opacity: 0, x: -8 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: i * 0.08, duration: 0.3 }}
+            className="flex items-center gap-3"
+          >
+            <div
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ background: l.color, boxShadow: `0 0 8px ${l.color}80` }}
+            />
+            <div className="text-[10px] uppercase tracking-[0.18em] flex-1 text-white-300">{l.name}</div>
+            <motion.div
+              initial={{ width: 0 }}
+              whileInView={{ width: '40%' }}
+              viewport={{ once: true, margin: '-15% 0px' }}
+              transition={{ delay: 0.3 + i * 0.08, duration: 0.6, ease: 'easeOut' }}
+              className="h-[3px] rounded-full"
+              style={{ background: `linear-gradient(90deg, ${l.color}, ${l.color}40)` }}
+            />
+            <div className="text-[11px] font-semibold w-16 text-right" style={{ color: l.color }}>
+              {l.count}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+      <div className="mt-5 grid grid-cols-3 gap-3 text-[9px] uppercase tracking-[0.30em]">
+        <div className="text-center">
+          <div className="text-matrix-400 mb-1">files</div>
+          <div className="text-white text-base font-display">395</div>
+        </div>
+        <div className="text-center">
+          <div className="text-matrix-400 mb-1">corpus</div>
+          <div className="text-white text-base font-display">1.2 MB</div>
+        </div>
+        <div className="text-center">
+          <div className="text-matrix-400 mb-1">compression</div>
+          <div className="text-white text-base font-display">~37×</div>
+        </div>
+      </div>
+      <div className="mt-4 text-[9px] uppercase tracking-[0.30em] text-matrix-400">
+        every file reachable from the 31.6KB index · 100% coverage
+      </div>
+    </div>
+  )
+}
+
+// ============ Learning-loop graphics ============
+
+function GfxLearningLoop() {
+  // Four phases around a central WWWD CORPUS node. Pulse travels around the
+  // perimeter to dramatize the closed loop.
+  const phases = [
+    { angle: -90,  label: '01 PROMPT',     sub: 'you direct',         color: '#00ff41' },
+    { angle: 0,    label: '02 GATE FIRES', sub: 'projection emits',   color: '#00ff41' },
+    { angle: 90,   label: '03 CORRECTION', sub: 'you push back',      color: '#00d4ff' },
+    { angle: 180,  label: '04 LOG WRITES', sub: 'corpus updates',     color: '#00ff41' },
+  ]
+  const polar = (deg, r) => {
+    const rad = (deg * Math.PI) / 180
+    return { x: 50 + r * Math.cos(rad), y: 50 + r * Math.sin(rad) }
+  }
+  return (
+    <div className="relative w-full min-h-[420px] font-mono">
+      {/* center node */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.7 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true, margin: '-15% 0px' }}
+        transition={{ duration: 0.5 }}
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center px-4 py-3 rounded-xl border border-matrix-500/60 bg-matrix-900/30"
+        style={{ boxShadow: '0 0 32px -8px rgba(0,255,65,0.35)' }}
+      >
+        <div className="text-[9px] uppercase tracking-[0.30em] text-matrix-400">corpus</div>
+        <div className="text-white font-display text-base">WWWD</div>
+        <div className="text-[9px] text-white-300/70">priority cache</div>
+      </motion.div>
+
+      {/* phase nodes */}
+      {phases.map((p, i) => {
+        const pos = polar(p.angle, 38)
+        return (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.6 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: 0.3 + i * 0.18, duration: 0.35, type: 'spring', stiffness: 220 }}
+            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+            className="absolute -translate-x-1/2 -translate-y-1/2 text-center px-3 py-2 rounded-lg border border-matrix-900/40 bg-black-900/90"
+          >
+            <div className="text-[9px] uppercase tracking-[0.30em] mb-0.5" style={{ color: p.color }}>{p.label}</div>
+            <div className="text-[10px] text-white-300">{p.sub}</div>
+          </motion.div>
+        )
+      })}
+
+      {/* orbit + travelling pulse */}
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full pointer-events-none">
+        <motion.circle
+          cx="50" cy="50" r="38"
+          fill="none"
+          stroke="rgba(0,255,65,0.25)"
+          strokeWidth="0.3"
+          strokeDasharray="1.5 2.5"
+          initial={{ pathLength: 0 }}
+          whileInView={{ pathLength: 1 }}
+          viewport={{ once: true, margin: '-15% 0px' }}
+          transition={{ delay: 0.5, duration: 1.4 }}
+        />
+        <motion.g
+          animate={{ rotate: 360 }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+          style={{ transformOrigin: '50% 50%' }}
+        >
+          <circle cx="88" cy="50" r="1.4" fill="#00ff41">
+            <animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite" />
+          </circle>
+        </motion.g>
+      </svg>
+    </div>
+  )
+}
+
+function GfxConvergence() {
+  // Convergence-signal bars over imagined sessions.
+  // Drift index = correction-rate over time, target = improving.
+  const sessions = [
+    { n: 'S01', rate: 92, signal: 'drifting' },
+    { n: 'S02', rate: 78, signal: 'drifting' },
+    { n: 'S03', rate: 64, signal: 'stable' },
+    { n: 'S04', rate: 48, signal: 'improving' },
+    { n: 'S05', rate: 31, signal: 'improving' },
+    { n: 'S06', rate: 22, signal: 'improving' },
+    { n: 'S07', rate: 18, signal: 'improving' },
+  ]
+  return (
+    <div className="font-mono text-[10px] min-h-[180px]">
+      <div className="flex items-end gap-3 h-32 mb-3">
+        {sessions.map((s, i) => (
+          <motion.div
+            key={s.n}
+            initial={{ height: 0 }}
+            whileInView={{ height: `${s.rate}%` }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: i * 0.1, duration: 0.5, ease: 'easeOut' }}
+            className="flex-1 rounded-t bg-gradient-to-t from-matrix-900/60 to-matrix-500/80 relative"
+          >
+            <div className="absolute -top-5 left-0 right-0 text-center text-matrix-400 text-[9px]">{s.rate}%</div>
+          </motion.div>
+        ))}
+      </div>
+      <div className="flex gap-3 mb-2">
+        {sessions.map((s) => (
+          <div key={s.n} className="flex-1 text-center text-white-300/70 text-[9px] uppercase tracking-[0.18em]">{s.n}</div>
+        ))}
+      </div>
+      <div className="mt-4 text-[10px] text-matrix-400 uppercase tracking-[0.30em]">correction-rate · convergence → improving</div>
+    </div>
+  )
+}
+
+function GfxLogEntry() {
+  return (
+    <div className="font-mono text-[10px] leading-relaxed text-matrix-300 min-h-[200px]">
+      <div className="text-matrix-400 mb-2 uppercase tracking-[0.30em] text-[9px]">
+        wwwd_gate_fires.jsonl · last entry
+      </div>
+      <motion.pre
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-15% 0px' }}
+        transition={{ duration: 0.3 }}
+        className="whitespace-pre-wrap text-[10px]"
+      >
+{`{
+  "timestamp": "2026-05-24T15:21:08Z",
+  "decision_class": "severity-calibration",
+  "trigger": ["severity-calibration"],
+  "tool_name": "Write",
+  "projection": "honest-number-over-marketing",
+  "executed": true,`}
+      </motion.pre>
+      <motion.pre
+        initial={{ opacity: 0, x: -6 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true, margin: '-15% 0px' }}
+        transition={{ delay: 0.5, duration: 0.35 }}
+        className="whitespace-pre-wrap text-[10px] text-matrix-500"
+      >
+{`  "gate_revision_occurred": true,
+  "correction": {
+    "timestamp": "2026-05-24T15:21:14Z",
+    "text_excerpt": "no — downgrade that claim",
+    "matched_patterns": ["\\\\bno,?\\\\s+"]
+  }
+}`}
+      </motion.pre>
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, margin: '-15% 0px' }}
+        transition={{ delay: 1, duration: 0.3 }}
+        className="mt-3 text-matrix-400 text-[9px] uppercase tracking-[0.30em]"
+      >
+        → next severity-calibration projection routes through this correction
+      </motion.div>
+    </div>
+  )
+}
+
 // ============ Animated step graphics ============
 
 function GfxInstall() {
@@ -531,6 +878,286 @@ export default function JarvisOSPage() {
               <div className="text-sm text-white-300">{f.d}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* How JARVIS learns — recursive feedback loop */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="recursion" op="feedback_loop" args="" ret="self-compounding cognition" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="lg:col-span-5">
+            <h3 className="text-2xl font-display text-white tracking-[-0.02em] mb-3">
+              The kernel learns from every session.
+            </h3>
+            <p className="text-sm text-white-300 leading-relaxed mb-4">
+              JARVIS does not retrain a model. It accumulates a corpus. Each
+              tool-call routes through the WWWD gate, each gate-fire writes
+              to a structured log, each correction you give is detected and
+              written back against the most recent entry. On every fresh
+              session boot, a priority cache is rebuilt and a convergence
+              signal is computed: <span className="font-mono text-matrix-400">improving</span> /{' '}
+              <span className="font-mono text-matrix-400">stable</span> /{' '}
+              <span className="font-mono text-matrix-400">drifting</span> /{' '}
+              <span className="font-mono text-matrix-400">insufficient-data</span>.
+            </p>
+            <p className="text-sm text-white-300 leading-relaxed">
+              The model is amnesic. The system is not. Your machine accumulates
+              a record of (decision, projection, correction) triples that
+              compound across sessions — readable, greppable, forkable
+              markdown all the way down.
+            </p>
+          </div>
+          <div className="lg:col-span-7">
+            <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5 sm:p-6">
+              <GfxLearningLoop />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              storage · structured log
+            </div>
+            <GfxLogEntry />
+          </div>
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              convergence signal · sessions over time
+            </div>
+            <GfxConvergence />
+          </div>
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Your role — orchestration */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="you" op="orchestrate" args="" ret="the operator closes the loop" />
+        <p className="text-sm text-white-300 max-w-2xl mb-8 leading-relaxed">
+          The kernel is augmentation. You are the operator. Five distinct
+          input channels you provide drive the recursive learning loop. The
+          system has no opinion of its own — it has yours, encoded.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[
+            {
+              num: '01',
+              label: 'Direction',
+              op: 'set_goal',
+              body: 'Top-down: what we are building, what matters, what is out of scope. Your prompt sets the substrate the projection draws on.',
+            },
+            {
+              num: '02',
+              label: 'Orchestration',
+              op: 'route',
+              body: 'Mid-level: which agent, which tool, which file, in which order. The boot screen makes the surface navigable; you pick the trajectory.',
+            },
+            {
+              num: '03',
+              label: 'Usage',
+              op: 'invoke',
+              body: 'Actually using the system — Write / Edit / Agent calls that fire the gate. Without usage there is no signal. Usage is the experiment.',
+            },
+            {
+              num: '04',
+              label: 'Interaction',
+              op: 'dialog',
+              body: 'Back-and-forth in conversation. Every "no", "actually", "wait", "let me clarify" is detected at the Stop hook and written back as training signal.',
+            },
+            {
+              num: '05',
+              label: 'Guidance',
+              op: 'correct',
+              body: 'Out-of-band corrections — primitive edits, projection-logic tuning, hook customization. The slow loop that reshapes the fast loop.',
+            },
+          ].map((c, i) => (
+            <motion.div
+              key={c.num}
+              initial={{ opacity: 0, y: 8 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-15% 0px' }}
+              transition={{ delay: i * 0.08, duration: 0.35 }}
+              className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5 relative overflow-hidden"
+            >
+              <div
+                className="absolute top-0 left-0 right-0 h-px"
+                style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.5), transparent)' }}
+              />
+              <div className="font-mono text-[9px] uppercase tracking-[0.30em] text-matrix-400 mb-1">
+                input.{c.num}
+              </div>
+              <div className="font-display text-white text-lg mb-1">{c.label}</div>
+              <div className="font-mono text-[10px] text-matrix-300 mb-3">.{c.op}()</div>
+              <div className="text-xs text-white-300 leading-relaxed">{c.body}</div>
+              <motion.div
+                className="absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full bg-matrix-500"
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.5 }}
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-10 rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+            why this is recursive
+          </div>
+          <p className="text-sm text-white-300 leading-relaxed">
+            Direction shapes orchestration. Orchestration drives usage. Usage
+            produces interaction. Interaction generates guidance. Guidance
+            updates the corpus that the next direction routes through. The
+            loop closes — and tightens — with every session you run.
+            Convergence is not aspirational; it is measured.
+          </p>
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Deeper kernel — Turing autopilot, RSI cycles, CKB */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="kernel" op="deeper_layers" args="" ret="what compounds underneath" />
+        <p className="text-sm text-white-300 max-w-2xl mb-10 leading-relaxed">
+          The pack you install is the entry layer. Three deeper layers do the
+          load-bearing work: a Turing-complete autopilot loop over persistent
+          state, recursive self-audit cycles that audit the methodology itself,
+          and a common knowledge base where every primitive is reachable from a
+          31.6 KB index.
+        </p>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              01 · autopilot.loop()
+            </div>
+            <h3 className="font-display text-white text-lg mb-2">Turing-complete autopilot</h3>
+            <p className="text-xs text-white-300 mb-4 leading-relaxed">
+              Persistent state on disk (markdown), deterministic transitions
+              (hooks), halt condition (sufficiency). The loop computes anything
+              the model can express because state survives outside the model.
+            </p>
+            <GfxTuringLoop />
+          </div>
+
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              02 · rsi.audit()
+            </div>
+            <h3 className="font-display text-white text-lg mb-2">RSI self-audit cycles</h3>
+            <p className="text-xs text-white-300 mb-4 leading-relaxed">
+              The audit methodology runs against the spec that defines it. Each
+              cycle finds real issues, fixes them, then the next cycle audits
+              the fixes. Convergence = zero new findings. The system improves
+              itself, measurably.
+            </p>
+            <GfxRSICycles />
+          </div>
+
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              03 · ckb.index()
+            </div>
+            <h3 className="font-display text-white text-lg mb-2">Common knowledge base</h3>
+            <p className="text-xs text-white-300 mb-4 leading-relaxed">
+              Every primitive, every feedback rule, every project memory, every
+              user-context file is reachable from one 31.6 KB index — a ~37×
+              structural compression that holds at 100% coverage as the corpus
+              grows.
+            </p>
+            <GfxCKB />
+          </div>
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Use it to its fullest */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="fluency" op="use_to_fullest" args="" ret="patterns that compound" />
+        <p className="text-sm text-white-300 max-w-2xl mb-8 leading-relaxed">
+          Minimum-viable usage is "install it and use Claude Code normally" —
+          the kernel learns passively. But a handful of habits unlock the
+          system's real range.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {[
+            {
+              tag: 'daily',
+              title: 'Use the natural-language commands',
+              body: 'The boot screen lists eight: "show protocols", "show gates", "show state", "show memory", "show philosophy", "show files", "show wal", "show wwwd". They are not slash commands — type them as plain text. Claude recognizes them and prints the relevant surface.',
+            },
+            {
+              tag: 'daily',
+              title: 'Correct in plain language',
+              body: 'When the gate projects badly, push back with "no", "actually", "wait", "let me clarify", or "that is wrong". The Stop hook detects these markers and writes the correction back. You do not need a special syntax; you just need to actually say it.',
+            },
+            {
+              tag: 'weekly',
+              title: 'Read your gate-fire log',
+              body: 'Open wwwd_gate_fires.jsonl. Filter for entries where gate_revision_occurred is true. Each one is a (projection, correction) pair you can encode into your primitive. The log is the substrate for tuning the system to your patterns.',
+            },
+            {
+              tag: 'weekly',
+              title: 'Watch the convergence signal',
+              body: 'Boot screen shows it: improving / stable / drifting / insufficient-data. Drifting = recent corrections > old corrections. That means the gate is moving away from your preferences. Investigate the recent log entries and tighten the projection logic.',
+            },
+            {
+              tag: 'ongoing',
+              title: 'Fork the WWWD primitive',
+              body: 'memory/primitive_what-would-will-do.md ships pre-populated with my patterns. Either rename it to primitive_what-would-<you>-do.md and rewrite, or extend it in place. The gate reads whatever you put there.',
+            },
+            {
+              tag: 'ongoing',
+              title: 'Customize the trigger set',
+              body: 'wwwd-gate.py has 11 trigger classes. Add yours: new keyword lists in detect_triggers(), new projection notes in project_will_pick(). Each trigger is ~5 lines of Python. The gate compiles every time the hook fires.',
+            },
+            {
+              tag: 'ongoing',
+              title: 'Absorb other substrates',
+              body: 'bash absorb.sh <repo>. The absorber namespace-prefixes imported files so two voice-gate.py files from different sources coexist. settings.json is backed up before any write. Roll back trivially.',
+            },
+            {
+              tag: 'ongoing',
+              title: 'Publish your own substrate',
+              body: 'Add a jarvis-os.yaml manifest at your repo root (see MANIFEST_SPEC.md). Declares event-matcher assignments explicitly. Other JARVIS-OS users absorb your stack cleanly. The format is composable; the network compounds.',
+            },
+          ].map((c, i) => (
+            <motion.div
+              key={c.title}
+              initial={{ opacity: 0, y: 6 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-15% 0px' }}
+              transition={{ delay: i * 0.05, duration: 0.3 }}
+              className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5"
+            >
+              <div className="font-mono text-[9px] uppercase tracking-[0.30em] mb-2" style={{ color: c.tag === 'daily' ? '#00ff41' : c.tag === 'weekly' ? '#00d4ff' : '#a855f7' }}>
+                {c.tag}
+              </div>
+              <div className="font-display text-white text-base mb-2">{c.title}</div>
+              <div className="text-xs text-white-300 leading-relaxed">{c.body}</div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="mt-10 rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+            escape hatch
+          </div>
+          <p className="text-sm text-white-300 leading-relaxed mb-3">
+            Every gate is augmentation, never block. If a projection is wrong,
+            ignore it and proceed. The hook prints a note to additionalContext;
+            nothing is enforced at the system layer. To disable a hook entirely,
+            edit ~/.claude/settings.json (or restore from the .bak-pre-jarvis-os
+            backup the installer made).
+          </p>
+          <div className="font-mono text-[11px] text-matrix-300 break-all">
+            $ cp ~/.claude/settings.json.bak-pre-jarvis-os ~/.claude/settings.json
+          </div>
         </div>
       </section>
 

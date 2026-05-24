@@ -140,6 +140,7 @@ const EmissionsPage = lazy(() => import('./components/EmissionsPage'))
 const TeamPage = lazy(() => import('./components/TeamPage'))
 const FAQPage = lazy(() => import('./components/FAQPage'))
 const ChangelogPage = lazy(() => import('./components/ChangelogPage'))
+const JarvisOSPage = lazy(() => import('./components/JarvisOSPage'))
 const NotFoundPage = lazy(() => import('./components/NotFoundPage'))
 const WalletPage = lazy(() => import('./components/WalletPage'))
 const SettingsPage = lazy(() => import('./components/SettingsPage'))
@@ -272,6 +273,7 @@ function AnimatedRoutes() {
             <Route path="/personality" element={<PersonalityPage />} />
             <Route path="/prompts" element={<PromptsPage />} />
             <Route path="/jarvis" element={<JarvisPage />} />
+            <Route path="/jarvis-os" element={<JarvisOSPage />} />
             <Route path="/voice" element={<VoiceChat />} />
             <Route path="/bounties" element={<JobMarket />} />
             <Route path="/mine" element={<MinePage />} />

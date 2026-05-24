@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 
 // ============ Constants ============
 
@@ -213,6 +213,103 @@ function GfxCKB() {
       </div>
       <div className="mt-4 text-[9px] uppercase tracking-[0.30em] text-matrix-400">
         every file reachable from the 31.6KB index · 100% coverage
+      </div>
+    </div>
+  )
+}
+
+// ============ Network / federation graphics ============
+
+function GfxNetwork() {
+  // Center = YOU. Perimeter peers connected via signal-pulse edges.
+  const peers = [
+    { x: 18, y: 22, name: 'alice-substrate' },
+    { x: 82, y: 18, name: 'bernhard-omega' },
+    { x: 88, y: 60, name: 'tom-witness' },
+    { x: 62, y: 88, name: 'kim-trion' },
+    { x: 22, y: 82, name: 'rick-usd8' },
+    { x: 8,  y: 52, name: 'anas-1inch' },
+  ]
+  return (
+    <div className="relative w-full min-h-[340px] font-mono">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" className="w-full h-[340px]">
+        {/* edges */}
+        {peers.map((p, i) => (
+          <motion.line
+            key={`e${i}`}
+            x1="50" y1="50" x2={p.x} y2={p.y}
+            stroke="rgba(0,255,65,0.25)"
+            strokeWidth="0.25"
+            initial={{ pathLength: 0 }}
+            whileInView={{ pathLength: 1 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: 0.2 + i * 0.08, duration: 0.6 }}
+          />
+        ))}
+
+        {/* travelling signal pulses */}
+        {peers.map((p, i) => (
+          <motion.circle
+            key={`p${i}`}
+            r="0.8"
+            fill="#00ff41"
+            animate={{
+              cx: [50, p.x, 50],
+              cy: [50, p.y, 50],
+              opacity: [0, 1, 0],
+            }}
+            transition={{
+              duration: 3 + i * 0.4,
+              repeat: Infinity,
+              delay: i * 0.5,
+              ease: 'easeInOut',
+            }}
+          />
+        ))}
+
+        {/* peer nodes */}
+        {peers.map((p, i) => (
+          <motion.circle
+            key={`n${i}`}
+            cx={p.x} cy={p.y} r="1.6"
+            fill="rgba(0,255,65,0.7)"
+            stroke="#00ff41"
+            strokeWidth="0.3"
+            initial={{ scale: 0 }}
+            whileInView={{ scale: 1 }}
+            viewport={{ once: true, margin: '-15% 0px' }}
+            transition={{ delay: 0.6 + i * 0.08, duration: 0.3, type: 'spring' }}
+          />
+        ))}
+
+        {/* center node — you */}
+        <motion.circle
+          cx="50" cy="50" r="3.2"
+          fill="#00ff41"
+          initial={{ scale: 0 }}
+          whileInView={{ scale: 1 }}
+          viewport={{ once: true, margin: '-15% 0px' }}
+          transition={{ duration: 0.4, type: 'spring' }}
+          style={{ filter: 'drop-shadow(0 0 6px rgba(0,255,65,0.7))' }}
+        />
+      </svg>
+
+      {/* peer labels */}
+      {peers.map((p, i) => (
+        <motion.div
+          key={`l${i}`}
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: '-15% 0px' }}
+          transition={{ delay: 1 + i * 0.05, duration: 0.3 }}
+          style={{ left: `${p.x}%`, top: `${p.y + 5}%` }}
+          className="absolute -translate-x-1/2 text-[8px] uppercase tracking-[0.18em] text-white-300/70 whitespace-nowrap"
+        >
+          {p.name}
+        </motion.div>
+      ))}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 translate-y-3 text-[9px] uppercase tracking-[0.30em] text-matrix-400">
+        you
       </div>
     </div>
   )
@@ -787,6 +884,61 @@ export default function JarvisOSPage() {
 
       <Divider />
 
+      {/* Why this is not a wrapper */}
+      <section className="px-6 pb-12 max-w-5xl mx-auto">
+        <OpHeader scope="architecture" op="not_a_wrapper" args="" ret="model · interchangeable" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">
+              deterministic
+            </div>
+            <h3 className="font-display text-white text-base mb-2">Hooks fire below the model</h3>
+            <p className="text-xs text-white-300 leading-relaxed">
+              Every gate is regex + context disambiguator, no LLM call. Fires
+              regardless of Claude's attention. Zero added API cost. The
+              architecture is static analysis at the tool-call boundary, not
+              another agent on top.
+            </p>
+          </div>
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">
+              substrate-agnostic
+            </div>
+            <h3 className="font-display text-white text-base mb-2">The model is interchangeable</h3>
+            <p className="text-xs text-white-300 leading-relaxed">
+              The kernel persists on disk. The model is the CPU; the kernel is
+              the OS; your work is the application running on top. Swap Claude
+              for any future provider and the hooks still fire, the corpus
+              still compounds.
+            </p>
+          </div>
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">
+              coupling caveat
+            </div>
+            <h3 className="font-display text-white text-base mb-2">Hook schema is Claude Code's</h3>
+            <p className="text-xs text-white-300 leading-relaxed">
+              The integration points (additionalContext / hookSpecificOutput /
+              event names) are defined by Claude Code. If Anthropic ships
+              breaking hook-schema changes, the kernel needs a recompile — the
+              persistence layer doesn't, but the gates do.
+            </p>
+          </div>
+        </div>
+        <div className="mt-5 text-center">
+          <a
+            href={WRAPPER_PAPER}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 hover:text-matrix-300 border-b border-matrix-900/40 hover:border-matrix-500/60 pb-0.5 transition-colors"
+          >
+            → read the full argument: "JARVIS is not a wrapper"
+          </a>
+        </div>
+      </section>
+
+      <Divider />
+
       {/* Verify */}
       <section className="px-6 pb-12 max-w-5xl mx-auto">
         <OpHeader scope="verify" op="sha256" args="MANIFEST.sha256" ret="byte-identical kernel" />
@@ -848,6 +1000,58 @@ export default function JarvisOSPage() {
 
       <Divider />
 
+      {/* HIERO primer */}
+      <section className="px-6 pb-12 max-w-5xl mx-auto">
+        <OpHeader scope="format" op="hiero" args="" ret="operator-density memory" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
+          <div>
+            <h3 className="text-xl font-display text-white tracking-[-0.02em] mb-3">
+              Why memory primitives look like operator soup
+            </h3>
+            <p className="text-sm text-white-300 leading-relaxed mb-3">
+              HIERO is the operator-density notation memory primitives are
+              written in. Glyphs like <span className="font-mono text-matrix-400">⇒</span>{' '}
+              <span className="font-mono text-matrix-400">∀</span>{' '}
+              <span className="font-mono text-matrix-400">∃</span>{' '}
+              <span className="font-mono text-matrix-400">×</span>{' '}
+              <span className="font-mono text-matrix-400">⊥</span>{' '}
+              <span className="font-mono text-matrix-400">¬</span>{' '}
+              <span className="font-mono text-matrix-400">→</span> replace prose
+              connectives. One symbol carries what an English sentence carries.
+            </p>
+            <p className="text-sm text-white-300 leading-relaxed mb-3">
+              The shipped <span className="font-mono text-matrix-400">hiero-gate.py</span> enforces
+              density on memory writes — refuses prose-style entries and forces
+              the operator form. The architecture self-enforces, even on its
+              own author.
+            </p>
+            <p className="text-xs text-white-300/80 leading-relaxed">
+              You can ignore HIERO and write prose. The gate will surface a
+              warning. Override or revise — your call.
+            </p>
+          </div>
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              before · prose
+            </div>
+            <div className="text-xs text-white-300/80 italic mb-4 leading-relaxed">
+              "For every partner-facing draft write, the system should scan for
+              em-dashes and surface a warning, but should not block."
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+              after · HIERO
+            </div>
+            <pre className="font-mono text-[11px] text-matrix-300 whitespace-pre-wrap">
+{`∀ partner-facing-write ⇒
+  scan(em-dash) ⇒
+  surface(warning) ¬ block.`}
+            </pre>
+          </div>
+        </div>
+      </section>
+
+      <Divider />
+
       {/* Absorb */}
       <section className="px-6 pb-12 max-w-5xl mx-auto">
         <OpHeader scope="extend" op="absorb" args="<path | url>" ret="other substrates wired in" />
@@ -865,7 +1069,7 @@ export default function JarvisOSPage() {
 
       {/* What it does */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <OpHeader scope="kernel" op="behavior" args="" ret="closed loop · self-compounding" />
+        <OpHeader scope="runtime" op="behavior" args="" ret="closed loop · self-compounding" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {[
             { t: 'Boot screen', d: '8-bit ASCII boot menu fires on every SessionStart. Surfaces protocols, files, gates, philosophy, and "show X" natural-language commands. Live WWWD-corpus stats inline.' },
@@ -876,6 +1080,26 @@ export default function JarvisOSPage() {
             <div key={f.t} className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
               <div className="font-display text-white text-base mb-2">{f.t}</div>
               <div className="text-sm text-white-300">{f.d}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Privacy / local */}
+      <section className="px-6 pb-12 max-w-5xl mx-auto">
+        <OpHeader scope="privacy" op="local_only" args="" ret="your machine, your corpus" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[
+            { tag: 'no telemetry', title: 'Nothing leaves your machine', body: 'The gate-fire log, the priority cache, the corrections, the corpus — all of it lives at ~/.claude/. No phone-home. No analytics. The installer ships zero network code beyond the initial clone.' },
+            { tag: 'no third party', title: 'No accounts, no keys', body: 'JARVIS-OS does not require an API key, an account, or a service login. It runs on your existing Claude Code install and reads/writes local files. You already had everything before you installed.' },
+            { tag: 'inspectable', title: 'Greppable end-to-end', body: 'Every primitive is markdown. Every hook is Python. Every config is JSON. Open them, edit them, fork them, audit them — the system is the file system. The filesystem is the substrate.' },
+          ].map((c) => (
+            <div key={c.title} className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">{c.tag}</div>
+              <div className="font-display text-white text-base mb-2">{c.title}</div>
+              <div className="text-xs text-white-300 leading-relaxed">{c.body}</div>
             </div>
           ))}
         </div>
@@ -1158,6 +1382,286 @@ export default function JarvisOSPage() {
           <div className="font-mono text-[11px] text-matrix-300 break-all">
             $ cp ~/.claude/settings.json.bak-pre-jarvis-os ~/.claude/settings.json
           </div>
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* First month timeline */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="timeline" op="first_month" args="" ret="what to expect" />
+        <p className="text-sm text-white-300 max-w-2xl mb-8 leading-relaxed">
+          The system has phases. Set expectations honestly: day one you have
+          twelve hooks firing on Claude's defaults. By week four you have a
+          measurably tuned cognition gate.
+        </p>
+        <div className="relative">
+          <div
+            className="absolute left-6 top-2 bottom-2 w-px"
+            style={{ background: 'linear-gradient(180deg, rgba(0,255,65,0.5), rgba(0,255,65,0.05))' }}
+          />
+          {[
+            { when: 'Day 1',   sig: 'insufficient-data', body: 'Install. Boot screen renders. WWWD fires on every Write/Edit/Agent with the shipped Will-projection notes. Your corpus is mine — empty of your own corrections.' },
+            { when: 'Week 1',  sig: 'insufficient-data → stable', body: '~30-60 gate-fires. Some corrections logged. Convergence signal still insufficient-data — you need ~20 logged fires before it computes. The boot screen starts showing actual stats.' },
+            { when: 'Week 2',  sig: 'stable', body: 'Convergence flips to stable or drifting. You start noticing where the shipped projections do not match your taste. Time to fork primitive_what-would-will-do.md into your own.' },
+            { when: 'Week 4',  sig: 'improving', body: 'You have edited the WWWD primitive. You have added 2-3 trigger classes. The correction rate drops. Convergence reads improving. The gate is genuinely yours.' },
+            { when: 'Month 3', sig: 'improving · stable', body: 'You absorb one or two other substrates from peers. Your corpus has ~30-50 personal primitives. The system reads as your cognition extension, not as my pack.' },
+          ].map((p, i) => (
+            <motion.div
+              key={p.when}
+              initial={{ opacity: 0, x: -8 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: '-15% 0px' }}
+              transition={{ delay: i * 0.08, duration: 0.35 }}
+              className="relative pl-16 pb-8 last:pb-0"
+            >
+              <div
+                className="absolute left-4 top-1 w-5 h-5 rounded-full border-2 border-matrix-500 bg-black"
+                style={{ boxShadow: '0 0 12px rgba(0,255,65,0.4)' }}
+              />
+              <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-1">
+                {p.when} · convergence: {p.sig}
+              </div>
+              <div className="text-sm text-white-300 leading-relaxed">{p.body}</div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Pack vs full kernel comparison */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="scope" op="pack_vs_kernel" args="" ret="what you get · what's beyond" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="rounded-xl border border-matrix-500/60 bg-matrix-900/15 p-6">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">
+              this install pack · v1.0.0
+            </div>
+            <h3 className="font-display text-white text-xl mb-3">JARVIS-OS</h3>
+            <ul className="space-y-1.5 text-xs text-white-300 font-mono">
+              <li><span className="text-matrix-500">→</span> 12 hooks (Layer 1 + Layer 3)</li>
+              <li><span className="text-matrix-500">→</span> 3 core primitives + MEMORY.md seed</li>
+              <li><span className="text-matrix-500">→</span> install.sh / absorb.sh</li>
+              <li><span className="text-matrix-500">→</span> jarvis-os.yaml manifest spec</li>
+              <li><span className="text-matrix-500">→</span> 8-bit boot screen</li>
+              <li><span className="text-matrix-500">→</span> SHA256 manifest verification</li>
+              <li className="text-white-300/60">~ 78 KB · MIT · installable in one command</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-6">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">
+              the full architecture · WGlynn/JARVIS
+            </div>
+            <h3 className="font-display text-white text-xl mb-3">Full kernel</h3>
+            <ul className="space-y-1.5 text-xs text-white-300 font-mono">
+              <li><span className="text-matrix-500">→</span> 8 layers (hooks → persistence → anti-hall → discipline → meta → agents → apps → fs)</li>
+              <li><span className="text-matrix-500">→</span> 395+ memory files, 1.2 MB corpus, 100% DE-score</li>
+              <li><span className="text-matrix-500">→</span> Subagent overlay (Explore / Plan / Review / etc.)</li>
+              <li><span className="text-matrix-500">→</span> Skill / MCP / scheduled trigger system</li>
+              <li><span className="text-matrix-500">→</span> Sharded TG bot with BFT consensus</li>
+              <li><span className="text-matrix-500">→</span> 60+ canonical papers</li>
+              <li className="text-white-300/60">~ multi-MB · personal / partially NDA-locked / forkable layers</li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-5 text-center">
+          <a
+            href="https://github.com/WGlynn/JARVIS"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 hover:text-matrix-300 border-b border-matrix-900/40 hover:border-matrix-500/60 pb-0.5 transition-colors"
+          >
+            → explore the full 8-layer architecture: WGlynn/JARVIS
+          </a>
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Forward horizon — MindMesh / network effect / defacto OS */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="horizon" op="defacto_os_for_llms" args="" ret="nodes federate → network effect" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="lg:col-span-5">
+            <h3 className="text-2xl font-display text-white tracking-[-0.02em] mb-3">
+              Each install is a node.
+            </h3>
+            <p className="text-sm text-white-300 leading-relaxed mb-4">
+              The current pack runs locally. The next phase federates: each
+              installed JARVIS-OS becomes a node on a decentralized mind
+              network. See the <a href="/mesh" className="text-matrix-400 hover:text-matrix-300 border-b border-matrix-900/40">MindMesh</a> page
+              for the theater — named shards (Apollo / Nyx / Athena / Hermes)
+              coordinating via BFT consensus, sharing knowledge over an
+              encoded substrate.
+            </p>
+            <p className="text-sm text-white-300 leading-relaxed mb-4">
+              Your install publishes primitives + projections (opt-in, per
+              category). The network pulls peer signal into your gate's
+              corpus when the local corpus is thin. The system gets
+              measurably better when you connect — not because your model
+              improved, but because the substrate did.
+            </p>
+            <p className="text-sm text-white-300 leading-relaxed">
+              At enough nodes, the kernel becomes the substrate the LLM
+              ecosystem coordinates on. Linux for servers. JARVIS-OS for
+              language models. The model is interchangeable; the kernel is
+              the network.
+            </p>
+          </div>
+          <div className="lg:col-span-7">
+            <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-6">
+              <GfxNetwork />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[
+            { stage: 'today', title: 'Local-only kernel', body: 'You install. The corpus lives on your machine. No network code in the hot path. This is where the pack ships.' },
+            { stage: 'next',  title: 'Opt-in publishing', body: 'Add a jarvis-os.yaml manifest declaring what categories of your substrate are shareable. Peers absorb selectively.' },
+            { stage: 'later', title: 'Mesh consensus',    body: 'Nodes federate via BFT consensus over substrate updates. Disputed projections resolve via pairwise comparison. The network compounds.' },
+          ].map((c, i) => (
+            <motion.div
+              key={c.stage}
+              initial={{ opacity: 0, y: 6 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-15% 0px' }}
+              transition={{ delay: i * 0.08, duration: 0.3 }}
+              className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5"
+            >
+              <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">stage · {c.stage}</div>
+              <div className="font-display text-white text-base mb-2">{c.title}</div>
+              <div className="text-xs text-white-300 leading-relaxed">{c.body}</div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      <Divider />
+
+      {/* Tokenization — primitives as NFTs + ERC-20 consumables via PsiNet */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <OpHeader scope="market" op="tokenize" args="primitives, projections" ret="NFT · ERC-20 · PsiNet exchange" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-7">
+            <h3 className="text-2xl font-display text-white tracking-[-0.02em] mb-3">
+              Primitives become assets. Projections become consumables.
+            </h3>
+            <p className="text-sm text-white-300 leading-relaxed mb-4">
+              The accreted corpus is not just personal substrate — it is
+              capital. A primitive that catches a real failure mode is worth
+              acquiring. A projection that resolves a recurring decision is
+              worth consuming. Both are tradeable.
+            </p>
+            <p className="text-sm text-white-300 leading-relaxed mb-4">
+              The network ports the Ocean Protocol model into the cognition
+              layer. Unique primitives mint as NFTs — each cognitive pattern
+              is non-fungible because the structural insight is. Projection
+              outputs and gate-fire signals mint as ERC-20 consumables —
+              holding a primitive's datatoken lets your gate consume that
+              primitive's projection logic on the next fire.
+            </p>
+            <p className="text-sm text-white-300 leading-relaxed">
+              Exchange runs over <span className="font-mono text-matrix-400">PsiNet</span>{' '}
+              — our context-exchange protocol. Discover primitives by tag.
+              Acquire the NFT to mint consumables. Consumables burn on use.
+              The substrate has price discovery; the network has revenue
+              attribution; contributors capture the Shapley value of what
+              they encode.
+            </p>
+          </div>
+          <div className="lg:col-span-5">
+            <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-5 space-y-4">
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.30em] text-matrix-400 mb-1">asset · NFT</div>
+                <div className="text-sm text-white font-display">Primitive</div>
+                <div className="text-xs text-white-300 leading-relaxed mt-1">
+                  Unique cognitive pattern. Owned. Forkable. Citation-tracked
+                  on-chain.
+                </div>
+              </div>
+              <div className="h-px bg-matrix-900/40" />
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.30em] text-matrix-400 mb-1">consumable · ERC-20</div>
+                <div className="text-sm text-white font-display">Projection datatoken</div>
+                <div className="text-xs text-white-300 leading-relaxed mt-1">
+                  Fungible right-to-consume. Burns when the gate fires
+                  against that projection. Re-mint by paying the creator.
+                </div>
+              </div>
+              <div className="h-px bg-matrix-900/40" />
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.30em] text-matrix-400 mb-1">venue</div>
+                <div className="text-sm text-white font-display">PsiNet exchange</div>
+                <div className="text-xs text-white-300 leading-relaxed mt-1">
+                  Context-exchange protocol. Tagged discovery, escrow,
+                  attribution. Built on the same VibeSwap commit-reveal
+                  primitives that prevent MEV.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-amber-400 mb-2">
+              tier · private
+            </div>
+            <div className="font-display text-white text-base mb-2">Stays local</div>
+            <p className="text-xs text-white-300 leading-relaxed">
+              NDA-locked content, partner context, secrets, anything tagged{' '}
+              <span className="font-mono text-amber-300">private: true</span>.
+              Never leaves the machine. No tokenization path at the gate
+              layer.
+            </p>
+          </div>
+          <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-purple-400 mb-2">
+              tier · compute-to-data
+            </div>
+            <div className="font-display text-white text-base mb-2">ZK / homomorphic</div>
+            <p className="text-xs text-white-300 leading-relaxed">
+              Useful-but-sensitive primitives publish under Ocean-style
+              compute-to-data: the logic stays encrypted, but the output is
+              queryable. Buyers consume the projection without ever
+              seeing the source.
+            </p>
+          </div>
+          <div className="rounded-xl border border-matrix-500/40 bg-matrix-900/15 p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-2">
+              tier · public
+            </div>
+            <div className="font-display text-white text-base mb-2">Fully tradeable</div>
+            <p className="text-xs text-white-300 leading-relaxed">
+              Reusable primitives (no sensitive coupling) mint as NFTs +
+              ERC-20 consumables openly. The primitive is forkable; the
+              datatoken meters consumption. Citation chain runs on-chain.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-xl border border-matrix-500/40 bg-matrix-900/15 p-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.30em] text-matrix-400 mb-3">
+            full circle · vibeswap rails
+          </div>
+          <h4 className="text-xl font-display text-white tracking-[-0.02em] mb-3">
+            PsiNet runs on VibeSwap commit-reveal.
+          </h4>
+          <p className="text-sm text-white-300 leading-relaxed mb-3">
+            Trading primitives is a market with the same adversaries as trading
+            tokens: MEV bots front-run high-value listings, sandwich tx, extract
+            from honest buyers. The exchange that hosts cognition primitives
+            must resist what the exchange that hosts tokens resists.
+          </p>
+          <p className="text-sm text-white-300 leading-relaxed">
+            PsiNet inherits VibeSwap's commit-reveal batch auction, Fisher-Yates
+            XOR shuffle, and canonical burn-and-mint cross-chain messaging. The
+            MEV-resistant primitive stack we built for token trading becomes
+            the trading rail for the kernel substrate. The loop closes.
+            VibeSwap → JARVIS-OS → MindMesh → PsiNet → VibeSwap.
+          </p>
         </div>
       </section>
 

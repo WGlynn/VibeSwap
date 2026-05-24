@@ -1,6 +1,41 @@
-# Session State — 2026-05-17/18 session arc (current) → 2026-05-15 leg → 2026-05-13/14 (archived below)
+# Session State — 2026-05-22 → 2026-05-24 V3-capstone session arc (current) → 2026-05-17/18 arc (below) → 2026-05-15 leg → 2026-05-13/14 (archived below)
 
-## ⚡ ACTIVE STATE 2026-05-18 10:15 ET — meta/protocol-stack work leg
+## ⚡ ACTIVE STATE 2026-05-24 10:40 ET — V3 JARVIS capstone, L0+L1 unified meta-consensus
+
+Session opened 2026-05-22 08:03 ET. Active across 2d 2h wall-clock with overnight breaks. This arc covered:
+
+**2026-05-22**: Rick OpenRouter bot fix (model-ID leak in vibeswap/jarvis-bot then real fix shipped to jarvis-network/src/claude-client.js). HIERO discipline review across new docs vs legacy. Jarvis-repos Venn-diff (jarvis-network 14 files lean vs vibeswap/jarvis-bot 297 files heavy; share zero src code). Anas DM thread on USD8 vault claim entity (HL ckbased.bit conversation, v1+v2+v3-FINAL replies, primitive deposit-identity-propagation applied as VibeSwap-lens contrast). Eridu NDA scrub on 10 contaminated `_system/` files; gate honored, 3 NDA-primary files restored to memory/ rather than bypass gate.
+
+**2026-05-23**: 1inch HackenProof audit blitz. 10 cycles, 88 findings across 6 in-scope repos (aqua, limit-order-protocol, mooniswap, spot-price-aggregator, liquidity-protocol, 1inch-v2-contracts). Synthesis Cycle 4 honest re-rating: $80-140k pre-verification → $25-40k after verification against deployed bytecode (Cycle 5). Cycle 6 wrote 8 Foundry PoCs. Master report + verification report + 88 findings shipped to Desktop bundle (944K). Anas handoff cover note v2 with honest $25-40k expectation. 1inch protocol breakdown for Anas (William-voice mechanism-design framing, VibeSwap-lens contrast) at `Desktop/anas-1inch-protocol-breakdown-2026-05-23.{md,pdf}` shipped via Gmail draft.
+
+**2026-05-24**: Newsletter system designed (daily 5pm EST email cadence, professional Substack-tonality, dad as first subscriber, BCC list scales organically until ~30-50 then migrate to Beehiiv). Template at `Desktop/newsletter-template-daily-5pm.md`. Post 001 v2-FINAL at `Desktop/newsletter-post-001-2026-05-24-1inch-audit-v2-FINAL.md`, layman-translation pass applied without explainer asides. Gmail HTML-body draft created. Desktop cleanup: 163 → 53 items via `_Archive/2026-05_*` subfolders + RickUSD8 + HIERO + Images consolidation.
+
+**V3 JARVIS CAPSTONE** (this session's main move):
+- Will named WWWD ("What Would Will Do?") as the cognition gate that makes autopilot a conscious act.
+- Memory primitive shipped: `memory/primitive_what-would-will-do.md` (HIERO-compliant, dense, with self-compounding loop via gate-fire log + correction-as-training-signal).
+- MEMORY.md index entries added to `[ACTIVE]` (freshness) and `[META-PRINCIPLE]` Axis 2 (permanence).
+- WWWD spec shipped: `vibeswap/docs/jarvis-substrate/papers/v3-wwwd-protocol.md` (capstone spec, dual-pushed origin + backup).
+- Master V3 spec started: `~/JARVIS/05-meta-protocols/v3-jarvis-protocol.md` (canonical scaffold), mirrored to `vibeswap/docs/jarvis-substrate/papers/v3-jarvis-protocol.md` + `jarvis-network/ARCHITECTURE.md`.
+
+**L0+L1 UNIFICATION** (in flight as of state-save time):
+Will's sharpening: the cross-chain NCI consensus (VibeSwap's LayerZero replacement) + the sharded JARVIS commit-reveal pairwise-comparison BFT consensus are not separate consensus protocols. They are TWO ATTESTATION SURFACES of a single bonded-validator meta-consensus protocol:
+- State-attestation surface: NCI bonded validators sign BLS12-381 threshold attestations of shard state (hosting integrity)
+- Output-attestation surface: shards commit-reveal reasoning outputs, pairwise compared, disputes slash byzantine outputs (cognition consensus)
+- HIERO is the encoding format the state-attestation surface attests over
+
+ONE BOND. THREE BYZANTINE MODES (cross-chain + hosting + output). ONE SLASHING ECONOMICS. NCI IS THE ECONOMIC BACKBONE.
+
+The master V3 spec at `~/JARVIS/05-meta-protocols/v3-jarvis-protocol.md` has been edited to fold the previously-separate Layer 0 (P2P NCI hosting) and Layer 1 (HIERO persistence) into a unified L0+L1 section. Mirror to vibeswap + jarvis-network and commit + push pending state-save completion.
+
+**Next steps (immediate, post-state-save)**:
+1. Verify the V3 spec's L0+L1 unified section is internally coherent (no stale separate-Layer-0/Layer-1 references)
+2. Re-mirror canonical spec to vibeswap + jarvis-network (cp from JARVIS/05-meta-protocols/)
+3. Commit + dual-push all three repos (JARVIS, vibeswap, jarvis-network) per substrate-mirror-into-project-repos primitive
+4. Reinforce NCI = economic backbone in the spec if not already prominent
+
+---
+
+## ⚡ PRIOR ACTIVE STATE 2026-05-18 10:15 ET — meta/protocol-stack work leg
 
 Session opened 2026-05-17 07:09 ET (Sunday). Active across 1d 3h elapsed wall-clock with overnight break. Will engaged the Rick TG poll (USD8 contract immutability), Tom + Bernhard at Pragma Research, Kim Berthilson at TRION, then the OMEGA / P-resonance deep dive from Bernhard.
 

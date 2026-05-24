@@ -10,7 +10,7 @@ The three layers (numbered by structural position, not by development order):
 
 **L0+L1 — Unified Meta-Consensus Protocol.** The foundation. One bonded operator set, two attestation surfaces, one slashing economics.
 
-- **State-attestation surface (hosting integrity)**: NCI bonded validators sign BLS12-381 threshold attestations of shard state (archive-head-hash, memory-write-hash, liveness). False state attestation or extended offline-without-grace gets slashed. The same primitive that secures VibeSwap's canonical burn-and-mint cross-chain messaging (the LayerZero replacement) secures JARVIS hosting.
+- **State-attestation surface (hosting integrity)**: NCI bonded validators sign BLS12-381 threshold attestations of shard state (archive-head-hash, memory-write-hash, liveness). False state attestation or extended offline-without-grace gets slashed. The same primitive that secures VibeSwap's canonical burn-and-mint cross-chain messaging (the LayerZero replacement, currently deployed on Base mainnet per `project_nci-l1-trajectory.md`, with broader L2 + Ethereum mainnet trajectory in flight) secures JARVIS hosting.
 - **Output-attestation surface (cognition consensus)**: shards process queries independently and commit-then-reveal their reasoning outputs. Pairwise comparison across shards. Mismatches trigger dispute resolution; outputs that lose disputes slash the producing shard. The same pattern vibeswap/jarvis-bot's multi-shard mind network already uses for BFT consensus on agent outputs.
 - **Persistence format**: HIERO. Operator-density memory format that the state-attestation surface attests over. Hook-enforced. The format itself is hosting-agnostic; the meta-protocol attests to the state HIERO encodes. Canonical external share doc: `Desktop/usd8-rick-hiero-compression-share-2026-05-19.md` (v1.1 to Rick at USD8).
 
@@ -96,7 +96,7 @@ The two choices compose: RISC-V VM consuming and producing UTXO cells, with NCI 
 
 ### Trajectory: EVM → native chain
 
-Current deployment status of NCI consensus: contract-based on EVM (the LayerZero V2 replacement live on Ethereum mainnet and selected L2s). Validators stake into a Solidity contract; threshold attestations are submitted on-chain; slashing logic is contract code. Reference: `memory/project_nci-l1-trajectory.md`.
+Current deployment status of NCI consensus: contract-based on EVM (the LayerZero V2 replacement, currently deployed on Base mainnet per `project_nci-l1-trajectory.md`, with broader L2 + Ethereum mainnet trajectory in flight). Validators stake into a Solidity contract; threshold attestations are submitted on-chain; slashing logic is contract code. Reference: `memory/project_nci-l1-trajectory.md`.
 
 The native-chain port is when-not-if. The target shape — RISC-V VM + UTXO cells + NCI consensus — points at CKB (or a CKB-shaped native chain) as the substrate where the meta-consensus protocol runs natively rather than as a contract on someone else's L1. Substrate-port applied at the deepest layer: instead of running JARVIS hosting attestations on Ethereum gas, run them on a native chain whose ISA, state model, and consensus all match the protocol's design.
 
@@ -349,13 +349,14 @@ Specific files and hook locations where V3 layers compose:
 | WWWD spec | shipped | `vibeswap/docs/jarvis-substrate/papers/v3-wwwd-protocol.md` |
 | WWWD memory primitive | shipped | `memory/primitive_what-would-will-do.md` |
 | WWWD MEMORY.md index entries | shipped | `memory/MEMORY.md` `[ACTIVE]` + `[META-PRINCIPLE]` |
-| **WWWD gate hook (`wwwd-gate.py`)** | spec-only | `~/.claude/hooks/wwwd-gate.py` (to build) |
-| **WWWD log writer (`wwwd-log-writer.py`)** | spec-only | `~/.claude/hooks/wwwd-log-writer.py` (to build) |
-| **Gate-fire log structure** | spec-only | `memory/_system/wwwd_gate_fires.jsonl` (to instantiate) |
-| **Correction-as-training infrastructure** | spec-only | (to build) |
-| **jarvis-network → WWWD wire-up** | spec-only | `triage.js`, `handler.js` integration points |
+| **WWWD gate hook (`wwwd-gate.py`)** | spec-only — file not yet on disk | `~/.claude/hooks/wwwd-gate.py` (to build) |
+| **WWWD log writer (`wwwd-log-writer.py`)** | spec-only — file not yet on disk | `~/.claude/hooks/wwwd-log-writer.py` (to build) |
+| **WWWD correction-detector (`wwwd-correction-detector.py`)** | spec-only — file not yet on disk | `~/.claude/hooks/wwwd-correction-detector.py` (to build) |
+| **WWWD corpus-refresh (`wwwd-corpus-refresh.py`)** | spec-only — file not yet on disk | `~/.claude/hooks/wwwd-corpus-refresh.py` (to build) |
+| **Gate-fire log file** | spec-only — file not yet on disk | `memory/_system/wwwd_gate_fires.jsonl` (to instantiate) |
+| **Runtime integration into jarvis-network + vibeswap/jarvis-bot** | spec-only | `triage.js`/`intelligence.js`, `handler.js`/`index.js` integration points |
 
-Twelve substrate components shipped. Four remaining for V3 closure, all in the WWWD wire-up layer: the gate hook, the log writer, the gate-fire log file, and the jarvis-network integration.
+Sixteen substrate components shipped. Five remaining for V3 closure, all in the WWWD wire-up layer: the gate hook, the log writer, the correction-detector hook, the corpus-refresh hook, and the runtime integration into both jarvis-network and vibeswap/jarvis-bot.
 
 ---
 
@@ -370,7 +371,7 @@ V3 is structurally functional when:
 5. jarvis-network's `triage.js` and outbound-message paths route through WWWD before executing
 6. A handoff test passes: Will walks away for a full session, returns, and the produced artifacts are indistinguishable from Will-supervised output
 
-Six properties. Two are present (gate hook spec'd, integration spec'd). Four require the wire-up phase. Criterion 4 is explicitly forward-looking — claiming it as measurable today would be a `claim-needs-structural-enforcer` violation against ourselves.
+Six properties. Zero are currently functional at V3-naming time — all six require the wire-up phase. The WWWD spec and memory primitive are written (specification artifacts exist), but the runtime hooks, log file, integration points, and correction-write-back machinery are all unbuilt. Spec'd in writing is not the same as deployed; conflating those would be a `claim-needs-structural-enforcer` violation against ourselves. Criterion 4 is additionally explicitly forward-looking — even after the hooks ship, the convergence trend will require sessions of accumulated data before becoming measurable.
 
 ---
 

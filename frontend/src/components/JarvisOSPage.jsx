@@ -1481,14 +1481,17 @@ export default function JarvisOSPage() {
 
       {/* Forward horizon — MindMesh / network effect / defacto OS */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <OpHeader scope="horizon" op="defacto_os_for_llms" args="" ret="nodes federate → network effect" />
+        <OpHeader scope="horizon" op="defacto_os_for_llms" args="" ret="future · design phase · not yet shipped" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-5">
             <h3 className="text-2xl font-display text-white tracking-[-0.02em] mb-3">
-              Each install is a node.
+              Each install <span className="text-matrix-400">will become</span> a node.
             </h3>
+            <div className="mb-3 inline-block px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 font-mono text-[9px] uppercase tracking-[0.30em] text-amber-300">
+              spec phase · design only · not yet shipped
+            </div>
             <p className="text-sm text-white-300 leading-relaxed mb-4">
-              The current pack runs locally. The next phase federates: each
+              The current pack runs locally. The next phase will federate: each
               installed JARVIS-OS becomes a node on a decentralized mind
               network. See the <a href="/mesh" className="text-matrix-400 hover:text-matrix-300 border-b border-matrix-900/40">MindMesh</a> page
               for the theater — named shards (Apollo / Nyx / Athena / Hermes)
@@ -1542,21 +1545,24 @@ export default function JarvisOSPage() {
 
       {/* Tokenization — primitives as NFTs + ERC-20 consumables via PsiNet */}
       <section className="px-6 pb-16 max-w-5xl mx-auto">
-        <OpHeader scope="market" op="tokenize" args="primitives, projections" ret="NFT · ERC-20 · PsiNet exchange" />
+        <OpHeader scope="market" op="tokenize" args="primitives, projections" ret="future · design phase · spec-only contracts" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-7">
             <h3 className="text-2xl font-display text-white tracking-[-0.02em] mb-3">
-              Primitives become assets. Projections become consumables.
+              Primitives <span className="text-matrix-400">will become</span> assets. Projections <span className="text-matrix-400">will become</span> consumables.
             </h3>
+            <div className="mb-3 inline-block px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 font-mono text-[9px] uppercase tracking-[0.30em] text-amber-300">
+              spec phase · design only · not yet shipped
+            </div>
             <p className="text-sm text-white-300 leading-relaxed mb-4">
               The accreted corpus is not just personal substrate — it is
               capital. A primitive that catches a real failure mode is worth
               acquiring. A projection that resolves a recurring decision is
-              worth consuming. Both are tradeable.
+              worth consuming. Both will be tradeable.
             </p>
             <p className="text-sm text-white-300 leading-relaxed mb-4">
-              The network ports the Ocean Protocol model into the cognition
-              layer. Unique primitives mint as NFTs — each cognitive pattern
+              The design ports the Ocean Protocol model into the cognition
+              layer. Unique primitives will mint as NFTs — each cognitive pattern
               is non-fungible because the structural insight is. Projection
               outputs and gate-fire signals mint as ERC-20 consumables —
               holding a primitive's datatoken lets your gate consume that

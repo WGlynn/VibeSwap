@@ -1,6 +1,37 @@
-# Session State — 2026-05-22 → 2026-05-24 V3-capstone session arc (current) → 2026-05-17/18 arc (below) → 2026-05-15 leg → 2026-05-13/14 (archived below)
+# Session State — 2026-05-22 → 2026-05-24 V3-capstone + JARVIS-OS-ship session arc (current) → 2026-05-17/18 arc (below) → 2026-05-15 leg → 2026-05-13/14 (archived below)
 
-## ⚡ ACTIVE STATE 2026-05-24 10:40 ET — V3 JARVIS capstone, L0+L1 unified meta-consensus
+## ⚡ ACTIVE STATE 2026-05-24 16:01 ET — JARVIS-OS v1.0.0 public release shipped, /jarvis-os download page live
+
+**Arc since 10:40 state-save**:
+
+1. **WWWD hook wiring complete**: 3 WWWD hooks + JARVIS-OS boot screen wired into `~/.claude/settings.json`. PreToolUse `Write|Edit|Agent` matcher; Stop event for correction-detect; SessionStart for corpus refresh + boot screen render. Backup at `~/.claude/settings.json.bak-2026-05-24-pre-wwwd`. Gate-fire log `memory/_system/wwwd_gate_fires.jsonl` populated through the session.
+
+2. **JARVIS-OS boot screen primitive**: 8-bit ASCII boot menu at `~/.claude/hooks/jarvis-os-boot-screen.py` renders Unicode box-drawing (CP437) categories: PROTOCOLS / FILES / GATES / PHILOSOPHY / COMMANDS, plus live WWWD-corpus stats. Memory primitive at `memory/primitive_jarvis-os.md` (HIERO-compliant; renamed "V3 capstone" → "navigation shell" after WWWD gate fired severity-inflation flag on own draft). MEMORY.md `[ACTIVE]` entry added.
+
+3. **JARVIS-OS v1.0.0 public release shipped**: New repo at `https://github.com/WGlynn/jarvis-os` (public). Contents: 12 hooks (4 WWWD + 8 anti-hallucination: hiero / partner-substance / partner-additive / strategic-framing / entity-xref / conflict-detector / em-dash / atomic-reflection), 3 core primitives (WWWD, JARVIS-OS, RSAW) + seed MEMORY.md, `install.sh` (interactive installer with `--dry-run` + settings.json merge + backup), `absorb.sh` (agnostic substrate-absorption tool with namespace-prefixed import + heuristic event-matcher inference), `MANIFEST_SPEC.md` (declarative `jarvis-os.yaml` format for substrate publishers), `MANIFEST.sha256` (byte-for-byte verification), `LICENSE` (MIT). v1.0.0 GitHub release with 78KB zip artifact attached.
+
+4. **Vibeswap /jarvis-os download page shipped**: New `JarvisOSPage.jsx` at `frontend/src/components/`, routed at `/jarvis-os`. 17 op-header sections: install + verify + 5-step animated tutorial + pack contents + HIERO primer + absorb + privacy default + runtime behavior + recursive feedback loop + your-role orchestration + deeper kernel (Turing autopilot + RSI cycles + CKB) + use-to-fullest fluency + first-month timeline + pack-vs-full-kernel comparison + forward horizon (MindMesh nodes, defacto-OS-for-LLMs framing) + tokenization (NFT + ERC-20 consumables + PsiNet exchange + VibeSwap commit-reveal as MEV-resistant trading rail + 3 privacy tiers: private / ZK-compute-to-data / public). 11 animated graphic components. Matrix-green/black terminal aesthetic. Deployed to Vercel prod via manual `vercel --prod --yes`. Live at `https://vibeswap-app.vercel.app/jarvis-os` + `https://frontend-jade-five-87.vercel.app/jarvis-os`. Dual-pushed.
+
+5. **README revised**: Dropped "you do not get my corpus" framing in `~/jarvis-os/README.md` in favor of tokenization model. Pushed.
+
+6. **Newsletter post 002 drafted**: `Desktop/newsletter-post-002-2026-05-24-jarvis-os-ship.md` covers today's ship arc. Gmail draft created — TO field currently `tiptaptangsun@gmail.com` placeholder; Will needs to swap to dad's email and send. Post 001 (1inch audit) still drafted in Gmail from earlier — can ship tomorrow or be recut.
+
+7. **Audit pass on /jarvis-os page**: removed 2 dead imports (`useEffect`, `AnimatePresence`), fixed namespace collision (`kernel.behavior()` → `runtime.behavior()`). Build clean.
+
+8. **Sensitive files moved**: `usd8 password.txt` + `usd8 gmaill password.txt` relocated from `vibeswap/` working tree to `C:\Users\Will\_secrets_local\`.
+
+**WWWD gate working signal**: Gate fired multiple times during today's writes — caught severity-inflation in JARVIS-OS primitive draft, template-resolution decisions, scope-decision moments. Real corrections logged. Self-audit property held: the system audits its own author.
+
+**Next session pending**:
+- Send newsletter post 002 (Will adds dad's email)
+- Decide fate of post 001 (1inch) — recut or queue for 2026-05-25
+- Phase 2.5 of RSAW dispatch could continue if returning to audit work
+- L0+L1 unified meta-consensus spec coherence verification (was pending before this arc; deferred)
+- WWWD runtime integration into jarvis-network triage.js + handler.js (still spec-only)
+
+---
+
+## ⚡ ARCHIVED 2026-05-24 10:40 ET — V3 JARVIS capstone, L0+L1 unified meta-consensus
 
 Session opened 2026-05-22 08:03 ET. Active across 2d 2h wall-clock with overnight breaks. This arc covered:
 

@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./interfaces/IAgentRegistry.sol";
 import "./interfaces/IVibeCode.sol";
 import "./interfaces/IContributionDAG.sol";
+import "../psinet/interfaces/IPrimitiveRegistry.sol";
 
 /**
  * @title AgentRegistry
@@ -24,6 +25,10 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
     event ContributionDAGUpdated(address indexed previous, address indexed current);
     event SoulboundIdentityUpdated(address indexed previous, address indexed current);
     event AuthorizedRecorderUpdated(address indexed recorder, bool previous, bool current);
+    event PrimitiveRegistryUpdated(address indexed previous, address indexed current);
+    event DIDRotationQueued(uint256 indexed agentId, bytes32 oldDIDHash, bytes32 newDIDHash, uint256 executeAfter);
+    event DIDRotationExecuted(uint256 indexed agentId, bytes32 oldDIDHash, bytes32 newDIDHash);
+    event DIDRotationCancelled(uint256 indexed agentId, bytes32 pendingDIDHash);
 
 
     // ============ Genesis — Immutable On-Chain ============
@@ -81,9 +86,31 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
     }
     mapping(uint256 => PendingTransfer) public pendingOperatorTransfers;
 
+    // ============ PsiNet PrimitiveRegistry FK (Cycle 1 Agent A delta) ============
+    // Set via setPrimitiveRegistry() admin path. Used for reverse lookups from
+    // child PrimitiveRegistry contract once deployed. Pre-deploy: address(0) is valid.
+    IPrimitiveRegistry public primitiveRegistry;
 
-    /// @dev Reserved storage gap for future upgrades
-    uint256[50] private __gap;
+    // ============ DID Rotation (Cycle 2 Agent E delta) ============
+    // Reuses OPERATOR_TRANSFER_TIMELOCK (2 days) — no new timelock primitive.
+    // agentDIDHash: agentId → keccak256(ed25519 pubkey) of currently-active DID.
+    // pendingDIDRotations: agentId → queued newDIDHash + executeAfter timestamp.
+    struct PendingDIDRotation {
+        bytes32 newDIDHash;
+        uint256 executeAfter;
+    }
+    mapping(uint256 => bytes32) public agentDIDHash;
+    mapping(uint256 => PendingDIDRotation) public pendingDIDRotations;
+
+    /// @dev Reserved storage gap for future upgrades.
+    /// Decremented from 50 → 46 (Cycle 3 Agent H):
+    ///   -1 for primitiveRegistry (Agent A)
+    ///   -1 for agentDIDHash mapping (Agent E)
+    ///   -1 for pendingDIDRotations mapping (Agent E)
+    ///   -1 buffer (per dispatch instructions)
+    /// @dev SAFETY: Zero mainnet deployments exist at delta-application time
+    ///      (deployments/ contains only .gitkeep). No upgrade history to invalidate.
+    uint256[46] private __gap;
 
     // ============ Initializer ============
 
@@ -519,6 +546,56 @@ contract AgentRegistry is IAgentRegistry, OwnableUpgradeable, UUPSUpgradeable {
         bool prev = authorizedRecorders[recorder];
         authorizedRecorders[recorder] = authorized;
         emit AuthorizedRecorderUpdated(recorder, prev, authorized);
+    }
+
+    /// @notice Set the PsiNet PrimitiveRegistry address (Agent A delta).
+    /// @dev Admin-only. Reverse-lookup target for child PrimitiveRegistry's
+    ///      authorAgentId FK. Pre-deploy: passing address(0) is acceptable.
+    function setPrimitiveRegistry(address newRegistry) external onlyOwner {
+        address prev = address(primitiveRegistry);
+        primitiveRegistry = IPrimitiveRegistry(newRegistry);
+        emit PrimitiveRegistryUpdated(prev, newRegistry);
+    }
+
+    // ============ DID Rotation (Agent E delta) ============
+    // Reuses OPERATOR_TRANSFER_TIMELOCK. Operator EOA queues → timelock → execute.
+    // STUB: full implementation deferred. Method shape committed; bodies guarded
+    // by basic validation only. See Cycle 2 Agent E doc + Cycle 2 META questions.
+
+    /// @notice Queue a DID rotation for an agent. Operator-gated.
+    /// @dev TODO(Cycle 3+): cross-dep on Agent D (WebAuthn co-rotation if
+    ///      D picks attested fire-weight). See agent-E-privacy-revocation-keyrotation.md §C.
+    /// @param agentId Target agent
+    /// @param newDIDHash keccak256 of the new ed25519 pubkey
+    function queueDIDRotation(uint256 agentId, bytes32 newDIDHash) external onlyOperator(agentId) {
+        require(newDIDHash != bytes32(0), "Zero DID hash");
+        bytes32 oldDIDHash = agentDIDHash[agentId];
+        uint256 executeAfter = block.timestamp + OPERATOR_TRANSFER_TIMELOCK;
+        pendingDIDRotations[agentId] = PendingDIDRotation({
+            newDIDHash: newDIDHash,
+            executeAfter: executeAfter
+        });
+        emit DIDRotationQueued(agentId, oldDIDHash, newDIDHash, executeAfter);
+    }
+
+    /// @notice Execute a queued DID rotation after the timelock elapses.
+    /// @dev TODO(Cycle 3+): if hardware-wallet recovery enforced, validate signer.
+    function executeDIDRotation(uint256 agentId) external onlyOperator(agentId) {
+        PendingDIDRotation memory pending = pendingDIDRotations[agentId];
+        require(pending.newDIDHash != bytes32(0), "No pending rotation");
+        require(block.timestamp >= pending.executeAfter, "Timelock active");
+        bytes32 oldDIDHash = agentDIDHash[agentId];
+        agentDIDHash[agentId] = pending.newDIDHash;
+        delete pendingDIDRotations[agentId];
+        emit DIDRotationExecuted(agentId, oldDIDHash, pending.newDIDHash);
+    }
+
+    /// @notice Cancel a pending DID rotation. Operator-gated.
+    function cancelDIDRotation(uint256 agentId) external onlyOperator(agentId) {
+        bytes32 pendingHash = pendingDIDRotations[agentId].newDIDHash;
+        require(pendingHash != bytes32(0), "No pending rotation");
+        delete pendingDIDRotations[agentId];
+        emit DIDRotationCancelled(agentId, pendingHash);
     }
 
     // ============ Internal ============

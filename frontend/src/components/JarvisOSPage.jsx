@@ -1511,6 +1511,24 @@ export default function JarvisOSPage() {
               language models. The model is interchangeable; the kernel is
               the network.
             </p>
+
+            <div className="mt-5 rounded-xl border border-terminal-500/30 bg-terminal-500/5 p-4">
+              <div className="font-mono text-[9px] uppercase tracking-[0.30em] text-terminal-400 mb-2">
+                collab · physics anchor
+              </div>
+              <div className="text-sm text-white font-display mb-2">
+                Active collaboration with Pragma Research / OPH
+              </div>
+              <p className="text-xs text-white-300 leading-relaxed">
+                Observer-Patch Holography (Mueller et al, r1458) supplies the
+                physics-level closure theorem: observers must agree on shared
+                observables, or reality is incoherent. The protocol stack
+                above is the federated-patch-carrier implementation lane for
+                OPH consensus. Architecture map:{' '}
+                <span className="font-mono text-terminal-400">jarvis-os x OPH consensus integration doc</span>{' '}
+                (local; share on request).
+              </p>
+            </div>
           </div>
           <div className="lg:col-span-7">
             <div className="rounded-xl border border-matrix-900/40 bg-gradient-to-br from-black-900/95 to-black-700/95 p-6">

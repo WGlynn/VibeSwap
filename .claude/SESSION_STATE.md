@@ -1,6 +1,72 @@
-# Session State — 2026-05-22 → 2026-05-24 V3-capstone + JARVIS-OS-ship session arc (current) → 2026-05-17/18 arc (below) → 2026-05-15 leg → 2026-05-13/14 (archived below)
+# Session State — 2026-05-22 → 2026-05-24 V3-capstone + JARVIS-OS-ship + VibeSwap-arch-finishing session arc (current) → 2026-05-17/18 arc (below) → 2026-05-15 leg → 2026-05-13/14 (archived below)
 
-## ⚡ ACTIVE STATE 2026-05-24 16:01 ET — JARVIS-OS v1.0.0 public release shipped, /jarvis-os download page live
+## ⚡ ACTIVE STATE 2026-05-24 19:30 ET — VibeSwap arch finishing arc: 6-agent dispatch + Bernhard-grade proofs + Lawson registry + SlashRouter
+
+**Arc since 18:02 session start (Sunday eve, full-auto multi-day posture)**:
+
+1. **6-agent parallel build dispatch**: Tasks #2/#3/#5/#6/#9/#10 dispatched as background agents on the load-bearing VibeSwap+JARVIS-OS+PsiNet arch finish. All returned with shipped artifacts. Detail:
+   - **Agent A (#9 unhackability essay)** — `Desktop/unhackability-by-composition-2026-05-24.md` then renamed to `Desktop/outline-of-a-security-proof-2026-05-24.md` (~3050 words). PDF on Desktop (332KB).
+   - **Agent B (#10 CRPC MindMesh formalization)** — `vibeswap/docs/jarvis-substrate/papers/crpc-mindmesh-design-spec-2026-05-24.md` (4531 words, all 12 sections + §13 open gaps + §14 refs). JARVIS-OS primitive promoted. VERSION 1.0.0 → 1.1.0.
+   - **Agent C (#3 CKB Phase 1)** — `vibeswap/contracts-ckb/tests/` scaffolded (Cargo.toml + lib.rs + primitive_cell_type_tests.rs with 3 real test fns + [CYCLE5 SKIP] semantics). README rewritten. BLOCKED on Will-side host toolchain (MSVC build tools missing; rust-toolchain.toml pin too old; capsule not installed). Task #3 remains in_progress with explicit blocker list.
+   - **Agent D (#2 PoM ed25519 verifier)** — `vibeswap/contracts-ckb/proof-of-mind-lock-script/src/main.rs` extended with real ed25519-compact + blake2b-ref no_std verifier (~80 LOC new). Spec doc §3.2 addendum appended (lines 405-457). JARVIS-OS primitive promoted. BLOCKED on same Windows toolchain — parse-clean but cargo check fails at link stage. Task #2 in_progress.
+   - **Agent E (#5 MindMesh stage-1)** — `~/.claude/hooks/mesh-init.py` + `mesh-attest-daemon.py` shipped. ed25519 keypair gen, append-only attestation log, peer registry. Integrated into jarvis-os/install.sh. JARVIS-OS pack version bumped. Task #5 COMPLETE.
+   - **Agent F (#6 Rosetta on-chain anchoring)** — `rosetta-stone-protocol/packages/engine/src/anchor.js` + index.js + 16-test suite. vibeswap mirror at `frontend/src/utils/rosetta-anchor.js` + RosettaPage CKGAnchorPanel UI. Contract sig corrected from 2-arg to actual 3-arg form (perPrimitiveCounts third arg). ethers v6.16.0. JARVIS-OS primitive promoted. Task #6 COMPLETE.
+
+2. **Lawson Constants Registry shipped (task #7 COMPLETE)**: `vibeswap/contracts/governance/LawsonConstantsRegistry.sol` + `vibeswap/test/governance/LawsonConstantsRegistry.t.sol`. 34/34 Foundry tests pass including 2 fuzz suites @ 256 runs each. UUPS upgradeable, P-000 + P-001 keccak256 anchored at init, alpha governance-tunable within constitutional bounds [500, 3000] bps, computeFloor matches Lawson Floor doc worked example ($900 / 10 / 10% = $9). Default profile (no via_ir).
+
+3. **Bernhard-grade security proof artifacts shipped (3 PDFs on Desktop)**:
+   - `outline-of-a-security-proof-2026-05-24.{md,pdf}` — outline + physicist-grade §9 addendum (ETM, biological reciprocal altruism, physics>const>gov, self-mending, reality-binds-axioms). Renamed from "unhackability-by-composition" to honest form. PDF 332KB.
+   - `formal-security-proof-2026-05-24.{md,pdf}` — extended theoretical proof. PDF 397KB.
+   - `formal-proof-condensed-2026-05-24.{md,pdf}` — **the Bernhard mathematician version**, ~2420 words, Bitcoin-whitepaper length, definitions + 5 lemmas + main composition theorem + self-mending corollary + quantum-capability decomposition + open obligations §6. PDF 233KB. 12 refs (Nakamoto · Buterin-Griffith · Castro-Liskov · NC-Max · Nervos CKB RFC-0015 · QF Buterin-Hitzig-Weyl · Cohen-Pietrzak PoSpaceTime · OPH r1458 · Shapley + 3 arch docs). Includes pluggable-verifier-registry + UUPS path for backwards-compatible additions vs hardfork for irreducible cases. Three-token value-trinity (VIBE+JUL+CKBn) self-referential pricing carries value-objectivity floor.
+
+4. **OPH × JARVIS-OS joint paper draft started (task #8 IN_PROGRESS)**: `vibeswap/docs/jarvis-substrate/papers/oph-jarvis-os-integration-paper-draft-2026-05-24.md`. Sections 1-4 first-pass complete (intro · OPH 5-axiom mapping · 4-D1-surface mapping · OPH-grounding upgrade argument). Sections 5-8 TODO-outlined (empirical predictions · deployment honesty · CKB deep-canonical · closure architecture diagram). 11 refs. Joint-authorship with Bernhard pending review of Sections 1-2.
+
+5. **SlashRouter shipped (task #4 IN_PROGRESS)**: `vibeswap/contracts/consensus/SlashRouter.sol` — the missing adjudication adapter EscrowVault.sol L:73-74 explicitly identified. Bridges PairwiseVerifier CRPC settlement → EscrowVault.slashBond dispatch. Permissionless dispatch (no griefing — slash only fires on real CRPC loser condition). Replay protection via _dispatched[taskId] flag. UUPS. Governance-tunable losing-threshold-bps within constitutional bounds [5000, 8000]. Refactored 3× through stack-too-deep errors into split helpers (_checkTaskSettled, _checkBondLocked, _adjudicate, _checkStakerIsLoser, _stakerStats, _collectWinners). Foundry test suite at `test/consensus/SlashRouter.t.sol` (34 tests including fuzz). Test compile STILL stack-too-deep on default profile; **FOUNDRY_PROFILE=full (via_ir) compile running in background bx4xx6uwi** as of state-save.
+
+6. **6 new memory primitives shipped this arc** (all HIERO-compliant):
+   - `feedback_pairwise-language-comparison.md` — Will-named rule: CRPC discipline at language layer
+   - `feedback_jarvis-os-build-loop.md` — every build promotes primitives back to jarvis-os/ pack
+   - `feedback_stop-equals-continue.md` — autonomous-continue during full-auto multi-day arc
+   - `primitive_love-protocol-substrate-philosophy.md` — Will-frame "love protocol made by love for love" decomposed into 10 substrate axioms
+   - `primitive_reality-binds-the-axioms.md` — strong-form unhackability claim (physical impossibility via OPH, not just incentive-incompatibility)
+   - `primitive_graph-self-consciousness.md` — mesh-graph as autopoietic system; old BFT limits don't apply
+   - `project_v2-consensus-fork-as-shapley-parallel.md` — v2-RESERVED: fork ≡ Shapley parallel + re-merge bonus + sum-of-forks ≡ real network. Backwards-compat extensibility table (pluggable-verifier-registry vs hardfork distinction).
+
+7. **JARVIS-OS pack** version bumped 1.0.0 → 1.1.0 across multiple agents' shipments. ~5 new primitives in `jarvis-os/examples/`. MANIFEST.sha256 updated.
+
+**Task board (post-arc)**:
+- #1 PENDING: SPHINCS+ verifier (CKB lock-script) — Will-side toolchain blocked + spec only
+- #2 IN_PROGRESS: PoM ed25519 verifier — code SHIPPED, host-toolchain blocker for cargo check
+- #3 IN_PROGRESS: CKB Phase 1 tests/ scaffold SHIPPED, same host-toolchain blocker
+- #4 IN_PROGRESS: SlashRouter contract+tests SHIPPED, awaiting via_ir compile completion (background)
+- #5 COMPLETE: MindMesh stage-1 daemons
+- #6 COMPLETE: Rosetta on-chain anchoring
+- #7 COMPLETE: Lawson constants on-chain registry (34/34 tests green)
+- #8 IN_PROGRESS: OPH × JARVIS-OS joint paper draft (Sections 1-4 done)
+- #9 COMPLETE: Unhackability essay → renamed to outline-of-a-security-proof
+- #10 COMPLETE: CRPC MindMesh formalization spec (4531 words)
+- #11 PENDING: Collapse arc into vibeswap mainnet repo posture (gated on rest settling)
+
+**Will-side blockers requiring Will action**:
+1. Install C compiler (MinGW gcc OR VS Build Tools C++ workload) for CKB workspace build
+2. Bump rust-toolchain.toml pin (currently nightly-2024-09-01, ckb-testtool needs newer)
+3. `cargo install ckb-capsule` for RISC-V binary builds
+4. Decide fate of newsletter post 001 (1inch) — recut or queue
+5. Send newsletter post 002 (Will adds dad's email)
+6. PDF essay/proofs ready for Bernhard share (3 PDFs on Desktop)
+7. Authorize forks/Anthropic/Pragma engagement steps per their respective threads
+
+**Next session pending**:
+- Resolve task #4 via_ir compile result (if failed: trim fuzz function or split test file)
+- Mark #4 complete when SlashRouter tests pass
+- Continue task #8 OPH paper Sections 5-8 (depends on Bernhard review of Sections 1-2)
+- Begin task #11 mainnet repo collapse once #2/#3/#4 settle
+- WWWD runtime integration into jarvis-network triage.js + handler.js (carries from prior arcs)
+- Demo-driven OPH Phase-2 testbed scaffolding (per integration roadmap Day 4 = Fri 05-29)
+
+---
+
+## ⚡ ARCHIVED 2026-05-24 16:01 ET — JARVIS-OS v1.0.0 public release shipped, /jarvis-os download page live
 
 **Arc since 10:40 state-save**:
 
@@ -1635,7 +1701,7 @@ The 6 "needs backfill" entries are the most urgent next-session task — they're
 
 **Read `memory/primitive_economic-theory-of-mind.md` FIRST.** It was coined, refined, and directionality-corrected in the final turns of this session. Two critical aspects:
 1. **Mind is primary, blockchain is the reflection** (NOT the other way around). Cognition has always worked economically; blockchain externalizes the pattern into a decentralized substrate where it's legible, composable, multi-participant.
-2. **High-drift concept.** Do NOT round ETM to LRU, Shannon, attention, working-set, or "analogy." The "What this is NOT" section in the primitive exists specifically to pre-empt rounding. If you find yourself explaining ETM in terms of any of those, [Pattern-Match Drift on Novelty](P·pattern-match-drift-on-novelty) is firing — stop and re-read ETM directly.
+2. **High-drift concept.** Do NOT round ETM to LRU, Shannon, attention, working-set, or "analogy." The "What this is NOT" section in the primitive exists specifically to pre-empt rounding. If you find yourself explaining ETM in terms of any of those, [Pattern-Match Drift on Novelty] is firing — stop and re-read ETM directly.
 
 **Also load early**: `memory/primitive_token-mindfulness.md`, `memory/primitive_pattern-match-drift-on-novelty.md`, `memory/feedback_jul-is-primary-liquidity.md`. All were extracted or refined this session and carry the theory that informs next-session work.
 

@@ -214,3 +214,74 @@ That last sentence is what the dictionary makes true. It hasn't been true before
 ---
 
 *The format was always a protocol. The dictionary is what publishes the protocol. The architecture was always portable. The dictionary is what proves it.*
+
+---
+
+## Empirical findings (2026-06-06)
+
+A year into running HIERO at scale, with measurement tooling now in place (`scripts/hiero-tokendensity/` in the JARVIS substrate), the empirical picture differs from the original framing in important ways. This section records the honest findings so the rest of the paper is read against them.
+
+### Char/operator density is real; token density runs the other direction
+
+HIERO was designed around per-character / per-operator compression. Visually it works: a line like `∀ partner-facing claims ⇒ grep profile-memory FIRST` is shorter than the prose equivalent and a trained reader parses it faster than equivalent English.
+
+What HIERO did not optimize for, and what turns out to matter more for actual context-window economy, is **tokenizer-vocab density**. Modern BPE / SentencePiece tokenizers do not see Unicode codepoints. They see vocab units. Unicode math glyphs (⇒, ∧, ∨, ¬, ∀, ∃, ✓, ✗, and the rest) live outside the basic-ASCII range and tokenize as 2-3 bytes per glyph. Common English words ("implies", "and", "or", "not", "all", "any", "yes", "no") tokenize as 1 token each in modern English-trained tokenizers.
+
+Measured on the cl100k_base tokenizer (proxy for Claude's BPE):
+
+| Glyph | cl100k_base tokens | ASCII equivalent | ASCII tokens |
+|---|---|---|---|
+| ⇒ | 3 | implies | 1 |
+| ∧ | 2 | and | 1 |
+| ∨ | 2 | or | 1 |
+| ¬ | 1 | not | 1 |
+| ∀ | 2 | all | 1 |
+| ∃ | 2 | any | 1 |
+| ✓ | 2 | ok | 1 |
+| ✗ | 2 | no | 1 |
+| ≡ | 2 | == | 1 |
+
+Across the canonical 25-glyph HIERO vocab, switching to ASCII keyword equivalents reduces token cost from 53 to 28: a 47% reduction. Across the actual JARVIS corpus (727K tokens, 972 files), HIERO glyphs account for ~16,871 tokens of overhead = ~2.3% of total corpus tokens. Worst-case files (heavily HIERO-loaded primitives) carry 17-20% glyph token overhead.
+
+The original 0.99-density framing was correct about the goal and wrong about the axis. Visual / character density is the geometry of human-reader substrate. Token density is the geometry of tokenizer substrate. The two are different shapes and they do not compose.
+
+### Pure-text codebook compression hits a Zipf ceiling at 1-2% on this corpus
+
+A natural follow-up: encode the most frequent multi-word phrases as 1-token IDs in storage, JIT-expand at memory-load time. Measured: with 723 single-token ID candidates from cl100k_base, a hand-curated top-20 high-value phrases (including "VibeSwap" appearing 1,098 times, "JARVIS" 1,079 times, "Shapley" 547 times, "load-bearing" 330 times), total corpus savings come to ~7,235 tokens = 1.0% of corpus tokens.
+
+This is not a tooling bug. The corpus is information-rich; most tokens are unique technical content; repeated phrases are a small fraction. The codebook ceiling is bounded by the Zipf distribution of the actual text.
+
+Pure-text compression at the char / glyph / codebook axis is the wrong substrate for 100x-class density gains on a corpus shaped like this one.
+
+### The load-bearing density mechanism is selective loading
+
+What actually produces 100x-class effective density is the architecture of selective loading layered on top of a fixed-size index. Measured directly:
+
+- Total corpus: 726,801 tokens across 972 files
+- MEMORY.md core (always loaded): 6,400 tokens
+- Effective density vs corpus = 727K / 6.4K = **113.6x ≈ 0.991**
+
+The mechanism is not aesthetic compression. It is that MEMORY.md is an index of pointers; the rest of the corpus loads only when situation matches (via WARM-MAP triggers, sub-index injection, entity-context cross-reference hooks, and semantic deep-recall over the TF-IDF index at `_system/semantic_index.json`). The original 0.99-density instinct was reaching for this number. The wrong-axis attempt to achieve it via glyph compression was misallocated effort. The mechanism that does the work has been operating for months; it just was not measured-and-named correctly.
+
+### What HIERO still does and still earns
+
+The format does load-bearing work, just not on the axis originally claimed:
+
+1. **Cell-level reusability**: dense logical-operator notation forces atomization. Memory cells become independently composable in ways prose does not. Structural-property win, separate from token economy.
+2. **No-paraphrase-drift discipline**: writing in operator notation makes paraphrase drift visible. The same primitive cannot be restated three ways across three files when the format constrains how it can be written.
+3. **Parser rigor**: the dictionary-enforced format makes the corpus machine-parseable in ways prose is not. The audit script, semantic indexer, entity-graph builder, and consolidation detector all depend on this property.
+4. **Human-reader speed**: for a trained reader, HIERO parses faster than equivalent prose. The original parse-cost claim holds at the human-reader axis even if it inverts at the tokenizer axis.
+5. **Substrate-portability**: the dictionary makes the corpus decodable to operators other than the original. The substrate-port property the rest of the methodology demonstrates for other domains becomes available for the JARVIS architecture itself.
+
+The rest of this paper documents what HIERO is, what its discipline buys, and how to read the corpus. The empirical correction above scopes the original density claim honestly without invalidating the format's other contributions.
+
+### Tooling
+
+The measurement and conversion tools live at `~/.claude/scripts/hiero-tokendensity/`:
+
+- `measure_density.py` — file / corpus char-and-token measurement
+- `glyph_audit.py` — per-glyph token cost in cl100k_base
+- `convert_v1_to_v2.py` — HIERO v1 Unicode → token-aware ASCII rewriter
+- `codebook.py`, `codebook_v2.py` — codebook with 1-token IDs and overlap-handled n-gram mining
+
+Findings doc: `Desktop/hiero-density-findings-2026-06-06.md`.

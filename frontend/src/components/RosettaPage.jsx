@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
+import { anchorCKGLog, previewCKGAnchor } from '../utils/rosetta-anchor'
 import {
   LEXICONS,
   TEN_COVENANTS,
@@ -48,6 +49,7 @@ const CANON_COLORS = {
   usd8:     '#06b6d4', // cyan — Cover Pool stablecoin liquidity
   amd:      '#8b5cf6', // violet — Augmented Mechanism Design (math-enforced fairness)
   agov:     '#dc2626', // red — Augmented Governance (capture-resistant hierarchy)
+  oph:      '#34d399', // emerald — Observer-Patch Holography (Müller / Pragma — 4-substrate convergence partner canon)
 }
 const CANON_IDS = Object.keys(CANON_COLORS)
 
@@ -5186,6 +5188,184 @@ function MobileBottomNav() {
   )
 }
 
+// ============ CKG Anchor Panel — OPH consensus surface 4 ============
+// Wires the CKG log into PrimitiveRegistry.anchorCitations() merkle roots.
+// Translation citations become record-algebra entries with (ε, δrec)
+// stability bounds. See:
+//   - contract: vibeswap/contracts/psinet/PrimitiveRegistry.sol L191
+//   - oph map:  Desktop/jarvis-os-x-oph-consensus-integration-2026-05-24.md §"Ref [2]"
+//
+// Three states:
+//   - env-var unset → "Contract not deployed on this network" (honest)
+//   - log empty     → "no entries to anchor"
+//   - signer ready  → preview gas → user signs → tx hash + epoch root
+// ====================================================================
+
+function CKGAnchorPanel({ logLength }) {
+  // External wallet exposes ethers.Signer directly. Device wallet (WebAuthn)
+  // does not — it provides signMessage / signTransaction only, no Signer
+  // shape. Anchor flow needs Signer.sendTransaction + estimateGas, so we
+  // gate on externalSigner only. Device-wallet anchoring is CYCLE5 work.
+  const { signer: externalSigner } = useWallet()
+  const { isConnected: deviceConnected } = useDeviceWallet()
+  const signer = externalSigner
+
+  const registryAddr = typeof import.meta !== 'undefined'
+    ? import.meta.env?.VITE_PRIMITIVE_REGISTRY_ADDR
+    : undefined
+
+  const [preview, setPreview] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [receipt, setReceipt] = useState(null)
+  const [error, setError] = useState(null)
+
+  const runPreview = useCallback(async () => {
+    if (!signer) { setError('connect a wallet first'); return }
+    setError(null); setReceipt(null); setPreviewing(true)
+    try {
+      const p = await previewCKGAnchor(signer)
+      setPreview(p)
+    } catch (e) {
+      setError(e?.message || String(e))
+      setPreview(null)
+    } finally {
+      setPreviewing(false)
+    }
+  }, [signer])
+
+  const runAnchor = useCallback(async () => {
+    if (!signer) { setError('connect a wallet first'); return }
+    setError(null); setReceipt(null); setSubmitting(true)
+    try {
+      const r = await anchorCKGLog(signer)
+      setReceipt(r)
+      setPreview(null)
+    } catch (e) {
+      setError(e?.message || String(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }, [signer])
+
+  const opSig = 'text-[10px] font-mono font-bold text-matrix-400 uppercase tracking-[0.18em]'
+  const opSub = 'text-[9px] font-mono text-black-500 uppercase tracking-wider mt-0.5 mb-3'
+  const btnCls = 'px-3 py-1.5 rounded-md text-[11px] font-mono font-bold uppercase tracking-[0.15em] bg-matrix-900/50 border border-matrix-700/60 text-matrix-300 hover:bg-matrix-800/60 hover:border-matrix-500 hover:text-matrix-200 transition-all disabled:opacity-25 disabled:cursor-not-allowed'
+
+  // Honest deployment state — no theater
+  const notDeployed = !registryAddr
+  const noWallet = !signer
+  const emptyLog = logLength === 0
+
+  return (
+    <div className="mb-4 rounded-lg border border-matrix-900/40 bg-black-900/70 p-4 transition-shadow hover:shadow-[0_0_24px_-12px_rgba(0,255,65,0.4)]">
+      <div className={opSig}>rosetta.anchorEpoch(epochId) → bytes32</div>
+      <div className={opSub}>oph surface 4 · record algebra · ε-stability</div>
+
+      {notDeployed ? (
+        <div className="text-[11px] font-mono text-amber-400 border-l-2 border-amber-700/50 pl-3 py-1">
+          ⚠ Contract not deployed on this network
+          <div className="text-[10px] text-black-500 mt-1 normal-case tracking-normal">
+            set <span className="text-amber-300">VITE_PRIMITIVE_REGISTRY_ADDR</span> to enable anchoring
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-3">
+            <button
+              onClick={runPreview}
+              disabled={noWallet || emptyLog || previewing || submitting}
+              className={btnCls}
+            >
+              {previewing ? 'Computing…' : 'Preview Root →'}
+            </button>
+            <button
+              onClick={runAnchor}
+              disabled={noWallet || emptyLog || submitting || !preview}
+              className={btnCls}
+            >
+              {submitting ? 'Awaiting Signature…' : 'Anchor This Epoch →'}
+            </button>
+          </div>
+
+          {noWallet && deviceConnected && (
+            <div className="text-[10px] font-mono text-amber-400 mb-2">
+              :: device wallet active — anchor flow requires an external signer (MetaMask etc) for now
+            </div>
+          )}
+          {noWallet && !deviceConnected && (
+            <div className="text-[10px] font-mono text-black-500 mb-2">
+              :: connect wallet (header) to compute root + sign anchor tx
+            </div>
+          )}
+          {emptyLog && !noWallet && (
+            <div className="text-[10px] font-mono text-black-500 mb-2">
+              :: CKG log empty — run a compose / register-universal op first
+            </div>
+          )}
+
+          {preview && !receipt && (
+            <div className="rounded-md border border-matrix-900/60 bg-black-700/40 p-3 mb-2 space-y-1 text-[10px] font-mono">
+              <div className="text-matrix-400 uppercase tracking-[0.18em] text-[9px] mb-1">preview</div>
+              <div>
+                <span className="text-black-500">root: </span>
+                <span className="text-matrix-300 break-all">{preview.root}</span>
+              </div>
+              <div>
+                <span className="text-black-500">epochId: </span>
+                <span className="text-white">{preview.epochId.toString()}</span>
+                <span className="text-black-600"> · </span>
+                <span className="text-black-500">leaves: </span>
+                <span className="text-white">{preview.leafCount}</span>
+              </div>
+              <div>
+                <span className="text-black-500">gas estimate: </span>
+                <span className="text-white">{preview.gasEstimate.toString()}</span>
+                {preview.gasEstimate === 0n && !preview.alreadyAnchored && (
+                  <span className="text-amber-400"> · likely UnauthorizedAnchorer</span>
+                )}
+              </div>
+              {preview.alreadyAnchored && (
+                <div className="text-amber-400">⚠ this epoch already anchored on-chain</div>
+              )}
+            </div>
+          )}
+
+          {receipt && (
+            <div className="rounded-md border border-matrix-700/60 bg-matrix-900/20 p-3 mb-2 space-y-1 text-[10px] font-mono">
+              <div className="text-matrix-300 uppercase tracking-[0.18em] text-[9px] mb-1">✓ anchored</div>
+              <div>
+                <span className="text-black-500">tx: </span>
+                <span className="text-matrix-300 break-all">{receipt.txHash}</span>
+              </div>
+              <div>
+                <span className="text-black-500">root: </span>
+                <span className="text-matrix-300 break-all">{receipt.root}</span>
+              </div>
+              <div>
+                <span className="text-black-500">block: </span>
+                <span className="text-white">{receipt.blockNumber}</span>
+                <span className="text-black-600"> · </span>
+                <span className="text-black-500">gas: </span>
+                <span className="text-white">{receipt.gasUsed.toString()}</span>
+                <span className="text-black-600"> · </span>
+                <span className="text-black-500">epoch: </span>
+                <span className="text-white">{receipt.epochId.toString()}</span>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="text-[10px] font-mono text-amber-400 border-l-2 border-amber-700/50 pl-3 py-1 break-words">
+              ✗ {error}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ============ CKG Lab — Compiled Knowledge Graph Operations ============
 // Visible UI surface for the CKG ops exported from rosetta-engine.js.
 // Five panels: discoverGaps · composeLexicon · lexiconSimilarity · lexiconShapley · registerUniversal.
@@ -5553,6 +5733,9 @@ function CKGLab() {
           </div>
         )}
       </div>
+
+      {/* On-chain Anchor — OPH consensus surface 4 */}
+      <CKGAnchorPanel logLength={log.length} />
 
       {/* CKG Log */}
       <div className="rounded-lg border border-black-800 bg-black-900/80 p-3">

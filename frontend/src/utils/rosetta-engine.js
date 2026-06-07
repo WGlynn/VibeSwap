@@ -646,6 +646,51 @@ export const LEXICONS = {
     },
   },
 
+  // ── OPH (Observer-Patch Holography) — partner canon ─────────────────────────
+  // Müller et al, r1458 release 2026-05-24. Stub lexicon — Bernhard's full
+  // concept graph export pending. When his JSON lands, expand `concepts` to
+  // include the cross-domain bridges (Bourdieu/Jung/Tegmark + sociology /
+  // politics / economics edges) he's already drawn.
+  oph: {
+    domain: 'Observer-Patch Holography',
+    concepts: {
+      observer_patch:       { universal: 'bounded_context',          desc: 'A finite local algebra + state assigned to a connected screen patch. An observer sees only their patch and nearby overlaps.' },
+      overlap_consistency:  { universal: 'shared_truth_constraint',  desc: 'Where two patch descriptions overlap, they must agree on observables. The load-bearing axiom of OPH.' },
+      mismatch:             { universal: 'conflict_state',           desc: 'Two observer patches disagree on a shared observable. Triggers repair. Sociology calls it conflict; psychology, dissonance.' },
+      record:               { universal: 'persistent_state',         desc: 'Stable parts of a patch that other patches can verify. Memory, archive, law, myth, habit, trauma, inscription.' },
+      repair:               { universal: 'corrective_action',        desc: 'The local-fit contract that brings mismatched overlaps back into agreement. Interpretation, therapy, negotiation, ritual, education, governance.' },
+      holonomy_defect:      { universal: 'unreconcilable_loop',      desc: 'A cycle of beliefs/norms that cannot be globally reconciled. Mathematically: nontrivial element of the cohomology class qΣ.' },
+      modular_flow:         { universal: 'emergent_ordering',        desc: 'Observer-subjective time emerges from modular flow on screen caps. Lorentz kinematics is the continuum limit.' },
+      generalized_entropy:  { universal: 'least_biased_inference',   desc: 'Recoverable entropy at fixed cap. Supplies collar-recovery and focusing structure. The gravity-branch ingredient.' },
+      maxent:               { universal: 'least_biased_inference',   desc: 'Local maximum-entropy state compatible with finite constraint data. Selects stable realized states under refinement.' },
+      mar:                  { universal: 'foundational_axiom',       desc: 'Minimal Admissible Realization. Selects the simplest low-energy sector compatible with consistency constraints.' },
+      patch_federation:     { universal: 'distributed_observer_field', desc: 'The full screen viewed as a network of mutually-overlapping local patches. Society is a patch federation; markets are too.' },
+      collar:               { universal: 'boundary_buffer',          desc: 'The interface region where two patches overlap. Records, repair operators, and synchronization data live here.' },
+      carried_remainder:    { universal: 'unresolved_load',          desc: 'When overlap repair is imperfect, the unresolved work persists as a remainder. In the cosmology branch, gravitates as dark-matter-like stress.' },
+      consensus_quotient:   { universal: 'shared_truth_constraint',  desc: 'The observable-equivalence quotient: many microscopic representatives can coexist, but the public terminal state is unique on the observable surface.' },
+      checkpoint:           { universal: 'persistent_state',          desc: 'Observer-facing record algebra + accessible local state + future update schedule + overlap interface data. Enables ε-accurate restoration after disruption.' },
+      pixel_ratio_P:        { universal: 'fixed_point_anchor',       desc: 'The local screen-cell area in Planck units. Fixed by simultaneous outer (geometric detuning above ϕ) and inner (electromagnetic observation scale) readings.' },
+      screen_capacity_Nscr: { universal: 'system_load_ceiling',      desc: 'Global de Sitter horizon entropy. Sets the cosmological constant Λ = 3π/(G·Nscr).' },
+      // Cross-domain bridges (sketch — full edges to land from Bernhard's graph export)
+      bourdieu_habitus:     { universal: 'persistent_state',         desc: 'Bourdieu\'s habitus as embodied attractor geometry. The patch-local stable record set that shapes future repair moves.' },
+      jung_archetype:       { universal: 'persistent_state',         desc: 'Jungian archetypes as persistent symbolic attractors across patches in the cultural patch federation.' },
+      tegmark_universe:     { universal: 'foundational_axiom',       desc: 'Tegmark\'s Mathematical Universe Hypothesis. OPH reframes it: the universe is what the consensus protocol computes from observer-overlap consistency.' },
+      // ─ Added 2026-05-24 from live graph at idea-graph-scribe.lovable.app (html-parse) ─
+      coherence_radius:     { universal: 'field_extent',             desc: 'Community, scene, discourse field, media network. Spatial/social range over which patch fields remain mutually coherent.' },
+      gauge_freedom:        { universal: 'representational_equivalence', desc: 'Different descriptions preserving the same shared observables. Multiple legitimate framings yielding identical public truth.' },
+      overlap:              { universal: 'shared_truth_constraint',  desc: 'Shared language, norm, ritual, interface, contract, boundary object. The intersection surface where two patches must agree.' },
+      local_field:          { universal: 'ambient_context',          desc: 'Social atmosphere, ideology, mood, vibe, symbolic environment. The continuous medium around a patch.' },
+      fixed_point:          { universal: 'stable_equilibrium',       desc: 'Stable self, institution, worldview, meaning, identity, equilibrium. The configuration that re-emerges as consensus solution under repair.' },
+      karma_functional:     { universal: 'time_integrated_outcome',  desc: 'Time-integrated symphony of an observer\'s trajectory. Mathematical core of OPH ethics.' },
+      symphony_dysphony:    { universal: 'interference_pattern',     desc: 'Constructive vs destructive interference between observer patches. Literal wave physics, not metaphor.' },
+      karma_engine:         { universal: 'judgment_mechanism',       desc: 'Physical mechanism by which permanent records + portable patterns + future observers make judgment inevitable.' },
+      memetic_evolution:    { universal: 'selection_process',        desc: 'Reality as natural selection of data patterns across the holographic substrate. No fundamental distinction between particle, cell, and idea.' },
+      parasitic_memes:      { universal: 'extraction_pattern',       desc: 'Patterns with no patch of their own that survive by hijacking host record algebras. Attention-economy failure mode.' },
+      self_reading_substrate: { universal: 'recursive_observer',     desc: 'Consciousness, institution, tradition, recursive culture, AI agent. A patch federation capable of reading its own records.' },
+      reality_as_consensus: { universal: 'consensus_ontology',       desc: 'Reality at every scale is what stably re-emerges when many observer-patches agree.' },
+    },
+  },
+
   // ── Human Domain Lexicons ────────────────────────────────────────────────────
   medicine: {
     domain: 'Medicine & Healthcare',

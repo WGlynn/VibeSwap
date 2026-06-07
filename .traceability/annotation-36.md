@@ -1,6 +1,6 @@
 ### 🔗 Traceability annotation (retroactive)
 
-Per [`DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md`](../blob/feature/social-dag-phase-1/DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md), this closed issue is receiving a retroactive annotation in the canonical Chat-to-DAG closing-comment format. **This issue is the root of the entire traceability-infrastructure rollout** — it's the one that asked "how do non-code contributions earn DAG credit?", and the answer is the full Chat-to-DAG loop now shipped.
+Per [`DOCUMENTATION/CONTRIBUTION_TRACEABILITY.md`](../docs/concepts/identity/CONTRIBUTION_TRACEABILITY.md), this closed issue is receiving a retroactive annotation in the canonical Chat-to-DAG closing-comment format. **This issue is the root of the entire traceability-infrastructure rollout** — it's the one that asked "how do non-code contributions earn DAG credit?", and the answer is the full Chat-to-DAG loop now shipped.
 
 ---
 

@@ -5,7 +5,7 @@ The essays that specify or justify pieces of the JARVIS architecture.
 | File | What it is |
 |---|---|
 | [`jarvis-is-not-a-wrapper.md`](./jarvis-is-not-a-wrapper.md) | The source-of-truth essay that specifies this repo. Eight layers, concrete artifacts, five verification checks. |
-| [`jarvis-is-not-a-wrapper.x-thread.md`](./jarvis-is-not-a-wrapper.x-thread.md) | 22-tweet condensed version for X / Twitter. Each tweet ≤280 chars. |
+| [`jarvis-is-not-a-wrapper.x-thread.md`](../../research/papers/jarvis-is-not-a-wrapper.x-thread.md) | 22-tweet condensed version for X / Twitter. Each tweet ≤280 chars. |
 
 ## More papers
 

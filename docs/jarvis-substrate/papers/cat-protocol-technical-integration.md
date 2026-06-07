@@ -20,7 +20,7 @@ The fifth condition is the inductive proof: a transaction proves valid lineage f
 
 The pattern: a recursive covenant is a state-machine primitive on UTXO chains. State = the data the covenant carries; transition = the constraint the covenant enforces; identity = the inductive proof from genesis. This is a complete enough primitive to express "fungible token + uniqueness + balance-preservation" without an account model.
 
-**Cross-substrate observation**: VibeSwap's [Bonded Permissionless Contest](../../vibeswap/docs/concepts/primitives/bonded-permissionless-contest.md) primitive uses a similar shape on EVM — a state machine (OPEN → VOTING → APPROVED → ...) with required-data-from-prior-state propagation. CAT's recursive covenant is the UTXO-substrate version of the same pattern.
+**Cross-substrate observation**: VibeSwap's [Bonded Permissionless Contest](../../concepts/primitives/bonded-permissionless-contest.md) primitive uses a similar shape on EVM — a state machine (OPEN → VOTING → APPROVED → ...) with required-data-from-prior-state propagation. CAT's recursive covenant is the UTXO-substrate version of the same pattern.
 
 ## Guard contracts as separated verification
 
@@ -66,7 +66,7 @@ The mint logic:
 
 Limited supply emerges as a degenerate case: the last mint transaction creates no new minter UTXOs. Minting ability terminates; supply is provably finite from on-chain inspection.
 
-**Cross-substrate observation**: This is the [generation-isolated commit-reveal](../../vibeswap/docs/concepts/primitives/generation-isolated-commit-reveal.md) pattern in different clothes. State carries forward; identity is preserved; supply / generation tracking is structural rather than indexer-tracked. EVM's storage-as-implicit-state contrasts with CAT's UTXO-as-explicit-state — different substrates, same property.
+**Cross-substrate observation**: This is the [generation-isolated commit-reveal](../../concepts/primitives/generation-isolated-commit-reveal.md) pattern in different clothes. State carries forward; identity is preserved; supply / generation tracking is structural rather than indexer-tracked. EVM's storage-as-implicit-state contrasts with CAT's UTXO-as-explicit-state — different substrates, same property.
 
 ## Parallel mint via N-ary tree
 
@@ -82,7 +82,7 @@ For NFTs (CAT721) that need unique localIds within a collection, the BFS (level-
 
 A minter at tree position `k` produces NFTs with `localId = k`. Parallel minting still produces non-conflicting IDs because the tree position is structural, not race-determined.
 
-**Cross-substrate observation**: This is structurally identical to the [Fibonacci Scaling](../../vibeswap/contracts/libraries/FibonacciScaling.sol) pattern — graceful saturation under contention through structured branching. Different math (golden-ratio damping vs N-ary tree growth), same property: contention dissolves through branching rather than by limiting access.
+**Cross-substrate observation**: This is structurally identical to the [Fibonacci Scaling](../../../contracts/libraries/FibonacciScaling.sol) pattern — graceful saturation under contention through structured branching. Different math (golden-ratio damping vs N-ary tree growth), same property: contention dissolves through branching rather than by limiting access.
 
 ## Contract-owned tokens via Taproot script path
 
@@ -111,7 +111,7 @@ sell contract guarantees:
 
 Partial fills work because the recursion creates a new sell-contract output for the remainder. The order can be filled across many transactions; everything is miner-validated; no off-chain order book required.
 
-**Cross-substrate observation**: This is the [commit-reveal auction](../../vibeswap/docs/architecture/RECURSIVE_BATCH_AUCTIONS.md) pattern's UTXO cousin. Both achieve order-book liveness without an off-chain matching engine. Different mechanism (commit-reveal batching vs covenant-recursive partial fills), same structural property: liveness without trusted intermediary.
+**Cross-substrate observation**: This is the [commit-reveal auction](../../architecture/RECURSIVE_BATCH_AUCTIONS.md) pattern's UTXO cousin. Both achieve order-book liveness without an off-chain matching engine. Different mechanism (commit-reveal batching vs covenant-recursive partial fills), same structural property: liveness without trusted intermediary.
 
 ## The SDK posture
 

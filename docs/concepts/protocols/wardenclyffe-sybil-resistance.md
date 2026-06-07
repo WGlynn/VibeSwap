@@ -286,9 +286,9 @@ Each link is independently verifiable. Breaking any link invalidates the attesta
 ## References
 
 - [Wardenclyffe Protocol](./wardenclyffe-protocol.md) — Layer 6 formal spec
-- [AgentRegistry.sol](../../contracts/identity/AgentRegistry.sol) — ERC-8004 agent identities
-- [ContextAnchor.sol](../../contracts/identity/ContextAnchor.sol) — On-chain context graph anchoring
-- [PairwiseVerifier.sol](../../contracts/identity/PairwiseVerifier.sol) — CRPC verification protocol
+- [AgentRegistry.sol](../../../contracts/identity/AgentRegistry.sol) — ERC-8004 agent identities
+- [ContextAnchor.sol](../../../contracts/identity/ContextAnchor.sol) — On-chain context graph anchoring
+- [PairwiseVerifier.sol](../../../contracts/identity/PairwiseVerifier.sol) — CRPC verification protocol
 - [ergon.ts](../../llm-hashcash/src/services/ergon.ts) — PoW primitives + `generateAgentRegistrationChallenge()`
 - [challenges.ts](../../llm-hashcash/src/services/challenges.ts) — 10 cognitive challenge types
-- [CKB Synergy](../../../.claude/nervos-intel.md) — PoW shared state + MMR integration <!-- FIXME: ../../../.claude/nervos-intel.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
+- [CKB Synergy] — PoW shared state + MMR integration <!-- FIXME: ../../../.claude/nervos-intel.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->

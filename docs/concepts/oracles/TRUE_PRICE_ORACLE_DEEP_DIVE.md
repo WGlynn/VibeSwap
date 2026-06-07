@@ -134,7 +134,7 @@ Defense: use TWAP (time-weighted average price) over the lag window to reduce ma
 
 ### Problem 4 — Oracle frontrunning
 
-An attacker sees the new price coming (via mempool monitoring) and front-runs trades in the AMM before the price update lands. This is mitigated by the AMM's own commit-reveal batch auction ([`CommitRevealAuction.sol`](../contracts/core/CommitRevealAuction.sol)).
+An attacker sees the new price coming (via mempool monitoring) and front-runs trades in the AMM before the price update lands. This is mitigated by the AMM's own commit-reveal batch auction ([`CommitRevealAuction.sol`](../../../contracts/core/CommitRevealAuction.sol)).
 
 ## The interaction with other mechanisms
 

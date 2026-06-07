@@ -2,7 +2,7 @@
 
 **Status**: research / proposal
 **Origin**: GitHub discussion [WGlynn/VibeSwap#18](https://github.com/WGlynn/VibeSwap/discussions/18) — "What Should the Anti-Hallucination Protocol Look Like On-Chain?"
-**Connects to**: [airgap-problem-onepager.md](./airgap-problem-onepager.md), [augmented-mechanism-design-usd8.md](./augmented-mechanism-design-usd8.md), [`bonded-permissionless-contest`](../../concepts/primitives/bonded-permissionless-contest.md)
+**Connects to**: [airgap-problem-onepager.md](./airgap-problem-onepager.md), [augmented-mechanism-design-usd8.md](../../partnerships/usd8/internal/from-vibeswap/augmented-mechanism-design-usd8.md), [`bonded-permissionless-contest`](../../concepts/primitives/bonded-permissionless-contest.md)
 
 ---
 

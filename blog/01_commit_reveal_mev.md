@@ -150,6 +150,6 @@ These are not theoretical constructs. The contracts are deployed, tested with fu
 ## See Also
 
 - [Commit-Reveal Batch Auctions (paper)](../docs/papers/commit-reveal-batch-auctions.md) — Full paper: temporal decoupling, Fisher-Yates shuffle, uniform clearing prices
-- [From MEV to GEV](../docs/papers/from-mev-to-gev.md) — Nine-component GEV resistance architecture
-- [Five-Layer MEV Defense on CKB](../docs/papers/five-layer-mev-defense-ckb.md) — CKB-specific five-layer defense analysis
-- [Recursive Batch Auctions](../DOCUMENTATION/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure: nested batches at multiple temporal scales
+- [From MEV to GEV](../docs/research/papers/from-mev-to-gev.md) — Nine-component GEV resistance architecture
+- [Five-Layer MEV Defense on CKB](../docs/research/papers/five-layer-mev-defense-ckb.md) — CKB-specific five-layer defense analysis
+- [Recursive Batch Auctions](../docs/architecture/RECURSIVE_BATCH_AUCTIONS.md) — Fractal time structure: nested batches at multiple temporal scales

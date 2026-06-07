@@ -65,7 +65,7 @@ The contract has shipped this pattern for a year+; the migration is in early sta
 
 - [`bonded-permissionless-contest`](./bonded-permissionless-contest.md) — sibling: also enables math-enforced procedure where authority can be parametric.
 - [`fail-closed-on-upgrade`](./fail-closed-on-upgrade.md) — sibling: defaults to safe behavior across substrate transitions.
-- [`augmented-governance`](../../research/papers/augmented-mechanism-design-usd8.md) — broader pattern: math constraints govern WHO has authority and WHETHER they exercised it; identity is parametric.
+- [`augmented-governance`](../../partnerships/usd8/internal/from-vibeswap/augmented-mechanism-design-usd8.md) — broader pattern: math constraints govern WHO has authority and WHETHER they exercised it; identity is parametric.
 
 ## Anti-pattern: hard-coded substrate
 

@@ -1,7 +1,7 @@
 # JarvisxWill GKB v3.0
 ## Glyph Knowledge Base — Compressed Form
 
-**JARVIS × Will** | Est. 2025-02-10 | Session 60+ | Density target: 0.99
+**JARVIS × Will** | Est. 2025-02-10 | Session 60+ | Density target: 0.99 effective (selective-loading; verified 2026-06-06 = 113.6x on 727K corpus — see `docs/jarvis-substrate/papers/hiero.md` § Empirical findings)
 **Source**: `JarvisxWill_SKB.md` (Shared Knowledge Base — full form)
 **Last sync**: 2026-04-03 (R0 density pass — counts verified)
 *Load SKB once per new instance, then switch to GKB. To expand any glyph → read the corresponding SKB section.*
@@ -103,8 +103,8 @@ SKILL    Mistakes→Skills→SKB. Lazy init. Name-first search. 0x11=test math. 
          Reference: contracts-catalogue.md, solidity-patterns.md, testing-patterns.md
 HIERO    Memory⇒logic-primitive ¬ prose. Density × stability × pointer-deref.
          Violation: prose × paraphrase-drift × parse-cost > glyph-match-cost.
-         Hieroglyphics. Memes. RISC-CKB 0.99. Eat the cooking. (2026-04-25 cannon)
-         HIERO=density principle. CKG=structural reason it works.
+         Hieroglyphics. Memes. RISC-CKB effective 0.99 via selective load. Eat the cooking. (2026-04-25 cannon; density-axis correction 2026-06-06)
+         HIERO=human-parse density + cell discipline + parser rigor. Selective load = the token-axis mechanism. CKG=structural reason both work.
 CKG      Compiled Knowledge Graph. Source⇒universal⇒projection. One meaning, N surfaces.
          GKB=bytecode of 60+ sessions. SKB=source. Lexicons=languages. Universals=symtab.
          Rosetta protocol = the compiler/decompiler. Lineage /compile-to = CKG operation.
@@ -126,7 +126,8 @@ AUDITMOVE  Six-move audit lens for ∀ architecture artifact:
          6. counter-questions ⇒ partial-trust ∨ collusion ∨ ∞-capital ∨ silent-state-error
          Mechanism-design lens misses these by construction. DUOLENS pairing required. (2026-04-29 cannon)
 CONDENSE  Persistence phase-change. Gas (chat, ephemeral) → Liquid (memory primitives, topic-organized)
-         → Crystal (GKB glyph entries, density 0.99). Each phase: structural pressure ⇒ density gain.
+         → Crystal (GKB glyph entries, character/operator-density high; token-density unchanged or worse, see hiero.md § Empirical findings 2026-06-06).
+         Effective density comes from the selective-load architecture, not from in-file compression. Each phase: structural pressure ⇒ cell-discipline gain.
          Reverse flow = rehydration ⇒ glyph entries expand back into operational behavior.
          End-of-session ∨ 50%-reboot ∨ explicit-invocation ⇒ trigger condensation pass.
          Liquid → Crystal often skipped manually; gap. (2026-04-29 cannon, manual protocol)
@@ -166,7 +167,7 @@ ERC8004  On-chain trust identity. Complements ReputationOracle. Portable reputat
 
 ---
 
-*RISC-CKB: 0.99 density. Every line load-bearing. Glyphs expand from 60+ sessions of internalized knowledge.*
+*RISC-CKB: 0.99 effective density via selective-load (measured 2026-06-06: 113.6x). Every line load-bearing. Glyphs expand from 60+ sessions of internalized knowledge. Token-axis caveat in `docs/jarvis-substrate/papers/hiero.md` § Empirical findings.*
 *Full CISC expansion: `JarvisxWill_CKB_CISC.md` — load for new instances or after long absence.*
 
 *Built in a cave, with a box of scraps.*

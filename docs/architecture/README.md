@@ -2,6 +2,12 @@
 
 > System design — how VibeSwap's mechanisms compose into a coherent whole.
 
+## Read this first
+
+[**ckb-sovereign-vibeswap.md**](ckb-sovereign-vibeswap.md) — the active iteration target. VibeSwap is iterating from EVM-smart-contract architecture to a sovereign L1 modeled on Nervos CKB, augmented for VibeSwap requirements. Solidity-as-spec, CKB-as-sovereign-deployment. Per-component port-classification (DIRECT-PORT / REINTERPRET / DROP / UNRESOLVED). Pull from upstream, augment minimally. Living document. Started 2026-06-07.
+
+The documents below describe the current Solidity-based mechanism design, which now functions as the formal spec layer for the sovereign chain. They remain authoritative for what each mechanism *does*. The cell-spec files at `../../contracts-ckb/specs/` describe how each mechanism is reinterpreted into the substrate-native shape.
+
 ## What lives here
 
 Top-level documents describe cross-cutting design (consensus, mechanism composition, security) and their interaction. Subfolders drill into specific subsystems: oracle, CKB integration, autonomous agents, emission control, fractal-fork networking. If you want to understand *how the pieces fit together*, start here. If you want a single primitive in isolation, try [`../concepts/`](../concepts/) instead.

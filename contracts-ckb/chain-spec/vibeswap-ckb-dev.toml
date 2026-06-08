@@ -1,0 +1,363 @@
+# =============================================================================
+# vibeswap-ckb-dev chain spec
+# =============================================================================
+#
+# This is the chain-spec (genesis + consensus parameters) for the VibeSwap-CKB
+# sovereign development chain. It is a forked-and-augmented descendant of the
+# upstream Nervos CKB v0.206.0 `resource/specs/dev.toml`.
+#
+# Upstream baseline:
+#   github.com/nervosnetwork/ckb @ v0.206.0
+#   resource/specs/dev.toml
+#
+# Augmentation discipline (per contracts-ckb/AUGMENTATION_SURFACE.md):
+#   - This file augments at the CONFIG layer only (Tier 1).
+#   - No Rust / substrate-code changes are required to use this spec.
+#   - Every customization vs. upstream is justified in an inline comment
+#     prefixed with `# VS-AUG:` (VibeSwap-AUGmentation) so a diff against
+#     upstream's dev.toml is trivially audit-able by a reader.
+#   - Anything marked `# TODO Will-decide:` is an unresolved parameter that
+#     blocks finalization but does not block first build / first boot.
+#
+# Per [F·jul-is-primary-liquidity]:
+#   - CKB-native is preserved as the state-rent capital asset (no replacement,
+#     no consensus-reward fork; reward distribution stays upstream).
+#   - JUL (money layer)  ⇒ deployed as sUDT cell, genesis-reserved capacity.
+#   - VIBE (governance)  ⇒ deployed as sUDT cell, genesis-reserved capacity.
+#   - The two protocol tokens are NOT minted at genesis. They are deployed
+#     by post-genesis transactions consuming the reserved deployment cells
+#     below. This keeps the augmentation surface to "reserve genesis capacity"
+#     rather than "add token-issuance logic to consensus."
+#
+# Per specs/lawson-constants.md:
+#   - This spec is referenced by the ConstitutionalBoundsCell and the initial
+#     ConstantsRegistryCell, both of which are also deployed post-genesis
+#     against capacity reserved here.
+#
+# Per specs/nci-consensus.md:
+#   - NCI lives entirely in user-space cells (REINTERPRET, not SUBSTRATE).
+#     Therefore NC-Max consensus parameters below are inherited from upstream
+#     unchanged. NCI does not appear in this file.
+# =============================================================================
+
+# VS-AUG: Chain identity. Upstream is "ckb_dev".
+# This name is what `ckb run` reports and what peers exchange in the
+# `identify` handshake. Distinguishing our devnet from upstream's prevents
+# accidental peer mixing when both nodes coexist on a developer's machine.
+name = "vibeswap_ckb_dev"
+
+# =============================================================================
+# [genesis] — genesis block header parameters
+# =============================================================================
+# Upstream-faithful except for `message` (rebranded) and `timestamp` (still 0
+# so deterministic builds reproduce the same genesis hash; see TODO below).
+#
+# `compact_target = 0x20010000` is the upstream dummy-difficulty target. Kept
+# because `[pow]` below is also Dummy. Touching one without the other breaks.
+
+[genesis]
+version = 0
+parent_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+timestamp = 0
+# TODO Will-decide: set timestamp to a fixed VibeSwap genesis moment (epoch
+# seconds) before the first peer joins. Until then, 0 is deterministic and
+# safe for local-only dev work.
+compact_target = 0x20010000
+uncles_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+nonce = "0x0"
+
+# -----------------------------------------------------------------------------
+# Genesis cell message — the "constitutional preamble" of the chain.
+# -----------------------------------------------------------------------------
+# VS-AUG: Rebranded from upstream's bare "ckb_dev". The message embeds the
+# Lawson Floor commitment in the genesis hash itself, making it part of the
+# chain's identity at the substrate level.
+[genesis.genesis_cell]
+message = "vibeswap-ckb-dev | A coordination primitive, not a casino. | Lawson floor inviolate."
+
+# Genesis-cell lock is "provably unspendable" (all-zero code_hash with hash_type
+# = "data"). Upstream-identical. Do not change.
+[genesis.genesis_cell.lock]
+code_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+args = "0x"
+hash_type = "data"
+
+# =============================================================================
+# [genesis.system_cells] — bundled scripts shipped at genesis
+# =============================================================================
+# These four entries are the canonical Nervos system-script set, inherited
+# upstream-verbatim per UPSTREAM.md ("All authorization that can use secp256k1
+# should use these. Saves cell deployment cost and avoids reimplementing
+# audited primitives.").
+#
+# VS-AUG philosophy: we do NOT add VibeSwap-specific scripts to this bundle.
+# VibeSwap scripts (proof-of-mind-lock-script, primitive-cell-type-script,
+# datatoken-cell-type-script, escrow-vault-cell-type-script, lineage-vault-
+# cell-type-script, plus all spec-driven additions) are deployed POST-genesis
+# as user code-cells. This keeps the "substrate stays clean" discipline from
+# AUGMENTATION_SURFACE.md section 3.4 intact.
+#
+# `capacity` is in shannons (1 CKB = 10^8 shannons). The values are upstream-
+# verbatim because the bundled scripts have not changed.
+
+[[genesis.system_cells]]
+file = { bundled = "specs/cells/secp256k1_blake160_sighash_all" }
+create_type_id = true
+capacity = 100_000_0000_0000
+
+[[genesis.system_cells]]
+file = { bundled = "specs/cells/dao" }
+create_type_id = true
+capacity = 16_000_0000_0000
+
+[[genesis.system_cells]]
+file = { bundled = "specs/cells/secp256k1_data" }
+create_type_id = false
+capacity = 1_048_617_0000_0000
+
+[[genesis.system_cells]]
+file = { bundled = "specs/cells/secp256k1_blake160_multisig_all" }
+create_type_id = true
+capacity = 100_000_0000_0000
+
+# System-cells lock is "provably unspendable" (upstream-identical).
+[genesis.system_cells_lock]
+code_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+args = "0x"
+hash_type = "data"
+
+# =============================================================================
+# [genesis.dep_groups] — pre-bundled cell-dep aliases
+# =============================================================================
+# Cell-dep groups let a transaction reference both code AND data with a single
+# OutPoint. Upstream ships the two standard groups; we preserve them.
+# VibeSwap-specific dep groups (e.g., a single OutPoint that pulls both the
+# CommitRevealAuction script and its parameter cell) will be added by POST-
+# genesis deployment transactions, not here.
+
+[[genesis.dep_groups]]
+name = "secp256k1_blake160_sighash_all"
+files = [
+  { bundled = "specs/cells/secp256k1_data" },
+  { bundled = "specs/cells/secp256k1_blake160_sighash_all" },
+]
+
+[[genesis.dep_groups]]
+name = "secp256k1_blake160_multisig_all"
+files = [
+  { bundled = "specs/cells/secp256k1_data" },
+  { bundled = "specs/cells/secp256k1_blake160_multisig_all" },
+]
+
+# Bootstrap lock is upstream-identical: provably unspendable, hash_type = type.
+# This is the lock under which `[[genesis.system_cells]]` capacity sits.
+[genesis.bootstrap_lock]
+code_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+args = "0x"
+hash_type = "type"
+
+# =============================================================================
+# [[genesis.issued_cells]] — initial capacity distribution
+# =============================================================================
+# These are the cells that hold all non-system capacity at chain birth.
+# Upstream issues three cells totalling ~33.6B CKB (the dev testnet fixture).
+#
+# VS-AUG: We restructure this section to allocate capacity into four
+# categories. Each `[[genesis.issued_cells]]` block is annotated with its
+# VibeSwap purpose. Totals must sum coherently; see "Genesis allocation
+# arithmetic" in README.md.
+#
+# All locks below currently use the same upstream-default placeholder lock
+# (secp256k1_blake160_sighash_all type-hash + a placeholder args). The actual
+# bootstrap lock-args (the 20-byte blake160 hashes of the genesis-deployer
+# pubkeys for each role) are Will-decide values.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# (1) Deployer faucet — capacity used by the post-genesis deployment txs that
+#     install VibeSwap scripts as user code-cells. 8.4B CKB matches upstream's
+#     first issued-cell so we don't accidentally inflate the dev money supply
+#     while standing the chain up.
+# -----------------------------------------------------------------------------
+[[genesis.issued_cells]]
+capacity = 8_400_000_000_00000000
+lock.code_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+# TODO Will-decide: replace with blake160 of the genesis-deployer pubkey.
+# Currently the upstream-default dev placeholder (62e907b1...).
+lock.args = "0x62e907b15cbf27d5425399ebf6f0fb50ebb88f18"
+lock.hash_type = "data"
+
+# -----------------------------------------------------------------------------
+# (2) JUL deployment reservation — capacity earmarked for the post-genesis tx
+#     that deploys the JUL sUDT issuer cell (per [F·jul-is-primary-liquidity],
+#     JUL is the money layer, not a bootstrap-for-CKB).
+#
+#     This cell holds raw capacity; no JUL is minted at genesis. The post-
+#     genesis JUL deployment consumes this cell as input and produces:
+#       - The JUL sUDT code-cell (referenced by all JUL holdings via type_id)
+#       - The JUL issuer cell (lock = JUL issuance multisig)
+#
+#     20B CKB matches upstream's second issued-cell value to keep allocation
+#     proportions familiar. Final value is a Will-decide.
+# -----------------------------------------------------------------------------
+[[genesis.issued_cells]]
+capacity = 20_000_000_000_00000000
+lock.code_hash = "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"
+# TODO Will-decide: replace with the args identifying the JUL deployment
+# multisig (typically a secp256k1_blake160_multisig_all 2-of-3 over Will + 2
+# co-signers). Currently the upstream-default dev placeholder.
+lock.args = "0xc8328aabcd9b9e8e64fbc566c4385c3bdeb219d7"
+lock.hash_type = "type"
+
+# -----------------------------------------------------------------------------
+# (3) VIBE deployment reservation — capacity earmarked for the post-genesis tx
+#     that deploys the VIBE sUDT governance-token issuer cell.
+#
+#     Same shape as the JUL reservation. VIBE is the governance token; not
+#     minted at genesis; final issuance schedule TBD per Will.
+#
+#     5.198B CKB matches upstream's third issued-cell value (the residual
+#     fragment that brings the total to ~33.6B CKB).
+# -----------------------------------------------------------------------------
+[[genesis.issued_cells]]
+capacity = 5_198_735_037_00000000
+lock.code_hash = "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8"
+# TODO Will-decide: replace with the args identifying the VIBE deployment
+# multisig. Currently the upstream-default dev placeholder.
+lock.args = "0x470dcdc5e44064909650113a274b3b36aecb6dc7"
+lock.hash_type = "type"
+
+# -----------------------------------------------------------------------------
+# (4) Lawson-constants deployment reservation — capacity for the post-genesis
+#     tx that creates the ConstitutionalBoundsCell + initial
+#     ConstantsRegistryCell (per specs/lawson-constants.md).
+#
+#     1B CKB is a working estimate. The ConstitutionalBoundsCell is small
+#     (under 4 KB even with ~50 named constants); 1B CKB covers cell capacity
+#     with extreme headroom for the per-constant ConstantValue array and
+#     future expansion. Final allocation pending sizing pass from
+#     lawson-constants.md.
+# -----------------------------------------------------------------------------
+[[genesis.issued_cells]]
+capacity = 1_000_000_000_00000000
+lock.code_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+# TODO Will-decide: replace with the lock-args of the Lawson deployer key.
+# This SHOULD be a hot key for the dev chain and a multisig for mainnet,
+# because the deployer of the ConstitutionalBoundsCell sets bounds that
+# cannot be modified post-genesis without a hardfork (specs/lawson-
+# constants.md "Open questions" #3).
+lock.args = "0x0000000000000000000000000000000000000000"
+lock.hash_type = "data"
+
+# =============================================================================
+# [params] — consensus parameters
+# =============================================================================
+# Upstream-faithful, with two VibeSwap-specific carve-outs noted below.
+# Touching anything in this block has cascading consensus implications; only
+# the carve-outs are altered. Everything else is left at upstream defaults
+# precisely because we have not yet demonstrated user-space NCI's finality
+# requirements need different values (per AUGMENTATION_SURFACE.md section 3.5).
+
+[params]
+
+# Upstream-default primary-epoch reward (~1917 CKB per block at genesis
+# epoch). Touching this requires a parallel patch to reward.rs, which we
+# explicitly DO NOT want per [F·jul-is-primary-liquidity]: CKB-native reward
+# distribution stays upstream-faithful.
+initial_primary_epoch_reward = 1_917_808_21917808
+secondary_epoch_reward = 613_698_63013698
+
+# Max block cycles. Upstream default. Touching this affects every script's
+# cycle budget. Our largest scripts (BLS verification per UPSTREAM.md open
+# questions) need a spike before this is tunable; until then, upstream value
+# stands.
+# TODO Will-decide: after the BLS12-381 cycle-budget spike (UPSTREAM.md
+# open questions #1), determine whether 10B cycles/block is sufficient for
+# a batch of MessagingHub attestations. If not, this is the parameter to
+# tune (config-only Tier 1) before falling back to substrate Tier 2.
+max_block_cycles = 10_000_000_000
+
+# Cellbase maturity: 0 = no maturity gating on coinbase outputs on dev. Keep
+# at 0 for dev; raise for testnet/mainnet (this is a config-only change, not
+# a fork).
+cellbase_maturity = 0
+
+# Upstream default. Halving schedule of primary epoch reward.
+primary_epoch_reward_halving_interval = 8760
+
+# -----------------------------------------------------------------------------
+# Epoch duration target
+# -----------------------------------------------------------------------------
+# VS-AUG: This is the most-watched parameter for VibeSwap. The 10-second
+# commit-reveal batch cadence requires block-time predictability. Per
+# UPSTREAM.md open questions ("Block-time predictability") and FORK_PLAN.md
+# section 8 #4, the choice between:
+#   (a) keep variable block time, build commit-reveal tolerance into app
+#       layer  (configuration-zero)
+#   (b) parameterize block time toward a tight band
+#       (configuration-only here, but may interact badly with NC-Max
+#        difficulty adjustment)
+# remains unresolved.
+#
+# For first-boot we keep upstream value of 80 (80-second epoch target per
+# upstream dev semantics). Application layer will tolerate variable block
+# time per option (a). This is the SAFE first-iteration choice.
+# TODO Will-decide: lock in (a) vs (b) after first end-to-end smoke test
+# measures observed block-time variance.
+epoch_duration_target = 80
+
+# Upstream default. Short epoch length for dev so reward halving and DAO
+# behavior can be exercised in a short test cycle.
+genesis_epoch_length = 10
+
+# `[pow] func = "Dummy"` mode means difficulty doesn't auto-adjust. Required
+# value for the Dummy PoW; do not change without changing `[pow]`.
+permanent_difficulty_in_dummy = true
+
+# Upstream default; only relevant once DAO withdrawals matter for tests.
+starting_block_limiting_dao_withdrawing_lock = 0
+
+# -----------------------------------------------------------------------------
+# Hardfork activation heights
+# -----------------------------------------------------------------------------
+# ckb2023 hardfork is active from block 0 on this chain (we're forking
+# v0.206.0 which already includes the ckb2023 feature set; no upstream-
+# compatibility reason to disable). VibeSwap-specific hardforks (if any) get
+# added here in the future as `vibeswap_v1 = <activation_block>`. None yet.
+[params.hardfork]
+ckb2023 = 0
+
+# =============================================================================
+# [pow] — proof-of-work configuration
+# =============================================================================
+# VS-AUG: Dummy PoW for the dev chain. Per specs/nci-consensus.md, the PoW
+# pillar of NCI consumes NC-Max output (block hashes) as a signal regardless
+# of the underlying PoW function; for the dev chain we use Dummy so blocks
+# are produced on-demand by `ckb miner --threads 1` without burning real
+# Eaglesong hash power.
+#
+# Mainnet vibeswap-ckb (when shipped) switches to:
+#   [pow]
+#   func = "Eaglesong"
+# matching upstream NC-Max. The sovereign chain inherits Eaglesong as the
+# substrate PoW; NCI's 10% PoW pillar reads this output, it does not
+# replace it.
+[pow]
+func = "Dummy"
+
+# =============================================================================
+# End of vibeswap-ckb-dev.toml
+# =============================================================================
+# Augmentation tier achieved: TIER 1 (config-only). Zero Rust crate changes
+# required. Per AUGMENTATION_SURFACE.md, this is the target ("most credible
+# version of 'Nervos CKB augmented to meet VibeSwap specifications'").
+#
+# Outstanding TODOs (see README.md "Open questions for Will"):
+#   1. Genesis timestamp
+#   2. Deployer faucet lock-args
+#   3. JUL deployment multisig args
+#   4. VIBE deployment multisig args
+#   5. Lawson deployer key args
+#   6. max_block_cycles after BLS spike
+#   7. epoch_duration_target tight-band decision
+# =============================================================================

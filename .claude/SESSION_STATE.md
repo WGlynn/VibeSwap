@@ -55,6 +55,21 @@ JARVIS-side response: 3-agent endless swarm spawned, 12+ tasks shipped, all arti
 - abstraction-phase strategy operationalized (top-3 primitives + secondary substrates surveyed)
 - memory hygiene done (MEMORY.md fixed, dormancy mapped, consolidations triaged)
 
+**🔄 PIVOT 2026-06-08 18:47 ET — Will course-correction**: *"no we are building a blockchain not contracts"*
+
+Saved as [F·blockchain-not-contracts] (commit `3797787` to memory). Discipline: stop treating CKB cells as contracts. Build the actual chain (fork-execution, Rust crates, consensus integration, chain spec, deployable node). Cell-specs continue useful as components but the work pivots from spec-proliferation to chain-runtime.
+
+Queue rewritten post-pivot. Tasks 16-22 deprecated (off-axis: Odysseus dispatch, jarvis-loop, memory hygiene, MetaTx-cell-spec, VSOS). New tasks 23-29 are all blockchain-build:
+- **Task 23** (active): Execute FORK_PLAN clone + cargo build (Nervos v0.206.0 → vibeswap/main branch)
+- **Task 24** (active): vibeswap-ckb-dev.toml chain spec design (actual TOML with augmentations)
+- **Task 25** (queued): NCI consensus Rust integration sketch
+- **Task 26** (active): VibeSwapCanonicalToken sUDT Rust scaffold (first real deployable type script)
+- **Task 27** (queued): ckb-debugger + ckb-testtool test infra setup
+- **Task 28** (queued): Apply MessagingHub drift fix (Option a — line edits in ~/.claude/CLAUDE.md + vibeswap/README.md)
+- **Task 29** (queued): BLS aggregation pipeline implementation plan (per Agent 9's Path 1+3 verdict)
+
+This pivot is the real meaning of [J·vibeswap-ckb-sovereign-pivot]: own the chain. The contract-shape framing was keeping JARVIS in the Solidity mental model even on the CKB side.
+
 ---
 
 ## ⚡ ACTIVE STATE 2026-06-08 ~18:00 ET — ASI mission articulated + abstraction-phase thesis + first production receipt + cron architecture

@@ -131,10 +131,26 @@ The pivot is realized when an external reader who finds this repository can read
 
 Until then, this document evolves with the iteration.
 
+## Match-or-Beat-CoW extensions (2026-06-08)
+
+A near-term VibeSwap-DEX cut ("VibeSwap Lite" per Krakovia's framing) only justifies its existence if it is structurally equal-or-better than CoW Protocol on every mechanism axis. Four extensions, specced in `contracts-ckb/specs/`, close or invert each CoW advantage:
+
+- **Extension 1** — Batch cycle resolver: deterministic N-cycle CoW netting via Tarjan's SCC + DFS. Beats CoW's solver-found 2-cycle pattern. Zero solver fees on cycle surplus.
+- **Extension 2** — ZK router verifier: solvers compete to route through external DEX liquidity, but with attached ZK proofs of correctness + bounded search-completeness. Replaces CoW's solver-honesty assumption with structural verification.
+- **Extension 3** — Composable resolution paths: per-trader Pareto-best selection across pure-netting / internal-multi-hop / ZK-external. Generalizes CoW's Fair Combinatorial Auction over a strict superset of strategies. Trader controls trust-vs-execution trade-off explicitly.
+- **Extension 4** — Substrate-deep liquidity: multi-curve AMM (constant product + concentrated + StableSwap), cross-pool LP portfolios with basket-stability Shapley weighting, thin-pool fee subsidy from emissions. CoW has no first-party liquidity; ours is structurally deeper and Shapley-incentivized for stickiness.
+
+Plan doc: `Desktop/vibeswap-match-or-beat-cow-mechanism-plan-2026-06-08.md`. Spec index: `contracts-ckb/specs/INDEX.md`. Sequencing: Ext 1 + 4 ship in parallel (independent tracks, biggest wins) → Ext 3 (builds on 1+4) → Ext 2 last (heaviest unknown is ZK proving infra fit within CKB-VM cycle budget).
+
+Net result: every mechanism axis where CoW currently beats us flips to equal-or-better, by construction. What remains in CoW's column after this work is maturity (4 years live, multi-chain deployment, ecosystem recognition) — time-and-execution problems, not mechanism problems.
+
 ## Living references
 
-- `vibeswap/contracts-ckb/specs/` — per-component CKB specs (CommitRevealAuction next)
-- `vibeswap/contracts-ckb/UPSTREAM.md` — survey of Nervos upstream artifacts we pull from (pending)
+- `vibeswap/contracts-ckb/specs/` — per-component CKB specs + match-or-beat extensions
+- `vibeswap/contracts-ckb/specs/INDEX.md` — catalog of all specs including extensions
+- `vibeswap/contracts-ckb/UPSTREAM.md` — survey of Nervos upstream artifacts we pull from
+- `vibeswap/contracts-ckb/AUGMENTATION_SURFACE.md` — explicit set of changes vs upstream Nervos CKB
+- `vibeswap/contracts-ckb/FORK_PLAN.md` — operational plan for forking + augmenting
 - `vibeswap/contracts-ckb/README.md` — workspace status and toolchain notes
 - `vibeswap/docs/research/papers/psinet-ckb-cell-model-canonical-spec.md` — existing PsiNet cell-model spec
 - `vibeswap/docs/architecture/ckb/integration/ckb-integration.md` — earlier integration notes (now subsidiary to this doc)

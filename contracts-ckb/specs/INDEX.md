@@ -18,6 +18,7 @@ Read [`../../docs/architecture/ckb-sovereign-vibeswap.md`](../../docs/architectu
 | [lawson-constants.md](lawson-constants.md) | `contracts/governance/LawsonConstantsRegistry.sol` | DIRECT-PORT | Draft | Low |
 | [circuit-breaker.md](circuit-breaker.md) | `contracts/core/CircuitBreaker.sol` | REINTERPRET | Draft | Medium (attestation + cooldown) |
 | [slash-router.md](slash-router.md) | `contracts/consensus/SlashRouter.sol` | REINTERPRET | Draft | Medium |
+| [pairwise-verifier.md](pairwise-verifier.md) | `contracts/consensus/PairwiseVerifier.sol` | REINTERPRET | Draft (2026-06-08) | Medium-High (O(N²) tally → cell-dep enumeration; cycle-budget spike pending) |
 
 ## Match-or-Beat-CoW extensions (2026-06-08)
 
@@ -38,8 +39,7 @@ Plan doc: [`vibeswap-match-or-beat-cow-mechanism-plan-2026-06-08.md`](https://gi
 
 | Mechanism | Solidity source | Notes |
 |---|---|---|
-| VibeSwapCore | `contracts/core/VibeSwapCore.sol` | UNRESOLVED port classification. The orchestrator pattern has no clean CKB equivalent; logic distributes across per-cell type-scripts. Needs design exploration. |
-| PairwiseVerifier | `contracts/consensus/` | Referenced by SlashRouter via TaskVerdictCell. Could merge with CRPC-MindMesh design. |
+| VibeSwapCore | `contracts/core/VibeSwapCore.sol` | UNRESOLVED port classification. The orchestrator pattern has no clean CKB equivalent; logic distributes across per-cell type-scripts. Design-exploration agent IN-FLIGHT 2026-06-08. |
 | MetaTx / AccountAbstraction | `contracts/AgentRegistry/...` | Account abstraction on CKB is largely solved by Omnilock; spec to formalize integration. |
 | Compliance / Tier registry | `contracts/identity/` | Pool access control on CKB. Cell-based per-user tier tracking. |
 | Reputation Oracle | `contracts/oracle/` | Used by CommitRevealAuction for tier fallback. |

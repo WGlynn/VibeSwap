@@ -79,7 +79,7 @@ graph TD
 | **Batch Auction** — commit-reveal + priority auction | `CommitRevealAuction`, `VibeSwapCore` |
 | **AMM** — constant product (x·y=k) with batch execution | `VibeAMM`, `VibeLP` |
 | **Fair Distribution** — Shapley value rewards | `ShapleyDistributor`, `IncentiveController` |
-| **Cross-Chain** — VibeSwap canonical burn-and-mint with bonded validator network ([spec](docs/research/papers/post-layerzero-canonical-messaging.md)) | `MessagingHub`, `VibeSwapCanonicalToken`, `MessagingValidatorRegistry`, `SupplyAccountant`, `MessagingPoM` |
+| **Cross-Chain** — VibeSwap canonical burn-and-mint with bonded validator network ([spec](docs/research/papers/post-layerzero-canonical-messaging.md)) | `IMessagingHub` (interface — chain-impl pending), `VibeSwapCanonicalToken`, `MessagingValidatorRegistry`, `SupplyAccountant`, `MessagingPoM` |
 | **Governance** — DAO treasury + counter-cyclical stabilization | `DAOTreasury`, `TreasuryStabilizer` |
 | **Security** — circuit breakers, rate limiting, flash loan guards | `CircuitBreaker`, `RateLimiter` |
 | **Settlement** — on-chain Shapley/trust/vote verification | `ShapleyVerifier`, `TrustScoreVerifier`, `VoteVerifier` |
@@ -100,7 +100,7 @@ Defense-in-depth with independent protection layers:
 | **Flash loan guard** — same-block interaction detection | `VibeSwapCore.sol` |
 | **Circuit breakers** — volume, price, withdrawal anomaly detection | `CircuitBreaker.sol` |
 | **TWAP validation** — max 5% deviation from time-weighted average | `VibeAMM.sol`, `TWAPOracle.sol` |
-| **Rate limiting** — 100K tokens/hour/user, per-chain message limits | `RateLimiter.sol`, `MessagingHub.sol` |
+| **Rate limiting** — 100K tokens/hour/user, per-chain message limits | `RateLimiter.sol`, `IMessagingHub` (impl pending) |
 | **50% slashing** for invalid reveals | `CommitRevealAuction.sol` |
 | **`nonReentrant`** on every state-changing external function | All contracts |
 | **UUPS + timelock** — no unilateral upgrades | `VibeTimelock.sol` |
@@ -190,7 +190,7 @@ vibeswap/
 │   ├── amm/                   #   VibeAMM (x·y=k), VibeLP
 │   ├── governance/            #   DAOTreasury, TreasuryStabilizer, VibeTimelock
 │   ├── incentives/            #   ShapleyDistributor, ILProtection, LoyaltyRewards
-│   ├── messaging/             #   MessagingHub, VibeSwapCanonicalToken, validator registry, supply accountant, PoM
+│   ├── messaging/             #   IMessagingHub (impl pending), VibeSwapCanonicalToken, validator registry, supply accountant, PoM
 │   ├── settlement/            #   ShapleyVerifier, TrustScoreVerifier, VoteVerifier
 │   ├── identity/              #   SmartAccount, SessionKeyManager
 │   ├── oracle/                #   VolatilityOracle

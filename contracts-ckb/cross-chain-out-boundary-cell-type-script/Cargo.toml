@@ -1,0 +1,16 @@
+[package]
+name = "cross-chain-out-boundary-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Cross-chain out boundary cell: authorizes outbound burn-and-mint emissions per nci-boundary-enforcement.md §2.8."
+
+[[bin]]
+name = "cross-chain-out-boundary-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

@@ -1,0 +1,20 @@
+[package]
+name = "vibe-amm-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "VibeAMM type-script: PoolCell (x*y=k state + TWAP ring + breaker state) + VibeLPCell (sUDT-shaped LP shares) + TwapObservationCell (ring-buffer sidecar). REINTERPRET port of contracts/amm/VibeAMM.sol. Composes with lawson-constants (fee/TWAP/breaker constants) + circuit-breaker (BreakerCell consumption) + vibeswap-canonical-token (reserve sUDT)."
+
+[[bin]]
+name = "vibe-amm-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }
+
+# Integration tests live in `contracts-ckb/tests/` (workspace crate). The
+# tests/test_basic.rs file here is a reviewable test-spec stub gated under
+# `#[cfg(any())]`. The `[[test]]` target is intentionally not declared.

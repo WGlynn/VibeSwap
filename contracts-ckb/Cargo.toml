@@ -115,6 +115,16 @@ members = [
     # O(N^2) symmetry + pairwise). Scaffold; pairwise-tolerance arithmetic
     # + glove-game kind + cell-dep code-hash matching are gaps.
     "shapley-distributor-cell-type-script",
+    # Commit-reveal auction — MEV-dissolution mechanism per
+    # specs/commit-reveal-auction.md. Role-multiplexed binary: CommitCell /
+    # RevealCell / BatchSettlementCell / SlashCell per type_script.args[0].
+    # Cell-deps Lawson (bond + windows + slash rate) and vibe-amm PoolCell
+    # (reserve readout for MAX_TRADE_SIZE + clearing-price reference).
+    # Settlement is permissionless: the type-script catches incorrect
+    # settlements, no trusted-settler role. Spec scaffold, not audit-ready —
+    # blake2b syscall wrapper + tip-anchor + code-hash discrimination are
+    # inline TODOs.
+    "commit-reveal-auction-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

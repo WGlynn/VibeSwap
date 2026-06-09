@@ -1,0 +1,16 @@
+[package]
+name = "cross-chain-in-boundary-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Cross-chain inbound boundary cell: authorizes BLS-attested mint of canonical tokens in response to a remote-chain burn per nci-boundary-enforcement.md §2.7."
+
+[[bin]]
+name = "cross-chain-in-boundary-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

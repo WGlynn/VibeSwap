@@ -51,6 +51,12 @@ members = [
     # REORG_BEHAVIOR_DESIGN.md §6 — most reorg-sensitive boundary (reorg
     # here = mint without burn = supply inflation).
     "cross-chain-in-boundary-cell-type-script",
+    # Cross-chain outbound boundary cell — per specs/nci-boundary-enforcement.md
+    # §2.8. Authorizes local-burn -> remote-mint emission; cell-deps
+    # NCIScoreCell + LawsonConstantsRegistry; composes same-tx with
+    # messaging-hub-canonical-token-cell (net-burn) and burn-receipt
+    # (companion). Dest_chain_id sanity against SUPPORTED_DEST_CHAINS.
+    "cross-chain-out-boundary-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

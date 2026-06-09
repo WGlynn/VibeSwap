@@ -84,6 +84,13 @@ members = [
     # threshold (slash is irreversible). Same-tx BondCell consumption per
     # slash-router.md (this crate authorizes; bond's type-script executes).
     "slash-boundary-cell-type-script",
+    # VibeAMM cells (PoolCell + VibeLPCell + TwapObservationCell) — REINTERPRET
+    # port of contracts/amm/VibeAMM.sol per specs/vibe-amm.md. Composes with
+    # lawson-constants (fee/TWAP/breaker constants), circuit-breaker
+    # (BreakerCell consumed via cell-dep — swap rejected if state != Clear),
+    # and vibeswap-canonical-token (reserve sUDT). Cell-dep matching is
+    # shape-only in v1 — production needs code-hash binding.
+    "vibe-amm-cell-type-script",
     # Governance parameter-update boundary cell — per
     # specs/nci-boundary-enforcement.md §2.5. Structurally most load-bearing:
     # governs the constants that govern every other boundary. Dual-layer
@@ -95,6 +102,19 @@ members = [
     # cross-constraint op-codes SUM_LT/GTE_ZERO/SUM_EQ). 24-block finality
     # per REORG_BEHAVIOR_DESIGN §6 governance-class.
     "governance-update-boundary-cell-type-script",
+    # Shapley reward distribution — REINTERPRET port of
+    # contracts/incentives/ShapleyDistributor.sol per
+    # specs/shapley-distributor.md. Single binary, role-multiplexed across
+    # 5 cells: ContributionEventCell (atomized log per [P·atomized-shapley]),
+    # ShapleyDistributionCell (5-axiom-verified per [P·shapley-5-axiom-set]:
+    # Efficiency ∧ Symmetry ∧ Null-Player ∧ Additivity ∧ Pairwise-Proportionality
+    # + Time-Neutrality on FEE track), RewardClaimCell (per-participant
+    # claim), EmissionScheduleCell (halving curve, TOKEN_EMISSION only),
+    # SybilGuardCell (null-player propagation). VerifiedCompute pattern:
+    # off-chain Shapley math + on-chain axiom check (O(N) efficiency/null,
+    # O(N^2) symmetry + pairwise). Scaffold; pairwise-tolerance arithmetic
+    # + glove-game kind + cell-dep code-hash matching are gaps.
+    "shapley-distributor-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

@@ -18,6 +18,17 @@ Pre-fork. No clone has been performed on this machine yet. This document is the 
 
 ---
 
+## Design preconditions
+
+Four decisions were executed 2026-06-08. They are upstream of every step below. Reading them is the precondition for editing this plan.
+
+- **Fork-vs-mainnet → Position F (fork).** `FORK_VS_MAINNET_ANSWER.md`. The chain is sovereign from genesis; chain-spec/ is critical-path.
+- **NCI consensus shape → Position C (user-space app-layer boundary enforcement).** `NCI_CONSENSUS_ANSWER.md` plus `specs/nci-boundary-enforcement.md`. Substrate stays untouched; every vibeswap-app boundary lock/type-script mandates an `NCIScoreCell` cell-dep.
+- **Reorg finality contract.** `REORG_BEHAVIOR_DESIGN.md`. Six per-decision-class finality thresholds encoded in `LawsonConstantsRegistry` and bounded by `ConstitutionalBoundsCell`.
+- **Operations phasing (Phase 0–3).** `OPERATIONS.md`. The 3-validator bootstrap is the Day-0 chain; the Cincinnatus walkaway is the 12-month target.
+
+---
+
 ## 1. Fork target identification
 
 **Chosen tag**: `v0.206.0` of `nervosnetwork/ckb`, released 2026-05-06.
@@ -163,17 +174,13 @@ Track as an open question (Section 8) until the JUL/VIBE issuance spec is finali
 
 ### 3.3 NCI consensus integration (60 PoM / 30 PoS / 10 PoW)
 
-**Default path: user-space** (per `AUGMENTATION_SURFACE.md` and `specs/nci-consensus.md`).
+**Resolved 2026-06-08: Position C — hybrid app-layer enforced at the vibeswap-app boundary.** See `NCI_CONSENSUS_ANSWER.md` for the full triad walkthrough; `specs/nci-boundary-enforcement.md` for the per-boundary invariants.
 
-**User-space mapping**: NCI lives as application-layer cells that consume PoW outputs (block hashes from on-chain headers via CKB syscalls), PoS bonded-validator signatures (BLS12-381 in lock-scripts), and PoM attestations (ed25519 in lock-scripts). The aggregation cell publishes a consensus-finality value that downstream mechanisms read via cell-dep. NC-Max upstream stays untouched.
+**User-space mapping**: NCI lives as application-layer cells that consume PoW outputs (block hashes from on-chain headers via CKB syscalls), PoS bonded-validator signatures (BLS12-381 in lock-scripts), and PoM attestations (ed25519 in lock-scripts). The aggregation cell publishes an `NCIScoreCell` that **every vibeswap-app boundary lock/type-script mandatorily references as a cell-dep**. Block production stays NC-Max + Eaglesong, unchanged.
 
-**Files touched (user-space path)**: zero in `ckb-fork/`. All work happens in `contracts-ckb/` cell scripts.
+**Files touched**: zero in `ckb-fork/`. All work happens in `contracts-ckb/` cell scripts plus the boundary-enforcement discipline in `specs/nci-boundary-enforcement.md`.
 
-**Substrate-augmentation escape hatch** (only if rate or finality requirements make application-layer NCI infeasible):
-- `chain/src/verify.rs` and `chain/src/chain_service.rs` (block-level integration)
-- `verification/src/` consensus rules
-- `pow/src/` if NCI composes with NC-Max at the PoW layer rather than just consuming its output
-This is the largest potential augmentation; gate carefully.
+**Escalation trigger (now narrow)**: only revisit substrate-patching if operational data shows the boundary-enforcement pattern is bypassable in ways the three-pillar math intended to prevent (e.g., a 51% PoS+PoM collusion that routes around the seam pre-deposit). Not a near-term concern; tracked in `NCI_CONSENSUS_ANSWER.md` §6.
 
 ### 3.4 System scripts as substrate-level primitives
 
@@ -209,7 +216,7 @@ Default principle: every augmentation defaults to user-space. Substrate patches 
 |---|---|---|
 | Genesis configuration | Substrate (config-only, `resource/specs/dev.toml`) | Genesis is definitionally substrate. No user-space alternative exists. |
 | Three-token model | User-space (sUDT for JUL and VIBE) | Escalate only if a consensus-reward split into three tokens proves required for protocol-level supply commitments. Open question; not yet escalated. |
-| NCI consensus | User-space (aggregation cell) | Escalate only if block-rate or finality requirements cannot be met by application-layer aggregation. Spike required before any escalation. |
+| NCI consensus | User-space, mandatorily cell-dep'd at vibeswap-app boundary (Position C) | Escalate only if boundary-enforcement is shown bypassable in ways the three-pillar math intended to prevent. Operational-data question, not near-term. |
 | System scripts | User-deployable (code-cells, cell-dep refs) | Never escalate. The whole point of CKB's design is that user-deployable scripts are first-class. |
 | Network params (block time) | Substrate (config-only, `dev.toml`) | Block-time parameters are consensus-level by construction. Configuration suffices; no code change unless we exceed the safe range. |
 | Dust threshold | Substrate (config-only, `dev.toml`) | Configuration suffices if exposed; only touch `consensus.rs` if our cells can't fit within the configurable range. |
@@ -276,6 +283,10 @@ This is the layer where commit-reveal-batch timing, AMM swap flows, and ShapleyD
 ## 7. Fork execution checklist
 
 Ordered steps to actually create the fork. Run from `C:/Users/Will/vibeswap/`.
+
+**Day 0 Will-action blocker**: Visual Studio Build Tools (MSVC C++ workload) must be installed on the dev workstation before Step 5 (`cargo build --release`) succeeds — the `ckb` build chain depends on a native C linker. This is the single blocking precondition for the fork's first boot. Until it's installed, Steps 1–4 are runnable (clone + branch + edit) but Step 5 fails.
+
+The Phase-0 three-validator bootstrap (Node 1 = Will home, Node 2 = Hetzner, Node 3 = JARVIS/GCP) and its 7-day operational checklist are specified in `OPERATIONS.md` §2 and §10. This Section 7 stands up Node 1; `OPERATIONS.md` extends the chain to the 3-validator Phase-0 set.
 
 1. **Clone upstream at v0.206.0**:
    ```bash
@@ -357,38 +368,34 @@ For implementation work to begin, the following must be installed and verified o
 - **ckb-cli** (build from `nervosnetwork/ckb-cli`).
 - **gh CLI** (already in use for the Odysseus campaign).
 
-Recorded blockers per `contracts-ckb/README.md` (still pending):
-- MSVC Build Tools C++ workload not installed
-- `rust-toolchain.toml` pin (nightly-2024-09-01) too old for current Capsule
-- Capsule not installed
-
-These are Will-side actions, not autonomous tasks.
+Recorded blockers per `contracts-ckb/README.md` (still pending — all Will-side actions):
+- **VS Build Tools (MSVC C++ workload) not installed** — Day-0 blocker per Section 7; gates the `ckb` node build, not just script crates.
+- `rust-toolchain.toml` pin (nightly-2024-09-01) too old for current Capsule.
+- Capsule not installed.
 
 ---
 
 ## 8. Open questions for Will
 
-These block fork-execution or shape it materially. Each needs a Will-decision before the affected step proceeds.
+The four design resolutions on 2026-06-08 (see "Design preconditions") closed the largest of the previously-open questions. What remains below is the residual set that still shapes fork-execution.
 
 1. **GitHub repo for the fork**: do we host `vibeswap-ckb` under `wglynn/` (matching the existing `vibeswap` org pattern) or under a new `vibeswap-ckb/` org? Visibility: public from day one, or private until first end-to-end test passes? Default assumption in Section 7 step 2: `wglynn/vibeswap-ckb`, private at first per the existing fork-plan stance. Confirm or override.
 
-2. **Three-token model: user-space sUDT vs substrate consensus-reward split**. Default plan: user-space sUDT for JUL and VIBE. Substrate-level escalation is named as an escape hatch but un-scoped. Decision needed before MessagingHub spec finalizes, because canonical burn-and-mint touches token issuance shape.
+2. **Three-token model: user-space sUDT vs substrate consensus-reward split**. Default plan (held): user-space sUDT for JUL and VIBE; CKB-native reward distribution untouched per `[F·jul-is-primary-liquidity]`. Substrate escalation remains the named escape hatch but is un-scoped. Decision still needed before MessagingHub spec finalizes.
 
-3. **NCI consensus: user-space aggregation vs substrate integration**. Default plan: user-space. The escalation case is "rate or finality requirements cannot be met." Need a target finality time and a target block-rate from the NCI spec author before this can be locked. Currently `specs/nci-consensus.md` says "REINTERPRET (user-space default)" — confirm this is the locked decision.
+3. **Block-time parameter**: 10-second commit-reveal batches need block-time predictability. NC-Max upstream uses variable block time. Two paths: (a) keep variable block time, build commit-reveal tolerance into the application layer; (b) parameterize block time toward a tight band in our `dev.toml`. Path (a) is configuration-zero on the substrate; the chain-spec currently sits at (a). Spike needed before (b) gets specified.
 
-4. **Block-time parameter**: 10-second commit-reveal batches need block-time predictability. NC-Max upstream uses variable block time. Two paths: (a) keep variable block time, build commit-reveal tolerance into the application layer; (b) parameterize block time toward a tight band in our `dev.toml`. Path (a) is configuration-zero on the substrate. Path (b) is configuration-only but may interact badly with NC-Max's difficulty adjustment. Spike needed before tight band gets specified.
+4. **Dust threshold**: defer until `commit-reveal-auction.md`, `vibe-amm.md`, and the other specs surface concrete cell-size numbers.
 
-5. **Dust threshold**: do we have concrete cell-size estimates from `commit-reveal-auction.md`, `vibe-amm.md`, and the other spec docs yet? Until we do, "tune dust threshold" is premature. Defer until specs surface concrete numbers.
+5. **Rebase cadence**: 2-week window after every Nervos stable tag is the proposed cadence (Section 1). The pre-existing `FORK_PLAN.md` said quarterly. Pick one.
 
-6. **Rebase cadence**: 2-week window after every Nervos stable tag is the proposed cadence (Section 1). The pre-existing `FORK_PLAN.md` said quarterly. Reconcile: quarterly is lower maintenance, 2-week is more upstream-faithful. Pick one.
+6. **Capsule installation on Windows**: gated on the VS Build Tools blocker above. Once VS Build Tools is in place, the known-good Capsule install path on Windows is the next operational question; WSL/Docker fallback is the alternative.
 
-7. **Capsule installation on Windows**: `UPSTREAM.md` and the recorded blockers above flag this. Resolve before Section 5 stage 4 (the build stage) becomes possible. Known-good install procedure for Capsule on Will's Windows environment, or WSL/Docker fallback?
+7. **BLS12-381 cycle-budget spike**: gates `vibeswap-ckb-bls` and therefore MessagingHub, CircuitBreaker, and SlashRouter. Same item in `UPSTREAM.md`. Run in parallel with fork-execution — BLS-dependent components are not on the critical path for the first devnet smoke test.
 
-8. **BLS12-381 cycle-budget spike**: gates `vibeswap-ckb-bls` and therefore MessagingHub, any NCI escalation, CircuitBreaker, and SlashRouter. Same item appears in `UPSTREAM.md` open questions. Should this spike run before or in parallel with the fork-execution checklist? Default proposal: in parallel — the fork can stand up without BLS, and BLS-dependent components are not on the critical path for the first devnet smoke test.
+8. **License**: Nervos CKB is MIT. VibeSwap can be MIT or Apache-2.0 with no upstream license conflict. Confirm MIT for `vibeswap-ckb` to match upstream.
 
-9. **Naming**: VibeSwap-CKB / Sovereign VibeSwap / new chain name? Open per the architectural statement's open obligations. Affects rebrand commit in Section 7 step 3.
-
-10. **License**: Nervos CKB is MIT. VibeSwap can be MIT or Apache-2.0 with no upstream license conflict. The OPH dependency from Pragma Coherence is CC BY-NC-SA 4.0, which blocks commercial integration without a separate license; this is tracked in `[R·pragma-os-crys-contact]` and does not affect the core fork. Confirm MIT for `vibeswap-ckb` to match upstream.
+9. **Validator-set bootstrap (operational)**: who runs Nodes 1/2/3 in the Phase-0 set per `OPERATIONS.md` §2? The default-named-roles are Will-home / Hetzner / JARVIS-on-GCP; confirm or override. Operator names for Phase-1 (5-validator open set) are explicitly **not** committed at this stage; they're tracked under `OPERATIONS.md` §3.
 
 ---
 

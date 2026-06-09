@@ -40,10 +40,10 @@
 #     unchanged. NCI does not appear in this file.
 # =============================================================================
 
-# VS-AUG: Chain identity. Upstream is "ckb_dev".
-# This name is what `ckb run` reports and what peers exchange in the
-# `identify` handshake. Distinguishing our devnet from upstream's prevents
-# accidental peer mixing when both nodes coexist on a developer's machine.
+# VS-AUG: Chain identity. Distinct from upstream's "ckb_dev" and from any
+# future "vibeswap_ckb_mainnet"; sovereign-fork per FORK_VS_MAINNET_ANSWER.md
+# Position F. The name is exchanged in peer `identify` handshakes and prevents
+# accidental peer mixing across chains.
 name = "vibeswap_ckb_dev"
 
 # =============================================================================
@@ -58,10 +58,8 @@ name = "vibeswap_ckb_dev"
 [genesis]
 version = 0
 parent_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-timestamp = 0
-# TODO Will-decide: set timestamp to a fixed VibeSwap genesis moment (epoch
-# seconds) before the first peer joins. Until then, 0 is deterministic and
-# safe for local-only dev work.
+# 2026-06-08T00:00:00Z — VibeSwap-CKB genesis-day anchor (Position F decision date).
+timestamp = 1749340800
 compact_target = 0x20010000
 uncles_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 nonce = "0x0"
@@ -267,14 +265,10 @@ lock.hash_type = "data"
 initial_primary_epoch_reward = 1_917_808_21917808
 secondary_epoch_reward = 613_698_63013698
 
-# Max block cycles. Upstream default. Touching this affects every script's
-# cycle budget. Our largest scripts (BLS verification per UPSTREAM.md open
-# questions) need a spike before this is tunable; until then, upstream value
-# stands.
-# TODO Will-decide: after the BLS12-381 cycle-budget spike (UPSTREAM.md
-# open questions #1), determine whether 10B cycles/block is sufficient for
-# a batch of MessagingHub attestations. If not, this is the parameter to
-# tune (config-only Tier 1) before falling back to substrate Tier 2.
+# Upstream default. Held: BLS12-381 cycle-budget spike (Agent 9, 2026-06-08)
+# concluded user-space BLS via Path 1+3 fits within 10B cycles/block at the
+# attestation batch sizes targeted by MessagingHub. Re-tune only if a
+# specific batch profile exceeds the budget in test-tooled measurement.
 max_block_cycles = 10_000_000_000
 
 # Cellbase maturity: 0 = no maturity gating on coinbase outputs on dev. Keep
@@ -285,25 +279,10 @@ cellbase_maturity = 0
 # Upstream default. Halving schedule of primary epoch reward.
 primary_epoch_reward_halving_interval = 8760
 
-# -----------------------------------------------------------------------------
-# Epoch duration target
-# -----------------------------------------------------------------------------
-# VS-AUG: This is the most-watched parameter for VibeSwap. The 10-second
-# commit-reveal batch cadence requires block-time predictability. Per
-# UPSTREAM.md open questions ("Block-time predictability") and FORK_PLAN.md
-# section 8 #4, the choice between:
-#   (a) keep variable block time, build commit-reveal tolerance into app
-#       layer  (configuration-zero)
-#   (b) parameterize block time toward a tight band
-#       (configuration-only here, but may interact badly with NC-Max
-#        difficulty adjustment)
-# remains unresolved.
-#
-# For first-boot we keep upstream value of 80 (80-second epoch target per
-# upstream dev semantics). Application layer will tolerate variable block
-# time per option (a). This is the SAFE first-iteration choice.
-# TODO Will-decide: lock in (a) vs (b) after first end-to-end smoke test
-# measures observed block-time variance.
+# Upstream default. Path (a) chosen pre-fork: app-layer tolerates variable
+# block time; commit-reveal batch sequencer absorbs NC-Max variance. Path (b)
+# (tight-band) reopens only if first end-to-end smoke test shows variance
+# breaks the 10s batch cadence beyond app-layer compensation.
 epoch_duration_target = 80
 
 # Upstream default. Short epoch length for dev so reward halving and DAO
@@ -352,12 +331,11 @@ func = "Dummy"
 # required. Per AUGMENTATION_SURFACE.md, this is the target ("most credible
 # version of 'Nervos CKB augmented to meet VibeSwap specifications'").
 #
-# Outstanding TODOs (see README.md "Open questions for Will"):
-#   1. Genesis timestamp
-#   2. Deployer faucet lock-args
-#   3. JUL deployment multisig args
-#   4. VIBE deployment multisig args
-#   5. Lawson deployer key args
-#   6. max_block_cycles after BLS spike
-#   7. epoch_duration_target tight-band decision
+# Outstanding TODOs (see README.md "Open questions for Will"): 4 lock-args
+# pending key generation at deploy time.
+#   1. Deployer faucet lock-args
+#   2. JUL deployment multisig args
+#   3. VIBE deployment multisig args
+#   4. Lawson deployer key args
+# Resolved 2026-06-08: genesis timestamp, max_block_cycles, epoch_duration_target.
 # =============================================================================

@@ -47,12 +47,14 @@ The following are the augmentation candidates identified in the architectural st
 
 ### NCI consensus integration
 
-**Status**: Open question. Lean toward user-space.
-**Scope**: VibeSwap's NCI (PoW 10% / PoS 30% / PoM 60%) three-token consensus weighting either replaces or composes with NC-Max upstream.
-**Upstream files**: If replacement: substantial parts of `ckb/consensus/` and `ckb/verification/`. If composition: minimal or zero.
-**Justification**: NCI is a defining protocol property; if it lives at consensus level, it's substrate-deep.
-**User-space alternative**: NCI lives as application-layer cells that consume PoW outputs (block hashes, transaction inclusion proofs) and PoM attestations and PoS validator signatures. Aggregate the three signals into a consensus-finality cell that downstream mechanisms read. This keeps NC-Max upstream untouched.
-**Decision**: Default to user-space unless rate or finality requirements make application-layer NCI infeasible. Significant design work needed before committing.
+**Status**: Decided — Position C (user-space app-layer boundary enforcement). See `NCI_CONSENSUS_ANSWER.md`.
+**Scope**: zero upstream Rust code changes. NCI cells exist as application-layer cells consuming PoW outputs (block hashes, transaction inclusion proofs) plus PoM attestations plus PoS validator signatures. Every vibeswap-app boundary lock/type-script (deposit, withdrawal, governance, validator-set update, slash, emergency pause) mandatorily references an `NCIScoreCell` cell-dep enforcing the three-pillar weighted score within constitutional bounds. Block production stays NC-Max + Eaglesong.
+**Upstream files**: zero.
+**Justification**: substrate-geometry match. Block-production consensus belongs at the block layer (NC-Max); protocol-decision authorization belongs at the cell-graph layer (NCI). Conflating them was a First-Available Trap; Position C separates them along the layer they naturally occupy.
+**User-space sufficient**: yes. Vibeswap-app value transitions are themselves cell-graph operations, so cell-graph enforcement is geometrically aligned. The "every block must include NCI" pattern (substrate-augmentation) is not required.
+**Escalation trigger**: only revisit substrate-patching if operational data shows the boundary-enforcement pattern is bypassable in ways the three-pillar math intended to prevent. Specifically: 51%-of-validators collusion compromising both PoS AND bonded-PoM-operator weighting AND routing around the seam via pre-deposit value flows. Not a near-term concern.
+**Boundary-enforcement gate doc**: `specs/nci-boundary-enforcement.md`.
+**Composes with**: `REORG_BEHAVIOR_DESIGN.md` per-decision-class finality thresholds; both gates AND together at every boundary.
 
 ### System scripts for VibeSwap primitives
 
@@ -85,7 +87,9 @@ The following are the augmentation candidates identified in the architectural st
 
 ## Net summary
 
-If all "lean toward user-space" decisions land in user-space, the augmentation surface reduces to:
+Post-2026-06-08 resolutions: NCI is Decided (Position C, user-space + mandatory boundary cell-dep). The remaining "lean toward user-space" entries (three-token model, system scripts) still hold their defaults; no escalation has been triggered by the four resolutions shipped 2026-06-08 (NCI Position C, Fork Position F, Reorg finality, Operations phases).
+
+Pre-fork the augmentation surface is:
 
 - Genesis configuration (configuration-only)
 - Network parameters: block time and capacity tuned for commit-reveal timing (configuration-only)
@@ -93,7 +97,7 @@ If all "lean toward user-space" decisions land in user-space, the augmentation s
 
 That is a configuration-only fork, no code changes to upstream. That is the most credible version of "Nervos CKB augmented to meet VibeSwap specifications."
 
-If NCI consensus or three-token model require substrate-level integration, the surface grows to include parts of consensus and reward distribution. That is still a tractable fork, but it puts us in active-maintenance territory against upstream changes.
+If the three-token model later requires substrate-level integration, the surface grows to include parts of consensus and reward distribution. NCI's escalation trigger is now narrow (operational-data question, see entry above) and does not require pre-deployment escalation.
 
 The decision-tree for each item is the same: can this live in user-space? If yes, it does. If no, the augmentation is named here with justification and scope.
 

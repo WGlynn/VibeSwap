@@ -1,0 +1,16 @@
+[package]
+name = "withdrawal-boundary-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Withdrawal boundary cell: authorizes internal->external value transitions out of vibeswap-app per nci-boundary-enforcement.md §2.2."
+
+[[bin]]
+name = "withdrawal-boundary-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

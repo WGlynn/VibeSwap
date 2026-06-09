@@ -1,0 +1,68 @@
+[package]
+name = "bls-aggregator"
+version = "0.1.0"
+edition = "2021"
+authors = ["VibeSwap contributors"]
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Off-chain BLS12-381 signature aggregator binary for VibeSwap-CKB MessagingHub attestations. Reads per-validator signature files from a directory, verifies each, and emits an AttestationCell-ready witness blob."
+
+# Standalone Cargo project — NOT a workspace member of contracts-ckb/.
+# This binary runs on the validator node host (typical x86-64 Linux or
+# ARM64). It does NOT compile to RISC-V. The contracts-ckb workspace
+# pin (`riscv64imac-unknown-none-elf`) would break this build.
+#
+# Per `contracts-ckb/Cargo.toml`'s `[workspace.exclude]`, this directory
+# is held out of the workspace.
+
+[[bin]]
+name = "bls-aggregator"
+path = "src/main.rs"
+
+[dependencies]
+# zkcrypto/bls12_381 same as bls-verify, but here under the std target
+# so we get the full host-side conveniences (rand_core::OsRng, std::io).
+# Default features enabled (alloc + pairings + groups + experimental
+# for hash-to-curve).
+bls12_381 = { version = "0.8", features = ["pairings", "groups", "experimental"] }
+
+# Pairing trait (same crate as bls-verify uses; pinned here separately
+# because we are NOT in the workspace).
+pairing = { version = "0.23" }
+
+# SHA-2 for the hash-to-G2 ciphersuite. Matches bls-verify's pin.
+sha2 = { version = "0.10" }
+
+# blake2 for canonical-digest computation, matching the
+# `SERIALIZATION_SPEC.md § Canonical Digest` blake2b-256 step.
+blake2 = { version = "0.10" }
+
+# subtle for constant-time pairing-result equality. Transitive of
+# bls12_381 but pinned explicitly so a future bls12_381 minor bump that
+# drops the transitive doesn't silently break the verify_individual
+# CT-comparison path.
+subtle = { version = "2.5" }
+
+# Clap for the CLI.
+clap = { version = "4.5", features = ["derive"] }
+
+# Serde + hex for I/O. Validator signature files are JSON-encoded
+# `(pubkey_hex, signature_hex, validator_index)` triples.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+
+# Anyhow for ergonomic error propagation in main.rs — this is a CLI
+# binary, not a library, so anyhow is appropriate.
+anyhow = "1.0"
+
+# Tracing for structured logs (validator nodes are expected to run this
+# under systemd / a process supervisor; structured logs help debug
+# aggregation failures across N validators).
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+# Property + canned-vector tests.
+proptest = "1.5"
+tempfile = "3.10"

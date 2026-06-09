@@ -67,8 +67,8 @@ This README orients any future session (human or AI) to the chain-build work in 
 - `UPSTREAM.md`: Nervos artifacts we pull from
 
 ### Fork status
-- FORK_PLAN.md Section 7 Step 1-3 (clone + branch + cargo build) in execution as of 2026-06-08 ~18:50 ET
-- See `Desktop/fork-execution-step-1-3-log-2026-06-08.md` for results
+- FORK_PLAN.md Section 7 Steps 1-4 (clone + branch + rebrand + dev genesis edit) executed 2026-06-08 ~18:50 ET. Step 5 (`cargo build --release`) blocked on VS Build Tools install (Will-action).
+- See `Desktop/fork-execution-step-1-3-log-2026-06-08.md` for results.
 
 ---
 
@@ -142,14 +142,21 @@ Per [F·full-leverage-only-moves]: pick the next cell that's the most-load-beari
 
 ---
 
+## Design resolutions shipped 2026-06-08
+
+Four answer docs closed the largest design questions:
+
+- `NCI_CONSENSUS_ANSWER.md` — NCI Position C (user-space + mandatory boundary cell-dep)
+- `FORK_VS_MAINNET_ANSWER.md` — Position F (sovereign fork from genesis)
+- `REORG_BEHAVIOR_DESIGN.md` — six per-decision-class finality thresholds
+- `OPERATIONS.md` — Phase 0-3 validator-bootstrap plan (3 → 5 → 15-25 → 30+, Cincinnatus walkaway at Month 12)
+- `specs/nci-boundary-enforcement.md` — gate-document for Position C; per-boundary invariant catalog
+
 ## Open Will-questions
 
-Aggregated from agent outputs (see `~/.claude/WILL_PENDING_DECISIONS.md`):
-
-- vibeswap-ckb-dev.toml has 7 TODO Will-decide markers (genesis timestamp, deployer faucet/JUL/VIBE/Lawson multisig args, max_block_cycles, epoch_duration_target)
-- FORK_PLAN.md has 9 open Qs (repo visibility, three-token lock-in, NCI shape confirm, block-time, rebase cadence, Capsule install, BLS sequencing, fork naming, license)
+- vibeswap-ckb-dev.toml has 4 TODO Will-decide markers — all lock-args pending actual key generation at deploy time (deployer faucet, JUL multisig, VIBE multisig, Lawson deployer)
 - PairwiseVerifier spec has 7 open Qs (cycle budget tally, settlement enum, AgentRegistry gating, PoM, reward denomination, tie-break, witness serialization)
-- BLS implementation Q3 is THE blocker: canonical serialization of attestation digest
+- BLS implementation Q3: canonical serialization of attestation digest still open at the implementation layer
 
 ---
 

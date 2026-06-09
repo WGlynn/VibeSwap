@@ -31,7 +31,7 @@ bls12_381 = { version = "0.8", features = ["pairings", "groups", "experimental"]
 pairing = { version = "0.23" }
 
 # SHA-2 for the hash-to-G2 ciphersuite. Matches bls-verify's pin.
-sha2 = { version = "0.10" }
+sha2 = { version = "0.9" }
 
 # blake2 for canonical-digest computation, matching the
 # `SERIALIZATION_SPEC.md § Canonical Digest` blake2b-256 step.

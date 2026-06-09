@@ -1,0 +1,16 @@
+[package]
+name = "shapley-distributor-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Shapley reward distribution cell-type-script enforcing the 5-axiom set (Efficiency, Symmetry, Null-Player, Additivity, Pairwise-Proportionality) over atomized contribution events per specs/shapley-distributor.md."
+
+[[bin]]
+name = "shapley-distributor-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

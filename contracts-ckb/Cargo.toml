@@ -57,6 +57,23 @@ members = [
     # messaging-hub-canonical-token-cell (net-burn) and burn-receipt
     # (companion). Dest_chain_id sanity against SUPPORTED_DEST_CHAINS.
     "cross-chain-out-boundary-cell-type-script",
+    # Validator-set update boundary cell — per specs/nci-boundary-enforcement.md
+    # §2.3. Authorizes ValidatorRegistryCell rotations (add/remove/stake-update);
+    # cell-deps NCIScoreCell (higher threshold than CROSSCHAIN_IN per §2.3) +
+    # LawsonConstantsRegistry; composes same-tx with the registry input + output
+    # (the registry being mutated). 24-block finality per
+    # REORG_BEHAVIOR_DESIGN.md §6 governance-class.
+    "validator-update-boundary-cell-type-script",
+    # Emergency-pause boundary cell — per specs/nci-boundary-enforcement.md
+    # §2.6. Discretionary trip / attested resume of BreakerCells; cell-deps
+    # NCIScoreCell + LawsonConstantsRegistry + BreakerCell (same-tx in+out)
+    # + BreakerAttestationCell (required for resume, optional for trip) +
+    # ValidatorRegistryCell (n_validators for unanimous-resume reference).
+    # Asymmetric: trip = lower NCI threshold + 3 attesters + 0-block
+    # finality; resume = higher NCI threshold + unanimous + 24-block
+    # finality per REORG_BEHAVIOR_DESIGN §6. Companion to
+    # circuit-breaker-cell-type-script.
+    "emergency-pause-boundary-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

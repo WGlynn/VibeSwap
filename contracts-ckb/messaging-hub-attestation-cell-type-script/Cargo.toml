@@ -1,0 +1,17 @@
+[package]
+name = "messaging-hub-attestation-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "MessagingHub BLS attestation cell: threshold-aggregated signature verification against the active validator registry."
+
+[[bin]]
+name = "messaging-hub-attestation-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }
+bls-verify = { path = "../bls-verify" }

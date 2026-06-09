@@ -1,0 +1,25 @@
+[package]
+name = "bls-verify"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "no_std BLS12-381 aggregate-signature verifier shared across MessagingHub AttestationCell and NCI ScoreCell (Path 1+3 per spike)."
+
+[lib]
+name = "bls_verify"
+path = "src/lib.rs"
+
+[dependencies]
+# Pure-Rust BLS12-381. Per Agent 9 spike: zkcrypto/bls12_381 over blst
+# because blst's assembly fast-paths are x86-64/ARM64 only, useless on
+# RV64. zkcrypto crate is no_std-clean and used by Filecoin/Zcash.
+bls12_381 = { workspace = true }
+# We need SHA-256 for hash-to-G2 in the BLS standard ciphersuite. The
+# `bls12_381` crate provides `hash_to_curve` if the `experimental` feature
+# is enabled, but we keep our own thin SHA-2 dep here so the message-digest
+# step is auditable in isolation.
+# TODO: verify against bls12_381 0.x hash_to_curve API — if 0.8.x exposes
+# the IETF BLS ciphersuite map directly, drop sha2 and use it.
+sha2 = { version = "0.10", default-features = false }

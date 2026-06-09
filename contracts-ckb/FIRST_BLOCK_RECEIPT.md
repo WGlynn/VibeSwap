@@ -34,10 +34,28 @@ Cadence: ~5s per block (dev-mode NC-Max).
 
 ## What this does NOT prove
 
-- vibeswap-ckb augmentations (`chain-spec/vibeswap-ckb-dev.toml`) are NOT applied — we used the upstream `dev` spec for the smoke test
 - none of the 26 RISC-V cell binaries from `contracts-ckb/` are deployed on this chain
 - no canonical-token mint, deposit boundary, or cell-state transition has been exercised on-chain
 - the asm-accelerated VM path is OFF (we dropped `detect-asm` from `ckb-script` defaults to bypass the gcc requirement); the on-chain VM uses the interpreter, which is slower but semantically identical
+
+## Sovereign-spec smoke (vibeswap-ckb-dev applied)
+
+Re-init with `--import-spec contracts-ckb/chain-spec/vibeswap-ckb-dev.toml`:
+
+| key | value |
+|---|---|
+| chain name | `vibeswap_ckb_dev` |
+| genesis hash | `0xd802dc439bf0fe7056e5a516857fbf309e13049a3be0956e2558ba1e3374f7e5` |
+| block #1 | `0x37f083100c6650dc950d1926e2c8bac77355311a0283d9c8136094e895f949fe` |
+| block #2 | `0xd5ba1cc1f6cf7a9cb89342d8a62a4c278eb39cce5f1f89466f0b01705de6a64f` |
+| block #3 | `0xbf430b6a5f44ed68996c95beb9b80d14828df972a9e76ca5bc458c1d730f1138` |
+
+The genesis hash differs from the upstream-dev hash above, confirming the
+chain-spec VS-AUG markers (rebranded `name`, rebranded `genesis_cell.message`,
+adjusted `timestamp` to 2026-06-08 Position F anchor) are applied at the
+substrate level. NCI / Lawson / boundary cells are still post-genesis
+deployment work — capacity allocations for them are reserved in the spec but
+no transactions have consumed those reservations yet.
 
 ## Next deliberate step (Day 2 of OPERATIONS)
 

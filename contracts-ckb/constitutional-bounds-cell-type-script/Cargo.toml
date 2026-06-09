@@ -1,0 +1,16 @@
+[package]
+name = "constitutional-bounds-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Type-script enforcing immutability + cross-constraint shape of the genesis ConstitutionalBoundsCell."
+
+[[bin]]
+name = "constitutional-bounds-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

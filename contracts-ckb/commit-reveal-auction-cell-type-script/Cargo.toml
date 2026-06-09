@@ -1,0 +1,16 @@
+[package]
+name = "commit-reveal-auction-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "MEV-dissolving commit-reveal batch auction: CommitCell / RevealCell / BatchSettlementCell / SlashCell. Role-multiplexed per type-script.args[0]. Spec: contracts-ckb/specs/commit-reveal-auction.md."
+
+[[bin]]
+name = "commit-reveal-auction-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

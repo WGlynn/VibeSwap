@@ -92,7 +92,7 @@ Each spec needs a Rust crate. Priority order:
 ## What's not yet built (Layer 2 chain components beyond config)
 
 - BLS aggregation pipeline (Agent 9's BLS spike concluded Path 1+3 user-space + off-chain aggregation; implementation plan queued as Task 29)
-- ckb-debugger + ckb-testtool integration test harness (Task 27)
+- ckb-debugger + ckb-testtool integration test harness (Task 27): SETUP.md + first canonical-token test scaffolded 2026-06-08 (`contracts-ckb/test-infra/SETUP.md`, `tests/src/vibeswap_canonical_token_tests.rs`). Source compiles; VM execution gated on RISC-V binary build + C-toolchain install on dev machine.
 - Genesis cell deployment scripts (post-chain-spec, post-fork)
 - Boot scripts for `ckb run --chain vibeswap-ckb-dev.toml`
 

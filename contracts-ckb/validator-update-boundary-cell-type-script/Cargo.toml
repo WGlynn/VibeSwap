@@ -1,0 +1,16 @@
+[package]
+name = "validator-update-boundary-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Validator-set update boundary cell: authorizes ValidatorRegistryCell transitions per nci-boundary-enforcement.md §2.3."
+
+[[bin]]
+name = "validator-update-boundary-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

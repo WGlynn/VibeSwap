@@ -97,7 +97,6 @@
 #![no_std]
 #![no_main]
 
-extern crate alloc;
 
 use alloc::vec::Vec;
 use ckb_std::{
@@ -165,10 +164,7 @@ const REGISTRY_VALIDATOR_PUBKEY_LEN: usize = 48;
 pub fn program_entry() -> i8 {
     match verify() {
         Ok(()) => 0,
-        Err(e) => match e {
-            Error::BlsLibError(c) => c as i8,
-            other => other as i8,
-        },
+        Err(e) => e as i8,
     }
 }
 
@@ -295,7 +291,7 @@ fn verify_one_attestation(data: &[u8], registry: &ParsedRegistry) -> Result<(), 
         threshold_n: registry.threshold_n,
         threshold_d: registry.threshold_d,
     };
-    bls_verify::verify_aggregate(&inputs).map_err(|e| Error::BlsLibError(e as i8 + 60))
+    bls_verify::verify_aggregate(&inputs).map_err(|_| Error::BlsLibError)
 }
 
 // ============ Registry loading ============
@@ -371,14 +367,12 @@ fn collect_group_cell_data(source: Source) -> Result<Vec<Vec<u8>>, Error> {
 }
 
 fn blake2b_256(data: &[u8]) -> [u8; 32] {
-    // ckb-std's blake2b uses the CKB personalization "ckb-default-hash".
-    // TODO: verify against ckb-std 0.16 — the symbol path is
-    // `ckb_std::high_level::blake2b_256` in some 0.x versions and a
-    // submodule in others. If this fails, swap to a manual blake2b-rs
-    // call with the same personalization.
     let mut out = [0u8; 32];
-    let hash = ckb_std::high_level::blake2b_256(data);
-    out.copy_from_slice(&hash);
+    let mut blake2b = blake2b_ref::Blake2bBuilder::new(32)
+        .personal(b"ckb-default-hash")
+        .build();
+    blake2b.update(data);
+    blake2b.finalize(&mut out);
     out
 }
 

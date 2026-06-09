@@ -15,3 +15,4 @@ path = "src/main.rs"
 ckb-std = { workspace = true }
 heapless = { workspace = true }
 bls-verify = { path = "../bls-verify" }
+blake2b-ref = { version = "0.3", default-features = false }

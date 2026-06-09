@@ -22,4 +22,4 @@ bls12_381 = { workspace = true }
 # step is auditable in isolation.
 # TODO: verify against bls12_381 0.x hash_to_curve API — if 0.8.x exposes
 # the IETF BLS ciphersuite map directly, drop sha2 and use it.
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.9", default-features = false }

@@ -1,0 +1,23 @@
+[package]
+name = "messaging-hub-validator-registry-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "MessagingHub BLS validator registry cell: bonded validator set + BLS12-381 pubkeys + epoch transitions."
+
+[[bin]]
+name = "messaging-hub-validator-registry-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }
+# We don't BLS-verify here at the registry layer. PoP verification at
+# bond-time lives in a future ValidatorBondCell type-script. Inclusion of
+# `bls-verify` here is reserved for an explicit "verify-pop-on-add"
+# governance flow if we choose to enforce PoP at the registry level
+# instead. Currently commented because adding it would force a pairing
+# into every registry transition, which is wasteful.
+# bls-verify = { path = "../bls-verify" }

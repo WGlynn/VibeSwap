@@ -1,0 +1,16 @@
+[package]
+name = "messaging-hub-burn-receipt-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "MessagingHub burn-side receipt cell: created in conjunction with a canonical-token burn, signals intent to receive on a destination chain."
+
+[[bin]]
+name = "messaging-hub-burn-receipt-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

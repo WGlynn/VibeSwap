@@ -1,0 +1,16 @@
+[package]
+name = "messaging-hub-canonical-token-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "MessagingHub-level bridged-token cell type-script: tokens burned/minted at the cross-chain messaging boundary."
+
+[[bin]]
+name = "messaging-hub-canonical-token-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

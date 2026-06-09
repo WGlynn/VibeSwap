@@ -1,0 +1,31 @@
+[package]
+name = "vibeswap-canonical-token-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "sUDT-compatible canonical token type-script for VibeSwap cross-chain burn-and-mint."
+
+[[bin]]
+name = "vibeswap-canonical-token-type-script"
+path = "src/main.rs"
+
+[dependencies]
+# CKB script standard library: syscalls, cell inspection, witness parsing.
+# Workspace pin: 0.16 (see vibeswap/contracts-ckb/Cargo.toml).
+ckb-std = { workspace = true }
+# Heapless Vec for accumulating input/output amounts without alloc churn.
+# Bound chosen at 32 — well over any realistic per-tx canonical-token cell count.
+heapless = { version = "0.8", default-features = false }
+
+# NOTE: integration tests do NOT live in this crate. The on-chain crate is
+# no_std + no_main and cannot host `cargo test` runners. The companion
+# `tests/test_basic.rs` file in THIS directory is a reviewable test-spec
+# stub; the runnable integration test follows the pattern in the workspace
+# `ckb-tests` crate (see `contracts-ckb/tests/Cargo.toml`). The
+# `[[test]]` target is intentionally NOT declared here.
+#
+# CYCLE5: when this crate's tests are wired in `contracts-ckb/tests/`,
+# add a module file `tests/src/vibeswap_canonical_token_tests.rs` there
+# that mirrors `tests/src/primitive_cell_type_tests.rs`.

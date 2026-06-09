@@ -1,0 +1,33 @@
+[package]
+name = "lawson-constants-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Type-script enforcing the Lawson constitutional-bounds / governance-tunable-constants / append-only-history triad on CKB."
+
+[[bin]]
+name = "lawson-constants-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+# CKB script standard library: syscalls, cell inspection, witness parsing.
+# Workspace pin: 0.16 (see vibeswap/contracts-ckb/Cargo.toml).
+ckb-std = { workspace = true }
+# Heapless Vec for accumulating constants without alloc churn. Bound chosen
+# at 64 (per-cell max constants) — generous over realistic ~16 Lawson knobs
+# (Lawson floor, alpha, NCI weights x3, fee rate, batch durations, slash
+# percentages, breaker thresholds, emission rate, Pioneer bonus, ...).
+heapless = { version = "0.8", default-features = false }
+
+# NOTE: integration tests do NOT live in this crate. The on-chain crate is
+# no_std + no_main and cannot host `cargo test` runners. The companion
+# `tests/test_basic.rs` file in THIS directory is a reviewable test-spec
+# stub; the runnable integration test follows the pattern in the workspace
+# `tests` crate (see `contracts-ckb/tests/Cargo.toml`). The `[[test]]`
+# target is intentionally NOT declared here.
+#
+# CYCLE5: when this crate's tests are wired in `contracts-ckb/tests/`, add
+# a module file `tests/src/lawson_constants_cell_type_tests.rs` there that
+# mirrors `tests/src/primitive_cell_type_tests.rs`.

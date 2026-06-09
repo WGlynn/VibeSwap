@@ -1,0 +1,27 @@
+[package]
+name = "ckb-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# This crate is a **host-target** integration-test harness. It compiles to the
+# developer's native triple (x86_64-pc-windows-{gnu,msvc} / x86_64-unknown-linux-gnu
+# / aarch64-apple-darwin) and uses `ckb-testtool` to spin up a CKB VM Context,
+# deploy the RISC-V script binaries, build transactions, and assert pass/fail.
+#
+# It is intentionally a `lib` (no `[[bin]]`) so cargo treats it purely as a
+# `cargo test` target.
+#
+# The RISC-V script binaries are loaded via `include_bytes!` from
+# `../build/release/<script-name>`, which is Capsule's output convention.
+# Until `capsule build` runs successfully on the developer's machine, those
+# paths are stub placeholders documented in `tests/README.md` and in
+# CYCLE5: comments at each include point.
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+ckb-testtool = "1.1"

@@ -8,6 +8,15 @@ members = [
     "escrow-vault-cell-type-script",
     "proof-of-mind-lock-script",
     "vibeswap-canonical-token-type-script",
+    "lawson-constants-cell-type-script",
+    # IMessagingHub canonical-burn-and-mint cells (Agent 13 drift-fix:
+    # interface existed since 2026-05, implementation never landed on
+    # EVM; now chain-native on CKB-fork per [J·vibeswap-ckb-sovereign-pivot]).
+    "bls-verify",
+    "messaging-hub-canonical-token-cell-type-script",
+    "messaging-hub-burn-receipt-cell-type-script",
+    "messaging-hub-validator-registry-cell-type-script",
+    "messaging-hub-attestation-cell-type-script",
     "tests",
 ]
 
@@ -30,3 +39,13 @@ publish = false
 
 [workspace.dependencies]
 ckb-std = { version = "0.16", default-features = false }
+# BLS12-381 pure-Rust no_std crate per the cycle-budget spike Path-1+3 verdict.
+# Spec: contracts-ckb/specs/bls12-381-cycle-budget-spike.md §5.
+# Pinned to 0.8 (current stable as of 2026-06). Disable `pairings` default
+# only if we move to off-chain-only verification (we don't — on-chain pair
+# verify is the whole point of Path 1+3).
+# TODO: verify against bls12_381 0.x — minor version may shift between
+# now and capsule-build; reproducibility harness will lock-step.
+bls12_381 = { version = "0.8", default-features = false, features = ["alloc", "pairings", "groups"] }
+# Heapless containers shared across cell crates.
+heapless = { version = "0.8", default-features = false }

@@ -17,7 +17,21 @@ members = [
     "messaging-hub-burn-receipt-cell-type-script",
     "messaging-hub-validator-registry-cell-type-script",
     "messaging-hub-attestation-cell-type-script",
+    # Circuit-breaker triad (REINTERPRET port of contracts/core/CircuitBreaker.sol).
+    # Composes with lawson-constants-cell-type-script (threshold + cooldown
+    # + quorum source via cell-dep) and the pending NCI ValidatorRegistry
+    # (attester identity). See contracts-ckb/specs/circuit-breaker.md.
+    "circuit-breaker-cell-type-script",
     "tests",
+]
+# `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds
+# under the host toolchain (stable), produces aggregated witness blobs
+# off-chain, and is bundled with the validator node, not the chain. It
+# must NOT compile under the workspace's `riscv64imac-unknown-none-elf`
+# target. Excluded from the workspace; has its own Cargo.toml with a
+# stable-toolchain pin.
+exclude = [
+    "bls-aggregator",
 ]
 
 # Per CKB script conventions, default profile is release-stripped to keep

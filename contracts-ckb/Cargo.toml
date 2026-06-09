@@ -84,6 +84,17 @@ members = [
     # threshold (slash is irreversible). Same-tx BondCell consumption per
     # slash-router.md (this crate authorizes; bond's type-script executes).
     "slash-boundary-cell-type-script",
+    # Governance parameter-update boundary cell — per
+    # specs/nci-boundary-enforcement.md §2.5. Structurally most load-bearing:
+    # governs the constants that govern every other boundary. Dual-layer
+    # enforcement (NCI + ConstitutionalBoundsCell) — a 51% NCI quorum cannot
+    # push out-of-bounds constants because the immutable BoundsCell vetoes.
+    # Cell-deps NCIScoreCell (highest tier threshold) + LawsonConstantsRegistry
+    # (read for own thresholds; same-tx I/O for the mutation) +
+    # ConstitutionalBoundsCell (mandatory: per-constant [min,max] +
+    # cross-constraint op-codes SUM_LT/GTE_ZERO/SUM_EQ). 24-block finality
+    # per REORG_BEHAVIOR_DESIGN §6 governance-class.
+    "governance-update-boundary-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

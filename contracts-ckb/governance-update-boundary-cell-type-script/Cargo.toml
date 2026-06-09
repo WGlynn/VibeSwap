@@ -1,0 +1,16 @@
+[package]
+name = "governance-update-boundary-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Governance parameter-update boundary cell: authorizes LawsonConstantsRegistry mutations per nci-boundary-enforcement.md §2.5 (dual-layer: NCI + ConstitutionalBoundsCell)."
+
+[[bin]]
+name = "governance-update-boundary-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

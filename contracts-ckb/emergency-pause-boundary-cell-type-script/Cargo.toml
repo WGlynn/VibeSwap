@@ -1,0 +1,16 @@
+[package]
+name = "emergency-pause-boundary-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Emergency-pause boundary cell: gates discretionary trip and attested resume of BreakerCells per nci-boundary-enforcement.md §2.6. Asymmetric: trip uses lower threshold + 3 attesters + 0-block finality; resume uses higher threshold + unanimous attestation + 24-block finality."
+
+[[bin]]
+name = "emergency-pause-boundary-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }

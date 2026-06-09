@@ -74,6 +74,16 @@ members = [
     # finality per REORG_BEHAVIOR_DESIGN §6. Companion to
     # circuit-breaker-cell-type-script.
     "emergency-pause-boundary-cell-type-script",
+    # Slash boundary cell — per specs/nci-boundary-enforcement.md §2.4.
+    # Authorizes validator-bond slashing on evidence; cell-deps NCIScoreCell
+    # (highest threshold of any boundary — false-slash is adversarial
+    # weapon) + LawsonConstantsRegistry + evidence cell (TaskVerdictCell /
+    # EquivocationProofCell / OfflineAttestationCell / MessagingPoMFailCell,
+    # dispatched on slash_reason) + ValidatorRegistryCell for bond-amount
+    # cap. 100-block finality per REORG_BEHAVIOR_DESIGN §6 — deepest
+    # threshold (slash is irreversible). Same-tx BondCell consumption per
+    # slash-router.md (this crate authorizes; bond's type-script executes).
+    "slash-boundary-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

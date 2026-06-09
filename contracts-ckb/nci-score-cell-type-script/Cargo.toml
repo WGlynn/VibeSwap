@@ -1,0 +1,21 @@
+[package]
+name = "nci-score-cell-type-script"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "NCI score cell: three-pillar (PoW/PoS/PoM) composite score gating every vibeswap-app boundary transition per NCI Position C."
+
+[[bin]]
+name = "nci-score-cell-type-script"
+path = "src/main.rs"
+
+[dependencies]
+ckb-std = { workspace = true }
+heapless = { workspace = true }
+# Attestation witness binding: bls-verify is included for the future
+# step where this script re-verifies the referenced AttestationCell's
+# aggregate signature inline. v1 only checks tx-hash linkage; v2 will
+# call into bls-verify::verify_aggregate.
+bls-verify = { path = "../bls-verify" }

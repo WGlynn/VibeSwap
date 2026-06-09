@@ -30,6 +30,12 @@ members = [
     # NCI three-pillar score cell — gates every vibeswap-app boundary per
     # NCI_CONSENSUS_ANSWER.md Position C + specs/nci-boundary-enforcement.md.
     "nci-score-cell-type-script",
+    # Deposit boundary cell — first of 7 boundary cells per
+    # specs/nci-boundary-enforcement.md §2.1. Authorizes external -> internal
+    # value transitions; cell-deps NCIScoreCell + LawsonConstantsRegistry;
+    # composes same-tx with vibeswap-canonical-token-type-script for amount
+    # conservation. Day 5 of OPERATIONS.md first-smoke target.
+    "deposit-boundary-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

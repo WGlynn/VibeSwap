@@ -3,7 +3,6 @@
 #![no_std]
 #![no_main]
 
-extern crate alloc;
 
 use ckb_std::{
     ckb_constants::Source,

@@ -51,6 +51,7 @@ pub enum Error {
     TripAttesterCountInsufficient = 82,
     // Resume quorum (unanimous against the registry's validator-count) not met.
     ResumeAttesterCountInsufficient = 83,
+    ValidatorRegistryCellDepMissing = 84,
 
     // Finality (REORG_BEHAVIOR_DESIGN §6: trip = 0, resume = 24)
     // Resume action cannot be consumed before 24-block finality on the

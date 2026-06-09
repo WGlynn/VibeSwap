@@ -155,7 +155,7 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-ckb-std = { version = "0.16", default-features = false }
+ckb-std = { version = "0.16", default-features = false, features = ["ckb-types", "allocator"] }
 # BLS12-381 pure-Rust no_std crate per the cycle-budget spike Path-1+3 verdict.
 # Spec: contracts-ckb/specs/bls12-381-cycle-budget-spike.md §5.
 # Pinned to 0.8 (current stable as of 2026-06). Disable `pairings` default
@@ -163,6 +163,6 @@ ckb-std = { version = "0.16", default-features = false }
 # verify is the whole point of Path 1+3).
 # TODO: verify against bls12_381 0.x — minor version may shift between
 # now and capsule-build; reproducibility harness will lock-step.
-bls12_381 = { version = "0.8", default-features = false, features = ["alloc", "pairings", "groups"] }
+bls12_381 = { version = "0.8", default-features = false, features = ["alloc", "pairings", "groups", "experimental"] }
 # Heapless containers shared across cell crates.
 heapless = { version = "0.8", default-features = false }

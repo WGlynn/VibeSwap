@@ -32,9 +32,9 @@ pub enum Error {
     RegistryMalformed = 51,
 
     // ============ bls-verify pass-through (60-79) ============
-    /// Wraps a `bls_verify::BlsError` code (1-9) shifted by +60.
-    /// Recipient can subtract 60 to recover the underlying lib error.
-    BlsLibError(i8) = 60,
+    /// Underlying `bls_verify::BlsError` shifted by +60 at construction.
+    /// Recipient can subtract 60 to recover the underlying lib code.
+    BlsLibError = 60,
 }
 
 impl From<SysError> for Error {

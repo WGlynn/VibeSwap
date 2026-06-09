@@ -70,6 +70,51 @@ Queue rewritten post-pivot. Tasks 16-22 deprecated (off-axis: Odysseus dispatch,
 
 This pivot is the real meaning of [J·vibeswap-ckb-sovereign-pivot]: own the chain. The contract-shape framing was keeping JARVIS in the Solidity mental model even on the CKB side.
 
+**🔄 SECOND PIVOT 2026-06-08 19:18 ET — Architecture review + COMMANDMENTS 5/6**:
+
+Will-directives 19:07-19:18 ET added Commandments 4/5/6 to the autonomous-loop primitive (now [P·six-commandment-autonomous-loop], commit `72e8e18`):
+- C4 EXECUTE — JARVIS decides, no queue. WILL_DECISIONS_MADE.md replaces WILL_PENDING_DECISIONS.md
+- C5 REVIEW EVERY EPOCH — senior-architect lens. Canonical reference: `Desktop/architecture-review-2026-06-08-senior-blockchain-architect.md` (12 findings on vibeswap-ckb)
+- C6 IMPROVE DESIGN SKILLS — continuous background meta-learning, blockchain-domain priority
+
+JARVIS shipped a senior-blockchain-architect review of the entire pivot work. Findings re-calibrated per [F·spec-vs-deployed-severity-calibration] (commit `60bef54`):
+- **CRITICAL** (spec × structurally-load-bearing): NCI-as-consensus ambiguity (#1), fork-vs-mainnet model (#2)
+- **HIGH**: 0 blocks booted (#3), bootstrap sequencing undesigned (#4), reorg behavior undefined (#5), BLS canonical digest (#6)
+- **MEDIUM-LOW**: spec-only Rust gaps (deferred to deploy-prep cycle), patterns, alternatives-comparison
+
+**Swarm pivoted from cell-scaffolding to design-resolution** (review-driven):
+- ✓ NCI Position C chosen (commit `ddd2e7ff`): hybrid app-layer consensus at vibeswap-ckb boundary seam; honors both blockchain-not-contracts + PULL-FROM-UPSTREAM directives
+- ⏳ NCI boundary enforcement spec (in flight, follow-up gate for Position C)
+- ⏳ Fork-vs-mainnet decision doc (in flight)
+- ⏳ Reorg behavior design (in flight)
+- ✓ BLS canonical digest: 104-byte Molecule preimage spec (commit `8d875cf0`) — Q3 blocker resolved
+
+**Chain-build artifacts shipped this leg (post-pivot, mostly post-review)**:
+- 2 Rust cells pre-review: vibeswap-canonical-token (`766373d4`), Lawson (`0f2343c5`)
+- 1 cell mid-review: CircuitBreaker (`54519341`)
+- 5 cells + shared lib post-review (continuation of in-flight work): IMessagingHub cells (canonical-token / burn-receipt / validator-registry / attestation + bls-verify lib, `d587a357`)
+- Total: 8 cell crates + 1 shared lib + bls-aggregator host binary
+- 10+ TODO at LOW severity per [F·spec-vs-deployed-severity-calibration]
+
+**Memory primitives added late-PM**:
+- `primitive_six-commandment-autonomous-loop.md` (replaces 4-commandment, `72e8e18`)
+- `feedback_spec-vs-deployed-severity-calibration.md` (`60bef54`)
+- `feedback_code-comment-why-only.md` (vdmkenny PR#3363 merge nit, `23199ef`)
+- `feedback_blockchain-not-contracts.md` (earlier pivot, `3797787`)
+
+**Will posture LATE evening**:
+- 19:07 ET — "you make decisions on my behalf no more pending decisions please" + "just execute"
+- 19:18 ET — "every epoch" + "5th commandment" + "6th is always be improving your design skills for blockchain"
+- 19:25 ET — paste of full PR #3363 thread: "doesnt need action ... making sure you are aware" + vdmkenny's "next time less narration" nit
+- ¬ further interruptions through ~19:50 ET
+
+**Critical-path verdicts pending resolution by 3 in-flight agents**:
+1. NCI boundary enforcement spec → enumerate every vibeswap-app boundary + mandatory NCIScoreCell cell-dep invariant. Without this, Position C collapses to decoration.
+2. Fork-vs-mainnet decision → F (sovereign chain, run validators), M (deploy on Nervos mainnet), or H (hybrid: mainnet first, fork later)
+3. Reorg behavior design → finality thresholds + cell-class-specific reorg semantics + composition with Position C
+
+**Next-session boot priority**: read `Desktop/architecture-review-2026-06-08-senior-blockchain-architect.md` first; then read `NCI_CONSENSUS_ANSWER.md` + the 3 pending design docs once landed; pick critical-path item #1 still open + execute.
+
 ---
 
 ## ⚡ ACTIVE STATE 2026-06-08 ~18:00 ET — ASI mission articulated + abstraction-phase thesis + first production receipt + cron architecture

@@ -36,6 +36,21 @@ members = [
     # composes same-tx with vibeswap-canonical-token-type-script for amount
     # conservation. Day 5 of OPERATIONS.md first-smoke target.
     "deposit-boundary-cell-type-script",
+    # Withdrawal boundary cell — companion to deposit per
+    # specs/nci-boundary-enforcement.md §2.2. Authorizes internal -> external
+    # value transitions; cell-deps NCIScoreCell + LawsonConstantsRegistry +
+    # matched DepositBoundaryCell (owner/sudt match + finality + unconsumed);
+    # composes same-tx with vibeswap-canonical-token-type-script for the
+    # owner-receipt output. Higher score threshold than deposit per §2.2.
+    "withdrawal-boundary-cell-type-script",
+    # Cross-chain inbound boundary cell — per specs/nci-boundary-enforcement.md
+    # §2.7. Authorizes BLS-attested remote-burn -> local-mint; cell-deps
+    # NCIScoreCell + LawsonConstantsRegistry + AttestationCell +
+    # ValidatorRegistryCell; composes same-tx with
+    # messaging-hub-canonical-token-cell for mint. 24-block finality per
+    # REORG_BEHAVIOR_DESIGN.md §6 — most reorg-sensitive boundary (reorg
+    # here = mint without burn = supply inflation).
+    "cross-chain-in-boundary-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

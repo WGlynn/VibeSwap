@@ -9,6 +9,11 @@ members = [
     "proof-of-mind-lock-script",
     "vibeswap-canonical-token-type-script",
     "lawson-constants-cell-type-script",
+    # ConstitutionalBoundsCell: immutable post-genesis bounds + cross-constraint
+    # op-codes (e.g. SUM_LT(pow_bps, pos_bps, pom_bps)) per
+    # specs/nci-boundary-enforcement.md §2.5 + OPERATIONS.md Day 2 deploy.
+    # Lawson registry cell-deps this for value/alpha bound checks.
+    "constitutional-bounds-cell-type-script",
     # IMessagingHub canonical-burn-and-mint cells (Agent 13 drift-fix:
     # interface existed since 2026-05, implementation never landed on
     # EVM; now chain-native on CKB-fork per [J·vibeswap-ckb-sovereign-pivot]).
@@ -22,6 +27,9 @@ members = [
     # + quorum source via cell-dep) and the pending NCI ValidatorRegistry
     # (attester identity). See contracts-ckb/specs/circuit-breaker.md.
     "circuit-breaker-cell-type-script",
+    # NCI three-pillar score cell — gates every vibeswap-app boundary per
+    # NCI_CONSENSUS_ANSWER.md Position C + specs/nci-boundary-enforcement.md.
+    "nci-score-cell-type-script",
     "tests",
 ]
 # `bls-aggregator` is a host-target binary (NOT a CKB cell). It builds

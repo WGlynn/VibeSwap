@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "primitive-cell-type-script",
+    "primitive-cell-lock-script",
+    "datatoken-cell-type-script",
+    "lineage-vault-cell-type-script",
+    "escrow-vault-cell-type-script",
+    "proof-of-mind-lock-script",
+    "vibeswap-canonical-token-type-script",
+    "tests",
+]
+
+# Per CKB script conventions, default profile is release-stripped to keep
+# RISC-V binary size down. Capsule overrides as needed.
+[profile.release]
+overflow-checks = true
+opt-level = 3
+strip = true
+codegen-units = 1
+panic = "abort"
+lto = true
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["VibeSwap contributors"]
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+ckb-std = { version = "0.16", default-features = false }

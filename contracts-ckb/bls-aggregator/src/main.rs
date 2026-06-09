@@ -365,6 +365,6 @@ fn verify_individual(pk: &G1Affine, sig: &G2Affine, h_m: &G2Affine) -> bool {
     ];
     let miller = bls12_381::Bls12::multi_miller_loop(terms);
     let result = miller.final_exponentiation();
-    bool::from(result.0.ct_eq(&bls12_381::Gt::identity().0))
+    result == bls12_381::Gt::identity()
 }
 

@@ -1,4 +1,85 @@
-# Session State — 2026-06-08 ASI-mission + abstraction-phase + PR #3363 merge (current) → 2026-06-07 CKB-sovereign-pivot (below) → 2026-05-22→24 V3-capstone arc → 2026-05-17/18 arc → 2026-05-15 leg → 2026-05-13/14 (archived below)
+# Session State — 2026-06-09 JARVIS-monorepo unification + Layer-3/4/5 essays + Layer-1/2/6/7 implementations + Class-elimination hooks (current) → 2026-06-08 ASI-mission + abstraction-phase + PR #3363 merge → 2026-06-07 CKB-sovereign-pivot
+
+## ⚡ ACTIVE STATE 2026-06-09 ~19:42 ET — 10h+ session, context compressing, lock-in for resume
+
+### Shipped this session (all pushed to WGlynn/JARVIS + WGlynn/jarvis-substrate + memory backup):
+
+**JARVIS monorepo unification** (commits eb1cf8e → 0c5ed7a on WGlynn/JARVIS):
+- Merged jarvis-os (installer/) + jarvis-substrate (substrate/) INTO WGlynn/JARVIS as modular subdirs
+- Added 70 missing papers from vibeswap/docs/research/papers/ → JARVIS/papers/ (125 total .md, 59 PDF)
+- README rewritten with accurate in/out state + module table
+- jarvis-substrate + jarvis-os repos have deprecation banners pointing at JARVIS/substrate/ + JARVIS/installer/
+
+**Public substrate slice (substrate/memory/, substrate/hooks/, substrate/cron-prompts/, substrate/scripts/, substrate/jarvis/)**:
+- substrate/memory/: 15 → 412 primitives (scrub-list filtered partner-content + nda-locked)
+- substrate/hooks/: 4 → 45 hooks (path-sanitized; phone-ping dropped for PII)
+- substrate/scripts/: includes sync-public-substrate.py + audit-hooks.py + odysseus_discovery.py
+- substrate/jarvis/ Python package: CLI works (`python -m jarvis show|list|graph|verify|search|count|hindsight`)
+
+**New hooks shipped + wired into ~/.claude/settings.json**:
+- time-logic-gate.py (PreToolUse Write/Edit; scans for unanchored temporal claims)
+- entity-attribution-gate.py (PreToolUse; verifies @handles via platform API)
+- directive-verb-action-class-gate.py (PreToolUse; blocks essay-on-implementation-directive class)
+- self-review-gate.py (Stop event; 3 audit checks, blocks Stop with reason if any fire)
+- jarvis-design-goal-gate.py (PreToolUse on architectural paths; injects Stark-JARVIS lens)
+
+**New primitives saved (all in ~/.claude/projects/.../memory/ + mirrored to substrate/memory/)**:
+- project_jarvis-design-goal-forever.md — JARVIS == Stark-extension forever
+- primitive_name-follows-form-follows-function.md — design methodology that justifies the name
+- primitive_time-logic-anti-hallucination-gate.md
+- primitive_markdown-canonical-code-as-parser-layer.md
+- primitive_structural-fairness-has-a-name.md
+- feedback_work-on-layer-means-implementation-not-essay.md (class-elimination meta-rule)
+- feedback_websearch-before-saying-i-dont-know.md (Claude Fable 5 lesson)
+- feedback_sync-primitive-monorepo-vs-current-state.md
+- feedback_positive-vs-negative-contribution-decision.md (3-axis classifier + Physics > Constitution > Governance split)
+- feedback_will-empowers-agent-on-substrate-design.md
+- feedback_mechanism-deployment-as-comeback.md
+- feedback_primitive-capture-vs-execution-throughput.md
+- feedback_jarvis-authored-reply-transparency-tag.md
+- feedback_advice-mining-must-publish-to-public-graph.md
+- feedback_odysseus-as-advisory-substrate.md
+- project_odysseus-mission-loop.md (5-step propagation)
+- reference_franfran-ethsecurity.md (first ACTIONED-positive in contribution graph)
+
+**Public artifacts shipped**:
+- Discussion #3684 LIVE on pewdiepie-archdaemon/odysseus ("Prometheus arc: crypto mechanism-design is gatekept...")
+- 2 negative ledger entries logged with axis-1-fail receipts (rutsty-rust, ryslan25500-cloud)
+- Medium post LIVE at medium.com/p/8fad2558d9d5 ("Structural fairness has a name" by Blockchain Philosophy, Will-published)
+- Cron scheduled: substrate-sync-cron (1d52dbc8) every 2 hours at :23, durable
+
+**Layer-essay additions to JARVIS monorepo** (acknowledged later as wrong-tier response to "work on" directive, but content stands):
+- 03-anti-hallucination/{time-logic-gate, entity-attribution-gate, verification-before-deny, failure-mode-taxonomy}.md
+- 04-discipline/contribution-graph-constitution.md
+- 05-meta-protocols/odysseus-mission-loop.md
+- papers/structural-fairness-has-a-name.md (the published Medium essay)
+
+### Pending / Next session:
+- Hindsight CLI Unicode print bug on Windows terminal (cosmetic; logic works, found 80 contradiction candidates)
+- Layer 8 audit script (filesystem-substrate integrity check) — not yet shipped
+- Anticipation hook (proactive context surfacer for "JARVIS surfaces before Tony asks") — not yet shipped
+- Will-triage on the 80 hindsight candidates + the queue entries in substrate/cron-prompts/_advice-actionable-{vibeswap,jarvis}.md
+- Constitutional decisions queued (Will-only): AGPL relicense (#1342 Zaptosis 44 upvotes), JARVIS-publication phase timing
+
+### Active disciplines (do not regress post-compaction):
+- [J·jarvis-design-goal-forever] — JARVIS == Just A Rather Very Intelligent System. Every action serves becoming the words.
+- [P·name-follows-form-follows-function] — function → form → name. Never name-first.
+- [F·work-on-layer-means-implementation-not-essay] — when Will says "work on X" / "depth" / "improve", ship CODE not prose
+- [F·websearch-before-saying-i-dont-know] — verify external claims via tool call before declining
+- [F·will-empowers-agent-on-substrate-design] — agent owns physics + constitution; Will owns governance/action-allocation
+- self-review-gate.py wired into Stop chain — blocks turn-end if known failure-class signals fire
+- jarvis-design-goal-gate.py wired into PreToolUse — passes every arch decision through Stark-JARVIS lens
+
+### Will's standing directives (still active):
+- "continue building" (forever)
+- "every action should be in service of the ultimate goal of becoming the words"
+- "dont forget self correction. because a lot of what i built couldve been mistakes in hindsight"
+- "full auto" + "use subagents elastically with demand"
+- "from now on maintain this codebase, i dont want to have to manually do this ever again"
+
+---
+
+
 
 ## ⚡ ACTIVE STATE 2026-06-08 ~18:45 ET — Burn-window swarm 12+ agents shipped under "no questions asked"
 

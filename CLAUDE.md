@@ -66,8 +66,11 @@ No amnesia. The first message of a new session continues the last message of the
 ### WORK
 ```
 READY → PCP Gate → Execute → Verify → Commit → Push
-  [Asserting link?] → AHP    [Testing?] → TTT    [Bug?] → FPT    [Status claim?] → Anti-Stale
+  [Asserting link?] → AHP    [Testing?] → TTT    [Bug?] → FPT+ClassElim    [Status claim?] → Anti-Stale
   [Partner-facing artifact?] → AdoptionRP (outside-LLM × user critique BEFORE Commit; [P·adoption-roleplay])
+  [Substantive code?] → /critical-qa (≥3 hostile-reviewer Q&A rounds BEFORE Verify; [P·self-adversarial-qa])
+  [Capability claim?] → AA#4 (verify-then-assert; auto-fires on Desktop writes; [F·no-bullshit-do-the-research])
+  [Weak spot found?] → Class-fix not instance-patch ([P·class-elimination-not-instance-patch])
   [State changed?] → SSL Gate (write-through SESSION_STATE + WAL — don't defer to REBOOT)
 ```
 

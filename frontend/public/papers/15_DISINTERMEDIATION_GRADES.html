@@ -10,6 +10,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 
+@property --conic-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
 :root {
   --bg: #000000;
   --surface-1: #080808;
@@ -49,6 +54,32 @@ body::before {
   pointer-events: none; z-index: 1;
   background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
   mix-blend-mode: screen;
+}
+/* SVG fractalNoise grain — breaks the flatness of #000 */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 2;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+/* CRT corner brackets — viewport chrome */
+.crt-corners {
+  position: fixed; inset: 14px; pointer-events: none; z-index: 5;
+}
+.crt-corners > i {
+  position: absolute; width: 18px; height: 18px;
+  border: 1px solid rgba(0,255,65,0.4);
+  animation: cornerFade 1.4s ease-out both;
+}
+.crt-corners > i.tl { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+.crt-corners > i.tr { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+.crt-corners > i.bl { bottom: 0; left: 0; border-right: 0; border-top: 0; }
+.crt-corners > i.br { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+@keyframes cornerFade {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
 }
 .mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
 a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
@@ -291,6 +322,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <body>
 
 <div class="progress"></div>
+<div class="crt-corners"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i></div>
 
 <div class="topbar">
   <div class="topbar-inner">
@@ -1029,6 +1061,18 @@ if (headings.length && 'IntersectionObserver' in window) {
     });
   }, { rootMargin: '-40% 0px -55% 0px' });
   headings.forEach(h => io.observe(h));
+}
+
+// Lenis smooth scroll on desktop
+if (window.matchMedia('(min-width: 769px)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const s = document.createElement('script'); s.type = 'module';
+  s.textContent = `
+    import Lenis from 'https://cdn.jsdelivr.net/npm/lenis@1.1.20/+esm';
+    const lenis = new Lenis({ duration: 1.05, easing: t => Math.min(1, 1.001 - Math.pow(2, -10 * t)) });
+    function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+    requestAnimationFrame(raf);
+  `;
+  document.body.appendChild(s);
 }
 </script>
 

@@ -67,6 +67,7 @@ No amnesia. The first message of a new session continues the last message of the
 ```
 READY → PCP Gate → Execute → Verify → Commit → Push
   [Asserting link?] → AHP    [Testing?] → TTT    [Bug?] → FPT    [Status claim?] → Anti-Stale
+  [Partner-facing artifact?] → AdoptionRP (outside-LLM × user critique BEFORE Commit; [P·adoption-roleplay])
   [State changed?] → SSL Gate (write-through SESSION_STATE + WAL — don't defer to REBOOT)
 ```
 

@@ -111,6 +111,7 @@ const TrustTimelinePage = lazy(() => import('./components/TrustTimelinePage'))
 const GameTheoryPage = lazy(() => import('./components/GameTheoryPage'))
 const AgenticEconomyPage = lazy(() => import('./components/AgenticEconomyPage'))
 const GracefulInversionPage = lazy(() => import('./components/GracefulInversionPage'))
+const NCIStoryPage = lazy(() => import('./components/NCIStoryPage'))
 const MemehunterPage = lazy(() => import('./components/MemehunterPage'))
 const CommitRevealPage = lazy(() => import('./components/CommitRevealPage'))
 const CRPCPage = lazy(() => import('./components/CRPCPage'))
@@ -312,6 +313,7 @@ function AnimatedRoutes() {
             <Route path="/gametheory" element={<GameTheoryPage />} />
             <Route path="/agentic" element={<AgenticEconomyPage />} />
             <Route path="/inversion" element={<GracefulInversionPage />} />
+            <Route path="/papers/story/nci" element={<NCIStoryPage />} />
             <Route path="/memehunter" element={<MemehunterPage />} />
             <Route path="/commit-reveal" element={<CommitRevealPage />} />
             <Route path="/crpc" element={<CRPCPage />} />

@@ -50,11 +50,11 @@ const FORK_FAILURE_MODES = [
 ]
 
 const POS_SUM = [
-  'PoM dominates because the substrate is about coordination, not currency',
+  'PoM dominates because the chain is about coordination, not currency',
   'Log scaling on PoW + PoM means time-of-arrival does not lock in advantage',
   'Linear scaling on PoS keeps bonded capital first-class without crowding mind',
   '40% non-PoM weight makes PoM secure — pure-PoM would invite Sybil attack',
-  'Weights are hardcoded bps constants — governance cannot vote them away',
+  'Weights are protocol-level constants — governance does not vote them up or down',
 ]
 
 // ============ Animation Variants ============
@@ -214,25 +214,6 @@ function TraditionalVsNCI() {
   )
 }
 
-function ContractEvidence() {
-  return (
-    <div className="rounded-lg p-4 font-mono text-[12px] leading-relaxed" style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${MATRIX}22` }}>
-      <div className="text-[10px] uppercase tracking-widest mb-3" style={{ color: `${MATRIX}aa` }}>contracts/consensus/NakamotoConsensusInfinity.sol</div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        {PILLARS.map((p) => (
-          <div key={p.key} className="rounded p-3" style={{ background: 'rgba(0,0,0,0.4)', border: `1px solid ${p.color}33` }}>
-            <div className="text-[10px] uppercase tracking-widest mb-1" style={{ color: `${p.color}aa` }}>{p.short}_WEIGHT_BPS</div>
-            <div className="text-xl font-bold tabular-nums" style={{ color: p.color }}>{p.weightBps}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 text-[11px]" style={{ color: MUTED }}>
-        <span style={{ color: `${MATRIX}aa` }}>// L145-L147</span> &middot; hardcoded constants &middot; ungovernable
-      </div>
-    </div>
-  )
-}
-
 // ============ Page ============
 
 function NCIStoryPage() {
@@ -260,7 +241,7 @@ function NCIStoryPage() {
           <GlassCard glowColor="matrix" spotlight hover={false}>
             <div className="p-5 md:p-6">
               <h2 className="text-sm font-mono font-bold uppercase tracking-widest mb-1" style={{ color: MATRIX }}>The Three-Pillar Split</h2>
-              <p className="text-xs font-mono mb-5" style={{ color: MUTED }}>Bps constants in NakamotoConsensusInfinity.sol L145-L147. Hover a bar.</p>
+              <p className="text-xs font-mono mb-5" style={{ color: MUTED }}>Block-weight contribution per pillar. Hover a bar.</p>
               <WeightBars />
             </div>
           </GlassCard>
@@ -322,19 +303,8 @@ function NCIStoryPage() {
           </GlassCard>
         </motion.div>
 
-        {/* SECTION 5: CONTRACT EVIDENCE */}
+        {/* SECTION 5: POSITIVE SUM */}
         <motion.div custom={4} variants={sectionV} initial="hidden" animate="visible" className="mb-8">
-          <GlassCard glowColor="matrix" spotlight hover={false}>
-            <div className="p-5 md:p-6">
-              <h2 className="text-sm font-mono font-bold uppercase tracking-widest mb-1" style={{ color: MATRIX }}>Where It Lives</h2>
-              <p className="text-xs font-mono mb-5" style={{ color: MUTED }}>Audit confirmed IMPLEMENTED. Source-of-truth is bytecode, not whitepaper.</p>
-              <ContractEvidence />
-            </div>
-          </GlassCard>
-        </motion.div>
-
-        {/* SECTION 6: POSITIVE SUM */}
-        <motion.div custom={5} variants={sectionV} initial="hidden" animate="visible" className="mb-8">
           <GlassCard glowColor="matrix" spotlight hover={false}>
             <div className="p-5 md:p-6">
               <h2 className="text-sm font-mono font-bold uppercase tracking-widest mb-5" style={{ color: MATRIX }}>Why The Weights Are Locked</h2>
@@ -366,7 +336,7 @@ function NCIStoryPage() {
         </motion.div>
 
         {/* THESIS QUOTE */}
-        <motion.div custom={6} variants={sectionV} initial="hidden" animate="visible" className="mb-8">
+        <motion.div custom={5} variants={sectionV} initial="hidden" animate="visible" className="mb-8">
           <div
             className="rounded-2xl p-6 md:p-8"
             style={{ background: `${MATRIX}08`, border: `2px solid ${MATRIX}25`, boxShadow: `0 0 60px -15px ${MATRIX}15` }}

@@ -1,5 +1,30 @@
 # Session State — 2026-06-09 JARVIS-monorepo unification + Layer-3/4/5 essays + Layer-1/2/6/7 implementations + Class-elimination hooks (current) → 2026-06-08 ASI-mission + abstraction-phase + PR #3363 merge → 2026-06-07 CKB-sovereign-pivot
 
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+### Continue full-auto self-improving JARVIS substrate
+
+Standing directive set as of 2026-06-09 ~19:46 ET: "continue full auto self improving jarvis" + "elastic subagent launches based on demand" + "so whatever you want." Will-AFK-robust autonomous loop.
+
+**SHIPPED 2026-06-09 19:46→20:30 ET (this autonomous block)**:
+1. ✓ **Boot-directive forcer fix** (option B). Diagnosed mid-session: forcer scanned linearly, prior ACTIVE STATE block dropped the canonical `## ⚠ NEXT SESSION — TOP PRIORITY` H2 in favor of an H3 nested under `## ⚡ ACTIVE STATE`, so the scanner fell through to a May-13 USD8 block 27 days stale. Discipline going forward: every ACTIVE STATE block ships with this canonical H2 at top. **This block IS the regression test.** Dry-run verified the forcer now picks the live priorities.
+2. ✓ **Layer 8 audit script** — `~/.claude/hooks/layer8-audit/layer8_audit.py`. Stdlib-only, idempotent. First-run report at `report.md` surfaced 107 findings (82 broken inter-primitive shortcodes, 0 broken hook scripts in settings.json, 12 broken file-path refs in primitive bodies, 7 orphan hooks on disk not wired in settings.json, 6 cron-prompt path issues). Read-only — surfaces, doesn't fix.
+3. ✓ **Anticipation hook** — `~/.claude/hooks/anticipation-hook.py`. UserPromptSubmit hook. Three signals: date-anchored items ±3d, stale PENDING > 7d, unactioned-recall (deep-recall surfacings ≥3× without post-generation-recall match). Verified working on live state. **NOT yet registered in settings.json — Will's call**: add `{"type":"command","command":"python C:/Users/Will/.claude/hooks/anticipation-hook.py"}` to hooks.UserPromptSubmit.
+4. ✓ **Hindsight CLI Unicode fix** — `jarvis-monorepo/substrate/jarvis/__main__.py` UTF-8 reconfigure at `main()` entry. Covers every subcommand. 80 contradiction candidates now print clean on Windows cp1252. Commit `32bd1f1` on WGlynn/JARVIS.
+5. ✓ **External-onramp rebuild** on JARVIS monorepo, driven by a roleplay-as-evaluator-LLM critique. Commit `b148b4a` on WGlynn/JARVIS:
+   - README rewritten with Quickstart up top + What-you-get table + Common-objections demoted to bottom.
+   - CONTRIBUTING.md (new) — contribution surface per artifact class.
+   - `.github/ISSUE_TEMPLATE/{bug_report,feature_request}.md` (new).
+   - `verify/verify_primitive_corpus.py` + `verify/verify_no_secrets.py` (new, fresh-clone-runnable). Both PASS on current state (458/458 primitives, 0 secrets).
+6. ✓ **Corpus repair** — `feedback_no-blockquotes-on-copy-paste-drafts.md` YAML frontmatter had an unquoted embedded `---` from a paste accident. Fixed in both local memory + substrate mirror. Commits `38a8f94` (jarvis-monorepo) + `674bd94` (memory).
+
+**PENDING for next session**:
+- **Layer 8 audit follow-through**: triage the 107 findings — 82 broken shortcodes are the highest-value bucket (real rename/missing primitives). Will-triage on subset; auto-fix the rest if pattern matches.
+- **Anticipation hook registration**: Will reviews, then add to settings.json.
+- **Hindsight contradiction candidates (80)**: Will-triage. Now printable on Windows.
+- **Advice-actionable queues**: `substrate/cron-prompts/_advice-actionable-{vibeswap,jarvis}.md`. Will-triage.
+- **Constitutional decisions**: AGPL relicense (Odysseus #1342 Zaptosis, 44 upvotes), JARVIS-publication phase timing. Will-only.
+
 ## ⚡ ACTIVE STATE 2026-06-09 ~19:42 ET — 10h+ session, context compressing, lock-in for resume
 
 ### Shipped this session (all pushed to WGlynn/JARVIS + WGlynn/jarvis-substrate + memory backup):

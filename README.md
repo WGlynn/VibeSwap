@@ -18,7 +18,7 @@
 > - **CKB chain** (`contracts-ckb/`, Rust RISC-V cells): the real target. 26 cells building, dev chain mining blocks (`contracts-ckb/FIRST_BLOCK_RECEIPT.md`). Sovereign deployment, not a side-chain. See [`contracts-ckb/FORK_PLAN.md`](contracts-ckb/FORK_PLAN.md).
 > - **Frontend** ([live demo](https://frontend-jade-five-87.vercel.app)): runs against a mock backend. Wallet flows work; swap settles against simulated batches.
 >
-> If you came here looking to swap: come back later. If you came here to audit, fork, or read the mechanism design: keep reading.
+> If you came here looking to swap: come back later. If you came here to audit, fork, or read the mechanism design: keep reading. The path from current state to mainnet — which cells ship at v1, what gates what, rough sizing per phase — lives in [`ROADMAP.md`](ROADMAP.md).
 
 ## What this repo is for, by audience
 

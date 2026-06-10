@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Entropy Preservation in the DAG :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">08</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-a-question-about-recordings">Start with a question about recordings</a>
+    <a class="toc-link" href="#entropy-plainly">Entropy, plainly</a>
+    <a class="toc-link" href="#attribution-chains-as-entropic-objects">Attribution chains as entropic objects</a>
+    <a class="toc-link l3" href="#structural-entropy-the-graph-itself">Structural entropy — the graph itself</a>
+    <a class="toc-link l3" href="#content-entropy-what-each-contribution-is">Content entropy — what each contribution IS</a>
+    <a class="toc-link l3" href="#the-big-difference">The big difference</a>
+    <a class="toc-link" href="#what-the-dag-preserves-losslessly">What the DAG preserves losslessly</a>
+    <a class="toc-link" href="#what-the-dag-does-not-preserve-losslessly">What the DAG does NOT preserve losslessly</a>
+    <a class="toc-link" href="#the-trade-off-quantified">The trade-off, quantified</a>
+    <a class="toc-link l3" href="#scenario-a-preserve-everything">Scenario A — Preserve everything</a>
+    <a class="toc-link l3" href="#scenario-b-preserve-structure-commit-content">Scenario B — Preserve structure, commit content</a>
+    <a class="toc-link l3" href="#scenario-c-preserve-only-summary">Scenario C — Preserve only summary</a>
+    <a class="toc-link" href="#why-this-trade-off-works">Why this trade-off works</a>
+    <a class="toc-link" href="#where-content-loss-matters">Where content-loss matters</a>
+    <a class="toc-link l3" href="#case-1-retroactive-re-adjudication">Case 1 — Retroactive re-adjudication</a>
+    <a class="toc-link l3" href="#case-2-dispute-resolution">Case 2 — Dispute resolution</a>
+    <a class="toc-link l3" href="#case-3-historical-analysis">Case 3 — Historical analysis</a>
+    <a class="toc-link" href="#the-merkle-chain-preservation-pattern">The Merkle-chain preservation pattern</a>
+    <a class="toc-link" href="#the-dignity-of-storage-problem">The dignity-of-storage problem</a>
+    <a class="toc-link l3" href="#tier-1-structural-on-chain">Tier 1 — Structural (on-chain)</a>
+    <a class="toc-link l3" href="#tier-2-content-on-fast-storage-ipfs-arweave">Tier 2 — Content on fast storage (IPFS, Arweave)</a>
+    <a class="toc-link l3" href="#tier-3-content-on-cold-archive">Tier 3 — Content on cold archive</a>
+    <a class="toc-link l3" href="#tier-4-content-on-multiple-independent-archives">Tier 4 — Content on multiple independent archives</a>
+    <a class="toc-link" href="#the-eviction-is-correct-argument">The eviction-is-correct argument</a>
+    <a class="toc-link" href="#natural-vs-accidental-loss">Natural vs. accidental loss</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#relationship-to-etm">Relationship to ETM</a>
+    <a class="toc-link" href="#relationship-to-other-primitives">Relationship to other primitives</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">08</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>Entropy preservation in DAG</span>
+    </div>
+    <h1>Entropy Preservation in the DAG</h1>
+<div class="tagline">**Status**: Information-theoretic fidelity analysis with concrete N-bit accounting.</div>
+
+<p><strong>Status</strong>: Information-theoretic fidelity analysis with concrete N-bit accounting.
+<strong>Audience</strong>: First-encounter OK. Entropy concept introduced from scratch.</p>
+<hr />
+<h2 id="start-with-a-question-about-recordings">Start with a question about recordings</h2>
+<p>You record a concert. You can:</p>
+<p><strong>Option A — Full-fidelity audio</strong>: lossless recording preserves every acoustic detail. Files are huge. You need expensive storage.</p>
+<p><strong>Option B — Compressed audio</strong>: mp3 or similar. Most people can't tell the difference. Files are much smaller.</p>
+<p><strong>Option C — Summary notes</strong>: just write down "Concert on Tuesday; the piano solo in middle was great." Files are tiny.</p>
+<p>Each preserves LESS information than the previous. But which is "enough"?</p>
+<p>Depends on use case. If you want to re-experience the concert, Option A is needed. If you want to remember it, Option B suffices. If you want to prove the concert happened, Option C is fine.</p>
+<p>Information theory quantifies this trade-off. This doc applies it to attribution chains.</p>
+<h2 id="entropy-plainly">Entropy, plainly</h2>
+<p><strong>Entropy</strong> = the information content of a thing. Measured in bits.</p>
+<p>More formally: entropy is the minimum number of bits needed to describe something uniquely.</p>
+<ul>
+<li>A coin flip: 1 bit (heads or tails).</li>
+<li>A die roll: log₂(6) ≈ 2.6 bits.</li>
+<li>A specific word from a 10,000-word dictionary: log₂(10,000) ≈ 13.3 bits.</li>
+<li>A specific book of 80,000 words from the 10,000-word vocabulary: 80,000 × 13.3 ≈ 1 million bits (~128 KB).</li>
+</ul>
+<p>Entropy is NOT the size of the thing. It's the minimum size of any description that uniquely identifies it. A wall-colored-white video is huge in bytes but has low entropy (same color every frame).</p>
+<h2 id="attribution-chains-as-entropic-objects">Attribution chains as entropic objects</h2>
+<p>An attribution chain is a graph of contributions. Each contribution is a node. Each parent-reference is an edge. Each node has metadata.</p>
+<p>What's the entropy of this graph?</p>
+<h3 id="structural-entropy-the-graph-itself">Structural entropy — the graph itself</h3>
+<p>The shape of the graph. Which contributions exist. Which ones cite which. Timestamps. Contributors.</p>
+<p>For N contributions and average fan-in of p parents per contribution: structural entropy ≈ O(N × log N) bits.</p>
+<p>For 10,000 contributions: ~10,000 × 14 = 140,000 bits ≈ 17 KB for structure.</p>
+<h3 id="content-entropy-what-each-contribution-is">Content entropy — what each contribution IS</h3>
+<p>For each contribution: the actual content (document, commit, design). Typically much larger than structure.</p>
+<p>For a 1000-word contribution: content entropy ~5,000 bits (log₂ of possible 1000-word sequences).</p>
+<p>For 10,000 contributions averaging 1000 words each: ~50 million bits = 5 MB for content.</p>
+<h3 id="the-big-difference">The big difference</h3>
+<p><strong>Structural entropy scales as N × log N</strong> (sub-linear in total bits).
+<strong>Content entropy scales as N × content_per_item</strong> (linear in total bits).</p>
+<p>Content dominates at scale. Structure is relatively cheap.</p>
+<h2 id="what-the-dag-preserves-losslessly">What the DAG preserves losslessly</h2>
+<p>VibeSwap's DAG (ContributionDAG + ContributionAttestor) preserves STRUCTURAL entropy losslessly:</p>
+<ul>
+<li>Every contribution's contributor, type, timestamp, parent references, claim-status are all stored on-chain.</li>
+<li>Cryptographic commitments (evidenceHash) commit to content but don't store it.</li>
+<li>Trust-weights and attestations are indexed explicitly.</li>
+</ul>
+<p>For the 10,000-contribution chain: ~17 KB structure, all on-chain. Preserved forever (subject to chain survival).</p>
+<h2 id="what-the-dag-does-not-preserve-losslessly">What the DAG does NOT preserve losslessly</h2>
+<p>Content entropy is NOT preserved on-chain. Instead:</p>
+<ul>
+<li>Each contribution has an evidenceHash (32 bytes) committing to the content.</li>
+<li>The content itself lives off-chain (IPFS, GitHub, Arweave, etc.).</li>
+<li>If the off-chain content is lost, the commitment is orphaned — verifies nothing retrievable.</li>
+</ul>
+<p>This is a deliberate choice. Storing 5 MB of content per chain on-chain is too expensive. Storing 32 bytes of commitment per contribution is affordable.</p>
+<h2 id="the-trade-off-quantified">The trade-off, quantified</h2>
+<h3 id="scenario-a-preserve-everything">Scenario A — Preserve everything</h3>
+<p>Store both structure and content on-chain. 5 MB per 10,000-contribution chain. At ~$0.01/KB-year storage: ~$600/year. Expensive.</p>
+<h3 id="scenario-b-preserve-structure-commit-content">Scenario B — Preserve structure, commit content</h3>
+<p>Store structure + evidence-hashes. 50 KB per 10,000-contribution chain. ~$6/year. Affordable.</p>
+<h3 id="scenario-c-preserve-only-summary">Scenario C — Preserve only summary</h3>
+<p>Store aggregate statistics. Very small. Not usable for fairness-verification (can't audit individual claims).</p>
+<p>VibeSwap uses Scenario B. Structural entropy losslessly preserved; content entropy committed-but-not-retained.</p>
+<h2 id="why-this-trade-off-works">Why this trade-off works</h2>
+<p>The information needed to run Shapley distribution is STRUCTURAL. Shapley math needs:
+- Who contributed.
+- In what order.
+- With what marginal value (estimated).
+- Which were accepted.</p>
+<p>All structural. Content entropy (the actual text of a contribution) is not needed for Shapley math. It's nice-to-have for auditability but not required.</p>
+<p>So preserving structure + committing content is sufficient for the core mechanism. Lost content degrades auditability but doesn't break fairness computation.</p>
+<h2 id="where-content-loss-matters">Where content-loss matters</h2>
+<h3 id="case-1-retroactive-re-adjudication">Case 1 — Retroactive re-adjudication</h3>
+<p>Alice claims "Bob's work built on my earlier contribution; I deserve partial credit."</p>
+<p>If Alice's earlier contribution's content is lost, she can't prove the influence. Re-adjudication impossible; original distribution stands.</p>
+<p>Mitigation: long-lived off-chain storage (Arweave, multiple IPFS replicas). Off-chain redundancy reduces but doesn't eliminate content-loss risk.</p>
+<h3 id="case-2-dispute-resolution">Case 2 — Dispute resolution</h3>
+<p>A tribunal is evaluating a disputed claim. They need to see the original content to judge.</p>
+<p>If lost, the dispute can't be resolved. Judgment defaults to status quo.</p>
+<p>Mitigation: same — redundant off-chain storage + Merkle-anchored content that survives even when primary storage fails.</p>
+<h3 id="case-3-historical-analysis">Case 3 — Historical analysis</h3>
+<p>Researchers 20 years later want to understand the protocol's evolution. They need to read old contributions.</p>
+<p>If content is lost, the history becomes skeletal — structure without texture.</p>
+<p>Mitigation: periodic snapshots to long-term archives.</p>
+<h2 id="the-merkle-chain-preservation-pattern">The Merkle-chain preservation pattern</h2>
+<p>VibeSwap uses incremental Merkle trees for content integrity. Each content piece is a leaf; the root is published on-chain.</p>
+<p>Later, anyone can prove "this content IS what was recorded at that time" by providing:
+- The content itself.
+- The Merkle path from the leaf to the root.
+- The on-chain root.</p>
+<p>If content is lost off-chain but the Merkle proof is kept, you can't reconstruct content but you can verify IF someone else holds a copy that their copy is authentic.</p>
+<p>Partial preservation — commitment survives when content fades.</p>
+<h2 id="the-dignity-of-storage-problem">The dignity-of-storage problem</h2>
+<p>A protocol that collects contributions and then loses them is breaking an implicit commitment. Contributors reasonably expect their work to be preserved.</p>
+<p>Four tiers of preservation:</p>
+<h3 id="tier-1-structural-on-chain">Tier 1 — Structural (on-chain)</h3>
+<p>100% reliable. Survives chain-existence. ~17 KB per 10K-chain. Cheap.</p>
+<h3 id="tier-2-content-on-fast-storage-ipfs-arweave">Tier 2 — Content on fast storage (IPFS, Arweave)</h3>
+<p>~95% reliable over 10 years. 5 MB per 10K-chain. Moderately expensive.</p>
+<h3 id="tier-3-content-on-cold-archive">Tier 3 — Content on cold archive</h3>
+<p>~99% reliable over 100 years. Requires active archive maintenance.</p>
+<h3 id="tier-4-content-on-multiple-independent-archives">Tier 4 — Content on multiple independent archives</h3>
+<p>~99.9%+ reliable. Redundancy reduces risk further.</p>
+<p>VibeSwap's target: Tier 2 by default, Tier 4 for high-value claims. Good trade-off of cost vs. preservation.</p>
+<h2 id="the-eviction-is-correct-argument">The eviction-is-correct argument</h2>
+<p>In cognition, memory decay is ADAPTIVE. Forgetting outdated information frees capacity for new learning.</p>
+<p>Applied to DAG: should we plan for some contributions to fade from detailed storage over time? Yes.</p>
+<p>Planned eviction:
+- Hot storage: recent + actively-attested contributions. Full detail.
+- Warm: middle-age, less-attested. Commitment + partial content.
+- Cold: old, dormant. Commitment only.
+- Eviction: claims that no longer earn attestations over long periods can be pruned.</p>
+<p>This is deliberate information-management. Not catastrophic loss; adaptive forgetting.</p>
+<h2 id="natural-vs-accidental-loss">Natural vs. accidental loss</h2>
+<p><strong>Natural loss</strong> (eviction via state-rent mechanism): deliberate. Claims that no longer earn fresh attestations pay the cost; those that do have their storage funded.</p>
+<p><strong>Accidental loss</strong> (off-chain content disappears from IPFS): undesired. Should be prevented via replication + archival.</p>
+<p>Architecture prevents accidental loss while permitting natural eviction. Infrastructure difference, not just philosophical.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: compute entropy of a specific contribution chain.</p>
+<ul>
+<li>100 contributions.</li>
+<li>Each has: contributor (from 10 possible), type (9 options), parent attestation count (0-3).</li>
+<li>Content averaging 500 bytes per contribution.</li>
+</ul>
+<p>Compute:
+1. Structural entropy per contribution (bits).
+2. Content entropy per contribution.
+3. Total for the chain.
+4. Compare to on-chain storage required.</p>
+<p>Observe: structure is cheap; content dominates.</p>
+<h2 id="relationship-to-etm">Relationship to ETM</h2>
+<p>Under <a href="etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognitive memory has temperature tiers: vivid episodic (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived).</p>
+<p>The DAG's hot/warm/cold storage tiers mirror this. Cognition doesn't preserve entropy uniformly; it compresses over time. Same pattern.</p>
+<h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
+<ul>
+<li><strong>Companion</strong>: <a href="../research/theorems/KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.md">Kolmogorov Complexity of Attribution</a> — Kolmogorov gives the storage lower bounds; entropy preservation is about which parts we keep.</li>
+<li><strong>Instance</strong>: <a href="identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md">ContributionAttestor</a> — stores the structural layer.</li>
+<li><strong>Enabling</strong>: <a href="identity/CONTRIBUTION_TRACEABILITY.md">Chat-to-DAG Traceability</a> — captures source content that then goes to off-chain tiers.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>The DAG preserves STRUCTURAL entropy losslessly (who, when, parents, claim-status) but COMMITS to content via evidenceHash rather than storing it. Structure is cheap (~17 KB per 10K chain); content is expensive (~5 MB). Four preservation tiers (on-chain, fast off-chain, cold archive, redundant). Deliberate eviction via state-rent is correct (matches cognitive memory temperature); accidental loss is prevented via redundant archival.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/07_THE_UNCOMPUTABLE_MARGINAL.html" class="nav-cell prev"><div class="label">&larr; PREV // 07</div><div class="ttl">The Uncomputable Marginal</div></a>
+  <a href="/papers/09_THE_OBSERVER_EFFECT_IN_ATTESTATION.html" class="nav-cell next"><div class="label">NEXT // 09 &rarr;</div><div class="ttl">The Observer Effect in Attestation</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

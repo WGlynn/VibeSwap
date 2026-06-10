@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Dignity Gradient :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">26</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-a-feeling-youve-had">Start with a feeling you've had</a>
+    <a class="toc-link" href="#the-three-positions">The three positions</a>
+    <a class="toc-link l3" href="#extractive-zero-or-negative-dignity">Extractive (zero or negative dignity)</a>
+    <a class="toc-link l3" href="#neutral-dignity-roughly-conserved">Neutral (dignity roughly conserved)</a>
+    <a class="toc-link l3" href="#elevating-positive-dignity">Elevating (positive dignity)</a>
+    <a class="toc-link" href="#walk-through-the-dignity-gradient-with-specific-systems">Walk through the dignity gradient with specific systems</a>
+    <a class="toc-link l3" href="#ad-driven-facebook-circa-2020">Ad-driven Facebook (circa 2020)</a>
+    <a class="toc-link l3" href="#mastodon-contemporary">Mastodon (contemporary)</a>
+    <a class="toc-link l3" href="#vibeswap">VibeSwap</a>
+    <a class="toc-link" href="#why-elevating-systems-win-long-term">Why elevating systems win long-term</a>
+    <a class="toc-link l3" href="#mechanism-1-contributor-retention">Mechanism 1 — Contributor retention</a>
+    <a class="toc-link l3" href="#mechanism-2-network-effect-compounding">Mechanism 2 — Network-effect compounding</a>
+    <a class="toc-link l3" href="#mechanism-3-governance-legitimacy">Mechanism 3 — Governance legitimacy</a>
+    <a class="toc-link l3" href="#mechanism-4-quality-of-work">Mechanism 4 — Quality of work</a>
+    <a class="toc-link" href="#the-four-vibeswap-architectural-commitments-to-dignity">The four VibeSwap architectural commitments to dignity</a>
+    <a class="toc-link l3" href="#commitment-1-lawson-constant">Commitment 1 — Lawson Constant</a>
+    <a class="toc-link l3" href="#commitment-2-p-001-no-extraction">Commitment 2 — P-001 No Extraction</a>
+    <a class="toc-link l3" href="#commitment-3-three-branch-due-process">Commitment 3 — Three-branch due process</a>
+    <a class="toc-link l3" href="#commitment-4-voluntary-participation">Commitment 4 — Voluntary participation</a>
+    <a class="toc-link" href="#the-asymmetry">The asymmetry</a>
+    <a class="toc-link" href="#the-political-angle">The political angle</a>
+    <a class="toc-link" href="#the-metric-challenge">The metric challenge</a>
+    <a class="toc-link" href="#implications-for-mechanism-design">Implications for mechanism design</a>
+    <a class="toc-link" href="#the-dignity-premium">The dignity premium</a>
+    <a class="toc-link" href="#implications-for-education-eridu-vibeswap">Implications for education (Eridu × VibeSwap)</a>
+    <a class="toc-link" href="#for-designers">For designers</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">26</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>The dignity gradient</span>
+    </div>
+    <h1>The Dignity Gradient</h1>
+<div class="tagline">**Status**: Economic + social analysis.</div>
+
+<p><strong>Status</strong>: Economic + social analysis.
+<strong>Audience</strong>: First-encounter OK. Concrete system comparisons.</p>
+<hr />
+<h2 id="start-with-a-feeling-youve-had">Start with a feeling you've had</h2>
+<p>Think of a service you use. Maybe it's a social media app, maybe a streaming platform, maybe a bank app.</p>
+<p>Ask yourself: does this system treat you like a person with dignity, or like a resource to extract from?</p>
+<p>Most people can tell the difference intuitively. Even if you can't articulate WHY, you feel it.</p>
+<p>Some systems leave you feeling valued: the rent-payment app that doesn't charge hidden fees; the email provider that doesn't scan your messages for ad-targeting; the news source that respects your time.</p>
+<p>Others leave you feeling used: the app that nudges you to click ads you don't want; the platform that shows you outrage content to maximize engagement; the service that makes cancellation deliberately hard.</p>
+<p><strong>The difference is the dignity gradient.</strong> And it's measurable — systems sort along a gradient from extractive (user-as-resource) through neutral to elevating (user-as-participant with standing).</p>
+<h2 id="the-three-positions">The three positions</h2>
+<h3 id="extractive-zero-or-negative-dignity">Extractive (zero or negative dignity)</h3>
+<p>The system treats participants as resources to extract. Examples:</p>
+<ul>
+<li><strong>Ad-driven media</strong> — your attention is inventory sold to advertisers.</li>
+<li><strong>Engagement-maximizing social networks</strong> — keeping you scrolling optimizes their revenue, regardless of cost to you.</li>
+<li><strong>Casino-style gambling</strong> — profit from user losses.</li>
+<li><strong>Predatory lending</strong> — designed around high-cost credit for those who can't refuse.</li>
+<li><strong>Attention-farming content</strong> — outrage-maximized for engagement.</li>
+</ul>
+<p>Dignity: zero or negative. Users leave worse off than they arrived.</p>
+<h3 id="neutral-dignity-roughly-conserved">Neutral (dignity roughly conserved)</h3>
+<p>The system treats participants transactionally. Examples:</p>
+<ul>
+<li><strong>Utility providers</strong> (electricity, water) — charge reasonable rates, provide what was promised.</li>
+<li><strong>Classical labor markets</strong> for replaceable skills — fair exchange of work for wages.</li>
+<li><strong>Most traditional services</strong> — neither enhancing nor degrading.</li>
+</ul>
+<p>Dignity: conserved. Users leave with same standing they arrived with.</p>
+<h3 id="elevating-positive-dignity">Elevating (positive dignity)</h3>
+<p>The system actively enhances participants' standing, recognition, capability. Examples:</p>
+<ul>
+<li><strong>Apprenticeships</strong> — trade skill for skill over time; apprentice grows.</li>
+<li><strong>Craft communities</strong> — recognize mastery; reputation compounds.</li>
+<li><strong>Mentorship structures</strong> — senior invests in junior; both grow.</li>
+<li><strong>Science at its best</strong> — contributors' names are preserved; discoveries attributed.</li>
+</ul>
+<p>Dignity: grows. Users leave better off than they arrived.</p>
+<h2 id="walk-through-the-dignity-gradient-with-specific-systems">Walk through the dignity gradient with specific systems</h2>
+<h3 id="ad-driven-facebook-circa-2020">Ad-driven Facebook (circa 2020)</h3>
+<ul>
+<li>Participants: users, advertisers, Facebook.</li>
+<li>User role: attention-resource + profile-data-resource.</li>
+<li>Dignity treatment: extractive. Users are inventory.</li>
+<li>Observable signals: engagement-maximizing algorithms, dark-pattern nudges, cancellation friction.</li>
+</ul>
+<h3 id="mastodon-contemporary">Mastodon (contemporary)</h3>
+<ul>
+<li>Participants: users, instance-hosts.</li>
+<li>User role: full participant; owns content; can migrate freely.</li>
+<li>Dignity treatment: neutral → elevating.</li>
+<li>Observable signals: no ads, user-controlled moderation, migration-friendly architecture.</li>
+</ul>
+<h3 id="vibeswap">VibeSwap</h3>
+<ul>
+<li>Participants: contributors, users, governance participants.</li>
+<li>User role: first-class participant with DAG attribution.</li>
+<li>Dignity treatment: elevating.</li>
+<li>Observable signals: attribution preserved via Lawson Constant, three-branch due-process, voluntary participation, constitutional P-001 no-extraction.</li>
+</ul>
+<p>Each system has different dignity-gradient placement. VibeSwap deliberately operates in the elevating zone.</p>
+<h2 id="why-elevating-systems-win-long-term">Why elevating systems win long-term</h2>
+<p>In the short term, extractive systems often win because they optimize for a narrow metric (engagement, revenue) and their competitors' dignity-preservation looks costly.</p>
+<p>Long-term, elevating systems win. Four mechanisms:</p>
+<h3 id="mechanism-1-contributor-retention">Mechanism 1 — Contributor retention</h3>
+<p>Extractive systems burn out contributors. Those who feel used leave.</p>
+<p><strong>Concrete</strong>: a contributor to a DAO that's revealed to be extractive gives a month's notice and leaves. Their replacement has to ramp up. The DAO loses accumulated knowledge.</p>
+<p>Elevating systems retain contributors. Long-tenure contributors accumulate deep expertise and deep trust. VibeSwap's approach: contributors' work compounds into DAG attribution — they have strong reason to stay.</p>
+<h3 id="mechanism-2-network-effect-compounding">Mechanism 2 — Network-effect compounding</h3>
+<p>Elevating: contributors in elevating systems recruit friends. "Try this community; they treat people well." Word-of-mouth compounds.</p>
+<p>Extractive: anti-network-effects. "Avoid this system; they use people." Users warn others.</p>
+<p>VibeSwap's community-bootstrap depends on the network-effect version. Dignity is a bootstrap accelerator.</p>
+<h3 id="mechanism-3-governance-legitimacy">Mechanism 3 — Governance legitimacy</h3>
+<p>Elevating systems produce legitimate governance. Participants feel heard. Decisions reflect collective input.</p>
+<p>Extractive systems produce extractive governance. Users feel ruled. Legitimacy erodes. Participation declines.</p>
+<p>VibeSwap's three-branch governance + constitutional axioms are dignity-preserving governance infrastructure.</p>
+<h3 id="mechanism-4-quality-of-work">Mechanism 4 — Quality of work</h3>
+<p>Work in dignity-preserving contexts is higher-quality. Research freedom produces better research. Developers with psychological safety ship better code.</p>
+<p>Quality compounds into quality of product. VibeSwap's work-output should benefit from the dignity investment.</p>
+<h2 id="the-four-vibeswap-architectural-commitments-to-dignity">The four VibeSwap architectural commitments to dignity</h2>
+<h3 id="commitment-1-lawson-constant">Commitment 1 — Lawson Constant</h3>
+<p>Attribution is structural, not decorative. Your contributions can't be erased. See <a href="../proofs/LAWSON_CONSTANT.md"><code>LAWSON_CONSTANT.md</code></a>.</p>
+<h3 id="commitment-2-p-001-no-extraction">Commitment 2 — P-001 No Extraction</h3>
+<p>No mechanism extracts value disproportionate to creation. See <a href="../../concepts/NO_EXTRACTION_AXIOM.md"><code>NO_EXTRACTION_AXIOM.md</code></a>.</p>
+<h3 id="commitment-3-three-branch-due-process">Commitment 3 — Three-branch due process</h3>
+<p>Accusations go through Executive/Judicial/Legislative. You can contest. You have recourse. See <a href="../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md"><code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code></a>.</p>
+<h3 id="commitment-4-voluntary-participation">Commitment 4 — Voluntary participation</h3>
+<p>Users can enter, exit, participate, abstain at will. No lock-ins, no vendor-dependency, no trap patterns.</p>
+<p>These aren't marketing. They're architectural consequences of P-000 (Fairness Above All).</p>
+<h2 id="the-asymmetry">The asymmetry</h2>
+<p>If two protocols compete, one extractive and one dignity-preserving:</p>
+<ul>
+<li>Extractive protocol CAN'T easily transition to dignity-preserving. Extractive mechanisms are load-bearing for its business model.</li>
+<li>Dignity-preserving protocol CAN transition to extractive. Requires removing constitutional axioms.</li>
+</ul>
+<p><strong>But</strong> — this asymmetry has a protection for dignity-preserving systems: the transition-to-extractive is temptingly available but structurally blocked.</p>
+<p>VibeSwap's architecture: P-000 and P-001 are non-governance-amendable. Lawson Constant is in bytecode. Removing these constitutes a fork, not a governance action. Community would resist.</p>
+<h2 id="the-political-angle">The political angle</h2>
+<p>Attention-extractive, labor-extractive, dignity-extractive systems have been the political-economic default of the internet era. Ads + engagement loops + attention-capture = industry baseline. User rebellion is ongoing but unfocused.</p>
+<p>VibeSwap is one alternative. Not the only one (GDPR + MiCA push in similar directions; Mastodon; cooperative economics scholarship growing).</p>
+<p>The dignity-gradient framing says: this is a DIRECTION. It wins over time. Projects aligned with it are tailwind-beneficiaries. Projects fighting it (extractive DeFi, attention-capture social) are headwind-fighters even when they succeed short-term.</p>
+<h2 id="the-metric-challenge">The metric challenge</h2>
+<p>"Dignity" is hard to measure quantitatively. Unlike engagement or revenue-per-user.</p>
+<p>Proposed composite "dignity-preservation score":
+- <strong>Retention</strong>: % of contributors staying after 6 months.
+- <strong>Depth of engagement</strong>: substantive contributions vs surface.
+- <strong>Governance participation rate</strong>: fraction of tokens voting.
+- <strong>Voluntary advocacy</strong>: contributors promoting unpaid.
+- <strong>Absence of grievances</strong>: how many feel extracted-from.</p>
+<p>Not a single number; composite. Useful for trend-tracking.</p>
+<p>VibeSwap could publish this score quarterly. Transparent accountability for dignity-preservation claim.</p>
+<h2 id="implications-for-mechanism-design">Implications for mechanism design</h2>
+<p>When designing, ask:</p>
+<ol>
+<li>Does it preserve contributors' dignity?</li>
+<li>Does it preserve users' dignity?</li>
+<li>Does it preserve the broader network's dignity?</li>
+</ol>
+<p>These are architectural questions. Proposed Correspondence Triad Check 4: "Does it preserve dignity?" (not yet officially in the Triad; proposed extension).</p>
+<h2 id="the-dignity-premium">The dignity premium</h2>
+<p>Users will pay a premium for dignity-preservation:</p>
+<ul>
+<li><strong>Mastodon vs Twitter</strong>: Mastodon is slower, less featured; users tolerate for non-extractive model.</li>
+<li><strong>Signal vs Meta messaging</strong>: Signal is less integrated; users accept for privacy.</li>
+<li><strong>Cooperatives vs traditional employers</strong>: cooperatives often mean less maximal-earnings but higher satisfaction.</li>
+</ul>
+<p>VibeSwap operates in this premium space. Users willing to accept slightly-more-friction for substantially-more-dignity are target audience.</p>
+<p>Not everyone. The ones who care.</p>
+<h2 id="implications-for-education-eridu-vibeswap">Implications for education (Eridu × VibeSwap)</h2>
+<p>Education is inherently dignity-sensitive. Good teachers preserve student dignity. Bad teachers extract.</p>
+<p>Eridu × VibeSwap course design principles:
+- Student contributions earn DAG credit.
+- Questions and confusions treated as valuable signals, not deficits.
+- Peer-to-peer help explicitly valued.
+- Multiple paths to understanding offered.
+- No gatekeeping on who can learn.</p>
+<p>The educational arm embodies the dignity-preserving architecture.</p>
+<h2 id="for-designers">For designers</h2>
+<p>If you're building mechanism design:</p>
+<p>Ask: where does my design fall on the dignity gradient?</p>
+<p>If extractive: redesign. Extraction-based models don't survive user-awareness.</p>
+<p>If neutral: consider if it could be elevating. Would cost little; could attract serious participants.</p>
+<p>If elevating: explicitly commit. Document the commitments. Let users hold you accountable.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Systems sort along a dignity gradient from extractive (ad-Facebook, casinos, attention-farming) through neutral (utility providers, labor markets) to elevating (apprenticeships, craft communities, VibeSwap). Elevating wins long-term via retention + network-effect + governance-legitimacy + work-quality. VibeSwap's four architectural commitments (Lawson Constant + P-001 + three-branch + voluntary) are constitutional dignity-preservation. Transition-to-extractive structurally blocked for dignity-preserving systems; inverse not true.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/25_ATTENTION_AS_INFRASTRUCTURE.html" class="nav-cell prev"><div class="label">&larr; PREV // 25</div><div class="ttl">Attention as Infrastructure</div></a>
+  <a href="/papers/27_WHAT_LLMS_TEACH_US_ABOUT_MIND.html" class="nav-cell next"><div class="label">NEXT // 27 &rarr;</div><div class="ttl">What LLMs Teach Us About Mind</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

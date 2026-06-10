@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Coordination Primitive Market :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">20</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-category-you-havent-heard-named-yet">A category you haven't heard named yet</a>
+    <a class="toc-link" href="#what-coordination-primitive-means">What "coordination primitive" means</a>
+    <a class="toc-link" href="#whats-missing-the-gap-vibeswap-fills">What's missing (the gap VibeSwap fills)</a>
+    <a class="toc-link l3" href="#prior-attempts">Prior attempts</a>
+    <a class="toc-link l3" href="#why-none-of-these-became-the-coordination-primitive">Why none of these became "the" coordination primitive</a>
+    <a class="toc-link" href="#why-not-a-casino">Why "not a casino"</a>
+    <a class="toc-link l3" href="#casino-pattern-prevalent-in-defi-2020-2024">Casino pattern (prevalent in DeFi 2020-2024)</a>
+    <a class="toc-link l3" href="#coordination-primitive-pattern-what-vibeswap-is">Coordination primitive pattern (what VibeSwap IS)</a>
+    <a class="toc-link" href="#whos-in-the-coordination-primitive-market">Who's in the coordination-primitive market</a>
+    <a class="toc-link l3" href="#adjacent-incumbents">Adjacent incumbents</a>
+    <a class="toc-link l3" href="#parallel-category-players">Parallel-category players</a>
+    <a class="toc-link" href="#why-uncontested-and-unstable">Why uncontested AND unstable</a>
+    <a class="toc-link" href="#the-category-creation-playbook">The category-creation playbook</a>
+    <a class="toc-link l3" href="#phase-1-niche-proof">Phase 1 — Niche proof</a>
+    <a class="toc-link l3" href="#phase-2-educational-infrastructure">Phase 2 — Educational infrastructure</a>
+    <a class="toc-link l3" href="#phase-3-platform-integrations">Phase 3 — Platform integrations</a>
+    <a class="toc-link l3" href="#phase-4-default-status">Phase 4 — Default status</a>
+    <a class="toc-link" href="#what-could-kill-the-category">What could kill the category</a>
+    <a class="toc-link l3" href="#threat-1-ai-coordination">Threat 1 — AI-coordination</a>
+    <a class="toc-link l3" href="#threat-2-centralized-attribution-as-a-service">Threat 2 — Centralized-attribution-as-a-service</a>
+    <a class="toc-link l3" href="#threat-3-declining-interest-in-coordination">Threat 3 — Declining interest in coordination</a>
+    <a class="toc-link" href="#market-size-estimate">Market size estimate</a>
+    <a class="toc-link" href="#the-attention-graph-moat">The attention-graph moat</a>
+    <a class="toc-link" href="#how-the-30-doc-pipeline-reinforces-the-market">How the 30-doc pipeline reinforces the market</a>
+    <a class="toc-link" href="#for-marketers">For marketers</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">20</span>
+      <span class="badge badge-terminal">ESSAY</span>
+      <span>The coordination primitive market</span>
+    </div>
+    <h1>The Coordination Primitive Market</h1>
+<div class="tagline">**Status**: Category-creation analysis. What "coordination primitive" means as a category.</div>
+
+<p><strong>Status</strong>: Category-creation analysis. What "coordination primitive" means as a category.
+<strong>Audience</strong>: First-encounter OK.</p>
+<hr />
+<h2 id="a-category-you-havent-heard-named-yet">A category you haven't heard named yet</h2>
+<p>You've heard of DEXes, AMMs, lending platforms, NFT marketplaces. These are product CATEGORIES. Each has multiple projects competing within it.</p>
+<p>When someone says "what category is Uniswap?", you say: DEX.</p>
+<p>When someone says "what category is VibeSwap?", a DEX answer is incomplete. VibeSwap does swaps, but that's not its category. Its category is "coordination primitive."</p>
+<p>You've probably never heard of coordination primitives as a category. That's intentional — it's a category we're creating. This doc makes the case.</p>
+<h2 id="what-coordination-primitive-means">What "coordination primitive" means</h2>
+<p>A coordination primitive is INFRASTRUCTURE that makes specific kinds of coordination between parties possible who couldn't previously coordinate, or could only coordinate via expensive intermediaries.</p>
+<p>Examples from pre-crypto:</p>
+<ul>
+<li><strong>Email</strong>: coordination between people in different organizations. Before email: postal mail (slow), phone (synchronous). Email enabled async cross-organizational coordination cheaply.</li>
+<li><strong>Git</strong>: coordination between software contributors at different companies. Before: proprietary source control, manual merging. Git enabled distributed development tractable.</li>
+<li><strong>APIs</strong>: coordination between software systems. Before: custom integrations per pair. APIs enabled many-to-many integration at scale.</li>
+<li><strong>OAuth</strong>: coordination of identity across systems. Before: separate passwords per service. OAuth standardized the protocol.</li>
+</ul>
+<p>Each is infrastructure, not an application. They become INVISIBLE once widespread — you use them without thinking.</p>
+<p>VibeSwap is aiming to be this kind of infrastructure for contribution-attribution + reward-distribution.</p>
+<h2 id="whats-missing-the-gap-vibeswap-fills">What's missing (the gap VibeSwap fills)</h2>
+<p>Coordination of <strong>contribution attribution + reward distribution</strong> across contributors from different backgrounds, working on different aspects of shared projects, with content spanning code / design / research / moderation / dialogue.</p>
+<h3 id="prior-attempts">Prior attempts</h3>
+<ul>
+<li><strong>Git + GitHub</strong>: captures code contribution with clear ownership. Doesn't capture non-code (dialogue, design decisions, audit prompts).</li>
+<li><strong>SourceCred</strong> (2019-2022): quantitative attribution via upvotes + GitHub metadata. Many iterations; didn't achieve wide adoption.</li>
+<li><strong>Optimism RetroPGF</strong>: retroactive grants committee-voted. Higher-profile successes but limited scope + slow.</li>
+<li><strong>CoordiNape</strong>: peer-to-peer reward distribution. Manual curation; doesn't scale beyond small groups.</li>
+<li><strong>Gitcoin Passport + Grants</strong>: quadratic-funding rounds. Helpful but episodic.</li>
+</ul>
+<p>Each is a partial solution. None established a full end-to-end attribution-as-infrastructure.</p>
+<h3 id="why-none-of-these-became-the-coordination-primitive">Why none of these became "the" coordination primitive</h3>
+<ul>
+<li>Technical complexity (cryptographic + economic + social design).</li>
+<li>Network-effect moats require patience; VCs often don't fund long-arc projects.</li>
+<li>Category is novel; projects pitching "coordination primitive" sound abstract.</li>
+</ul>
+<p>VibeSwap's bet: combining substantive technical foundation + long-time-horizon + explicit category-creation marketing can produce the coordination primitive that others didn't.</p>
+<h2 id="why-not-a-casino">Why "not a casino"</h2>
+<p>VibeSwap's tagline — "A coordination primitive, not a casino" — positions explicitly against the competitor-category that's actually winning in DeFi: casino-style protocols.</p>
+<h3 id="casino-pattern-prevalent-in-defi-2020-2024">Casino pattern (prevalent in DeFi 2020-2024)</h3>
+<ul>
+<li>Primary product: speculation on token price.</li>
+<li>User engagement: volatility + possibility of large gains.</li>
+<li>Revenue: transaction fees, spreads, liquidation penalties.</li>
+<li>Value extraction: the business model.</li>
+</ul>
+<h3 id="coordination-primitive-pattern-what-vibeswap-is">Coordination primitive pattern (what VibeSwap IS)</h3>
+<ul>
+<li>Primary product: infrastructure for collaborative work.</li>
+<li>User engagement: contribution + attribution.</li>
+<li>Revenue: network value increases over time (network effect).</li>
+<li>Value creation: the business model.</li>
+</ul>
+<p>Genuinely different categories. Casino user cares about profit-and-loss per session. Coordination-primitive user cares about accumulated position over years.</p>
+<h2 id="whos-in-the-coordination-primitive-market">Who's in the coordination-primitive market</h2>
+<p>At 2026-04-22, the coordination-primitive space is small but emerging.</p>
+<h3 id="adjacent-incumbents">Adjacent incumbents</h3>
+<ul>
+<li><strong>Gitcoin</strong>: quadratic-funding. Somewhat adjacent but focused on single-round distributions.</li>
+<li><strong>Optimism RetroPGF</strong>: retroactive public-goods funding; committee-based; one-way flow.</li>
+<li><strong>GnosisSafe + multisig tooling</strong>: coordination on asset management; not attribution-focused.</li>
+<li><strong>DAO platforms</strong> (Aragon, DAOhaus): coordination templates, mostly governance.</li>
+</ul>
+<h3 id="parallel-category-players">Parallel-category players</h3>
+<ul>
+<li><strong>Linear / Notion / Asana</strong>: workspace coordination for centralized orgs. Not decentralized; not attribution-focused.</li>
+<li><strong>Stripe</strong>: financial coordination, specific domain.</li>
+<li><strong>Snowflake / Databricks</strong>: data coordination, specific domain.</li>
+</ul>
+<p>None is directly competing with VibeSwap's specific position. The coordination-primitive market for decentralized contribution-attribution is uncontested.</p>
+<h2 id="why-uncontested-and-unstable">Why uncontested AND unstable</h2>
+<p>Uncontested because:
+- Technical difficulty is high.
+- Network-effect moats require patience.
+- Category is novel; sounds abstract to VCs.</p>
+<p>Unstable because:
+- VC-funded competitor with deep pockets could enter.
+- 2-3 well-resourced teams could plausibly launch 2027-2028.
+- Incumbent social/tech giants could expand (GitHub + Copilot into attribution is plausible).
+- Regulatory shift could reframe.</p>
+<p>VibeSwap's race: establish attention-graph density BEFORE a well-funded competitor enters. Become default reference by 2028. Compound network effect through 2030.</p>
+<h2 id="the-category-creation-playbook">The category-creation playbook</h2>
+<p>Successful category creation (Salesforce, Zoom, Slack, Figma) follows a pattern:</p>
+<h3 id="phase-1-niche-proof">Phase 1 — Niche proof</h3>
+<p>Pick specific user segment. Solve their coordination problem excellently. Establish credibility.</p>
+<p><strong>VibeSwap's Phase 1</strong>: serious-DeFi-governance participants + cryptographically-sophisticated contributors. Currently executing.</p>
+<h3 id="phase-2-educational-infrastructure">Phase 2 — Educational infrastructure</h3>
+<p>Teach the category's value. Make concept understood by target audiences.</p>
+<p><strong>VibeSwap's Phase 2</strong>: 30-doc pipeline + Eridu partnership. Underway.</p>
+<h3 id="phase-3-platform-integrations">Phase 3 — Platform integrations</h3>
+<p>Integrate with existing workflows. Other projects adopt your primitives as infrastructure.</p>
+<p><strong>VibeSwap's Phase 3</strong>: 2027-2028 target. Chat-to-DAG Traceability primitives become importable.</p>
+<h3 id="phase-4-default-status">Phase 4 — Default status</h3>
+<p>Category is named after you. Every new project asks "how do we handle [coordination primitive] stuff" and default answer is VibeSwap.</p>
+<p><strong>VibeSwap's Phase 4</strong>: 2029-2030 target.</p>
+<h2 id="what-could-kill-the-category">What could kill the category</h2>
+<p>Even if VibeSwap executes perfectly, the category could lose to:</p>
+<h3 id="threat-1-ai-coordination">Threat 1 — AI-coordination</h3>
+<p>LLMs coordinate directly without infrastructure. If AI agents can agree on attribution without shared substrate, VibeSwap's category is bypassed.</p>
+<p>Counter-argument: AI coordination itself becomes a category VibeSwap could serve. LLMs coordinating still need attribution infrastructure for learning and accumulating.</p>
+<h3 id="threat-2-centralized-attribution-as-a-service">Threat 2 — Centralized-attribution-as-a-service</h3>
+<p>Y-Combinator-style company offering centralized attribution for a fee. Lower friction + acceptable trust.</p>
+<p>Counter: possible, depends on regulatory acceptance of centralized attribution at scale.</p>
+<h3 id="threat-3-declining-interest-in-coordination">Threat 3 — Declining interest in coordination</h3>
+<p>Macro shift toward individualism / solopreneurship. Collaborative work declines; coordination primitives atrophy.</p>
+<p>Counter: economic data suggests collaboration is INCREASING, not decreasing. But this is macro-uncertainty.</p>
+<p>Each is a real risk. None is certain.</p>
+<h2 id="market-size-estimate">Market size estimate</h2>
+<p>Let's sketch:</p>
+<ul>
+<li>Global cooperative-production labor: ~$10T/year (R&amp;D, open-source, creative industries).</li>
+<li>Fraction currently well-attributed: ~20%.</li>
+<li>Fraction that would benefit from coordination-primitive infrastructure: ~80% of the under-attributed ~80% = 64%.</li>
+<li>Fraction captured by coordination-primitive infrastructure if successfully-established: 5-20% over 10 years.</li>
+</ul>
+<p>Coordination-primitive market by 2035: <strong>$300B-$1.2T annually.</strong></p>
+<p>Fraction VibeSwap could capture: 1-5% (the default-reference position).
+Annual value routed through VibeSwap by 2035: <strong>$3B-$60B.</strong></p>
+<p>Order-of-magnitude estimates. The bottom is substantial; the top is meaningful share of global economic infrastructure.</p>
+<h2 id="the-attention-graph-moat">The attention-graph moat</h2>
+<p>Suppose in 2028, a competitor enters with better-funded engineering. They fork VibeSwap contracts, launch competing protocol with superior marketing.</p>
+<p><strong>Without attention-graph moat</strong>: they win.</p>
+<p><strong>With it</strong>: they're scrambling.</p>
+<p>The attention graph (ContributionDAG + lineage + trust-scores + accumulated attestations) takes years to build. A 2028 competitor with zero graph has to rebuild. During the rebuild, VibeSwap's graph continues compounding.</p>
+<p>At 5,000 active contributors with 3-year history (2028), a zero-history competitor needs ~5-7 years to match while VibeSwap continues growing. By the time they catch up, VibeSwap is 2033-2035 with more established positioning.</p>
+<h2 id="how-the-30-doc-pipeline-reinforces-the-market">How the 30-doc pipeline reinforces the market</h2>
+<ul>
+<li><strong>Category-definition vocabulary</strong>: "coordination primitive", "attention-graph", "attestation-weight", "Shapley", "Lawson Constant" — these become canonical terms.</li>
+<li><strong>Intellectual credibility</strong>: technical-philosophical depth signals serious project; attracts serious users; deters surface-copiers.</li>
+<li><strong>Narrative control</strong>: whoever publishes definitive framings owns category.</li>
+</ul>
+<p>Content pipeline IS category-creation infrastructure. Don't underestimate compound effect.</p>
+<h2 id="for-marketers">For marketers</h2>
+<p>When pitching VibeSwap:</p>
+<ul>
+<li>Don't call it a DEX. DEXes are a subcategory of "coordination primitive" at best.</li>
+<li>Call it a coordination primitive.</li>
+<li>Explain what coordination primitive means (most people don't know).</li>
+<li>Use the category-creation playbook — niche proof, educational infrastructure, integrations, default status.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Coordination primitive is a category (like email, git, OAuth) — infrastructure for cross-party coordination previously impossible or too expensive. VibeSwap creates this category for contribution-attribution + reward-distribution. Market uncontested (novel category) and unstable (competitors could enter). Market size $300B-$1.2T annually by 2035. VibeSwap's moat is attention-graph density, compounding year-over-year. 30-doc pipeline is category-creation infrastructure.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/19_WHY_VIBESWAP_WINS_IN_2030.html" class="nav-cell prev"><div class="label">&larr; PREV // 19</div><div class="ttl">Why VibeSwap Wins in 2030</div></a>
+  <a href="/papers/21_INVESTOR_ECONOMIC_MODEL.html" class="nav-cell next"><div class="label">NEXT // 21 &rarr;</div><div class="ttl">Investor Economic Model</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

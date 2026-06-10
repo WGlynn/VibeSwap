@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Cognitive Economy Thesis :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">24</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#the-sentence-that-unlocks-everything">The sentence that unlocks everything</a>
+    <a class="toc-link" href="#the-historical-separation">The historical separation</a>
+    <a class="toc-link" href="#the-convergence">The convergence</a>
+    <a class="toc-link" href="#the-four-bijections">The four bijections</a>
+    <a class="toc-link l3" href="#bijection-1-belief-update-walrasian-clearing">Bijection 1 — Belief update ↔ Walrasian clearing</a>
+    <a class="toc-link l3" href="#bijection-2-marginal-credit-shapley-value">Bijection 2 — Marginal credit ↔ Shapley value</a>
+    <a class="toc-link l3" href="#bijection-3-memory-decay-state-rent-eviction">Bijection 3 — Memory decay ↔ State-rent eviction</a>
+    <a class="toc-link l3" href="#bijection-4-agent-consensus-multi-pillar-weighting">Bijection 4 — Agent consensus ↔ Multi-pillar weighting</a>
+    <a class="toc-link" href="#what-externalization-enables">What externalization enables</a>
+    <a class="toc-link" href="#vibeswap-as-one-instantiation">VibeSwap as one instantiation</a>
+    <a class="toc-link" href="#implications-for-ai">Implications for AI</a>
+    <a class="toc-link" href="#implications-for-governance">Implications for governance</a>
+    <a class="toc-link" href="#the-thesis-in-ten-words">The thesis in ten words</a>
+    <a class="toc-link" href="#what-if-were-wrong">What if we're wrong</a>
+    <a class="toc-link" href="#the-political-consequences">The political consequences</a>
+    <a class="toc-link" href="#what-to-do-about-it">What to do about it</a>
+    <a class="toc-link" href="#for-readers-wanting-to-engage">For readers wanting to engage</a>
+    <a class="toc-link" href="#for-educators">For educators</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">24</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>The cognitive economy thesis</span>
+    </div>
+    <h1>The Cognitive Economy Thesis</h1>
+<div class="tagline">**Status**: Outreach-scale essay. LinkedIn / Medium / course-material adaptation.</div>
+
+<p><strong>Status</strong>: Outreach-scale essay. LinkedIn / Medium / course-material adaptation.
+<strong>Audience</strong>: First-encounter OK. Strong hooks, accessible pace, load-bearing depth.</p>
+<hr />
+<h2 id="the-sentence-that-unlocks-everything">The sentence that unlocks everything</h2>
+<p><strong>The mind is not separate from economics. It IS an economy.</strong></p>
+<p>Not "like" an economy. <em>Is</em>. Same mathematics. Same dynamics. Same failure modes.</p>
+<p>If that sentence seems strange, keep reading. It's the claim this thesis rests on, and the claim VibeSwap is architected around. Once you feel it, the rest follows.</p>
+<h2 id="the-historical-separation">The historical separation</h2>
+<p>For most of human history, we treated mind and economics as distinct domains.</p>
+<p>Philosophers owned the mind. Economists owned money. Each had their turf, their jargon, their experts. Cross-boundary comparison was called "analogy" — suggestive but non-committal.</p>
+<p>The separation was historical convenience, not principle. It lasted because no substrate let us directly compare them.</p>
+<p>Then something changed.</p>
+<h2 id="the-convergence">The convergence</h2>
+<p>Two substrates recently became observable at scale:</p>
+<ol>
+<li>
+<p><strong>LLMs</strong>: Large Language Models run cognitive processes observably. For the first time, we can measure attention, memory, consensus in a computing system that does cognitive work.</p>
+</li>
+<li>
+<p><strong>Blockchains</strong>: decentralized substrates let us specify economic mechanisms precisely, with trust-minimized invariants.</p>
+</li>
+</ol>
+<p>Both are recent (past ~5-10 years). Both expose their internal workings. Both let us run experiments.</p>
+<p>Compare the same phenomenon in both:</p>
+<ul>
+<li><strong>Attention in LLMs</strong>: measurable via attention-weight heatmaps. Budget is model-size-bounded.</li>
+<li>
+<p><strong>Attention in blockchain</strong>: measurable via gas. Budget is block-gas-bounded.</p>
+</li>
+<li>
+<p><strong>Memory in LLMs</strong>: context window + retrieval-augmented generation. Decay via context limits.</p>
+</li>
+<li><strong>Memory in blockchain</strong>: state-rent + eviction. Decay via unpaid rent.</li>
+</ul>
+<p>Same phenomena. Different substrates. Revealing the same math.</p>
+<h2 id="the-four-bijections">The four bijections</h2>
+<p>The Cognitive Economy Thesis rests on four specific mathematical correspondences:</p>
+<h3 id="bijection-1-belief-update-walrasian-clearing">Bijection 1 — Belief update ↔ Walrasian clearing</h3>
+<p>When you update a belief based on evidence, you're doing Bayesian inference:</p>
+<pre><code>P(new belief | evidence) ∝ P(evidence | belief) × P(belief)
+</code></pre>
+<p>When a batch auction clears at uniform price, the math IS Bayesian update — precision-weighted aggregation across bidders' positions.</p>
+<h3 id="bijection-2-marginal-credit-shapley-value">Bijection 2 — Marginal credit ↔ Shapley value</h3>
+<p>When you credit a team member for their contribution to a cooperative project, you're doing Shapley computation — expected marginal contribution averaged over permutations.</p>
+<p>Shapley is the unique axiomatically-fair distribution. Cognition's intuition about credit matches it when well-calibrated.</p>
+<h3 id="bijection-3-memory-decay-state-rent-eviction">Bijection 3 — Memory decay ↔ State-rent eviction</h3>
+<p>When you forget something you haven't reviewed, you're experiencing Ebbinghaus decay.</p>
+<p>When on-chain state is evicted for unpaid rent, the math IS the same — convex-cost retention with eviction at payment failure.</p>
+<h3 id="bijection-4-agent-consensus-multi-pillar-weighting">Bijection 4 — Agent consensus ↔ Multi-pillar weighting</h3>
+<p>When you form confidence from multiple independent observers, the math is weighted aggregation.</p>
+<p>VibeSwap's NCI (Nakamoto Consensus Infinity) combines PoW + PoS + PoM with specific weights. Same math.</p>
+<p>See <a href="../../concepts/etm/ETM_MATHEMATICAL_FOUNDATION.md"><code>ETM_MATHEMATICAL_FOUNDATION.md</code></a> for the formal treatment.</p>
+<h2 id="what-externalization-enables">What externalization enables</h2>
+<p>Once you recognize the bijections, a cascade of implications:</p>
+<ul>
+<li><strong>Attribution infrastructure becomes first-class.</strong> If the chain mirrors cognitive production, attribution (who produced what) must be on-chain. This is <a href="../../concepts/identity/CONTRIBUTION_TRACEABILITY.md"><code>CONTRIBUTION_TRACEABILITY.md</code></a>'s motivation.</li>
+<li><strong>Design of cognitive-economic mechanisms transfers.</strong> Cognitive-science observations (how attention allocates, how memory decays, how consensus forms) inform on-chain mechanism design. Cost savings compound.</li>
+<li><strong>Cognitive pathologies are preventable.</strong> Extraction surfaces that exist in attention-based systems can be architecturally prevented on-chain.</li>
+<li><strong>Long-arc contribution preserves.</strong> Attribution infrastructure that preserves decade-long lineages makes cognitive work economically viable at time-scales classical labor markets can't compensate.</li>
+<li><strong>New market categories emerge.</strong> "Coordination primitive" becomes a product category. Attribution-as-a-service, reputation-weighted-curation, cross-substrate-contribution-tracking — all viable businesses.</li>
+</ul>
+<h2 id="vibeswap-as-one-instantiation">VibeSwap as one instantiation</h2>
+<p>The mechanism stack:</p>
+<ul>
+<li><strong>Substrate</strong>: <a href="../../concepts/monetary/COGNITIVE_RENT_ECONOMICS.md"><code>COGNITIVE_RENT_ECONOMICS.md</code></a> — memory rent on-chain.</li>
+<li><strong>Identity</strong>: [<code>SoulboundIdentity</code>] + <a href="../../concepts/identity/CONTRIBUTION_DAG_EXPLAINER.md"><code>CONTRIBUTION_DAG_EXPLAINER.md</code></a> — persistent identity + trust graph.</li>
+<li><strong>Attribution</strong>: <a href="../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md"><code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code></a> + <a href="../../concepts/identity/CONTRIBUTION_TRACEABILITY.md"><code>CONTRIBUTION_TRACEABILITY.md</code></a> — claim substrate + chain-to-chain loop.</li>
+<li><strong>Distribution</strong>: <a href="../proofs/THE_LAWSON_FLOOR_MATHEMATICS.md"><code>Shapley + Lawson Floor</code></a> + <a href="../theorems/THE_NOVELTY_BONUS_THEOREM.md"><code>Novelty Bonus</code></a> — marginal-contribution-based reward.</li>
+<li><strong>Governance</strong>: <a href="../../architecture/AUGMENTED_GOVERNANCE.md"><code>AUGMENTED_GOVERNANCE.md</code></a> — Physics &gt; Constitution &gt; Governance.</li>
+<li><strong>Defense</strong>: <a href="../../concepts/security/SIREN_PROTOCOL.md"><code>SIREN_PROTOCOL.md</code></a> + <a href="../../concepts/security/CLAWBACK_CASCADE_MECHANICS.md"><code>CLAWBACK_CASCADE_MECHANICS.md</code></a> — extraction-resistant architecture.</li>
+<li><strong>Consensus</strong>: <a href="../../concepts/identity/NCI_WEIGHT_FUNCTION.md"><code>NCI_WEIGHT_FUNCTION.md</code></a> — multi-pillar aggregation.</li>
+</ul>
+<p>Each layer has cognitive-economic counterpart. Stack isn't arbitrary — required components of cognitive economy made legible.</p>
+<h2 id="implications-for-ai">Implications for AI</h2>
+<p>If the bijection is real, AI systems become first-class participants in cognitive economy. An LLM producing valuable contributions earns DAG credit the same way a human does.</p>
+<p>This has consequences:
+- <strong>AI alignment becomes cognitive-economic</strong>: aligned AI is AI whose contributions earn positive Shapley. Misaligned extracts (violates P-001).
+- <strong>AI regulation leverages the cognitive-economic framework</strong>: AI-generated contributions attributed, attested, rewarded by same rules.
+- <strong>AI collaboration is mechanized</strong>: AI agents coordinate through same DAG/Attestor/Shapley substrate as humans.</p>
+<p>VibeSwap provides this infrastructure. Not purpose-built for AI (purpose-built for cognitive-economy-externalization), but AI fits naturally.</p>
+<h2 id="implications-for-governance">Implications for governance</h2>
+<p>Traditional governance assumes distinct "political" sphere separate from "economic" and "cognitive." Thesis says no such separation exists. Governance IS cognitive-economic — consensus-formation over collective-action-selection.</p>
+<p>Reframe enables:
+- <strong>Math-enforced constitutional axioms</strong> — P-000 (Fairness) + P-001 (No Extraction) as non-negotiable.
+- <strong>Quadratic voting</strong> — cognitive-economic-cost-sensitive voting.
+- <strong>Tribunal juries</strong> — random-selection-from-trusted, mirroring human juries.
+- <strong>Multi-branch authority</strong> — executive/judicial/legislative separation as invariant, not convention.</p>
+<h2 id="the-thesis-in-ten-words">The thesis in ten words</h2>
+<p><em>Mind is economy. Blockchain is its first visible externalization. Act accordingly.</em></p>
+<h2 id="what-if-were-wrong">What if we're wrong</h2>
+<p>The thesis could be wrong in specific ways:</p>
+<ul>
+<li><strong>Mind isn't economic in the claimed sense.</strong> Bijections break; formulas don't transfer. Mechanisms from cognitive observations don't work on chain.</li>
+<li><strong>Externalization is fundamentally lossy.</strong> Mind has properties that don't externalize (consciousness, phenomenal experience, embodiment). Mechanisms capture degraded version.</li>
+<li><strong>Blockchain isn't the right substrate.</strong> Some other medium (quantum computing? unknown?) is the actual first externalization.</li>
+</ul>
+<p>Each would falsify parts of the thesis. Each is a real scientific risk.</p>
+<p>We proceed because:
+1. Partial evidence is strong.
+2. Downside of not-externalizing (cognitive pathologies running rampant in unregulated attention markets) is worse than downside of externalizing-imperfectly.</p>
+<h2 id="the-political-consequences">The political consequences</h2>
+<p>If mind IS economy, power flows differently than political theory assumes. Authority derives from cognitive contribution — who produces what value for whom. Not from office, credentials, institutional position.</p>
+<p>Political consequences:
+- Credentialed institutions lose monopoly over expertise-certification.
+- Governance bodies lose monopoly over legitimacy-conferring.
+- Financial institutions lose monopoly over value-movement.</p>
+<p>Each is a live political struggle. VibeSwap is not neutral; the project's success depends on cognitive-economy externalization proving durable.</p>
+<p>Will (project originator) is a college dropout who plays Valorant — outside credentialed hierarchies. The <a href="../memory/user_will-paradigm-break-creativity.md">paradigm-break creativity</a> that produced VibeSwap wasn't from academia. That's not incidental — institutions would have rejected the ideas. <!-- FIXME: ../memory/user_will-paradigm-break-creativity.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --></p>
+<p>Revenge of the meek. In the sense the founding thesis intends.</p>
+<h2 id="what-to-do-about-it">What to do about it</h2>
+<p>Practical response:</p>
+<ol>
+<li><strong>Build infrastructure</strong> — VibeSwap is one instance; multiple approaches valuable.</li>
+<li><strong>Demonstrate durable fairness</strong> — mechanisms holding over time become trusted.</li>
+<li><strong>Teach widely</strong> — Eridu Labs + 30-doc pipeline + future courses.</li>
+<li><strong>Resist credentialism</strong> — ideas evaluable on merit; gatekeeping is pathology.</li>
+<li><strong>Compound attribution</strong> — each contribution credited, every lineage preserved.</li>
+</ol>
+<p>None is individually heroic. Together they're the practical response to the thesis being true.</p>
+<h2 id="for-readers-wanting-to-engage">For readers wanting to engage</h2>
+<p>If this resonates:</p>
+<ul>
+<li>Read the technical substrate: <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md"><code>ECONOMIC_THEORY_OF_MIND.md</code></a> + <a href="../../concepts/etm/ETM_MATHEMATICAL_FOUNDATION.md"><code>ETM_MATHEMATICAL_FOUNDATION.md</code></a>.</li>
+<li>Explore the mechanism stack: <a href="../../concepts/etm/ETM_BUILD_ROADMAP.md"><code>ETM_BUILD_ROADMAP.md</code></a>.</li>
+<li>Join the community: Telegram <code>t.me/+3uHbNxyZH-tiOGY8</code>.</li>
+<li>Contribute via <a href="../../concepts/identity/CONTRIBUTION_TRACEABILITY.md"><code>CONTRIBUTION_TRACEABILITY.md</code></a> loop.</li>
+</ul>
+<p>If skeptical:</p>
+<ul>
+<li>Read bijections in detail. Critique specific steps.</li>
+<li>Run your own mechanism-design experiments. Test claims.</li>
+<li>Build counter-examples. Publish.</li>
+</ul>
+<p>Either way, engaging moves the thesis forward.</p>
+<h2 id="for-educators">For educators</h2>
+<p>This doc is designed for Eridu-style course adaptation:</p>
+<ul>
+<li>Modular sections can be course weeks.</li>
+<li>Each section stands alone enough for single-lecture use.</li>
+<li>Cross-references go to deeper technical docs when students want them.</li>
+<li>Honest limits enable academic discussion rather than evangelism.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>The mind IS an economy (not like — is). Four mathematical bijections (Bayesian-Walrasian, marginal-Shapley, memory-state-rent, consensus-NCI) establish the claim. Blockchain is the first substrate where this economy can exist visibly and composably. VibeSwap is one concrete infrastructure instance. Implications span AI, governance, politics (credentialism reversal). Testable thesis, honest about what could falsify it.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/23_THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.html" class="nav-cell prev"><div class="label">&larr; PREV // 23</div><div class="ttl">The Community Bootstrap Playbook</div></a>
+  <a href="/papers/25_ATTENTION_AS_INFRASTRUCTURE.html" class="nav-cell next"><div class="label">NEXT // 25 &rarr;</div><div class="ttl">Attention as Infrastructure</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Cross-Chain State Atomicity :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">29</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#the-problem-stated-simply">The problem, stated simply</a>
+    <a class="toc-link" href="#why-its-hard">Why it's hard</a>
+    <a class="toc-link" href="#the-spectrum-of-atomicity">The spectrum of atomicity</a>
+    <a class="toc-link l3" href="#weak-most-of-the-internet-circa-2024">Weak (most of the internet circa 2024)</a>
+    <a class="toc-link l3" href="#optimistic-popular-2024">Optimistic (popular 2024)</a>
+    <a class="toc-link l3" href="#zk-verified-emerging-2025">ZK-verified (emerging 2025+)</a>
+    <a class="toc-link l3" href="#atomic-native-rare">Atomic-native (rare)</a>
+    <a class="toc-link" href="#layerzero-v2-primer">LayerZero V2 primer</a>
+    <a class="toc-link" href="#what-vibeswap-does">What VibeSwap does</a>
+    <a class="toc-link l3" href="#pattern-1-commitment-with-reveal">Pattern 1 — Commitment with reveal</a>
+    <a class="toc-link l3" href="#pattern-2-optimistic-execution-with-challenge">Pattern 2 — Optimistic execution with challenge</a>
+    <a class="toc-link l3" href="#pattern-3-zk-verified">Pattern 3 — ZK-verified</a>
+    <a class="toc-link" href="#the-pieces-you-need">The pieces you need</a>
+    <a class="toc-link l3" href="#piece-1-message-format">Piece 1 — Message format</a>
+    <a class="toc-link l3" href="#piece-2-receipt-contract">Piece 2 — Receipt contract</a>
+    <a class="toc-link l3" href="#piece-3-recovery-contract">Piece 3 — Recovery contract</a>
+    <a class="toc-link l3" href="#piece-4-idempotency-guard">Piece 4 — Idempotency guard</a>
+    <a class="toc-link l3" href="#piece-5-monitoring-and-alerts">Piece 5 — Monitoring and alerts</a>
+    <a class="toc-link" href="#whats-easy-whats-hard">What's easy, what's hard</a>
+    <a class="toc-link l3" href="#easy-to-do-correctly">Easy to do correctly</a>
+    <a class="toc-link l3" href="#medium-difficulty">Medium difficulty</a>
+    <a class="toc-link l3" href="#hard">Hard</a>
+    <a class="toc-link" href="#security-posture">Security posture</a>
+    <a class="toc-link" href="#the-user-experience">The user experience</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#the-lesson">The lesson</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">29</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>Cross-chain state atomicity</span>
+    </div>
+    <h1>Cross-Chain State Atomicity</h1>
+<div class="tagline">**Status**: Pedagogical deep-dive on LayerZero V2 integration + atomicity tradeoffs.</div>
+
+<p><strong>Status</strong>: Pedagogical deep-dive on LayerZero V2 integration + atomicity tradeoffs.
+<strong>Audience</strong>: First-encounter with cross-chain concepts is OK.
+<strong>Related</strong>: <a href="./CROSS_CHAIN_SETTLEMENT.md">Cross-Chain Settlement</a>, <a href="./ROSETTA_COVENANTS_CROSS_CHAIN.md">Rosetta Covenants Cross-Chain</a>, <a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a>.</p>
+<hr />
+<h2 id="the-problem-stated-simply">The problem, stated simply</h2>
+<p>You send $100 USDC from Ethereum to Polygon. You want the result: $100 disappeared from Ethereum AND $100 appeared on Polygon. Not one without the other.</p>
+<p>This is the cross-chain atomicity problem. What does "atomic" mean when two separate chains are involved? How do we guarantee both sides complete, or neither completes, with no in-between state?</p>
+<h2 id="why-its-hard">Why it's hard</h2>
+<p>On a single blockchain, atomicity is easy. A transaction either commits (all changes happen) or reverts (nothing happens). The chain's consensus guarantees it.</p>
+<p>Across two chains, there's no shared consensus. Chain A doesn't know what Chain B did until someone tells it. The messenger (called a "bridge" or "oracle") is a separate system.</p>
+<p>Concrete example of what can go wrong: you initiate a transfer. Chain A burns your USDC. The bridge is supposed to tell Chain B to mint. But the bridge has a bug, or is slow, or is compromised. Your USDC is burned on A but never minted on B. Your money is lost.</p>
+<p>This is the fundamental cross-chain risk. Solutions differ in how they mitigate it.</p>
+<h2 id="the-spectrum-of-atomicity">The spectrum of atomicity</h2>
+<p>Cross-chain operations fall on a spectrum:</p>
+<h3 id="weak-most-of-the-internet-circa-2024">Weak (most of the internet circa 2024)</h3>
+<p>Chain A executes. A separate system notifies Chain B. Chain B executes. No synchronization; if the notifier fails, you have inconsistent state.</p>
+<p><strong>Concrete failure</strong>: Wormhole hack 2022. Bridge exploit minted 120,000 wETH on Solana without burning ETH on Ethereum. ~$320M stolen.</p>
+<p>Most production cross-chain systems sit here. Acceptable for unimportant data; unacceptable for money.</p>
+<h3 id="optimistic-popular-2024">Optimistic (popular 2024)</h3>
+<p>Chain A executes. Chain B executes optimistically. A challenge window allows disputes; if challenged and the challenge succeeds, the action is reverted.</p>
+<p><strong>Used by</strong>: Optimism's native bridge, Arbitrum, many rollups.</p>
+<p><strong>Tradeoffs</strong>: operations have delay (7-day challenge windows common). If a fraud is caught, it's caught; but fraud must be detected and challenged within the window.</p>
+<h3 id="zk-verified-emerging-2025">ZK-verified (emerging 2025+)</h3>
+<p>Chain A executes + produces a ZK proof of execution. Chain B verifies the proof; if valid, Chain B executes.</p>
+<p><strong>Advantages</strong>: cryptographic certainty. No challenge window needed; proof suffices.</p>
+<p><strong>Tradeoffs</strong>: ZK proofs are expensive to generate; proof-of-L1-activity is complex.</p>
+<h3 id="atomic-native-rare">Atomic-native (rare)</h3>
+<p>Two chains share a consensus mechanism that includes both. Transactions span both; consensus treats them as single transactions.</p>
+<p><strong>Examples</strong>: Cosmos IBC with light clients; Polkadot parachain exchange.</p>
+<p><strong>Tradeoffs</strong>: requires coordinated consensus, which limits which chains can participate.</p>
+<p>VibeSwap uses LayerZero V2 which operates in the Optimistic tier with some ZK-enhanced features.</p>
+<h2 id="layerzero-v2-primer">LayerZero V2 primer</h2>
+<p>LayerZero is a general-purpose messaging protocol that lets contracts on one chain trigger contracts on another.</p>
+<p>Conceptually:</p>
+<ol>
+<li>Contract on Chain A sends a message via LayerZero.</li>
+<li>LayerZero validators (the "Decentralized Verifier Network") verify the message was sent.</li>
+<li>LayerZero executors relay the message to Chain B.</li>
+<li>Contract on Chain B receives the message and executes.</li>
+</ol>
+<p>Key properties:
+- <strong>Ordering</strong>: messages in a channel arrive in order.
+- <strong>Liveness</strong>: messages eventually deliver (bounded latency under normal conditions).
+- <strong>Replay resistance</strong>: each message has a unique GUID; double-delivery detected and rejected.
+- <strong>Retry semantics</strong>: failed delivery can be retried; consumers must handle idempotently.</p>
+<p>These are solid foundations but not atomic. A cross-chain operation using LayerZero is NOT atomic by default — Chain A commits, message is sent, Chain B eventually processes (possibly delayed, possibly retried).</p>
+<h2 id="what-vibeswap-does">What VibeSwap does</h2>
+<p>VibeSwap uses LayerZero for cross-chain operations but layers on atomicity guarantees:</p>
+<h3 id="pattern-1-commitment-with-reveal">Pattern 1 — Commitment with reveal</h3>
+<p>Chain A commits (burn tokens, record intent). LayerZero message is sent. Chain B receives message, verifies, and reveals (mints tokens, completes action).</p>
+<p>Atomicity property: if Chain A's commit is final but Chain B's reveal fails (e.g., contract paused), the commit stays on Chain A but is claimable back (recoverable state).</p>
+<p><strong>Concrete example</strong>: user bridges 100 USDC from Ethereum to Polygon.
+- Ethereum: <code>bridgeOut(100, polygonChainId, userAddr)</code> — USDC is burned.
+- LayerZero: <code>send(polygonChainId, mintMessage)</code> — message dispatched.
+- Polygon: receives message, mints 100 USDC to userAddr.</p>
+<p>If Polygon step fails (contract upgrade paused minting), the Ethereum burn is recoverable via <code>recoverBridge()</code> after a timeout. Money not lost.</p>
+<h3 id="pattern-2-optimistic-execution-with-challenge">Pattern 2 — Optimistic execution with challenge</h3>
+<p>Chain A commits. Chain B executes optimistically. A challenge window (7 days) allows disputes.</p>
+<p>Used for: large-value cross-chain operations where speed matters, and challenge-window delay is tolerable.</p>
+<p><strong>Concrete example</strong>: cross-chain Shapley distribution. Compute on Chain A, distribute on Chain B. Challenge window allows disputing if Chain A's computation was incorrect.</p>
+<h3 id="pattern-3-zk-verified">Pattern 3 — ZK-verified</h3>
+<p>Chain A executes + produces ZK proof. Chain B verifies proof on receipt.</p>
+<p>Used for: highest-value operations where immediate certainty is required.</p>
+<p><strong>Concrete example</strong>: cross-chain governance votes. Vote tally on Chain A + ZK-proof of correct counting. Chain B verifies the proof and executes the governance decision.</p>
+<h2 id="the-pieces-you-need">The pieces you need</h2>
+<p>To implement cross-chain atomicity, you need:</p>
+<h3 id="piece-1-message-format">Piece 1 — Message format</h3>
+<p>A standard structure for cross-chain messages. VibeSwap uses:</p>
+<pre><code class="language-solidity">struct CrossChainMessage {
+    uint8  messageType;     // 0=transfer, 1=vote, 2=attestation, etc.
+    bytes32 originChain;
+    bytes32 originContract;
+    bytes32 nonce;          // prevents replay
+    bytes   payload;        // type-specific data
+}
+</code></pre>
+<h3 id="piece-2-receipt-contract">Piece 2 — Receipt contract</h3>
+<p>Contract on Chain B that receives messages and dispatches to the right handler:</p>
+<pre><code class="language-solidity">function lzReceive(
+    Origin calldata _origin,
+    bytes32 _guid,
+    bytes calldata _message,
+    address _executor,
+    bytes calldata _extraData
+) internal override {
+    // Verify sender
+    // Parse message
+    // Dispatch to handler
+    // Emit event
+}
+</code></pre>
+<h3 id="piece-3-recovery-contract">Piece 3 — Recovery contract</h3>
+<p>Contract on Chain A that handles recovery if Chain B doesn't respond:</p>
+<pre><code class="language-solidity">function recoverBridge(bytes32 messageGuid) external {
+    // Verify enough time has passed
+    // Verify Chain B didn't complete
+    // Refund user
+}
+</code></pre>
+<h3 id="piece-4-idempotency-guard">Piece 4 — Idempotency guard</h3>
+<p>Contract on Chain B that prevents double-execution if a message is retried:</p>
+<pre><code class="language-solidity">mapping(bytes32 =&gt; bool) public executedMessages;
+
+modifier notAlreadyExecuted(bytes32 guid) {
+    require(!executedMessages[guid], &quot;already executed&quot;);
+    executedMessages[guid] = true;
+    _;
+}
+</code></pre>
+<h3 id="piece-5-monitoring-and-alerts">Piece 5 — Monitoring and alerts</h3>
+<p>Off-chain monitoring: watch Chain A's outbound messages; watch Chain B's receipts; alert on discrepancies.</p>
+<h2 id="whats-easy-whats-hard">What's easy, what's hard</h2>
+<h3 id="easy-to-do-correctly">Easy to do correctly</h3>
+<ul>
+<li>Simple token transfers (mature patterns, well-tested).</li>
+<li>Information-only messages (announcements, state updates).</li>
+<li>Atomic-within-chain operations.</li>
+</ul>
+<h3 id="medium-difficulty">Medium difficulty</h3>
+<ul>
+<li>Cross-chain voting aggregation.</li>
+<li>Cross-chain attestation replication.</li>
+<li>Cross-chain oracle synchronization.</li>
+</ul>
+<h3 id="hard">Hard</h3>
+<ul>
+<li>Cross-chain AMM trading (requires synchronized state).</li>
+<li>Cross-chain composed DeFi operations.</li>
+<li>Cross-chain governance where votes span chains.</li>
+</ul>
+<p>VibeSwap's current roadmap focuses on medium-difficulty integrations, deferring the hardest to V2+ when the cryptographic primitives mature.</p>
+<h2 id="security-posture">Security posture</h2>
+<p>Cross-chain is the #1 attack surface in DeFi (by $ stolen historically). Discipline:</p>
+<ol>
+<li><strong>Minimize cross-chain dependencies</strong>. Most value should be chain-local; cross-chain only where coordination demands it.</li>
+<li><strong>Use production-hardened messaging</strong>. LayerZero V2 is battle-tested; custom bridges are not.</li>
+<li><strong>Always provide recovery paths</strong>. Users should never lose funds due to cross-chain issues.</li>
+<li><strong>Monitor continuously</strong>. Watch for discrepancies; investigate anomalies immediately.</li>
+<li><strong>Isolate blast radius</strong>. A cross-chain exploit should affect only the cross-chain operation, not the entire protocol.</li>
+<li><strong>Audit cross-chain code harder than chain-local</strong>. 2x-3x audit rigor, different audit firms for independent verification.</li>
+</ol>
+<h2 id="the-user-experience">The user experience</h2>
+<p>From user perspective, cross-chain atomicity should be invisible. User says "bridge 100 USDC to Polygon" and:
+- Sees estimated time.
+- Sees intermediate status (Ethereum burn → message sent → Polygon mint).
+- Sees final success or error.</p>
+<p>If anything goes wrong, user should get clear error + recovery path. "Transaction failed" is not enough; "Transaction failed on Polygon, your funds are in bridge contract, claim via X" is.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: design a cross-chain atomic-swap protocol.</p>
+<ul>
+<li>Alice on Chain A has 1 ETH, wants 100 USDC.</li>
+<li>Bob on Chain B has 100 USDC, wants 1 ETH.</li>
+<li>Design a protocol where both transfers complete, or neither does.</li>
+</ul>
+<p>Hints: Hashed-time-lock contracts (HTLCs) are a classical approach. LayerZero or similar messaging is another. ZK-proofs of state are emerging.</p>
+<p>Compare your design to production bridges (e.g., AtomicLoans, Thorchain). Where does yours differ? What tradeoffs did you make?</p>
+<h2 id="the-lesson">The lesson</h2>
+<p>Cross-chain atomicity is a real engineering challenge with multiple solution patterns, each with tradeoffs. No single solution is "best"; architecture depends on:
+- Value at stake.
+- Speed requirements.
+- Liquidity constraints.
+- Security tolerance.</p>
+<p>VibeSwap's approach: use LayerZero V2 for messaging, layer on pattern-specific atomicity, provide user-facing recovery paths, monitor continuously.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Cross-chain atomicity = getting two chains to agree on a shared outcome without shared consensus — spectrum from weak (most existing) to atomic-native (rare). VibeSwap uses LayerZero V2 plus commit-with-reveal / optimistic / ZK patterns per operation. Pedagogical walkthrough: user-story for USDC bridge + recovery pathway + code-structure guide.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/28_TRUE_PRICE_ORACLE_DEEP_DIVE.html" class="nav-cell prev"><div class="label">&larr; PREV // 28</div><div class="ttl">True Price Oracle — Deep Dive</div></a>
+  <a href="/papers/30_STORAGE_SLOT_ECOLOGY.html" class="nav-cell next"><div class="label">NEXT // 30 &rarr;</div><div class="ttl">Storage Slot Ecology</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

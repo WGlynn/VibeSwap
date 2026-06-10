@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Regulatory Compliance — Deep Dive :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">22</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#why-regulation-matters-earlier-than-most-people-think">Why regulation matters earlier than most people think</a>
+    <a class="toc-link" href="#the-jurisdictions-that-matter">The jurisdictions that matter</a>
+    <a class="toc-link l3" href="#united-states">United States</a>
+    <a class="toc-link l3" href="#european-union">European Union</a>
+    <a class="toc-link l3" href="#united-kingdom">United Kingdom</a>
+    <a class="toc-link l3" href="#singapore">Singapore</a>
+    <a class="toc-link l3" href="#hong-kong">Hong Kong</a>
+    <a class="toc-link l3" href="#japan">Japan</a>
+    <a class="toc-link l3" href="#china">China</a>
+    <a class="toc-link l3" href="#switzerland">Switzerland</a>
+    <a class="toc-link l3" href="#uae-dubai-adgm">UAE (Dubai + ADGM)</a>
+    <a class="toc-link" href="#the-gdpr-dimension">The GDPR dimension</a>
+    <a class="toc-link l3" href="#challenge-1-right-to-be-forgotten">Challenge 1 — Right to be forgotten</a>
+    <a class="toc-link l3" href="#challenge-2-data-protection-by-design">Challenge 2 — Data protection by design</a>
+    <a class="toc-link l3" href="#challenge-3-data-transfers-across-borders">Challenge 3 — Data transfers across borders</a>
+    <a class="toc-link" href="#beyond-crypto-general-financial-regulation">Beyond crypto — general financial regulation</a>
+    <a class="toc-link l3" href="#aml-kyc">AML / KYC</a>
+    <a class="toc-link l3" href="#sanctions-compliance">Sanctions compliance</a>
+    <a class="toc-link l3" href="#tax-compliance">Tax compliance</a>
+    <a class="toc-link" href="#is-the-protocol-itself-regulated">Is the protocol itself regulated?</a>
+    <a class="toc-link" href="#the-augmented-governance-regulatory-argument">The Augmented Governance regulatory argument</a>
+    <a class="toc-link" href="#enforcement-exposure">Enforcement exposure</a>
+    <a class="toc-link" href="#the-too-decentralized-to-regulate-argument">The "too decentralized to regulate" argument</a>
+    <a class="toc-link" href="#legal-entity-structure">Legal entity structure</a>
+    <a class="toc-link" href="#path-forward">Path forward</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">22</span>
+      <span class="badge badge-terminal">ESSAY</span>
+      <span>Regulatory compliance deep dive</span>
+    </div>
+    <h1>Regulatory Compliance — Deep Dive</h1>
+<div class="tagline">**Status**: Jurisdictional analysis beyond the existing SEC whitepaper.</div>
+
+<p><strong>Status</strong>: Jurisdictional analysis beyond the existing SEC whitepaper.
+<strong>Audience</strong>: First-encounter OK. Concrete jurisdiction-by-jurisdiction.</p>
+<hr />
+<h2 id="why-regulation-matters-earlier-than-most-people-think">Why regulation matters earlier than most people think</h2>
+<p>Crypto projects often treat regulation as "we'll deal with it after product-market-fit." That's a mistake.</p>
+<p>Regulation shapes who can adopt. A regulator-unfriendly project:
+- Has harder time raising institutional capital.
+- Can't partner with regulated entities (banks, exchanges).
+- Faces uncertainty about token classification.
+- May have users stranded by later enforcement action.</p>
+<p>VibeSwap is a serious infrastructure project targeting multi-year horizons. Regulatory approach matters from day 1.</p>
+<p>This doc extends <a href="./SEC_REGULATORY_COMPLIANCE_ANALYSIS.md">SEC Regulatory Compliance Analysis</a> to the jurisdictions VibeSwap will actually operate in.</p>
+<h2 id="the-jurisdictions-that-matter">The jurisdictions that matter</h2>
+<p>Not everywhere. Specifically:</p>
+<h3 id="united-states">United States</h3>
+<p>Most activity. Highest enforcement risk.</p>
+<ul>
+<li><strong>SEC</strong> — securities law (Howey test, token classification).</li>
+<li><strong>CFTC</strong> — commodities (possible JUL classification).</li>
+<li><strong>FinCEN</strong> — money transmission (for any entity that touches fiat).</li>
+<li><strong>IRS</strong> — taxation.</li>
+</ul>
+<p>VibeSwap's position summary:
+- <strong>JUL</strong>: likely CFTC commodity (work-anchored). Not SEC security (passive-income/investment-contract prongs of Howey likely fail).
+- <strong>VIBE</strong>: governance token; possible securities classification depending on specifics. <a href="../../architecture/AUGMENTED_GOVERNANCE.md">Augmented Governance</a> designed to be regulatable.
+- <strong>CKB-native</strong>: substrate-layer; likely outside SEC/CFTC scope (utility).</p>
+<h3 id="european-union">European Union</h3>
+<p>MiCA (Markets in Crypto-Assets Regulation), fully in force 2024-12-30. Applies if offering services to EU residents.</p>
+<p>Key MiCA elements for VibeSwap:
+- <strong>Asset-referenced tokens (ARTs)</strong>: if JUL were pegged to stable basket, would be ART. VibeSwap's JUL is work-anchored, not stable-basket. Not ART.
+- <strong>E-money tokens (EMTs)</strong>: if JUL pegged to single fiat, would be EMT. Not applicable.
+- <strong>Crypto-asset service providers (CASPs)</strong>: platforms offering trading/custody/advice need CASP authorization. Contested whether VibeSwap's decentralized nature qualifies; protocol-itself may not, but specific frontends might.
+- <strong>Whitepaper publication</strong>: cryptocurrency issuers must publish specific info. VibeSwap's multiple whitepapers would need MiCA-compliant version or acknowledged non-compliance.</p>
+<p>Strategy: publish MiCA-compliant whitepaper alongside existing docs. Flag specific jurisdictions where operations are restricted. EU users route through CASP-compliant frontends.</p>
+<h3 id="united-kingdom">United Kingdom</h3>
+<p>Post-Brexit UK has own crypto regime similar to MiCA but with differences:
+- UK crypto-promotions now require FCA authorization (since 2023-10).
+- Qualifying cryptoassets covered by Financial Services Markets Act expansion.</p>
+<p>Strategy: UK-specific marketing materials + FCA authorization for promotional activities.</p>
+<h3 id="singapore">Singapore</h3>
+<p>Singapore is crypto-friendly. VibeSwap likely classifiable as "digital payment token" service; licensing exists and achievable.</p>
+<p>Strategy: Singapore-registered entity for Asia-Pacific operations.</p>
+<h3 id="hong-kong">Hong Kong</h3>
+<p>Similar to Singapore but with stricter listing requirements.</p>
+<p>Strategy: selective market entry.</p>
+<h3 id="japan">Japan</h3>
+<p>Japan allows crypto operations with specific licensing. JVCEA membership streamlines.</p>
+<p>Strategy: Japan-specific partnership rather than own operations.</p>
+<h3 id="china">China</h3>
+<p>Crypto-trading banned in mainland; crypto-infrastructure restricted.</p>
+<p>Strategy: no operations in China. HK intermediary for Chinese diaspora.</p>
+<h3 id="switzerland">Switzerland</h3>
+<p>FINMA has relatively clear framework (Payment Tokens / Utility Tokens / Asset Tokens).</p>
+<p>VibeSwap's tokens likely classify:
+- JUL: Payment Token.
+- CKB-native: Utility Token.
+- VIBE: Asset Token (arguable).</p>
+<p>Strategy: Swiss Foundation structure plausible for VibeSwap's governance entity.</p>
+<h3 id="uae-dubai-adgm">UAE (Dubai + ADGM)</h3>
+<p>UAE is becoming crypto-hub. VARA (Virtual Assets Regulatory Authority) provides clear licensing.</p>
+<p>Strategy: consider UAE operations as low-friction regulatory jurisdiction.</p>
+<h2 id="the-gdpr-dimension">The GDPR dimension</h2>
+<p>GDPR (EU), CCPA (California), LGPD (Brazil), PIPL (China) raise data-regulation challenges for on-chain data.</p>
+<h3 id="challenge-1-right-to-be-forgotten">Challenge 1 — Right to be forgotten</h3>
+<p>GDPR allows EU residents to request data erasure. On-chain data is immutable.</p>
+<p>VibeSwap's response:
+- Store identifying data off-chain where possible (evidence-hash, not raw content).
+- On-chain identifiers are cryptographic (addresses, hashes), not direct identity.
+- Users needing erasure request off-chain data deletion.
+- On-chain pseudonymous data argued as not personal data if not linked to identity.</p>
+<p><strong>Weakness</strong>: if an address is publicly linked to a real person, on-chain history becomes personal data. Arguable under GDPR.</p>
+<h3 id="challenge-2-data-protection-by-design">Challenge 2 — Data protection by design</h3>
+<p>GDPR requires privacy-preserving architecture from start.</p>
+<p>VibeSwap's design:
+- Pseudonymous by default (addresses, not names).
+- Optional <a href="../../concepts/identity/ZK_ATTRIBUTION.md">ZK attribution</a> for privacy-sensitive contributions.
+- Contributor address-identity binding is user-controlled.</p>
+<p>Argument: VibeSwap's privacy-by-default exceeds GDPR requirements.</p>
+<h3 id="challenge-3-data-transfers-across-borders">Challenge 3 — Data transfers across borders</h3>
+<p>VibeSwap's substrate is global. GDPR allows transfers to "adequate" countries, requires safeguards otherwise.</p>
+<p>Strategy: publish data-transfer disclosure. Users transacting agree via terms of service.</p>
+<h2 id="beyond-crypto-general-financial-regulation">Beyond crypto — general financial regulation</h2>
+<h3 id="aml-kyc">AML / KYC</h3>
+<p>Many jurisdictions require crypto-service providers to perform KYC.</p>
+<p>VibeSwap architecture choice:
+- <strong>Protocol level</strong>: permissionless. No KYC at protocol.
+- <strong>Frontend level</strong>: CAN be KYC-compliant versions deployed by regulated entities.
+- <strong>User choice</strong>: users needing regulated access use compliant frontends; others use direct contract interaction.</p>
+<h3 id="sanctions-compliance">Sanctions compliance</h3>
+<p>OFAC (US) and similar sanctions lists apply to financial activity. Penalties substantial for serving sanctioned addresses/jurisdictions.</p>
+<p>VibeSwap strategy:
+- <a href="../../concepts/security/CLAWBACK_CASCADE_MECHANICS.md">Clawback Cascade</a> enables response to sanctioned-funds flows without blocking protocol itself.
+- Frontends for US residents can pre-screen against sanctions.
+- Protocol itself doesn't implement address-level blocklist (consistent with <a href="../../concepts/NO_EXTRACTION_AXIOM.md"><code>NO_EXTRACTION_AXIOM.md</code></a> + GEV-resistance non-censorship commitment).</p>
+<h3 id="tax-compliance">Tax compliance</h3>
+<p>Crypto taxable in most jurisdictions. Specific rules vary.</p>
+<p>Strategy:
+- Provide optional tax-reporting tools.
+- Transaction history exportable to tax software formats.
+- Don't offer tax advice.</p>
+<h2 id="is-the-protocol-itself-regulated">Is the protocol itself regulated?</h2>
+<p>Traditional regulation assumes identifiable institutions. VibeSwap is decentralized; who's responsible?</p>
+<p>Current jurisdictional answer:
+- <strong>Developers</strong>: can be held liable for code if used for regulated activities. Reduced liability for open-source + documentation + educational work.
+- <strong>Deployed contracts</strong>: subject to court orders (where enforceable). Technical enforcement limited.
+- <strong>Frontend operators</strong>: can be regulated as service providers.
+- <strong>Protocol users</strong>: responsible for own compliance in own jurisdictions.</p>
+<p>VibeSwap's architecture distributes responsibility. Each participant bears their compliance burden. Protocol doesn't centralize.</p>
+<h2 id="the-augmented-governance-regulatory-argument">The Augmented Governance regulatory argument</h2>
+<p><a href="../../architecture/AUGMENTED_GOVERNANCE.md">Augmented Governance</a> hierarchy (Physics &gt; Constitution &gt; Governance) is designed for regulatability:</p>
+<ul>
+<li><strong>Physics layer</strong> (math invariants) — regulators can recognize as stable commitment.</li>
+<li><strong>Constitutional layer</strong> (P-000, P-001 axioms) — self-regulating; regulators can trust these are stable.</li>
+<li><strong>Governance layer</strong> (DAO votes) — potentially regulatable as governance activity.</li>
+</ul>
+<p>Strategy: argue to regulators that VibeSwap's structured hierarchy provides predictable, stable commitments — which is what good regulation seeks. Rigid math-enforced anti-extraction is arguably STRONGER than discretionary regulatory enforcement.</p>
+<h2 id="enforcement-exposure">Enforcement exposure</h2>
+<p>Realistic:</p>
+<ul>
+<li><strong>US</strong>: likely. SEC or CFTC could claim jurisdiction. Mitigation: active engagement, voluntary disclosure where appropriate.</li>
+<li><strong>EU</strong>: medium. MiCA compliance achievable; enforcement likely limited to specific frontends.</li>
+<li><strong>Asia</strong>: low-medium. Jurisdictional diversity means any single action has limited scope.</li>
+</ul>
+<p>Overall: VibeSwap needs active regulatory engagement in US + EU, watch-and-wait in most other jurisdictions.</p>
+<h2 id="the-too-decentralized-to-regulate-argument">The "too decentralized to regulate" argument</h2>
+<p>Proponents argue VibeSwap is too decentralized for effective regulator control. Regulators can block frontends or ban specific uses, but protocol continues.</p>
+<p>Honest assessment: partly true.</p>
+<p><strong>Regulators CAN</strong>:
+- Block contract addresses from services (RPC providers, wallet software).
+- Prosecute individuals associated.
+- Restrict banking for project-associated entities.</p>
+<p><strong>Regulators CAN'T</strong>:
+- Delete protocol from immutable on-chain state.
+- Effectively block all user access (VPN + direct interaction works).
+- Stop all contribution activity.</p>
+<p>Strategy: architect to minimize single-jurisdiction exposure. Respect regulatory cooperation within reason. Fight overreach when it exceeds reasonable bounds.</p>
+<h2 id="legal-entity-structure">Legal entity structure</h2>
+<p>Current: placeholder — specifics TBD.</p>
+<p>Recommended post-seed:
+- <strong>Primary entity</strong> in Switzerland (crypto-friendly + clear legal framework).
+- <strong>Operational entity</strong> in Singapore for Asia operations.
+- <strong>Marketing entity</strong> in Delaware for US outreach.
+- <strong>Foundation</strong> for governance neutrality.</p>
+<p>Specific choices depend on Will + legal counsel.</p>
+<h2 id="path-forward">Path forward</h2>
+<ol>
+<li><strong>Existing SEC work</strong> — already substantial (see <a href="./SEC_REGULATORY_COMPLIANCE_ANALYSIS.md"><code>SEC_REGULATORY_COMPLIANCE_ANALYSIS.md</code></a>).</li>
+<li><strong>MiCA whitepaper drafting</strong> — TODO, required before EU marketing.</li>
+<li><strong>FINMA consultation</strong> — TODO, for Swiss entity choice.</li>
+<li><strong>FCA authorization</strong> — TODO, for UK marketing.</li>
+<li><strong>Periodic enforcement-landscape review</strong> — quarterly; regulatory environment changes fast.</li>
+</ol>
+<p>Each is a specific work-item. None insurmountable.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>VibeSwap's global regulatory requires jurisdiction-specific response — MiCA (EU), FCA (UK), MAS (Singapore), FINMA (Switzerland), GDPR (data regime) — plus AML/KYC at frontend + sanctions compliance. Architecture (decentralized protocol + regulated frontends + Augmented Governance hierarchy) designed to be regulatable without centralizing responsibility. Path forward: MiCA whitepaper, FINMA consultation, FCA authorization, quarterly enforcement-landscape review.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/21_INVESTOR_ECONOMIC_MODEL.html" class="nav-cell prev"><div class="label">&larr; PREV // 21</div><div class="ttl">Investor Economic Model</div></a>
+  <a href="/papers/23_THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.html" class="nav-cell next"><div class="label">NEXT // 23 &rarr;</div><div class="ttl">The Community Bootstrap Playbook</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

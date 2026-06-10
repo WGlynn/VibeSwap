@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Attention as Infrastructure :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">25</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-a-counting-exercise">Start with a counting exercise</a>
+    <a class="toc-link" href="#the-claim">The claim</a>
+    <a class="toc-link" href="#why-this-matters">Why this matters</a>
+    <a class="toc-link" href="#attention-across-scales">Attention across scales</a>
+    <a class="toc-link l3" href="#individual-scale">Individual scale</a>
+    <a class="toc-link l3" href="#team-scale">Team scale</a>
+    <a class="toc-link l3" href="#organization-scale">Organization scale</a>
+    <a class="toc-link l3" href="#global-scale">Global scale</a>
+    <a class="toc-link" href="#walk-through-a-concrete-scenario">Walk through a concrete scenario</a>
+    <a class="toc-link l3" href="#hour-1-onboarding">Hour 1 — Onboarding</a>
+    <a class="toc-link l3" href="#hour-2-first-contribution">Hour 2 — First contribution</a>
+    <a class="toc-link l3" href="#hour-3-getting-feedback">Hour 3 — Getting feedback</a>
+    <a class="toc-link" href="#the-economics-of-attention-protection">The economics of attention protection</a>
+    <a class="toc-link" href="#attention-infrastructure-principles">Attention-infrastructure principles</a>
+    <a class="toc-link l3" href="#principle-1-dont-interrupt-without-value">Principle 1 — Don't interrupt without value</a>
+    <a class="toc-link l3" href="#principle-2-make-selective-depth-possible">Principle 2 — Make selective depth possible</a>
+    <a class="toc-link l3" href="#principle-3-aggregate-rather-than-duplicate">Principle 3 — Aggregate rather than duplicate</a>
+    <a class="toc-link l3" href="#principle-4-compound-attention-via-attribution">Principle 4 — Compound attention via attribution</a>
+    <a class="toc-link l3" href="#principle-5-protect-attention-from-extractive-patterns">Principle 5 — Protect attention from extractive patterns</a>
+    <a class="toc-link" href="#the-meta-observation">The meta-observation</a>
+    <a class="toc-link" href="#for-contributors">For contributors</a>
+    <a class="toc-link" href="#educational-framing-for-eridu">Educational framing for Eridu</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">25</span>
+      <span class="badge badge-muted">PRIMITIVE-ONLY</span>
+      <span>Attention as infrastructure</span>
+    </div>
+    <h1>Attention as Infrastructure</h1>
+<div class="tagline">**Status**: Philosophical essay + design implications.</div>
+
+<p><strong>Status</strong>: Philosophical essay + design implications.
+<strong>Audience</strong>: First-encounter OK.</p>
+<hr />
+<h2 id="start-with-a-counting-exercise">Start with a counting exercise</h2>
+<p>Take a moment right now. Count:</p>
+<ul>
+<li>How many tabs are open on your computer?</li>
+<li>How many notifications are waiting?</li>
+<li>How many emails unread?</li>
+<li>How many people are trying to reach you?</li>
+</ul>
+<p>All of these want your attention. Right now, you're attending to this doc. Simultaneously, all those other claims are waiting.</p>
+<p><strong>Your attention is finite.</strong> At any moment, it's allocated to one thing (or switching between things, which has costs). Everything else waits.</p>
+<p>This is infrastructure-level. Not a preference. Not a problem to fix. A fundamental constraint shaping everything downstream.</p>
+<h2 id="the-claim">The claim</h2>
+<p>In any cognitive system — individual, team, organization, on-chain — attention is the MOST SCARCE resource.</p>
+<ul>
+<li>Data? Abundant. Growing exponentially.</li>
+<li>Compute? Large. Getting cheaper.</li>
+<li>Memory? Large. Persistent.</li>
+<li>Bandwidth? Scales with infrastructure.</li>
+</ul>
+<p>But attention? Each agent has a fixed amount per unit time. Can't buy more. Can't manufacture. Can't borrow.</p>
+<p>Everything else is abundant or derivative. Only attention is fundamentally scarce.</p>
+<h2 id="why-this-matters">Why this matters</h2>
+<p>If attention is the bottleneck, any system that:
+- Efficiently allocates it wins.
+- Captures it for high-value uses wins.
+- Economizes on demanding it wins.
+- Protects it from extraction wins.</p>
+<p>Conversely, any system that:
+- Wastes attention loses.
+- Routes attention to low-value uses loses.
+- Demands more attention than necessary loses.
+- Allows attention extraction loses.</p>
+<p>DeFi's biggest failures are attention-waste failures: gas-war retries, mempool-watching for MEV, endless token-price-speculation. Each extracts attention without returning value.</p>
+<h2 id="attention-across-scales">Attention across scales</h2>
+<p>The attention-as-infrastructure principle compounds when applied across scales.</p>
+<h3 id="individual-scale">Individual scale</h3>
+<p>A single contributor has limited attention. Can't reasonably evaluate all open issues, read all docs, follow all conversations. Must focus on what matches their expertise.</p>
+<p><strong>VibeSwap's response</strong>:
+- <strong>Canonical format</strong> reduces individual evaluation cost. Standard structure = faster comprehension.
+- <strong>Notification discipline</strong> — don't spam; signal meaningfully.
+- <strong>Delegation via trust-weighting</strong> — don't evaluate every attestation personally; aggregated trust provides implicit delegation.</p>
+<h3 id="team-scale">Team scale</h3>
+<p>Small teams (5-20 people) face coordination-overhead attention costs. Meetings, syncs, status updates, alignment discussions.</p>
+<p><strong>VibeSwap's response</strong>:
+- <strong>Async-first culture</strong> — reduce synchronous meeting load.
+- <strong>Self-serve documentation</strong> — anyone onboards without 1-on-1.
+- <strong>Structured issue + PR format</strong> — decisions and status flow through repo, not verbal updates.</p>
+<h3 id="organization-scale">Organization scale</h3>
+<p>Larger organizations (50-500 people) have exponential communication overhead (Brooks's Law). Attention fragments.</p>
+<p><strong>VibeSwap's response</strong>:
+- <strong>Federated governance</strong> — sub-groups operate semi-autonomously within constitutional bounds.
+- <strong>Delegation via ContributionDAG</strong> — trust-weighting serves as implicit delegation.
+- <strong>Specialization encouraged</strong> — per-type contribution clusters reduce cross-type coordination.</p>
+<h3 id="global-scale">Global scale</h3>
+<p>Distributed contributor networks (1,000s of people, multiple time zones, languages) face attention-fragmentation at global scale.</p>
+<p><strong>VibeSwap's response</strong>:
+- <strong>Chat-to-DAG Traceability</strong> — preserves attribution across disparate attention pools.
+- <strong>Consensus via NCI weight</strong> — aggregates heterogeneous-attention into singular consensus without demanding all participants pay attention to every decision.
+- <strong>Temporal tiering via state-rent</strong> — old-but-still-relevant contributions stay cheap to retrieve.</p>
+<h2 id="walk-through-a-concrete-scenario">Walk through a concrete scenario</h2>
+<p>A new contributor joins VibeSwap. Let's trace their attention-investment per VibeSwap's design vs a hypothetical attention-hostile alternative.</p>
+<h3 id="hour-1-onboarding">Hour 1 — Onboarding</h3>
+<p><strong>VibeSwap</strong>:
+- Reads MASTER_INDEX; navigates to relevant docs.
+- Picks one specific contribution type (e.g., Design).
+- Attention spent efficiently on their area.</p>
+<p><strong>Hostile alternative</strong>:
+- Reads 30 docs; not clear which matter.
+- Attends calls to "catch up."
+- Attention fragmented across irrelevant-to-them content.</p>
+<h3 id="hour-2-first-contribution">Hour 2 — First contribution</h3>
+<p><strong>VibeSwap</strong>:
+- Opens <code>[Dialogue]</code> issue via template. Template pre-fills structure.
+- Attention focused on the CONTENT, not the format.
+- Submits.</p>
+<p><strong>Hostile alternative</strong>:
+- Figures out where to submit. Formats manually. Guesses at conventions.
+- Attention on mechanics, not content.</p>
+<h3 id="hour-3-getting-feedback">Hour 3 — Getting feedback</h3>
+<p><strong>VibeSwap</strong>:
+- Gets attestations from trust-weighted reviewers.
+- Reviewers can spend &lt;5 min per attestation (canonical format).
+- Many reviewers can afford to attest → aggregate signal emerges.</p>
+<p><strong>Hostile alternative</strong>:
+- Needs intensive individual feedback from small number of reviewers.
+- Reviewers take 30+ min each.
+- Either few reviewers respond (limited signal) or reviewers burnout.</p>
+<p>Over 100 contributors, this difference compounds dramatically.</p>
+<h2 id="the-economics-of-attention-protection">The economics of attention protection</h2>
+<p>Attention is the resource being extracted in most attention-extractive business models:</p>
+<ul>
+<li>Ad-driven media extracts attention, sells to advertisers.</li>
+<li>Social-media engagement loops extract attention for longer engagement.</li>
+<li>Gambling / casino-style crypto extracts attention for more gambling.</li>
+</ul>
+<p>VibeSwap's choice: DON'T extract attention. Instead, ATTRACT attention toward cooperative-production activities, and route captured attention into value-creating mechanisms. Revenue from network-effect growth, not per-attention-unit extraction.</p>
+<p>This is:
+- <strong>Sustainable</strong> — attention-extractive models collapse when users learn. Attention-attracting-and-returning models build loyalty.
+- <strong>Aligned with P-001</strong> — <a href="./NO_EXTRACTION_AXIOM.md"><code>NO_EXTRACTION_AXIOM.md</code></a> prohibits extractive models.
+- <strong>Aligned with cognitive-economic health</strong> — see <a href="../research/essays/THE_ATTENTION_AUCTION_PARADOX.md">Attention Auction Paradox</a>.</p>
+<h2 id="attention-infrastructure-principles">Attention-infrastructure principles</h2>
+<p>For any system treating attention as infrastructure:</p>
+<h3 id="principle-1-dont-interrupt-without-value">Principle 1 — Don't interrupt without value</h3>
+<p>Every notification, every popup, every demand must justify itself. Default: don't interrupt.</p>
+<p>Concrete applications:
+- No "please rate our service" popups.
+- No "you have 12 unread notifications" nudges.
+- No re-enrollment pressure.</p>
+<h3 id="principle-2-make-selective-depth-possible">Principle 2 — Make selective depth possible</h3>
+<p>Readers should be able to choose their depth level. Structured content with clear entry/exit points.</p>
+<p>Applied: every VibeSwap doc has one-line summary at bottom. Readers who skim get the crux; readers who want detail have it.</p>
+<h3 id="principle-3-aggregate-rather-than-duplicate">Principle 3 — Aggregate rather than duplicate</h3>
+<p>One summary reaches many; many summaries reach none. Invest once in excellent synthesis.</p>
+<p>Applied: the 30-doc content pipeline synthesizes concepts once; readers across LinkedIn/Medium/X/Telegram adapt as needed.</p>
+<h3 id="principle-4-compound-attention-via-attribution">Principle 4 — Compound attention via attribution</h3>
+<p>When attention invested produces durable attribution, investment compounds. Reputation grows, trust-score rises, future work earns more.</p>
+<p>Applied: VibeSwap's DAG turns each attention-investment into a lineage-asset. Classical labor markets don't compound; DAG does.</p>
+<h3 id="principle-5-protect-attention-from-extractive-patterns">Principle 5 — Protect attention from extractive patterns</h3>
+<p>Actively architect against extraction. Siren Protocol, No Extraction Axiom, GEV Resistance — all specific applications.</p>
+<h2 id="the-meta-observation">The meta-observation</h2>
+<p>You're reading this because you've allocated attention to it. Your reading choice is itself a cognitive-economic transaction — attention spent for (hopefully) insight gained.</p>
+<p>If this doc was worth your attention, the transaction was positive-sum. You gained insight; VibeSwap gained attention investment (compounds into reputation as you share, discuss, build on ideas).</p>
+<p>If it wasn't worth your attention, the transaction was net-negative for you. Attention lost without commensurate gain. Attention-as-infrastructure design should minimize these transactions.</p>
+<p>Feedback: which parts feel like positive-sum transactions? Which feel like extractions? The pipeline evolves based on this signal.</p>
+<h2 id="for-contributors">For contributors</h2>
+<p>What to think about:
+- Your attention is finite.
+- Every hour on VibeSwap is an hour NOT elsewhere.
+- Is the trade-off worth it?</p>
+<p>VibeSwap's proposition: each hour earns DAG credit, reputation, skill, connection. Compared to alternatives (social media scrolling, gambling), trade seems favorable.</p>
+<p>BUT: vs deeper alternatives (family, rest, physical activity), trade may NOT be favorable. Know your trade-offs.</p>
+<h2 id="educational-framing-for-eridu">Educational framing for Eridu</h2>
+<p>Education is inherently attention-sensitive. Good teachers preserve student attention (focused lessons, not meandering). Bad teachers demand student attention while offering little back.</p>
+<p>Eridu × VibeSwap education applies attention-as-infrastructure:
+- Modular course content — students consume at own pace.
+- Attribution for learning activities — earns DAG credit.
+- Scaffolded depth — intro / intermediate / advanced.
+- Community-supported learning — peer-help earns DAG credit too.</p>
+<p>Course design itself embeds attention-as-infrastructure thinking.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Attention is the scarcest resource across individual, team, organization, on-chain. VibeSwap treats it as infrastructure: don't demand without value, route to high-leverage, return compounded value via attribution, defend against extraction. Five principles (don't interrupt, selective depth, aggregate, compound, protect). Business model attracts attention and returns value, unlike casino-style extraction. Meta-question: is the reader getting positive-sum transaction from this doc?</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/24_THE_COGNITIVE_ECONOMY_THESIS.html" class="nav-cell prev"><div class="label">&larr; PREV // 24</div><div class="ttl">The Cognitive Economy Thesis</div></a>
+  <a href="/papers/26_THE_DIGNITY_GRADIENT.html" class="nav-cell next"><div class="label">NEXT // 26 &rarr;</div><div class="ttl">The Dignity Gradient</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

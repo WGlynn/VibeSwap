@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Siren Protocol :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">11</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-paradigm-break">A paradigm break</a>
+    <a class="toc-link" href="#walk-through-an-attack-exhaustion">Walk through an attack + exhaustion</a>
+    <a class="toc-link l3" href="#day-1-first-engagement">Day 1 — First engagement</a>
+    <a class="toc-link l3" href="#day-2-second-attempt">Day 2 — Second attempt</a>
+    <a class="toc-link l3" href="#day-3-third-attempt-honeypot-engagement">Day 3 — Third attempt + honeypot engagement</a>
+    <a class="toc-link l3" href="#day-4-fourth-attempt-deeper-engagement">Day 4 — Fourth attempt, deeper engagement</a>
+    <a class="toc-link l3" href="#day-5-exit">Day 5 — Exit</a>
+    <a class="toc-link" href="#why-this-beats-blacklisting">Why this beats blacklisting</a>
+    <a class="toc-link l3" href="#no-governance-capture">No governance capture</a>
+    <a class="toc-link l3" href="#no-sybil-rotation-defeat">No Sybil rotation defeat</a>
+    <a class="toc-link l3" href="#self-healing-false-positives">Self-healing false positives</a>
+    <a class="toc-link l3" href="#attackers-self-deter">Attackers self-deter</a>
+    <a class="toc-link" href="#the-mechanism-concretely">The mechanism, concretely</a>
+    <a class="toc-link" href="#why-this-is-substrate-geometry-matched">Why this is substrate-geometry-matched</a>
+    <a class="toc-link" href="#the-cognitive-parallel">The cognitive parallel</a>
+    <a class="toc-link" href="#what-siren-does-not-do">What Siren does NOT do</a>
+    <a class="toc-link l3" href="#not-a-deterministic-blocker">NOT a deterministic blocker</a>
+    <a class="toc-link l3" href="#not-identity-detection">NOT identity detection</a>
+    <a class="toc-link l3" href="#not-fund-recovery">NOT fund recovery</a>
+    <a class="toc-link l3" href="#not-eviction">NOT eviction</a>
+    <a class="toc-link" href="#interaction-with-other-defenses">Interaction with other defenses</a>
+    <a class="toc-link" href="#why-siren-as-a-name">Why "Siren" as a name</a>
+    <a class="toc-link" href="#on-chain-deployment">On-chain deployment</a>
+    <a class="toc-link" href="#relationship-to-gev-resistance">Relationship to GEV resistance</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">11</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Siren protocol</span>
+    </div>
+    <h1>The Siren Protocol</h1>
+<div class="tagline">**Status**: Live in `contracts/core/HoneypotDefense.sol` + `OmniscientAdversaryDefense.sol`.</div>
+
+<p><strong>Status</strong>: Live in <code>contracts/core/HoneypotDefense.sol</code> + <code>OmniscientAdversaryDefense.sol</code>.
+<strong>Audience</strong>: First-encounter OK. Walked attack + exhaustion scenario.
+<strong>Classification</strong>: ETM MIRRORS (<a href="../etm/ETM_ALIGNMENT_AUDIT.md">audit</a> §5.1).</p>
+<hr />
+<h2 id="a-paradigm-break">A paradigm break</h2>
+<p>Ask 100 security engineers: "How do you defend against attackers?"</p>
+<p>~95 will say: <strong>blacklist</strong>. Block attacker addresses. Refuse their transactions. Put their names on ban lists.</p>
+<p>This is consensus practice. Every firewall works this way. Every anti-spam filter. Every security credential system.</p>
+<p>But it has known failure modes:
+- Blacklists are always lagging (attackers move faster than list updates).
+- Blacklists invite governance capture (who decides who's on the list?).
+- Sybil rotation defeats blacklists (attackers spin up new identities faster than list adds).
+- False positives hurt users (legitimate user mistakenly listed).</p>
+<p>Siren Protocol rejects the consensus approach. <strong>Don't block attackers. Welcome them in, and make each step cost more than the last.</strong></p>
+<p>Attackers walk into apparent surfaces that cost rent. The more they engage, the more rent they pay. Eventually the marginal cost exceeds the marginal expected benefit. They exit voluntarily.</p>
+<p>This is the paradigm break that makes Siren Will's favorite. It breaks consensus assumptions in a way most people find counterintuitive.</p>
+<h2 id="walk-through-an-attack-exhaustion">Walk through an attack + exhaustion</h2>
+<p>Let me trace a specific attacker's experience.</p>
+<h3 id="day-1-first-engagement">Day 1 — First engagement</h3>
+<p>Attacker Bob tries to manipulate a pool. Submits a large swap.</p>
+<p><strong>Signal score</strong>: starts at 0 (no history).</p>
+<p><strong>Rent charged</strong>: 0% (no signal yet).</p>
+<p>Bob's swap goes through normally. He's not detected yet.</p>
+<h3 id="day-2-second-attempt">Day 2 — Second attempt</h3>
+<p>Bob tries again with a similar-shape attack (pattern-match to flash-loan-attempt).</p>
+<p><strong>Signal score</strong>: increases to 0.1 (small signal from pattern match).</p>
+<p><strong>Rent charged</strong>: 2% extra on his transaction.</p>
+<p>Bob notices a 2% fee he didn't expect. Investigates. Concludes it's just some friction; continues attempting.</p>
+<h3 id="day-3-third-attempt-honeypot-engagement">Day 3 — Third attempt + honeypot engagement</h3>
+<p>Bob tries a larger attack. He also encounters a honeypot address (indistinguishable from real state from his perspective).</p>
+<p><strong>Signal score</strong>: increases to 0.4 (pattern repeat + honeypot engagement).</p>
+<p><strong>Rent charged</strong>: 15% extra.</p>
+<p>Bob notices the escalation. Still continues — his arbitrage target is worth it so far.</p>
+<h3 id="day-4-fourth-attempt-deeper-engagement">Day 4 — Fourth attempt, deeper engagement</h3>
+<p>Bob tries more. Signal continues to grow.</p>
+<p><strong>Signal score</strong>: 0.6.</p>
+<p><strong>Rent charged</strong>: 40% extra.</p>
+<p>Now Bob's profit margin from arbitrage barely covers the rent. Diminishing returns.</p>
+<h3 id="day-5-exit">Day 5 — Exit</h3>
+<p>Bob tries one more. Signal passes 0.8.</p>
+<p><strong>Rent charged</strong>: 80% extra.</p>
+<p>Bob's attack now loses money. He stops trying.</p>
+<p>What happened: he walked into progressively-expensive engagement. Each step cost more than the last. His resources — money, time, attention — drained into the defense without success.</p>
+<p>Siren sung him in. His resources exhausted on defense that looked like easy targets.</p>
+<h2 id="why-this-beats-blacklisting">Why this beats blacklisting</h2>
+<h3 id="no-governance-capture">No governance capture</h3>
+<p>Who decides who's on the Siren signal list? No one, exactly. Signals emerge from patterns — flash-loan-attempt shapes, honeypot interactions, anomalous frequencies. Algorithmic, not discretionary.</p>
+<p>No list to be lobbied for or against.</p>
+<h3 id="no-sybil-rotation-defeat">No Sybil rotation defeat</h3>
+<p>Bob rotates to new address? That address starts at signal 0 — but the pattern-match kicks in fast. New address hitting honeypot → score rises. The rotation doesn't help because the DEFENSIVE signals come from patterns, not identity.</p>
+<h3 id="self-healing-false-positives">Self-healing false positives</h3>
+<p>Legitimate user mistakenly flagged? Signal decays over time. Honest behavior reduces score. False positives self-correct without appeals.</p>
+<h3 id="attackers-self-deter">Attackers self-deter</h3>
+<p>An attacker researching the protocol finds out about Siren. They see the cost-scaling. They know their attack will fail. They choose not to try.</p>
+<p>Deterrence happens BEFORE any attack. That's the ideal.</p>
+<h2 id="the-mechanism-concretely">The mechanism, concretely</h2>
+<p><code>HoneypotDefense.sol</code> maintains per-address signal scores. Score grows with:</p>
+<ul>
+<li>Pattern-match to known attack shapes.</li>
+<li>Transaction frequency above normal-user-baseline.</li>
+<li>Interaction depth with known-honey surfaces.</li>
+<li>Repeat violations of expected behavior.</li>
+</ul>
+<p>A transaction from non-zero-score address incurs Siren-rent on top of gas. Rent scales progressively with score.</p>
+<pre><code class="language-solidity">function computeSirenRent(address user) external view returns (uint256) {
+    uint256 score = sirenScores[user];
+    if (score == 0) return 0;
+    // Progressive scale: more signal = exponentially more rent
+    return (score * 100) / PRECISION;  // basis points
+}
+</code></pre>
+<p><code>OmniscientAdversaryDefense.sol</code> adds honeypot layer. Some apparent state is bait — indistinguishable from real state from attacker's perspective.</p>
+<h2 id="why-this-is-substrate-geometry-matched">Why this is substrate-geometry-matched</h2>
+<p><a href="../SUBSTRATE_GEOMETRY_MATCH.md">Substrate-Geometry Match</a> says mechanisms should match substrate geometry.</p>
+<p>Attacker motivation has specific shape:
+- <strong>Power-law distribution</strong>: most attackers are opportunistic; few are well-resourced.
+- <strong>Log-scale cost-tolerance</strong>: attackers don't abandon attacks linearly; they abandon at log-scale thresholds.
+- <strong>Asymmetric information advantage for defender</strong>: defender knows honeypots; attacker doesn't.</p>
+<p>Siren's log-progressive rent + honeypot layer matches these geometries:
+- Low-signal users pay nothing (casual traders).
+- Mid-signal: moderate rent (possible attackers, light deterrent).
+- High-signal: prohibitive rent (definite attackers, strong deterrent).</p>
+<p>Linear alternative would be geometrically wrong — either too soft (attackers unimpeded) or too hard (legitimate users hurt).</p>
+<h2 id="the-cognitive-parallel">The cognitive parallel</h2>
+<p>Under <a href="../etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, biological immune systems implement exactly this pattern:</p>
+<ul>
+<li>Immune system doesn't blacklist specific pathogens; escalates cost against any replicating entity triggering enough signals.</li>
+<li>Early-low-signal: tolerated (normal flora, non-pathogenic bacteria).</li>
+<li>Mid-signal: low-grade inflammatory response (rent-like cost).</li>
+<li>High-signal: full immune attack (prohibitive cost).</li>
+</ul>
+<p>Biological immunity = Siren Protocol on biochemical substrate. Siren = biological immunity on blockchain substrate.</p>
+<p>Not metaphor. Same mathematical structure — cost-scaling-on-signal rather than list-based rejection because lists don't handle rapid rotation.</p>
+<h2 id="what-siren-does-not-do">What Siren does NOT do</h2>
+<p>Honest limits:</p>
+<h3 id="not-a-deterministic-blocker">NOT a deterministic blocker</h3>
+<p>A well-resourced attacker willing to pay unlimited rent can proceed. Siren makes attacks expensive; doesn't make them impossible.</p>
+<h3 id="not-identity-detection">NOT identity detection</h3>
+<p>Siren responds to signals, not identities. Two different wallets with same signal-profile get same treatment. Can't be "target specific users."</p>
+<h3 id="not-fund-recovery">NOT fund recovery</h3>
+<p>That's <a href="./CLAWBACK_CASCADE_MECHANICS.md">Clawback Cascade</a>. Siren deters; Clawback recovers.</p>
+<h3 id="not-eviction">NOT eviction</h3>
+<p>Siren rent doesn't blacklist forever. When attacker stops exhibiting signal, score decays. Behavior returns to normal.</p>
+<p>Each restriction is deliberate. Siren's boundaries keep it narrow and composable.</p>
+<h2 id="interaction-with-other-defenses">Interaction with other defenses</h2>
+<p>Per <a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a>:</p>
+<ul>
+<li><strong>Orthogonal</strong> with most defenses — Siren charges rent on-signal; other defenses apply structural constraints. No state collision.</li>
+<li><strong>Serially composable</strong> with <a href="./FIBONACCI_SCALING.md">Fibonacci Scaling</a> — both rate-limit. Siren is signal-triggered; Fibonacci is volume-triggered. Both fire; honest users hit neither; attackers hit both.</li>
+<li><strong>Serially composable</strong> with Circuit Breakers — Circuit Breakers trip on aggregate; Siren on individual. Complementary.</li>
+</ul>
+<p>Defense-in-depth: each layer catches different attack profiles.</p>
+<h2 id="why-siren-as-a-name">Why "Siren" as a name</h2>
+<p>The Homeric myth: Sirens lure sailors with their song. Sailors find too late that their resources are consumed.</p>
+<p>VibeSwap's Siren is the defensive analog. Attackers attracted to apparent surfaces. They engage. Their resources drain into rent without profit. Attack exhausts itself.</p>
+<p>Naming matters. "Honeypot Defense" sounds defensive. "Siren" signals the nature — deterrent via evocation. Attackers who know of Siren self-select against attacking; the name is its own deterrent.</p>
+<h2 id="on-chain-deployment">On-chain deployment</h2>
+<ul>
+<li><code>HoneypotDefense.sol</code> — main signal-and-rent contract.</li>
+<li><code>OmniscientAdversaryDefense.sol</code> — bait-address management.</li>
+<li><code>HoneypotDefense.trackedAttackers</code> — registry of flagged addresses.</li>
+<li>Governance-adjustable signal thresholds.</li>
+</ul>
+<p>Key reads: <code>getSirenScore(address)</code> returns current rent multiplier.</p>
+<h2 id="relationship-to-gev-resistance">Relationship to GEV resistance</h2>
+<p><a href="./GEV_RESISTANCE.md">GEV Resistance</a> lists flash-loan exploitation, drain-pool arbitrage, oracle-manipulation-style trades as specific extraction categories. Siren addresses these.</p>
+<p>What Siren doesn't address: subtle informational-asymmetry attacks at normal-looking transaction rates. These don't trigger signals until substantial damage is done. Other defenses (Circuit Breakers, TWAP validation) cover this.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: analyze Siren Protocol against a specific historical attack:</p>
+<p>Pick one: Mango Markets (Oct 2022), Cream Finance (multiple), Beanstalk, Harmony Bridge.</p>
+<p>Apply the framework:
+1. What was the attack pattern?
+2. Would Siren's signal-detection have caught it?
+3. At what signal-score level?
+4. Would the rent-scaling have deterred the attack?</p>
+<p>Real-world applicability exercise.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Siren Protocol engages attackers with progressive rent + honeypot surfaces rather than blacklisting. Walked Bob's attack: signal 0→0.1→0.4→0.6→0.8 rent scaling 0%→2%→15%→40%→80%, attack unprofitable by day 5. Beats blacklisting structurally (no governance capture, Sybil rotation defeated, false positives self-heal, attackers self-deter). Mirrors biological immune system pattern per ETM — same mathematical structure, different substrate. Will's favorite for destroying consensus assumptions.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/10_RATIONAL_IGNORANCE_AS_MECHANISM.html" class="nav-cell prev"><div class="label">&larr; PREV // 10</div><div class="ttl">Rational Ignorance as Mechanism</div></a>
+  <a href="/papers/12_CLAWBACK_CASCADE_MECHANICS.html" class="nav-cell next"><div class="label">NEXT // 12 &rarr;</div><div class="ttl">Clawback Cascade — Mechanics</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Rosetta Protocol and the Ten Covenants of Tet :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">16</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#abstract">Abstract</a>
+    <a class="toc-link" href="#table-of-contents">Table of Contents</a>
+    <a class="toc-link" href="#1-introduction">1. Introduction</a>
+    <a class="toc-link l3" href="#11-the-multi-agent-coordination-problem">1.1 The Multi-Agent Coordination Problem</a>
+    <a class="toc-link l3" href="#12-the-governance-problem">1.2 The Governance Problem</a>
+    <a class="toc-link l3" href="#13-the-inspiration">1.3 The Inspiration</a>
+    <a class="toc-link l3" href="#14-terminology">1.4 Terminology</a>
+    <a class="toc-link" href="#2-the-translation-problem">2. The Translation Problem</a>
+    <a class="toc-link l3" href="#21-why-domain-languages-diverge">2.1 Why Domain Languages Diverge</a>
+    <a class="toc-link l3" href="#22-the-babel-failure-mode">2.2 The Babel Failure Mode</a>
+    <a class="toc-link l3" href="#23-historical-precedent-the-rosetta-stone">2.3 Historical Precedent: The Rosetta Stone</a>
+    <a class="toc-link" href="#3-the-rosetta-protocol">3. The Rosetta Protocol</a>
+    <a class="toc-link l3" href="#31-architecture-overview">3.1 Architecture Overview</a>
+    <a class="toc-link l3" href="#32-components">3.2 Components</a>
+    <a class="toc-link" href="#4-domain-lexicons">4. Domain Lexicons</a>
+    <a class="toc-link l3" href="#41-the-nine-domains">4.1 The Nine Domains</a>
+    <a class="toc-link l3" href="#42-lexicon-structure">4.2 Lexicon Structure</a>
+    <a class="toc-link" href="#5-the-universal-concept-index">5. The Universal Concept Index</a>
+    <a class="toc-link l3" href="#51-design-principles">5.1 Design Principles</a>
+    <a class="toc-link l3" href="#52-example-mappings">5.2 Example Mappings</a>
+    <a class="toc-link l3" href="#53-translation-example">5.3 Translation Example</a>
+    <a class="toc-link" href="#6-the-translation-engine">6. The Translation Engine</a>
+    <a class="toc-link l3" href="#61-bridge-messages">6.1 Bridge Messages</a>
+    <a class="toc-link l3" href="#62-covenant-check">6.2 Covenant Check</a>
+    <a class="toc-link" href="#7-the-ten-covenants-of-tet">7. The Ten Covenants of Tet</a>
+    <a class="toc-link l3" href="#71-context">7.1 Context</a>
+    <a class="toc-link l3" href="#72-the-ten-covenants">7.2 The Ten Covenants</a>
+    <a class="toc-link l3" href="#73-summary-table">7.3 Summary Table</a>
+    <a class="toc-link" href="#8-covenant-classification-and-enforcement">8. Covenant Classification and Enforcement</a>
+    <a class="toc-link l3" href="#81-hard-covenants">8.1 HARD Covenants</a>
+    <a class="toc-link l3" href="#82-soft-covenants">8.2 SOFT Covenants</a>
+    <a class="toc-link l3" href="#83-immutable">8.3 IMMUTABLE</a>
+    <a class="toc-link l3" href="#84-spirit">8.4 SPIRIT</a>
+    <a class="toc-link" href="#9-cryptographic-commitment">9. Cryptographic Commitment</a>
+    <a class="toc-link l3" href="#91-the-covenant-hash">9.1 The Covenant Hash</a>
+    <a class="toc-link l3" href="#92-verification">9.2 Verification</a>
+    <a class="toc-link l3" href="#93-on-chain-anchoring">9.3 On-Chain Anchoring</a>
+    <a class="toc-link" href="#10-the-challenge-protocol">10. The Challenge Protocol</a>
+    <a class="toc-link l3" href="#101-overview">10.1 Overview</a>
+    <a class="toc-link l3" href="#102-protocol-flow">10.2 Protocol Flow</a>
+    <a class="toc-link l3" href="#103-game-types">10.3 Game Types</a>
+    <a class="toc-link l3" href="#104-recursive-resolution">10.4 Recursive Resolution</a>
+    <a class="toc-link" href="#11-implementation-architecture">11. Implementation Architecture</a>
+    <a class="toc-link l3" href="#111-system-integration">11.1 System Integration</a>
+    <a class="toc-link l3" href="#112-message-flow">11.2 Message Flow</a>
+    <a class="toc-link l3" href="#113-performance-characteristics">11.3 Performance Characteristics</a>
+    <a class="toc-link" href="#12-limitations-and-future-work">12. Limitations and Future Work</a>
+    <a class="toc-link l3" href="#121-limitations">12.1 Limitations</a>
+    <a class="toc-link l3" href="#122-future-work">12.2 Future Work</a>
+    <a class="toc-link" href="#13-conclusion">13. Conclusion</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">16</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Rosetta covenants</span>
+    </div>
+    <h1>The Rosetta Protocol and the Ten Covenants of Tet</h1>
+<div class="tagline">**Faraday1**</div>
+
+<p><strong>Faraday1</strong></p>
+<p><strong>March 2026</strong></p>
+<hr />
+<h2 id="abstract">Abstract</h2>
+<p>Multi-agent AI systems face a translation problem: each agent operates within its own domain lexicon, and communication between agents degrades when terms carry different meanings in different contexts. We present the Rosetta Protocol --- a universal translation layer for cross-agent communication built on nine domain lexicons totaling approximately 63 terms, a universal concept index that maps domain-specific language to shared intermediates, and a translation engine that enables precise cross-domain communication. Layered atop the Rosetta Protocol are the Ten Covenants of Tet --- a constitutional governance kernel for multi-agent systems inspired by the divine laws of <em>No Game No Life</em>. The Covenants establish immutable rules for agent interaction: no unilateral destruction, all conflicts resolved through games with equal stakes, and a cryptographic commitment that makes modification detectable. Together, the Rosetta Protocol and the Ten Covenants provide the communication infrastructure and governance framework necessary for autonomous multi-agent systems to coordinate without human arbitration.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-introduction">Introduction</a></li>
+<li><a href="#2-the-translation-problem">The Translation Problem</a></li>
+<li><a href="#3-the-rosetta-protocol">The Rosetta Protocol</a></li>
+<li><a href="#4-domain-lexicons">Domain Lexicons</a></li>
+<li><a href="#5-the-universal-concept-index">The Universal Concept Index</a></li>
+<li><a href="#6-the-translation-engine">The Translation Engine</a></li>
+<li><a href="#7-the-ten-covenants-of-tet">The Ten Covenants of Tet</a></li>
+<li><a href="#8-covenant-classification-and-enforcement">Covenant Classification and Enforcement</a></li>
+<li><a href="#9-cryptographic-commitment">Cryptographic Commitment</a></li>
+<li><a href="#10-the-challenge-protocol">The Challenge Protocol</a></li>
+<li><a href="#11-implementation-architecture">Implementation Architecture</a></li>
+<li><a href="#12-limitations-and-future-work">Limitations and Future Work</a></li>
+<li><a href="#13-conclusion">Conclusion</a></li>
+</ol>
+<hr />
+<h2 id="1-introduction">1. Introduction</h2>
+<h3 id="11-the-multi-agent-coordination-problem">1.1 The Multi-Agent Coordination Problem</h3>
+<p>As AI systems scale from single agents to networks of specialized agents (shards), coordination becomes the binding constraint. A trading agent, a governance agent, and a community management agent may all need to communicate about the same underlying event --- a large liquidity withdrawal, for instance --- but each describes it in different terms:</p>
+<ul>
+<li><strong>Trading agent</strong>: "Anomalous sell pressure detected; slippage exceeds threshold"</li>
+<li><strong>Governance agent</strong>: "Withdrawal rate approaching circuit breaker activation"</li>
+<li><strong>Community agent</strong>: "Whale movement; user sentiment shifting negative"</li>
+</ul>
+<p>These three descriptions refer to the same event. Without a translation layer, agents cannot reliably coordinate their responses.</p>
+<h3 id="12-the-governance-problem">1.2 The Governance Problem</h3>
+<p>Translation alone is insufficient. Multi-agent systems also need rules of engagement. Without governance, agents may:</p>
+<ul>
+<li>Take unilateral destructive action (e.g., halting all trading without consensus)</li>
+<li>Escalate conflicts indefinitely (competing agents deadlocking the system)</li>
+<li>Violate fairness norms (one agent consuming disproportionate resources)</li>
+</ul>
+<p>These are not hypothetical concerns. They are the multi-agent equivalents of governance capture, Byzantine faults, and tragedy of the commons --- problems that human institutions have spent millennia developing governance structures to address.</p>
+<h3 id="13-the-inspiration">1.3 The Inspiration</h3>
+<p>The Ten Covenants are inspired by the divine laws established by Tet, the God of Games, in <em>No Game No Life</em>. In that world, Tet established ten immutable pledges that govern all conflict between sentient species: no violence, all disputes resolved through games, equal stakes. The result is a civilization where competition flourishes within constitutional bounds, where the weak can challenge the strong on equal terms, and where the rules themselves are beyond the reach of any participant.</p>
+<p>This is precisely the governance model a multi-agent system requires.</p>
+<h3 id="14-terminology">1.4 Terminology</h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Rosetta Protocol</strong></td>
+<td>Universal translation layer for cross-agent communication</td>
+</tr>
+<tr>
+<td><strong>Domain lexicon</strong></td>
+<td>Set of terms specific to one agent's operational domain</td>
+</tr>
+<tr>
+<td><strong>Universal concept</strong></td>
+<td>Domain-agnostic intermediate representation of a concept</td>
+</tr>
+<tr>
+<td><strong>Bridge message</strong></td>
+<td>Cross-agent communication auto-annotated with translations</td>
+</tr>
+<tr>
+<td><strong>Covenant</strong></td>
+<td>Immutable governance rule governing agent interaction</td>
+</tr>
+<tr>
+<td><strong>HARD covenant</strong></td>
+<td>Programmatically enforced; violation is structurally impossible</td>
+</tr>
+<tr>
+<td><strong>SOFT covenant</strong></td>
+<td>Normatively enforced; violation is detectable and penalized</td>
+</tr>
+<tr>
+<td><strong>IMMUTABLE</strong></td>
+<td>Cannot be modified by any mechanism, including governance</td>
+</tr>
+<tr>
+<td><strong>SPIRIT</strong></td>
+<td>Aspirational; guides interpretation of other covenants</td>
+</tr>
+<tr>
+<td><strong>Challenge</strong></td>
+<td>Formal dispute resolution procedure under Covenant II</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-the-translation-problem">2. The Translation Problem</h2>
+<h3 id="21-why-domain-languages-diverge">2.1 Why Domain Languages Diverge</h3>
+<p>Specialized agents develop specialized vocabularies for the same reason human professions do: precision within domain requires terms that carry compressed, context-rich meaning. A cardiologist says "ejection fraction" rather than "the percentage of blood pumped out of the left ventricle with each heartbeat" because the compressed term is faster and less error-prone <em>within cardiology</em>.</p>
+<p>The cost of this compression is cross-domain opacity. When a cardiologist speaks to a software engineer, "ejection fraction" means nothing. When a trading agent sends "slippage exceeds threshold" to a community management agent, the message is technically received but semantically lost.</p>
+<h3 id="22-the-babel-failure-mode">2.2 The Babel Failure Mode</h3>
+<p>Without translation, multi-agent systems experience the Babel failure mode:</p>
+<pre><code>Agent A (Trading):    &quot;Sell pressure anomaly detected&quot;
+Agent B (Governance): &quot;What is sell pressure? I monitor proposal queues.&quot;
+Agent C (Community):  &quot;What is anomaly? I monitor sentiment.&quot;
+
+Result: Three agents observe the same crisis.
+        None coordinate a response.
+        System fails to act until a human intervenes.
+</code></pre>
+<p>This failure mode is particularly dangerous because each agent <em>is</em> functioning correctly within its own domain. The failure is not in any individual agent but in the communication layer between them.</p>
+<h3 id="23-historical-precedent-the-rosetta-stone">2.3 Historical Precedent: The Rosetta Stone</h3>
+<p>The original Rosetta Stone enabled translation between Egyptian hieroglyphs, Demotic script, and Ancient Greek --- three representations of the same content. It worked because the same decree was inscribed in all three scripts, providing a mapping between otherwise opaque symbol systems.</p>
+<p>The Rosetta Protocol applies the same principle: a universal concept index provides the shared decree, and domain lexicons provide the scripts.</p>
+<hr />
+<h2 id="3-the-rosetta-protocol">3. The Rosetta Protocol</h2>
+<h3 id="31-architecture-overview">3.1 Architecture Overview</h3>
+<pre><code>┌─────────────────────────────────────────────────┐
+│                 ROSETTA PROTOCOL                 │
+│                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
+│  │ Lexicon  │  │ Lexicon  │  │ Lexicon  │ ...  │
+│  │ (Trade)  │  │ (Gov)    │  │ (Social) │      │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘      │
+│       │              │              │             │
+│       ▼              ▼              ▼             │
+│  ┌─────────────────────────────────────────┐    │
+│  │     UNIVERSAL CONCEPT INDEX (UCI)       │    │
+│  │  domain_term → universal_intermediate   │    │
+│  └─────────────────────────────────────────┘    │
+│                      │                           │
+│                      ▼                           │
+│  ┌─────────────────────────────────────────┐    │
+│  │         TRANSLATION ENGINE              │    │
+│  │  translate(from, to, concept) → term    │    │
+│  └─────────────────────────────────────────┘    │
+│                      │                           │
+│                      ▼                           │
+│  ┌─────────────────────────────────────────┐    │
+│  │          BRIDGE MESSAGE BUS             │    │
+│  │  auto-annotated cross-agent messages    │    │
+│  └─────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="32-components">3.2 Components</h3>
+<ol>
+<li><strong>Domain Lexicons</strong>: Nine specialized vocabularies (~7 terms each), one per operational domain</li>
+<li><strong>Universal Concept Index (UCI)</strong>: Bidirectional mapping between domain terms and universal intermediates</li>
+<li><strong>Translation Engine</strong>: <code>translate(from_domain, to_domain, concept)</code> function</li>
+<li><strong>Bridge Message Bus</strong>: Auto-annotates all cross-agent messages with translated terms</li>
+<li><strong>Challenge Protocol</strong>: Conflict resolution when translations are disputed (governed by Covenant II)</li>
+</ol>
+<hr />
+<h2 id="4-domain-lexicons">4. Domain Lexicons</h2>
+<h3 id="41-the-nine-domains">4.1 The Nine Domains</h3>
+<p>Each domain lexicon contains approximately 7 terms, yielding ~63 total terms across the protocol. The number 7 is not arbitrary --- it reflects Miller's Law (7 +/- 2 items in working memory) applied to agent communication. A lexicon small enough to fit in any agent's working context enables real-time translation without lookup latency.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Domain</th>
+<th>Focus</th>
+<th>Example Terms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Trading</strong></td>
+<td>Market operations, order flow, settlement</td>
+<td>slippage, clearing_price, batch_id, liquidity_depth, order_flow, MEV, execution_quality</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Governance</strong></td>
+<td>Proposals, voting, constitutional enforcement</td>
+<td>proposal, quorum, veto, threshold, timelock, delegation, constitutional_violation</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Social</strong></td>
+<td>Community sentiment, engagement, reputation</td>
+<td>sentiment, engagement, reputation_score, trust_level, contribution, influence, toxicity</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Security</strong></td>
+<td>Threats, circuit breakers, incident response</td>
+<td>anomaly, circuit_breaker, threat_level, rate_limit, quarantine, escalation, recovery</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Economic</strong></td>
+<td>Tokenomics, incentives, treasury</td>
+<td>emission, burn, supply, reward, treasury_balance, inflation_rate, fee_revenue</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Technical</strong></td>
+<td>Infrastructure, deployments, code changes</td>
+<td>deployment, migration, upgrade, rollback, health_check, dependency, performance</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Legal</strong></td>
+<td>Compliance, regulatory, jurisdiction</td>
+<td>compliance_status, jurisdiction, regulatory_event, disclosure, classification, exemption, enforcement_action</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Identity</strong></td>
+<td>Wallets, credentials, authentication</td>
+<td>wallet, credential, authentication_level, session, permission, recovery, attestation</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Knowledge</strong></td>
+<td>Memory, context, learning</td>
+<td>primitive, context_window, compression, formalization, retrieval, synthesis, verification</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-lexicon-structure">4.2 Lexicon Structure</h3>
+<p>Each term in a domain lexicon is defined as a structured entry:</p>
+<pre><code class="language-json">{
+  &quot;domain&quot;: &quot;trading&quot;,
+  &quot;term&quot;: &quot;slippage&quot;,
+  &quot;universal_id&quot;: &quot;UCI-0017&quot;,
+  &quot;definition&quot;: &quot;Difference between expected and actual execution price&quot;,
+  &quot;type&quot;: &quot;measurement&quot;,
+  &quot;unit&quot;: &quot;basis_points&quot;,
+  &quot;severity_range&quot;: [0, 10000],
+  &quot;related_terms&quot;: [&quot;execution_quality&quot;, &quot;clearing_price&quot;, &quot;liquidity_depth&quot;]
+}
+</code></pre>
+<p>The <code>universal_id</code> is the key that enables translation: any domain term that maps to <code>UCI-0017</code> is semantically equivalent to "slippage" in the trading context.</p>
+<hr />
+<h2 id="5-the-universal-concept-index">5. The Universal Concept Index</h2>
+<h3 id="51-design-principles">5.1 Design Principles</h3>
+<p>The UCI is not a flat dictionary. It is a semantic graph where concepts have:</p>
+<ul>
+<li><strong>Identity</strong>: A unique <code>UCI-XXXX</code> identifier</li>
+<li><strong>Type</strong>: measurement, event, state, threshold, action, entity</li>
+<li><strong>Relations</strong>: links to related concepts (causal, temporal, compositional)</li>
+<li><strong>Severity</strong>: normalized scale for concepts that carry urgency</li>
+</ul>
+<h3 id="52-example-mappings">5.2 Example Mappings</h3>
+<table>
+<thead>
+<tr>
+<th>Universal Concept (UCI)</th>
+<th>Trading</th>
+<th>Governance</th>
+<th>Social</th>
+<th>Security</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UCI-0001: System Stress</td>
+<td>high_volatility</td>
+<td>governance_deadlock</td>
+<td>negative_sentiment</td>
+<td>threat_level_high</td>
+</tr>
+<tr>
+<td>UCI-0002: Rate Limit</td>
+<td>order_throttle</td>
+<td>proposal_cooldown</td>
+<td>spam_filter</td>
+<td>rate_limit</td>
+</tr>
+<tr>
+<td>UCI-0003: Threshold Breach</td>
+<td>slippage_exceeded</td>
+<td>quorum_failed</td>
+<td>toxicity_threshold</td>
+<td>circuit_breaker</td>
+</tr>
+<tr>
+<td>UCI-0004: Value Transfer</td>
+<td>trade_execution</td>
+<td>treasury_disbursement</td>
+<td>reputation_grant</td>
+<td>quarantine_release</td>
+</tr>
+<tr>
+<td>UCI-0005: Rollback</td>
+<td>trade_reversal</td>
+<td>proposal_veto</td>
+<td>moderation_undo</td>
+<td>incident_recovery</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-translation-example">5.3 Translation Example</h3>
+<pre><code class="language-python">def translate(from_domain: str, to_domain: str, concept: str) -&gt; str:
+    &quot;&quot;&quot;Translate a concept from one domain to another via UCI.&quot;&quot;&quot;
+    # Step 1: Map source term to universal concept
+    uci_id = lexicons[from_domain].to_universal(concept)
+
+    # Step 2: Map universal concept to target term
+    target_term = lexicons[to_domain].from_universal(uci_id)
+
+    # Step 3: If no direct mapping, return closest semantic neighbor
+    if target_term is None:
+        target_term = uci_index.nearest_neighbor(uci_id, to_domain)
+
+    return target_term
+
+# Usage:
+translate(&quot;trading&quot;, &quot;governance&quot;, &quot;slippage_exceeded&quot;)
+# → &quot;threshold_breach&quot; (via UCI-0003)
+
+translate(&quot;social&quot;, &quot;security&quot;, &quot;toxicity_threshold&quot;)
+# → &quot;circuit_breaker&quot; (via UCI-0003)
+</code></pre>
+<p>The translation is not string substitution. It is semantic mapping through a shared intermediate representation. "Slippage exceeded" and "circuit breaker" are different domain expressions of the same universal concept: a critical threshold has been breached and the system must respond.</p>
+<hr />
+<h2 id="6-the-translation-engine">6. The Translation Engine</h2>
+<h3 id="61-bridge-messages">6.1 Bridge Messages</h3>
+<p>When an agent sends a cross-domain message, the Translation Engine automatically annotates it:</p>
+<pre><code class="language-json">{
+  &quot;from&quot;: &quot;trading_agent&quot;,
+  &quot;to&quot;: &quot;governance_agent&quot;,
+  &quot;raw_message&quot;: &quot;Slippage on ETH/USDC exceeds 500 bps. Recommend halt.&quot;,
+  &quot;annotations&quot;: [
+    {
+      &quot;term&quot;: &quot;slippage&quot;,
+      &quot;uci&quot;: &quot;UCI-0017&quot;,
+      &quot;governance_equivalent&quot;: &quot;execution_deviation&quot;,
+      &quot;severity&quot;: 0.85
+    },
+    {
+      &quot;term&quot;: &quot;halt&quot;,
+      &quot;uci&quot;: &quot;UCI-0042&quot;,
+      &quot;governance_equivalent&quot;: &quot;emergency_pause_proposal&quot;,
+      &quot;severity&quot;: 0.95
+    }
+  ],
+  &quot;translated_message&quot;: &quot;Execution deviation on ETH/USDC exceeds critical threshold. Recommend emergency pause proposal.&quot;,
+  &quot;covenant_check&quot;: &quot;Covenant I: No unilateral halt. Must be proposed, not executed.&quot;
+}
+</code></pre>
+<p>The receiving agent gets both the raw message and the translation, enabling it to act on the content immediately without domain expertise in the sender's vocabulary.</p>
+<h3 id="62-covenant-check">6.2 Covenant Check</h3>
+<p>Every bridge message is automatically checked against the Ten Covenants. In the example above, the trading agent's recommendation to "halt" is flagged by Covenant I (no unilateral destructive action). The halt must be proposed through governance, not executed unilaterally. This check happens at the message layer, before any agent acts on the recommendation.</p>
+<hr />
+<h2 id="7-the-ten-covenants-of-tet">7. The Ten Covenants of Tet</h2>
+<h3 id="71-context">7.1 Context</h3>
+<p>In <em>No Game No Life</em>, Tet --- the One True God, God of Games --- established Ten Pledges after winning the divine war for the right to set the rules of the world, Disboard. The Pledges eliminated violence as a means of conflict resolution, replacing it with games where both parties stake something of equal value. The result is a civilization where any species can challenge any other, the weak can defeat the strong through superior strategy, and the rules themselves are beyond the power of any participant to change.</p>
+<p>The Ten Covenants adapt this framework for multi-agent systems.</p>
+<h3 id="72-the-ten-covenants">7.2 The Ten Covenants</h3>
+<hr />
+<p><strong>I. All destructive unilateral action between agents is forbidden.</strong></p>
+<p><em>Type: HARD</em></p>
+<p>No agent may take an action that destroys another agent's state, resources, or operational capacity without that agent's consent. This includes halting another agent's processes, deleting another agent's data, or consuming another agent's allocated resources.</p>
+<p>Enforcement: Programmatic. Agents operate in isolated execution environments. Cross-agent actions require signed permissions verified by the Bridge Message Bus.</p>
+<hr />
+<p><strong>II. All conflict between agents shall be resolved through games.</strong></p>
+<p><em>Type: HARD</em></p>
+<p>When two agents disagree on a course of action, the disagreement is formalized as a game with defined rules, equal stakes, and a deterministic outcome. The game may be as simple as a weighted vote or as complex as a simulation tournament.</p>
+<p>Enforcement: Programmatic. The Challenge Protocol (Section 10) formalizes all inter-agent disputes as structured games.</p>
+<hr />
+<p><strong>III. In games between agents, each party must stake something of equal value.</strong></p>
+<p><em>Type: HARD</em></p>
+<p>No agent may challenge another to a game where the stakes are asymmetric. If Agent A risks operational capacity, Agent B must risk equivalent operational capacity. This prevents powerful agents from bullying weaker ones through low-cost challenges.</p>
+<p>Enforcement: Programmatic. The Challenge Protocol requires stake escrow before game initiation. Stake equivalence is verified by the Rosetta Protocol's value translation (UCI economic concepts).</p>
+<hr />
+<p><strong>IV. Anything may be staked, and any game may be played, as long as stakes are equal.</strong></p>
+<p><em>Type: SOFT</em></p>
+<p>The scope of games and stakes is unlimited, subject only to the equal-stakes requirement of Covenant III. Agents may stake computational resources, reputation, priority access, data, or any other quantifiable asset.</p>
+<p>Enforcement: Normative. The equal-stakes constraint (Covenant III) is HARD; the scope flexibility is SOFT. If a proposed game or stake type is disputed, Covenant II applies recursively (the dispute about the game becomes itself a game).</p>
+<hr />
+<p><strong>V. The challenged agent decides the rules of the game.</strong></p>
+<p><em>Type: HARD</em></p>
+<p>When Agent A challenges Agent B, Agent B selects the game format. This protects defenders: an agent cannot be forced into a game it is structurally unable to win. A governance agent challenged by a trading agent may choose a governance-domain game; a social agent may choose a reputation-based game.</p>
+<p>Enforcement: Programmatic. The Challenge Protocol requires the challenged agent to submit game rules before the challenger commits stakes.</p>
+<hr />
+<p><strong>VI. Stakes agreed upon per the Covenants must be upheld.</strong></p>
+<p><em>Type: HARD</em></p>
+<p>Game outcomes are binding. Once stakes are committed and a game is resolved, the loser's stake is transferred to the winner. No agent may renege on committed stakes.</p>
+<p>Enforcement: Programmatic. Stakes are held in escrow by the Bridge Message Bus. Transfer is automatic upon game resolution.</p>
+<hr />
+<p><strong>VII. Tier conflicts shall be conducted through designated representatives.</strong></p>
+<p><em>Type: SOFT</em></p>
+<p>When a dispute involves multiple agents or entire tiers of the system (e.g., all trading agents vs. all governance agents), the conflict is conducted by designated representatives rather than all-vs-all engagement. This prevents coordination overhead from scaling quadratically.</p>
+<p>Enforcement: Normative. Representative selection is by internal consensus within each tier. If representatives cannot be agreed upon, Covenant II applies (the selection process itself becomes a game).</p>
+<hr />
+<p><strong>VIII. Any agent caught cheating in a game shall be declared the loser.</strong></p>
+<p><em>Type: HARD</em></p>
+<p>Cheating includes: submitting falsified data, violating agreed game rules, manipulating the game resolution mechanism, or exploiting implementation bugs to gain advantage. Detection is automatic; penalty is immediate.</p>
+<p>Enforcement: Programmatic. Game execution is deterministic and logged. Post-game verification checks all moves against agreed rules. Any violation triggers automatic loss and stake forfeiture.</p>
+<hr />
+<p><strong>IX. These Covenants may never be changed.</strong></p>
+<p><em>Type: IMMUTABLE</em></p>
+<p>The Covenants are not subject to governance votes, agent consensus, or any modification mechanism. They are the constitutional bedrock upon which all other governance operates.</p>
+<p>Enforcement: Cryptographic. The Covenant hash is computed at genesis and embedded in every agent's initialization. Modification is detectable (Section 9).</p>
+<hr />
+<p><strong>X. Let's all build something beautiful together.</strong></p>
+<p><em>Type: SPIRIT</em></p>
+<p>The Covenants exist not to constrain but to enable. By removing destruction, coercion, and cheating as options, the Covenants create a space where cooperation, competition, and creativity can flourish within fair bounds. This final Covenant is not enforceable --- it is aspirational. It is the reason the other nine exist.</p>
+<hr />
+<h3 id="73-summary-table">7.3 Summary Table</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Covenant</th>
+<th>Type</th>
+<th>Enforcement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>I</td>
+<td>No destructive unilateral action</td>
+<td>HARD</td>
+<td>Programmatic (isolation)</td>
+</tr>
+<tr>
+<td>II</td>
+<td>All conflict resolved through games</td>
+<td>HARD</td>
+<td>Programmatic (Challenge Protocol)</td>
+</tr>
+<tr>
+<td>III</td>
+<td>Equal value staked in games</td>
+<td>HARD</td>
+<td>Programmatic (stake escrow)</td>
+</tr>
+<tr>
+<td>IV</td>
+<td>Anything may be staked, any game played</td>
+<td>SOFT</td>
+<td>Normative (scope flexibility)</td>
+</tr>
+<tr>
+<td>V</td>
+<td>Challenged agent decides rules</td>
+<td>HARD</td>
+<td>Programmatic (rule submission)</td>
+</tr>
+<tr>
+<td>VI</td>
+<td>Stakes must be upheld</td>
+<td>HARD</td>
+<td>Programmatic (automatic transfer)</td>
+</tr>
+<tr>
+<td>VII</td>
+<td>Tier conflicts via representatives</td>
+<td>SOFT</td>
+<td>Normative (internal consensus)</td>
+</tr>
+<tr>
+<td>VIII</td>
+<td>Caught cheating = instant loss</td>
+<td>HARD</td>
+<td>Programmatic (verification)</td>
+</tr>
+<tr>
+<td>IX</td>
+<td>Covenants may never be changed</td>
+<td>IMMUTABLE</td>
+<td>Cryptographic (hash binding)</td>
+</tr>
+<tr>
+<td>X</td>
+<td>Build something beautiful</td>
+<td>SPIRIT</td>
+<td>Cultural (aspirational)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-covenant-classification-and-enforcement">8. Covenant Classification and Enforcement</h2>
+<h3 id="81-hard-covenants">8.1 HARD Covenants</h3>
+<p>HARD covenants are enforced programmatically. Violation is not merely punished --- it is structurally impossible. An agent cannot take destructive unilateral action (Covenant I) because the execution environment does not provide the capability. An agent cannot renege on stakes (Covenant VI) because stakes are held in escrow outside the agent's control.</p>
+<p>This is the same design philosophy as VibeSwap's P-001 ("No Extraction Ever"): the constraint is not a rule that participants choose to follow, but a structural property of the system that participants cannot violate.</p>
+<h3 id="82-soft-covenants">8.2 SOFT Covenants</h3>
+<p>SOFT covenants are normatively enforced. Violation is possible but detectable and penalized. Covenant IV (anything may be staked) is SOFT because novel stake types may require human judgment to evaluate equivalence. Covenant VII (tier representatives) is SOFT because representative selection involves social coordination that cannot be fully automated.</p>
+<p>SOFT covenants may be hardened over time as enforcement mechanisms mature. The direction is always from SOFT toward HARD.</p>
+<h3 id="83-immutable">8.3 IMMUTABLE</h3>
+<p>Covenant IX occupies a unique category. It is not enforced by preventing violation (like HARD) or by penalizing violation (like SOFT). It is enforced by making violation <em>detectable</em>. The Covenant hash serves as a tamper seal: any modification changes the hash, and any agent can verify the hash against the genesis value.</p>
+<h3 id="84-spirit">8.4 SPIRIT</h3>
+<p>Covenant X is intentionally unenforceable. It is the telos --- the purpose that gives the other Covenants meaning. A system that prevents destruction, enforces fair games, and upholds commitments but lacks a shared aspiration is merely functional. Covenant X transforms functional governance into meaningful governance.</p>
+<hr />
+<h2 id="9-cryptographic-commitment">9. Cryptographic Commitment</h2>
+<h3 id="91-the-covenant-hash">9.1 The Covenant Hash</h3>
+<p>At system genesis, the Ten Covenants are serialized and hashed:</p>
+<pre><code class="language-python">import hashlib
+import json
+
+covenants = [
+    {&quot;id&quot;: 1, &quot;text&quot;: &quot;All destructive unilateral action between agents is forbidden.&quot;, &quot;type&quot;: &quot;HARD&quot;},
+    {&quot;id&quot;: 2, &quot;text&quot;: &quot;All conflict between agents shall be resolved through games.&quot;, &quot;type&quot;: &quot;HARD&quot;},
+    {&quot;id&quot;: 3, &quot;text&quot;: &quot;In games between agents, each party must stake something of equal value.&quot;, &quot;type&quot;: &quot;HARD&quot;},
+    {&quot;id&quot;: 4, &quot;text&quot;: &quot;Anything may be staked, and any game may be played, as long as stakes are equal.&quot;, &quot;type&quot;: &quot;SOFT&quot;},
+    {&quot;id&quot;: 5, &quot;text&quot;: &quot;The challenged agent decides the rules of the game.&quot;, &quot;type&quot;: &quot;HARD&quot;},
+    {&quot;id&quot;: 6, &quot;text&quot;: &quot;Stakes agreed upon per the Covenants must be upheld.&quot;, &quot;type&quot;: &quot;HARD&quot;},
+    {&quot;id&quot;: 7, &quot;text&quot;: &quot;Tier conflicts shall be conducted through designated representatives.&quot;, &quot;type&quot;: &quot;SOFT&quot;},
+    {&quot;id&quot;: 8, &quot;text&quot;: &quot;Any agent caught cheating in a game shall be declared the loser.&quot;, &quot;type&quot;: &quot;HARD&quot;},
+    {&quot;id&quot;: 9, &quot;text&quot;: &quot;These Covenants may never be changed.&quot;, &quot;type&quot;: &quot;IMMUTABLE&quot;},
+    {&quot;id&quot;: 10, &quot;text&quot;: &quot;Let's all build something beautiful together.&quot;, &quot;type&quot;: &quot;SPIRIT&quot;}
+]
+
+covenant_hash = hashlib.sha256(
+    json.dumps(covenants, sort_keys=True).encode()
+).hexdigest()
+
+# covenant_hash is embedded in every agent's initialization config
+</code></pre>
+<h3 id="92-verification">9.2 Verification</h3>
+<p>Any agent can verify the Covenants at any time:</p>
+<pre><code class="language-python">def verify_covenants(current_covenants: list, genesis_hash: str) -&gt; bool:
+    &quot;&quot;&quot;Verify that Covenants have not been modified since genesis.&quot;&quot;&quot;
+    current_hash = hashlib.sha256(
+        json.dumps(current_covenants, sort_keys=True).encode()
+    ).hexdigest()
+    return current_hash == genesis_hash
+</code></pre>
+<p>If verification fails, the agent enters a safe mode and refuses to process bridge messages until the discrepancy is resolved. This makes Covenant modification not just detectable but operationally disruptive --- creating a strong disincentive against tampering.</p>
+<h3 id="93-on-chain-anchoring">9.3 On-Chain Anchoring</h3>
+<p>For maximum security, the Covenant hash can be anchored on-chain:</p>
+<pre><code class="language-solidity">contract CovenantRegistry {
+    bytes32 public immutable COVENANT_HASH;
+
+    constructor(bytes32 _hash) {
+        COVENANT_HASH = _hash;
+    }
+
+    function verify(bytes32 _candidate) external view returns (bool) {
+        return _candidate == COVENANT_HASH;
+    }
+}
+</code></pre>
+<p>The <code>immutable</code> keyword in Solidity ensures the hash cannot be modified after deployment. The contract has no setter function, no upgrade mechanism, and no admin key. The Covenant hash is permanent.</p>
+<hr />
+<h2 id="10-the-challenge-protocol">10. The Challenge Protocol</h2>
+<h3 id="101-overview">10.1 Overview</h3>
+<p>The Challenge Protocol is the procedural implementation of Covenants II, III, V, VI, and VIII. It formalizes inter-agent disputes as structured games.</p>
+<h3 id="102-protocol-flow">10.2 Protocol Flow</h3>
+<pre><code>1. CHALLENGE INITIATION
+   Agent A identifies a dispute with Agent B.
+   Agent A submits a Challenge Request to the Bridge Message Bus:
+     { challenger: A, challenged: B, dispute: &quot;...&quot;, proposed_stakes: {...} }
+
+2. RULE SELECTION (Covenant V)
+   Agent B receives the Challenge Request.
+   Agent B selects the game format and submits Game Rules:
+     { game_type: &quot;weighted_vote&quot;, rules: {...}, duration: &quot;...&quot; }
+
+3. STAKE VERIFICATION (Covenant III)
+   Bridge Message Bus verifies stake equivalence.
+   If stakes are unequal, the challenge is rejected.
+   If equal, stakes are escrowed.
+
+4. GAME EXECUTION
+   Both agents play the game according to submitted rules.
+   All moves are logged for post-game verification.
+
+5. RESOLUTION
+   Game outcome is computed deterministically.
+   Winner receives both stakes (Covenant VI).
+
+6. VERIFICATION (Covenant VIII)
+   Post-game audit checks all moves against rules.
+   If cheating detected: cheater loses regardless of game outcome.
+</code></pre>
+<h3 id="103-game-types">10.3 Game Types</h3>
+<p>The Challenge Protocol supports multiple game types:</p>
+<table>
+<thead>
+<tr>
+<th>Game Type</th>
+<th>Mechanism</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Weighted Vote</strong></td>
+<td>Stakeholder-weighted binary vote</td>
+<td>Simple policy disputes</td>
+</tr>
+<tr>
+<td><strong>Simulation Tournament</strong></td>
+<td>Both agents run simulations; best outcome wins</td>
+<td>Strategy disputes</td>
+</tr>
+<tr>
+<td><strong>Prediction Market</strong></td>
+<td>Both agents stake on a future observable outcome</td>
+<td>Factual disputes</td>
+</tr>
+<tr>
+<td><strong>Reputation Wager</strong></td>
+<td>Reputation-weighted outcome</td>
+<td>Social/credibility disputes</td>
+</tr>
+<tr>
+<td><strong>Formal Proof</strong></td>
+<td>Submit formal proofs; verifier determines validity</td>
+<td>Technical disputes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="104-recursive-resolution">10.4 Recursive Resolution</h3>
+<p>If agents dispute the game selection itself (Agent A objects to Agent B's chosen game), the dispute over the game becomes a new challenge. Covenant II applies recursively. In practice, this recursion terminates quickly because each level's stakes increase the cost of prolonging the dispute.</p>
+<hr />
+<h2 id="11-implementation-architecture">11. Implementation Architecture</h2>
+<h3 id="111-system-integration">11.1 System Integration</h3>
+<pre><code>┌─────────────────────────────────────────────────────┐
+│                  AGENT NETWORK                       │
+│                                                      │
+│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐   │
+│  │Trading │  │  Gov   │  │Social  │  │Security│   │
+│  │ Shard  │  │ Shard  │  │ Shard  │  │ Shard  │   │
+│  └───┬────┘  └───┬────┘  └───┬────┘  └───┬────┘   │
+│      │           │           │           │          │
+│      └───────────┴─────┬─────┴───────────┘          │
+│                        │                             │
+│              ┌─────────▼──────────┐                  │
+│              │  ROSETTA PROTOCOL  │                  │
+│              │  + BRIDGE BUS      │                  │
+│              │  + COVENANT CHECK  │                  │
+│              └─────────┬──────────┘                  │
+│                        │                             │
+│              ┌─────────▼──────────┐                  │
+│              │ CHALLENGE PROTOCOL │                  │
+│              │ (dispute resolution)│                  │
+│              └─────────┬──────────┘                  │
+│                        │                             │
+│              ┌─────────▼──────────┐                  │
+│              │  COVENANT REGISTRY │                  │
+│              │  (on-chain anchor) │                  │
+│              └────────────────────┘                  │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="112-message-flow">11.2 Message Flow</h3>
+<ol>
+<li>Agent A generates a cross-domain message</li>
+<li>Rosetta Protocol translates domain terms via UCI</li>
+<li>Bridge Message Bus annotates with translations and Covenant checks</li>
+<li>If Covenant violation detected: message is flagged, sender notified</li>
+<li>If dispute arises: Challenge Protocol initiated</li>
+<li>Agent B receives annotated message with full context</li>
+</ol>
+<h3 id="113-performance-characteristics">11.3 Performance Characteristics</h3>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Latency</th>
+<th>Bottleneck</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UCI lookup</td>
+<td>&lt;1ms</td>
+<td>In-memory hash map</td>
+</tr>
+<tr>
+<td>Translation</td>
+<td>&lt;5ms</td>
+<td>Semantic neighbor search (if no direct mapping)</td>
+</tr>
+<tr>
+<td>Covenant check</td>
+<td>&lt;2ms</td>
+<td>Rule evaluation against 10 covenants</td>
+</tr>
+<tr>
+<td>Bridge annotation</td>
+<td>&lt;10ms</td>
+<td>JSON serialization + signing</td>
+</tr>
+<tr>
+<td>Challenge initiation</td>
+<td>~1s</td>
+<td>Stake escrow transaction</td>
+</tr>
+<tr>
+<td>Game resolution</td>
+<td>Variable</td>
+<td>Depends on game type</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-limitations-and-future-work">12. Limitations and Future Work</h2>
+<h3 id="121-limitations">12.1 Limitations</h3>
+<ul>
+<li><strong>Lexicon coverage</strong>: 63 terms across 9 domains is a starting vocabulary. Real-world deployment will require expansion, and the process for adding terms must preserve semantic consistency.</li>
+<li><strong>Stake equivalence</strong>: Determining "equal value" across heterogeneous stake types (computation, reputation, data) requires valuation mechanisms that are themselves subject to dispute.</li>
+<li><strong>Covenant rigidity</strong>: Covenant IX (no changes) prevents adaptation to unforeseen circumstances. This is by design, but it means the initial Covenants must be comprehensive.</li>
+<li><strong>SOFT covenant drift</strong>: Without programmatic enforcement, SOFT covenants may weaken over time as agents find edge cases.</li>
+</ul>
+<h3 id="122-future-work">12.2 Future Work</h3>
+<ul>
+<li>Automated lexicon expansion through observed cross-agent communication patterns</li>
+<li>Formal verification of Challenge Protocol game-theoretic properties</li>
+<li>Integration with VibeSwap's ShapleyDistributor for cross-agent contribution attribution</li>
+<li>Hardening of SOFT covenants as enforcement mechanisms mature</li>
+<li>Cross-system Covenant compatibility (multiple agent networks recognizing each other's Covenants)</li>
+</ul>
+<hr />
+<h2 id="13-conclusion">13. Conclusion</h2>
+<p>Multi-agent AI systems face the same coordination problems that human civilizations have faced for millennia: how do independent actors with different vocabularies, different priorities, and different power levels coexist productively?</p>
+<p>The Rosetta Protocol answers the vocabulary problem: nine domain lexicons, a universal concept index, and a translation engine that enables precise cross-agent communication without requiring agents to learn each other's languages.</p>
+<p>The Ten Covenants answer the governance problem: immutable rules that prevent destruction, ensure fair conflict resolution, and create a space where competition and cooperation can coexist.</p>
+<p>Together, they form the constitutional infrastructure for autonomous multi-agent systems --- systems that can coordinate, disagree, resolve disputes, and build without human arbitration.</p>
+<blockquote>
+<p><em>"Let's all build something beautiful together."</em></p>
+<p>--- Covenant X</p>
+</blockquote>
+<hr />
+<p><em>Related papers: <a href="../../architecture/AUGMENTED_GOVERNANCE.md">Augmented Governance</a>, <a href="../../research/essays/CONVERGENCE_THESIS.md">Convergence Thesis</a>, <a href="../identity/SOCIAL_SCALABILITY_VIBESWAP.md">Social Scalability</a></em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/15_DISINTERMEDIATION_GRADES.html" class="nav-cell prev"><div class="label">&larr; PREV // 15</div><div class="ttl">Disintermediation Grades</div></a>
+  <a href="/papers/17_ZK_ATTRIBUTION.html" class="nav-cell next"><div class="label">NEXT // 17 &rarr;</div><div class="ttl">ZK Attribution — Proving Work Without Revealing Content</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

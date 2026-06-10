@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Disintermediation Grades :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">15</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#abstract">Abstract</a>
+    <a class="toc-link" href="#table-of-contents">Table of Contents</a>
+    <a class="toc-link" href="#1-introduction">1. Introduction</a>
+    <a class="toc-link l3" href="#11-the-problem">1.1 The Problem</a>
+    <a class="toc-link l3" href="#12-the-principle">1.2 The Principle</a>
+    <a class="toc-link l3" href="#13-the-name">1.3 The Name</a>
+    <a class="toc-link" href="#2-the-scale">2. The Scale</a>
+    <a class="toc-link l3" href="#21-grade-definitions">2.1 Grade Definitions</a>
+    <a class="toc-link l3" href="#22-grade-comparison-table">2.2 Grade Comparison Table</a>
+    <a class="toc-link" href="#3-current-state-assessment">3. Current State Assessment</a>
+    <a class="toc-link l3" href="#31-full-interaction-audit">3.1 Full Interaction Audit</a>
+    <a class="toc-link l3" href="#32-grade-distribution-summary">3.2 Grade Distribution Summary</a>
+    <a class="toc-link l3" href="#33-honest-assessment">3.3 Honest Assessment</a>
+    <a class="toc-link" href="#4-the-cincinnatus-test">4. The Cincinnatus Test</a>
+    <a class="toc-link l3" href="#41-the-test">4.1 The Test</a>
+    <a class="toc-link l3" href="#42-test-results-by-grade">4.2 Test Results by Grade</a>
+    <a class="toc-link l3" href="#43-completion-criterion">4.3 Completion Criterion</a>
+    <a class="toc-link" href="#5-connection-to-p-001">5. Connection to P-001</a>
+    <a class="toc-link l3" href="#51-the-mechanism">5.1 The Mechanism</a>
+    <a class="toc-link l3" href="#52-emergent-disintermediation">5.2 Emergent Disintermediation</a>
+    <a class="toc-link l3" href="#53-the-cascade">5.3 The Cascade</a>
+    <a class="toc-link l3" href="#54-why-this-is-different">5.4 Why This Is Different</a>
+    <a class="toc-link" href="#6-the-four-phase-roadmap">6. The Four-Phase Roadmap</a>
+    <a class="toc-link l3" href="#phase-1-remove-will-as-single-point-of-failure-grade-0-2">Phase 1: Remove Will as Single Point of Failure (Grade 0 → 2)</a>
+    <a class="toc-link l3" href="#phase-2-make-intermediaries-optional-grade-1-3">Phase 2: Make Intermediaries Optional (Grade 1 → 3)</a>
+    <a class="toc-link l3" href="#phase-3-make-intermediaries-structurally-impossible-grade-2-">Phase 3: Make Intermediaries Structurally Impossible (Grade 2 → 4)</a>
+    <a class="toc-link l3" href="#phase-4-pure-peer-to-peer-where-possible-grade-4-5">Phase 4: Pure Peer-to-Peer Where Possible (Grade 4 → 5)</a>
+    <a class="toc-link" href="#7-augmented-governance">7. Augmented Governance</a>
+    <a class="toc-link l3" href="#71-the-risk-of-governance-capture">7.1 The Risk of Governance Capture</a>
+    <a class="toc-link l3" href="#72-the-augmented-governance-solution">7.2 The Augmented Governance Solution</a>
+    <a class="toc-link l3" href="#73-what-governance-can-and-cannot-do">7.3 What Governance Can and Cannot Do</a>
+    <a class="toc-link l3" href="#74-the-constitutional-court">7.4 The Constitutional Court</a>
+    <a class="toc-link" href="#8-case-studies">8. Case Studies</a>
+    <a class="toc-link l3" href="#81-swap-execution-grade-4">8.1 Swap Execution (Grade 4)</a>
+    <a class="toc-link l3" href="#82-governance-grade-0">8.2 Governance (Grade 0)</a>
+    <a class="toc-link l3" href="#83-price-oracle-grade-1">8.3 Price Oracle (Grade 1)</a>
+    <a class="toc-link" href="#9-formal-properties">9. Formal Properties</a>
+    <a class="toc-link l3" href="#91-monotonicity">9.1 Monotonicity</a>
+    <a class="toc-link l3" href="#92-convergence">9.2 Convergence</a>
+    <a class="toc-link l3" href="#93-the-shapley-null-player-axiom-as-disintermediation-engine">9.3 The Shapley Null Player Axiom as Disintermediation Engine</a>
+    <a class="toc-link" href="#10-conclusion">10. Conclusion</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">15</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Disintermediation grades</span>
+    </div>
+    <h1>Disintermediation Grades</h1>
+<div class="tagline">**The Cincinnatus Roadmap: A Six-Grade Scale for Measuring Protocol Sovereignty**</div>
+
+<p><strong>The Cincinnatus Roadmap: A Six-Grade Scale for Measuring Protocol Sovereignty</strong></p>
+<p><em>Faraday1, March 2026</em></p>
+<hr />
+<h2 id="abstract">Abstract</h2>
+<p>We present a formal grading system for measuring the degree of peer-to-peer interaction in decentralized protocols. The scale runs from Grade 0 (fully intermediated, every interaction requires a trusted third party) to Grade 5 (pure peer-to-peer, no intermediation point exists). We apply this scale to every interaction in the VibeSwap protocol, assess the current state, and define a four-phase roadmap for systematic disintermediation. The central mechanism is P-001 (No Extraction Ever): Shapley fairness measurement proves that intermediaries who add zero marginal value are null players, the protocol pays them nothing, they starve, they exit, and the grade increases automatically. Disintermediation is not a design choice imposed from above — it is an emergent property of fairness enforcement. The roadmap's completion criterion is the Cincinnatus Test: "If Will disappeared tomorrow, does this still work?" When every interaction passes at Grade 4 or above, the protocol is finished.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-introduction">Introduction</a></li>
+<li><a href="#2-the-scale">The Scale</a></li>
+<li><a href="#3-current-state-assessment">Current State Assessment</a></li>
+<li><a href="#4-the-cincinnatus-test">The Cincinnatus Test</a></li>
+<li><a href="#5-connection-to-p-001">Connection to P-001</a></li>
+<li><a href="#6-the-four-phase-roadmap">The Four-Phase Roadmap</a></li>
+<li><a href="#7-augmented-governance">Augmented Governance</a></li>
+<li><a href="#8-case-studies">Case Studies</a></li>
+<li><a href="#9-formal-properties">Formal Properties</a></li>
+<li><a href="#10-conclusion">Conclusion</a></li>
+</ol>
+<hr />
+<h2 id="1-introduction">1. Introduction</h2>
+<h3 id="11-the-problem">1.1 The Problem</h3>
+<p>Every protocol claims to be decentralized. Few measure it. "Decentralization" in practice is a binary label applied to marketing materials, not a quantitative property of system architecture. A protocol with 50 <code>onlyOwner</code> functions and a single admin key calls itself decentralized because its smart contracts are on a public blockchain.</p>
+<p>This is insufficient. A protocol that cannot function without its founder is a company with extra steps.</p>
+<h3 id="12-the-principle">1.2 The Principle</h3>
+<blockquote>
+<p>"If you figuratively imagine middlemen as satan getting in between people, they must be identified and eradicated from reality."</p>
+</blockquote>
+<p>Every intermediary — including the founder — is a structural compromise. The question is not whether intermediaries exist (they do, in every early-stage protocol) but whether they are tracked, graded, and systematically eliminated.</p>
+<h3 id="13-the-name">1.3 The Name</h3>
+<p>Lucius Quinctius Cincinnatus was a Roman dictator who, having been granted absolute power to save the Republic, relinquished it the moment the crisis was resolved and returned to his farm. The Cincinnatus Roadmap is the protocol's plan for the founder to do the same: build the system, transfer control to the system itself, and walk away.</p>
+<blockquote>
+<p>"I want nothing left but a holy ghost."</p>
+</blockquote>
+<hr />
+<h2 id="2-the-scale">2. The Scale</h2>
+<h3 id="21-grade-definitions">2.1 Grade Definitions</h3>
+<p>The disintermediation scale has six grades, from fully intermediated to pure peer-to-peer:</p>
+<hr />
+<p><strong>Grade 0 — Fully Intermediated</strong></p>
+<p>Every interaction requires a trusted third party. You cannot transact without them. They have full control and can censor, extract, or deny service. The intermediary is not optional — they are the system.</p>
+<p><em>Example</em>: A centralized exchange. You deposit funds to their custody. They execute trades on your behalf. They can freeze your account, front-run your orders, or exit-scam with your assets. You have no recourse except legal action in their jurisdiction.</p>
+<hr />
+<p><strong>Grade 1 — Transparent Intermediary</strong></p>
+<p>The middleman exists but their extraction is visible. You can see the fees, the MEV, the admin actions. Transparency without elimination. The intermediary is still required, but their behavior is observable and auditable.</p>
+<p><em>Example</em>: A DeFi protocol with public fee parameters and an <code>onlyOwner</code> admin key. The owner can change fees, pause the contract, or upgrade the logic. But every action is on-chain and visible. You can see the extraction — you just cannot prevent it.</p>
+<hr />
+<p><strong>Grade 2 — Optional Intermediary</strong></p>
+<p>A peer-to-peer path exists alongside the intermediated path. Users CAN go direct but the middleman is still available, and most users default to it out of convenience or habit. The infrastructure supports both modes.</p>
+<p><em>Example</em>: A protocol with a default frontend that routes through its own relayer, but also supports direct contract interaction. Power users bypass the frontend; most do not.</p>
+<hr />
+<p><strong>Grade 3 — Economically Unviable Intermediary</strong></p>
+<p>Shapley fairness proves the middleman adds zero marginal value. P-001 detects their extraction. The protocol does not pay them (null player axiom). They can exist in theory but they starve in practice. No rule forbids intermediation — the economics simply do not support it.</p>
+<p><em>Example</em>: A fee distribution system where rewards are allocated by marginal contribution. An intermediary who routes transactions without adding liquidity, governance, or computational value receives zero allocation. They can operate — but at a loss.</p>
+<hr />
+<p><strong>Grade 4 — Structurally Impossible Intermediary</strong></p>
+<p>The protocol architecture eliminates the surface for intermediation. No position exists for a middleman to occupy. The design itself prevents the insertion of a third party between participants.</p>
+<p><em>Example</em>: A commit-reveal auction. You cannot front-run what you cannot see. The commitment hash hides the order during the commit phase. The reveal is batch-settled at a uniform clearing price. There is no information asymmetry for a middleman to exploit. The attack surface does not exist.</p>
+<hr />
+<p><strong>Grade 5 — Pure Peer-to-Peer</strong></p>
+<p>No intermediation point exists. The protocol is the medium, not the middleman. Like language between two people — it facilitates communication but does not intermediate it. The question "who is the middleman?" has no meaningful answer.</p>
+<p><em>Example</em>: Direct atomic swap between two parties who have already agreed on terms. No order book, no batch settlement, no routing. Two signatures, one transaction, done.</p>
+<hr />
+<h3 id="22-grade-comparison-table">2.2 Grade Comparison Table</h3>
+<table>
+<thead>
+<tr>
+<th>Grade</th>
+<th>Intermediary Status</th>
+<th>User Autonomy</th>
+<th>P-001 Role</th>
+<th>Founder Required?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Required, opaque</td>
+<td>None</td>
+<td>Not applicable</td>
+<td>Yes (is the intermediary)</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Required, visible</td>
+<td>Observation only</td>
+<td>Detection possible</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Optional</td>
+<td>Choice exists</td>
+<td>Detection + alternative</td>
+<td>Awkwardly replaceable</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Starving</td>
+<td>Default is P2P</td>
+<td>Null player enforcement</td>
+<td>No (but suboptimal)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Impossible</td>
+<td>Guaranteed</td>
+<td>Structural prevention</td>
+<td>No</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Nonexistent</td>
+<td>Absolute</td>
+<td>Not needed (no attack surface)</td>
+<td>Question is meaningless</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-current-state-assessment">3. Current State Assessment</h2>
+<h3 id="31-full-interaction-audit">3.1 Full Interaction Audit</h3>
+<p>The following table grades every major interaction in the VibeSwap protocol as of March 2026:</p>
+<table>
+<thead>
+<tr>
+<th>Interaction</th>
+<th style="text-align: center;">Current Grade</th>
+<th>Middleman</th>
+<th style="text-align: center;">Target Grade</th>
+<th>Path to Target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Swap execution</td>
+<td style="text-align: center;"><strong>4</strong></td>
+<td>None (commit-reveal)</td>
+<td style="text-align: center;">5</td>
+<td>Already near-P2P. Grade 5 = direct atomic swap without batch settlement</td>
+</tr>
+<tr>
+<td>LP fee distribution</td>
+<td style="text-align: center;"><strong>2</strong></td>
+<td>Authorized creator picks participants/weights</td>
+<td style="text-align: center;">4</td>
+<td>On-chain contribution tracking, auto-game creation, no human picks participants</td>
+</tr>
+<tr>
+<td>Token minting</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td>Owner can mint directly, bypassing emission schedule</td>
+<td style="text-align: center;">4</td>
+<td>Remove owner from mint path. Only EmissionController mints. Enforce in contract</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td style="text-align: center;"><strong>0</strong></td>
+<td>50+ onlyOwner functions, unilateral pause/blacklist/upgrade</td>
+<td style="text-align: center;">4</td>
+<td>Cincinnatus Protocol: timelock, multisig, governance, renounce. GovernanceGuard with Shapley veto</td>
+</tr>
+<tr>
+<td>Trust scoring</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td>Owner-only recalculateTrustScores()</td>
+<td style="text-align: center;">3</td>
+<td>Permissionless recalculation with rate limiting. Anyone can trigger, BFS is deterministic</td>
+</tr>
+<tr>
+<td>Price oracle</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td>Off-chain Python operator signs attestations</td>
+<td style="text-align: center;">3</td>
+<td>Multi-source oracle with Shapley-weighted consensus. On-chain TWAP as fallback. Operator becomes optional</td>
+</tr>
+<tr>
+<td>Cross-chain messaging</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td>LayerZero relayers</td>
+<td style="text-align: center;">2</td>
+<td>Already using LZ with permissionless relaying. Still depends on LZ infrastructure</td>
+</tr>
+<tr>
+<td>Bot deployment</td>
+<td style="text-align: center;"><strong>0</strong></td>
+<td>Will runs Fly.io servers</td>
+<td style="text-align: center;">3</td>
+<td>Shard-per-conversation on user devices. WebRTC P2P. Users run their own Jarvis</td>
+</tr>
+<tr>
+<td>Contract upgrades</td>
+<td style="text-align: center;"><strong>0</strong></td>
+<td>Owner calls upgradeToAndCall</td>
+<td style="text-align: center;">4</td>
+<td>Timelock + governance vote + Shapley fairness gate. Eventually renounce upgrade authority</td>
+</tr>
+<tr>
+<td>Fee routing</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td>FeeRouter controlled by owner</td>
+<td style="text-align: center;">4</td>
+<td>Governance-adjustable parameters, Shapley-gated changes, eventually immutable</td>
+</tr>
+<tr>
+<td>Insurance claims</td>
+<td style="text-align: center;"><strong>1</strong></td>
+<td>Manual claim validation</td>
+<td style="text-align: center;">3</td>
+<td>On-chain proof of loss (oracle-attested), automatic payout, no human review</td>
+</tr>
+<tr>
+<td>Contributor registration</td>
+<td style="text-align: center;"><strong>2</strong></td>
+<td>Authorized bridges can vouch on behalf</td>
+<td style="text-align: center;">4</td>
+<td>Self-sovereign vouching only. Remove addVouchOnBehalf. Trust is P2P or it is not trust</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-grade-distribution-summary">3.2 Grade Distribution Summary</h3>
+<pre><code>Grade 0: ████████████  3 interactions (Governance, Bot deployment, Contract upgrades)
+Grade 1: ████████████████████  5 interactions (Minting, Trust, Oracle, Fee routing, Insurance)
+Grade 2: ████████  2 interactions (LP distribution, Contributor registration)
+Grade 3:          0 interactions
+Grade 4: ████  1 interaction (Swap execution)
+Grade 5:          0 interactions
+
+Median grade: 1
+Target median: 4
+</code></pre>
+<h3 id="33-honest-assessment">3.3 Honest Assessment</h3>
+<p>The protocol is early. Most interactions still require Will or a trusted operator. The commit-reveal swap mechanism is the architectural showpiece at Grade 4, but governance — the most important interaction for long-term sovereignty — is at Grade 0. This is the natural state of a bootstrapping protocol: the mechanism is ahead of the governance.</p>
+<hr />
+<h2 id="4-the-cincinnatus-test">4. The Cincinnatus Test</h2>
+<h3 id="41-the-test">4.1 The Test</h3>
+<p>For each interaction, ask one question:</p>
+<blockquote>
+<p><strong>"If Will disappeared tomorrow, does this still work?"</strong></p>
+</blockquote>
+<h3 id="42-test-results-by-grade">4.2 Test Results by Grade</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Grade</th>
+<th style="text-align: center;">Passes Cincinnatus Test?</th>
+<th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">0</td>
+<td style="text-align: center;">No</td>
+<td>Will is required. The interaction stops without him.</td>
+</tr>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">No</td>
+<td>Will is required. His actions are visible but still necessary.</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">Awkwardly</td>
+<td>Someone has to step in. The P2P path exists but the intermediated path is the default and the P2P path may be poorly documented or difficult to use.</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">Yes, suboptimally</td>
+<td>The protocol functions. Some features degrade. The intermediary was already starving, so their absence causes minimal disruption.</td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">Yes, fully</td>
+<td>The protocol runs itself. There is no role for Will to have vacated. The architecture does not accommodate a middleman.</td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">The question does not apply</td>
+<td>There is no position to vacate. The protocol is the medium, not the middleman. Asking "what happens without Will?" is like asking "what happens to language without its inventor?"</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-completion-criterion">4.3 Completion Criterion</h3>
+<p><strong>The protocol is finished when the Cincinnatus Test passes for every interaction at Grade 4 or above.</strong></p>
+<p>This is not a marketing milestone. It is an engineering specification. Every <code>onlyOwner</code> function is a Grade 0 dependency. Every off-chain operator is a Grade 1 dependency. The roadmap is the systematic elimination of these dependencies.</p>
+<hr />
+<h2 id="5-connection-to-p-001">5. Connection to P-001</h2>
+<h3 id="51-the-mechanism">5.1 The Mechanism</h3>
+<p>P-001 (No Extraction Ever) is not just a fairness axiom. It is the enforcement mechanism for disintermediation. The logic is:</p>
+<pre><code>Step 1: A middleman exists in interaction X.
+Step 2: Shapley measures the middleman's marginal contribution to X.
+Step 3: The middleman adds zero value (they route, they do not create).
+Step 4: Shapley null player axiom: φᵢ(v) = 0 for null player i.
+Step 5: The protocol pays them nothing.
+Step 6: The middleman operates at a loss.
+Step 7: The middleman exits.
+Step 8: Interaction X is now more peer-to-peer.
+Step 9: Grade increases.
+</code></pre>
+<h3 id="52-emergent-disintermediation">5.2 Emergent Disintermediation</h3>
+<p>The critical insight is that <strong>disintermediation is emergent from fairness enforcement</strong>. P-001 does not target intermediaries directly. It targets extraction. But intermediaries who add no value ARE extractors by definition — they take payment for zero marginal contribution.</p>
+<p>This means the grade scale is not a static classification imposed by the designer. It is a dynamic measurement of the protocol's current fairness state. As P-001 detection improves and more interactions come under Shapley measurement, grades increase automatically.</p>
+<p>The designer does not need to identify every intermediary and build a specific disintermediation plan for each one. The designer needs to deploy Shapley measurement as broadly as possible. The math does the rest.</p>
+<h3 id="53-the-cascade">5.3 The Cascade</h3>
+<pre><code>P-001 deployed
+    ↓
+Shapley measures marginal contribution for all participants
+    ↓
+Null players identified (φᵢ = 0)
+    ↓
+Null players receiving payment = extraction detected
+    ↓
+Self-correction: payment to null players → 0
+    ↓
+Intermediaries starve (Grade 1 → Grade 3)
+    ↓
+Architecture updated to remove intermediary surface (Grade 3 → Grade 4)
+    ↓
+P2P path becomes the only path (Grade 4 → Grade 5 where possible)
+</code></pre>
+<h3 id="54-why-this-is-different">5.4 Why This Is Different</h3>
+<p>Traditional disintermediation roadmaps are policy documents: "In Q3 we will transfer ownership to a multisig. In Q4 we will add a timelock." These are plans that depend on the founder's willingness to execute them.</p>
+<p>The P-001 approach is different. The founder deploys the Shapley measurement. After that, intermediary elimination happens whether the founder wants it or not. If the founder is the intermediary — and at Grade 0, the founder IS the intermediary — then P-001 will eventually detect the founder's extraction and self-correct.</p>
+<p>The roadmap executes itself. The founder cannot stop it without removing P-001. And P-001 sits above governance in the protocol hierarchy.</p>
+<hr />
+<h2 id="6-the-four-phase-roadmap">6. The Four-Phase Roadmap</h2>
+<h3 id="phase-1-remove-will-as-single-point-of-failure-grade-0-2">Phase 1: Remove Will as Single Point of Failure (Grade 0 → 2)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Interaction Affected</th>
+<th style="text-align: center;">Grade Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Transfer ownership to multisig (2-of-3: Will + 2 team members)</td>
+<td>Governance, Upgrades</td>
+<td style="text-align: center;">0 → 1</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Add 48-hour timelock on all admin functions</td>
+<td>All onlyOwner functions</td>
+<td style="text-align: center;">0 → 1</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Remove owner from VIBEToken.mint() path</td>
+<td>Token minting</td>
+<td style="text-align: center;">1 → 2</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Make trust score recalculation permissionless</td>
+<td>Trust scoring</td>
+<td style="text-align: center;">1 → 2</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Deploy GovernanceGuard (Shapley veto on proposals)</td>
+<td>Governance</td>
+<td style="text-align: center;">1 → 2</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cincinnatus Test after Phase 1</strong>: The protocol limps without Will. The multisig can operate. The timelock prevents immediate damage. But Will's key is still in the multisig, and most advanced functions still need team coordination.</p>
+<hr />
+<h3 id="phase-2-make-intermediaries-optional-grade-1-3">Phase 2: Make Intermediaries Optional (Grade 1 → 3)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Interaction Affected</th>
+<th style="text-align: center;">Grade Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6</td>
+<td>On-chain contribution tracking with auto-game creation in ShapleyDistributor</td>
+<td>LP distribution</td>
+<td style="text-align: center;">2 → 3</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Multi-source oracle consensus (not single operator)</td>
+<td>Price oracle</td>
+<td style="text-align: center;">1 → 3</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Self-sovereign vouching only in ContributionDAG</td>
+<td>Contributor registration</td>
+<td style="text-align: center;">2 → 3</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Insurance auto-payout via oracle proof of loss</td>
+<td>Insurance claims</td>
+<td style="text-align: center;">1 → 3</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Fee router parameters become governance-adjustable</td>
+<td>Fee routing</td>
+<td style="text-align: center;">1 → 3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cincinnatus Test after Phase 2</strong>: The protocol functions without Will. Some features are suboptimal. The oracle degrades to TWAP-only without the Kalman filter operator. Governance is slow without a leader. But nothing breaks.</p>
+<hr />
+<h3 id="phase-3-make-intermediaries-structurally-impossible-grade-2-">Phase 3: Make Intermediaries Structurally Impossible (Grade 2 → 4)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Interaction Affected</th>
+<th style="text-align: center;">Grade Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>11</td>
+<td>Renounce upgrade authority on core contracts (VibeSwapCore, VibeAMM)</td>
+<td>Contract upgrades</td>
+<td style="text-align: center;">2 → 4</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Immutable fee routing (or governance-only with Shapley veto)</td>
+<td>Fee routing</td>
+<td style="text-align: center;">3 → 4</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Fully on-chain oracle (TWAP + multi-source, no off-chain operator)</td>
+<td>Price oracle</td>
+<td style="text-align: center;">3 → 4</td>
+</tr>
+<tr>
+<td>14</td>
+<td>Permissionless settlement (anyone can call settleBatch)</td>
+<td>Swap execution</td>
+<td style="text-align: center;">4 (maintained)</td>
+</tr>
+<tr>
+<td>15</td>
+<td>Permissionless emission (EmissionController.drip() already permissionless)</td>
+<td>Token minting</td>
+<td style="text-align: center;">3 → 4</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cincinnatus Test after Phase 3</strong>: The protocol runs itself. Will's absence is not detectable by the system. Every critical function operates without human intervention. The remaining Grade &lt; 4 interactions are convenience features, not critical path.</p>
+<hr />
+<h3 id="phase-4-pure-peer-to-peer-where-possible-grade-4-5">Phase 4: Pure Peer-to-Peer Where Possible (Grade 4 → 5)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Action</th>
+<th>Interaction Affected</th>
+<th style="text-align: center;">Grade Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>16</td>
+<td>Direct atomic swaps for willing counterparties (skip batch auction)</td>
+<td>Swap execution</td>
+<td style="text-align: center;">4 → 5</td>
+</tr>
+<tr>
+<td>17</td>
+<td>Peer-to-peer Jarvis instances (user runs own shard)</td>
+<td>Bot deployment</td>
+<td style="text-align: center;">3 → 5</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Client-side oracle validation (verify, do not trust)</td>
+<td>Price oracle</td>
+<td style="text-align: center;">4 → 5</td>
+</tr>
+<tr>
+<td>19</td>
+<td>Local-first frontend (IPFS/Arweave hosted, no Vercel dependency)</td>
+<td>Frontend access</td>
+<td style="text-align: center;">1 → 5</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cincinnatus Test after Phase 4</strong>: The question "does this work without Will?" no longer has meaning. There is no role for Will to occupy. The protocol is a medium, not a service. Cincinnatus has returned to his farm.</p>
+<hr />
+<h2 id="7-augmented-governance">7. Augmented Governance</h2>
+<h3 id="71-the-risk-of-governance-capture">7.1 The Risk of Governance Capture</h3>
+<p>The most common failure mode in DeFi DAOs is governance capture: a whale or coordinated group acquires majority voting power and extracts value through governance proposals. Compound governance was captured by a whale who voted themselves $25M. MakerDAO governance nearly drained the surplus buffer. Curve wars turned governance capture into a business model.</p>
+<p>Increasing the governance grade from 0 to 4 is meaningless if the governance itself can be captured. A captured DAO is just a different middleman.</p>
+<h3 id="72-the-augmented-governance-solution">7.2 The Augmented Governance Solution</h3>
+<p>VibeSwap's governance sits below P-000 and P-001 in the protocol hierarchy:</p>
+<pre><code>Layer 1: Physics (P-001 — Shapley invariants, self-correction)
+Layer 2: Constitution (P-000 — Fairness Above All)
+Layer 3: Governance (DAO votes, proposals, parameters)
+</code></pre>
+<p>Governance can freely adjust parameters within the invariants. It cannot adjust the invariants themselves. The enforcement mechanism is the GovernanceGuard contract (Phase 1, item 5), which wraps every governance proposal in a Shapley fairness check before execution.</p>
+<h3 id="73-what-governance-can-and-cannot-do">7.3 What Governance Can and Cannot Do</h3>
+<table>
+<thead>
+<tr>
+<th>Governance CAN</th>
+<th>Governance CANNOT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Adjust fee tiers per pool (100% stays with LPs)</td>
+<td>Enable protocol fee extraction from LP swaps</td>
+</tr>
+<tr>
+<td>Fund initiatives from treasury (priority bid revenue)</td>
+<td>Redirect LP fees to treasury/stakers/anyone</td>
+</tr>
+<tr>
+<td>Change circuit breaker thresholds</td>
+<td>Override Shapley distribution weights</td>
+</tr>
+<tr>
+<td>Add new token pairs</td>
+<td>Drain treasury beyond fair allocation</td>
+</tr>
+<tr>
+<td>Approve grants and partnerships</td>
+<td>Break the null player axiom</td>
+</tr>
+<tr>
+<td>Modify emission schedules (within Shapley efficiency)</td>
+<td>Remove the Lawson Constant</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-the-constitutional-court">7.4 The Constitutional Court</h3>
+<p>A constitutional court strikes down laws that violate the constitution. The legislature has full legislative power — within constitutional bounds.</p>
+<p>Augmented governance is the same structure, except:
+- The constitution is P-000 + P-001.
+- The court is Shapley math.
+- The ruling is autonomous (no judges needed).
+- The enforcement is on-chain (no appeals).</p>
+<p>A constitutional court staffed by math, not humans. Incorruptible by definition.</p>
+<hr />
+<h2 id="8-case-studies">8. Case Studies</h2>
+<h3 id="81-swap-execution-grade-4">8.1 Swap Execution (Grade 4)</h3>
+<p>The commit-reveal batch auction is VibeSwap's architectural centerpiece for disintermediation:</p>
+<pre><code>Commit phase (8s):
+  User submits hash(order || secret) with deposit.
+  Order content is hidden from all other participants.
+  No MEV bot can front-run what it cannot see.
+
+Reveal phase (2s):
+  Users reveal orders and secrets.
+  Invalid reveals are slashed 50%.
+
+Settlement:
+  Fisher-Yates shuffle using XORed secrets (deterministic, unbiasable).
+  Uniform clearing price (all trades at the same price).
+  No priority based on speed, block position, or gas price.
+</code></pre>
+<p><strong>Why Grade 4</strong>: There is no position for a middleman. The information asymmetry that enables front-running (MEV) is eliminated by the commit phase. The execution priority that enables sandwich attacks is eliminated by the shuffle. The price discrimination that enables arbitrage against users is eliminated by the uniform clearing price.</p>
+<p><strong>Why not Grade 5</strong>: The batch auction still requires a settlement function to be called. Currently, anyone can call <code>settleBatch()</code> (permissionless), but the batch mechanism itself is an intermediation structure — orders are collected, processed, and settled rather than executed directly between counterparties. Grade 5 would require direct atomic swaps between willing counterparties, bypassing the batch entirely.</p>
+<h3 id="82-governance-grade-0">8.2 Governance (Grade 0)</h3>
+<p>Governance is currently the weakest point:</p>
+<pre><code>Current state:
+  50+ onlyOwner functions
+  Single admin key controls: pause, blacklist, upgrade, parameter changes
+  No timelock, no multisig, no DAO vote required
+  Will IS the governance
+</code></pre>
+<p><strong>Why Grade 0</strong>: Every governance action requires Will's private key. If Will's key is compromised, the entire protocol is compromised. If Will is unavailable, no governance action can occur. The protocol is, in governance terms, a centralized service with a decentralized execution layer.</p>
+<p><strong>The path to Grade 4</strong>: This is the most important and most difficult disintermediation in the roadmap. It requires four transitions:</p>
+<ol>
+<li><strong>0 → 1</strong>: Transfer to multisig. Multiple keys required. Actions are visible.</li>
+<li><strong>1 → 2</strong>: Add timelock. Actions are delayed. Community can react.</li>
+<li><strong>2 → 3</strong>: Deploy GovernanceGuard. Shapley veto prevents extraction. The DAO governs within invariants.</li>
+<li><strong>3 → 4</strong>: Renounce remaining admin keys. Governance is the only path. Shapley guards the gates.</li>
+</ol>
+<h3 id="83-price-oracle-grade-1">8.3 Price Oracle (Grade 1)</h3>
+<pre><code>Current state:
+  Off-chain Python operator runs Kalman filter
+  Operator signs price attestations
+  On-chain TWAP exists as fallback (5% max deviation)
+  Single operator = single point of failure
+</code></pre>
+<p><strong>Why Grade 1</strong>: The oracle operator is transparent (attestations are on-chain, the Kalman filter algorithm is open source), but still required. If the operator goes offline, the protocol falls back to on-chain TWAP, which is less accurate and more manipulable.</p>
+<p><strong>The path to Grade 3</strong>: Multi-source oracle with Shapley-weighted consensus. Multiple independent operators submit attestations. Their weights are determined by their historical accuracy (Shapley marginal contribution to price discovery). A single operator's failure degrades quality but does not halt the system.</p>
+<hr />
+<h2 id="9-formal-properties">9. Formal Properties</h2>
+<h3 id="91-monotonicity">9.1 Monotonicity</h3>
+<p><strong>Claim</strong>: Under P-001 enforcement, disintermediation grades are monotonically non-decreasing.</p>
+<p><strong>Argument</strong>: P-001 detects extraction by null players. Once detected, the self-correction mechanism reduces payment to the null player to zero. The null player exits. The grade increases. P-001 does not create new intermediaries — it only removes existing ones. Therefore, grades can increase but not decrease under P-001 enforcement.</p>
+<p><strong>Caveat</strong>: This assumes P-001 is not removed or circumvented. If governance could remove P-001, grades could decrease. But P-001 sits above governance (Section 7.2), so this would require a protocol-level compromise, not a governance vote.</p>
+<h3 id="92-convergence">9.2 Convergence</h3>
+<p><strong>Claim</strong>: For any finite set of interactions, the disintermediation process converges to a stable state where all intermediaries are either eliminated or provide genuine marginal value.</p>
+<p><strong>Argument</strong>: At each step, P-001 identifies the intermediary with the lowest Shapley value. If that value is zero (null player), the intermediary is removed. If all remaining intermediaries have nonzero Shapley values, they are genuine contributors, not intermediaries — and the process halts.</p>
+<p>The process must converge because:
+1. The number of intermediaries is finite.
+2. Each step removes at least one intermediary (the null player).
+3. No step adds a new intermediary.</p>
+<h3 id="93-the-shapley-null-player-axiom-as-disintermediation-engine">9.3 The Shapley Null Player Axiom as Disintermediation Engine</h3>
+<p>The null player axiom states:</p>
+<pre><code>∀S ⊆ N \ {i}: v(S ∪ {i}) = v(S) ⟹ φᵢ(v) = 0
+</code></pre>
+<p>If player <code>i</code> adds zero value to every coalition, they receive zero. This is the mathematical foundation of Grades 3 and above. An intermediary who routes but does not create is a null player in the cooperative game of value creation. Shapley assigns them zero. P-001 enforces the assignment. The intermediary starves.</p>
+<p>This is not a punishment mechanism. It is an accounting identity. The intermediary receives exactly what they contributed: nothing.</p>
+<hr />
+<h2 id="10-conclusion">10. Conclusion</h2>
+<p>The disintermediation grades are not a marketing classification. They are an engineering measurement: for each protocol interaction, how many humans are required between the two parties who actually want to transact?</p>
+<p>The current state is honest: median Grade 1, with governance at Grade 0 and swaps at Grade 4. Most interactions still need Will or a trusted operator. The protocol is early. The cave is still the workshop.</p>
+<p>But the roadmap is not a promise — it is a mechanism. P-001, once deployed, does not ask permission to eliminate intermediaries. It measures marginal contribution, pays accordingly, and lets the market decide who survives. Intermediaries who add value will persist at their Shapley-fair compensation. Intermediaries who add nothing will starve.</p>
+<p>The four phases are not deadlines. They are grade transitions: 0→2, 1→3, 2→4, 4→5. Each phase removes a class of intermediary. Each removal passes another interaction through the Cincinnatus Test. When every interaction passes at Grade 4 or above, the founder has nothing left to do.</p>
+<blockquote>
+<p>"I want nothing left but a holy ghost."</p>
+</blockquote>
+<p>The protocol is the ghost. The math is the haunting. The founder returns to his farm.</p>
+<hr />
+<pre><code>Faraday1 (2026). &quot;Disintermediation Grades: The Cincinnatus Roadmap for
+Measuring Protocol Sovereignty.&quot; VibeSwap Protocol Documentation. March 2026.
+
+Depends on:
+  VibeSwap (2026). &quot;Formal Fairness Proofs.&quot;
+  VibeSwap (2026). &quot;Incentives Whitepaper.&quot;
+  VibeSwap (2026). &quot;Security Mechanism Design.&quot;
+  Faraday1 (2026). &quot;The Lawson Constant.&quot;
+  Faraday1 (2026). &quot;The Three-Token Economy.&quot;
+</code></pre>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/14_THE_LAWSON_FLOOR_MATHEMATICS.html" class="nav-cell prev"><div class="label">&larr; PREV // 14</div><div class="ttl">The Lawson Floor Mathematics</div></a>
+  <a href="/papers/16_ROSETTA_COVENANTS.html" class="nav-cell next"><div class="label">NEXT // 16 &rarr;</div><div class="ttl">The Rosetta Protocol and the Ten Covenants of Tet</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

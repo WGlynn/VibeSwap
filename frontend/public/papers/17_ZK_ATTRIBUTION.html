@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>ZK Attribution — Proving Work Without Revealing Content :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">17</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#the-problem-were-trying-to-solve">The problem we're trying to solve</a>
+    <a class="toc-link" href="#what-a-zk-proof-is">What a ZK proof is</a>
+    <a class="toc-link" href="#the-specific-proofs-that-matter-for-attribution">The specific proofs that matter for attribution</a>
+    <a class="toc-link l3" href="#statement-1-i-wrote-content-with-hash-h">Statement 1 — "I wrote content with hash H"</a>
+    <a class="toc-link l3" href="#statement-2-content-c-hashed-to-h-has-property-p">Statement 2 — "Content C (hashed to H) has property P"</a>
+    <a class="toc-link l3" href="#statement-3-contributors-x-y-z-collaborated-on-content-with-">Statement 3 — "Contributors X, Y, Z collaborated on content with hash H"</a>
+    <a class="toc-link" href="#how-zk-attribution-would-work-in-vibeswap">How ZK attribution would work in VibeSwap</a>
+    <a class="toc-link" href="#what-this-enables">What this enables</a>
+    <a class="toc-link l3" href="#application-1-nda-compliant-audits">Application 1 — NDA-compliant audits</a>
+    <a class="toc-link l3" href="#application-2-private-dialogue-credit">Application 2 — Private dialogue credit</a>
+    <a class="toc-link l3" href="#application-3-investor-communications">Application 3 — Investor communications</a>
+    <a class="toc-link l3" href="#application-4-credential-bound-identities">Application 4 — Credential-bound identities</a>
+    <a class="toc-link" href="#the-on-chain-cost">The on-chain cost</a>
+    <a class="toc-link" href="#the-trusted-setup-question">The trusted-setup question</a>
+    <a class="toc-link" href="#the-ux-challenge">The UX challenge</a>
+    <a class="toc-link" href="#the-verifiers-burden">The verifier's burden</a>
+    <a class="toc-link" href="#the-cryptographic-assumption">The cryptographic assumption</a>
+    <a class="toc-link" href="#integration-with-contribution-traceability">Integration with Contribution Traceability</a>
+    <a class="toc-link" href="#education">Education</a>
+    <a class="toc-link" href="#open-questions">Open questions</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">17</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>ZK attribution</span>
+    </div>
+    <h1>ZK Attribution — Proving Work Without Revealing Content</h1>
+<div class="tagline">**Status**: Research direction + design sketch.</div>
+
+<p><strong>Status</strong>: Research direction + design sketch.
+<strong>Depth</strong>: Pedagogical. Assumes first-encounter with zero-knowledge proofs; builds to concrete VibeSwap application.
+<strong>Related</strong>: <a href="./CONTRIBUTION_TRACEABILITY.md">Contribution Traceability</a>, <a href="./CONTRIBUTION_ATTESTOR_EXPLAINER.md">ContributionAttestor Explainer</a>, <a href="../../research/essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a>.</p>
+<hr />
+<h2 id="the-problem-were-trying-to-solve">The problem we're trying to solve</h2>
+<p>Every contribution the DAG records carries an evidence hash pointing to some off-chain artifact. For most contributions this is fine — the artifact is meant to be public. A public commit, a published paper, a public Telegram message.</p>
+<p>But some valuable contributions have private content:</p>
+<ul>
+<li>An audit for an NDA-protected client. The audit report must remain private; the auditor still deserves DAG credit.</li>
+<li>A design memo drafted inside a private conversation. The participants don't want the draft public; but the framing it produced deserves credit.</li>
+<li>A strategy document shared with investors under confidentiality. The document can't go public; the strategist should still be creditable.</li>
+<li>Insights surfaced in counseling, mentorship, or therapeutic settings. Attribution matters; content must stay private.</li>
+</ul>
+<p>The question: can we give DAG credit to contributions whose content is private?</p>
+<p>Naively: no. On-chain records are public; committing a hash that points to private content makes the hash public but the content still private — no one can verify the content matches the claim.</p>
+<p>Zero-knowledge proofs (ZK proofs) change this answer. Let's build the concept from scratch.</p>
+<h2 id="what-a-zk-proof-is">What a ZK proof is</h2>
+<p>Imagine you know the solution to a puzzle. You want to prove to me that you know the solution, but without showing me the solution itself.</p>
+<p><strong>Example:</strong> You're color-blind and need to be convinced that two balls (red and green, indistinguishable to you) are actually different colors. Without showing you the colors, I can prove they're different.</p>
+<p>How: I show you both balls in my hands. You put them behind your back, maybe swap them or not, then show them to me again. I tell you whether I swapped them. If you didn't swap and I say "different" — or you did swap and I say "same" — I'm right. After 20 rounds, if I'm right every time, the chance I'm guessing is 1-in-a-million. You're convinced the balls differ in some way I can see and you can't.</p>
+<p>I proved the balls differ without showing you the difference. That's a zero-knowledge proof.</p>
+<p>Cryptographic ZK proofs do this mathematically. They produce a proof (a short string of data) that convinces any verifier that a statement is true, without revealing why it's true or what the underlying data is.</p>
+<h2 id="the-specific-proofs-that-matter-for-attribution">The specific proofs that matter for attribution</h2>
+<p>Three kinds of statements are useful to prove in zero-knowledge:</p>
+<h3 id="statement-1-i-wrote-content-with-hash-h">Statement 1 — "I wrote content with hash H"</h3>
+<p>Prove: I possess content C such that <code>hash(C) == H</code> (publicly committed hash).</p>
+<p>Why this matters: if I commit H to the blockchain, I claim to have written C. A ZK proof lets me demonstrate I actually hold C without revealing C.</p>
+<h3 id="statement-2-content-c-hashed-to-h-has-property-p">Statement 2 — "Content C (hashed to H) has property P"</h3>
+<p>Prove: I possess content C with <code>hash(C) == H</code>, and C satisfies some property P (e.g., "is a well-formed audit report", "contains N words", "is dated before X").</p>
+<p>Why this matters: commitments can be verified for quality/type without revealing content.</p>
+<h3 id="statement-3-contributors-x-y-z-collaborated-on-content-with-">Statement 3 — "Contributors X, Y, Z collaborated on content with hash H"</h3>
+<p>Prove: the content was produced via collaboration of specific identifiable parties, without revealing what they produced.</p>
+<p>Why this matters: multi-party contributions can be attributed without exposing the joint work.</p>
+<p>All three are practically implementable with modern ZK frameworks (SNARKs, STARKs, etc.).</p>
+<h2 id="how-zk-attribution-would-work-in-vibeswap">How ZK attribution would work in VibeSwap</h2>
+<ol>
+<li>A contributor creates private content C.</li>
+<li>They compute <code>hash(C) == H</code> and commit H to <code>ContributionAttestor.submitClaim</code> along with their chain-address and type.</li>
+<li>They generate a ZK proof that demonstrates "I, contributor_addr, produced content with hash H" without revealing C.</li>
+<li>The proof is verified on-chain or by a designated verifier (trusted or not). If verification passes, the claim is valid.</li>
+<li>Attestors can verify the proof is well-formed without needing access to C.</li>
+<li>DAG credit is assigned based on the claim's type and attested weight.</li>
+</ol>
+<p>The content C stays private. The chain records: contributor address, type, timestamp, hash H, and the verified proof's metadata. Auditors can re-verify the proof anytime without needing C.</p>
+<h2 id="what-this-enables">What this enables</h2>
+<h3 id="application-1-nda-compliant-audits">Application 1 — NDA-compliant audits</h3>
+<p>A security audit done for a client under NDA: the audit report can't be public. With ZK attribution, the auditor proves "I wrote a security report of type X, with coverage level Y, for the project deployed at address Z, dated D" without the report itself being published.</p>
+<p>The project can verify the audit happened. The auditor gets DAG credit. Non-party observers learn nothing about the report.</p>
+<h3 id="application-2-private-dialogue-credit">Application 2 — Private dialogue credit</h3>
+<p>Telegram conversations, video calls, written correspondence that shaped design decisions: participants prove their roles without broadcasting content.</p>
+<h3 id="application-3-investor-communications">Application 3 — Investor communications</h3>
+<p>Strategic docs shared with investors under confidentiality can be attributed to their writers without content disclosure.</p>
+<h3 id="application-4-credential-bound-identities">Application 4 — Credential-bound identities</h3>
+<p>A contributor claims a professional credential ("licensed lawyer", "PhD in cryptography") without exposing which institution / identity. ZK attribution verifies the credential's existence without specificity.</p>
+<h2 id="the-on-chain-cost">The on-chain cost</h2>
+<p>ZK proofs are cryptographically expensive. Current state:</p>
+<ul>
+<li><strong>SNARKs</strong>: proof size ~200 bytes, verification cost ~200K gas. Feasible for occasional attribution.</li>
+<li><strong>STARKs</strong>: proof size ~100 KB, verification cost higher but transparent (no trusted setup). Feasible for critical attributions.</li>
+<li><strong>Recursive proofs</strong>: batch many attributions together, amortize cost. Hot area.</li>
+</ul>
+<p>Rough cost per ZK attestation on Ethereum L1 at 2024 prices: $2-$10 per attestation. Too expensive for every claim.</p>
+<p>Design response: ZK attribution is OPTIONAL, used when content-privacy matters. Default attribution uses public evidenceHash (cheap); ZK attribution is a privacy-preserving alternative (expensive) for specific use cases.</p>
+<h2 id="the-trusted-setup-question">The trusted-setup question</h2>
+<p>SNARKs need a "trusted setup" — a ceremony where randomness is generated and then destroyed. If the randomness leaks, false proofs become possible.</p>
+<p>Large ZK-proof protocols (Ethereum's KZG ceremony, for example) distribute the setup so no single party's compromise breaks security. Still, the trust-minimization angle is: STARKs avoid trusted setup entirely; use STARKs where setup-trust is unacceptable.</p>
+<p>For VibeSwap, both are options. STARKs are more Rosetta-covenant-preserving (no trust required); SNARKs are cheaper. Different use cases may choose differently.</p>
+<h2 id="the-ux-challenge">The UX challenge</h2>
+<p>Users generating ZK proofs need:
+- A trusted prover (local tool or trusted service).
+- Enough computational resources (proofs take seconds to minutes to generate on a laptop).
+- A well-defined claim statement (type-safe).</p>
+<p>None of these is casual. ZK attribution is not a mass-market UX yet; it's for users who value privacy enough to invest in the workflow.</p>
+<p>Migration path: start with web-assembly local prover for desktop users; mobile prover as hardware accelerates; eventually cloud-prover-with-trust assumption for casual users.</p>
+<h2 id="the-verifiers-burden">The verifier's burden</h2>
+<p>Anyone who wants to verify a ZK attestation needs:
+- The on-chain proof data.
+- The prover's claimed statement.
+- The ZK verification key (public).
+- Verification software (open source).</p>
+<p>Verification is cheap once the proof is produced — milliseconds per proof. But verifying requires running the software; not automatic like on-chain verification.</p>
+<p>Design response: on-chain verification for economic actions (attestations that affect Shapley or voting power). Off-chain verification for audit-time review. Provides accountability without requiring 100% on-chain verification.</p>
+<h2 id="the-cryptographic-assumption">The cryptographic assumption</h2>
+<p>ZK proofs' soundness depends on specific cryptographic assumptions:
+- Certain problems are computationally hard (elliptic curve discrete log, factoring).
+- Certain cryptographic primitives behave pseudo-randomly.
+- Hashes don't have known collisions.</p>
+<p>If any of these assumptions is broken (e.g., a quantum computer breaks elliptic curves), existing ZK proofs become forgeable. Migration to post-quantum-secure ZK proofs is ongoing research.</p>
+<p>For VibeSwap's roadmap: implement ZK attribution with existing SNARKs/STARKs. Plan for migration when post-quantum ZK becomes practical (likely 5-10 years).</p>
+<h2 id="integration-with-contribution-traceability">Integration with Contribution Traceability</h2>
+<p><a href="./CONTRIBUTION_TRACEABILITY.md">Chat-to-DAG Traceability</a> currently uses evidence-hash commitments. The ZK upgrade adds an optional proof field:</p>
+<pre><code>submitClaim(
+    contributor,
+    contribType,
+    evidenceHash,   // unchanged
+    description,    // unchanged
+    value,          // unchanged
+    zkProof         // NEW: optional, verifiable cryptographic proof
+)
+</code></pre>
+<p>Claims without <code>zkProof</code> behave as today. Claims with <code>zkProof</code> are verified; verification-failed claims are rejected.</p>
+<p>Tribunals and attestors can weigh ZK-verified claims more heavily than unverified ones (higher verification = higher trust).</p>
+<h2 id="education">Education</h2>
+<p>For students new to ZK: build understanding through:
+1. Interactive proof demos (e.g., Sudoku ZK, graph coloring ZK).
+2. SNARK circuits for simple arithmetic.
+3. Attribution circuits for the specific VibeSwap use case.</p>
+<p>A future Eridu Labs course on "Cryptographic Attribution" could use VibeSwap's ZK attribution as a concrete running example. From simple interactive proofs to production-ready on-chain ZK attestations — a 6-week course structure.</p>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>Which ZK proving framework</strong> for production? Circom+SNARK? Noir+proving? Cairo+STARK?</li>
+<li><strong>Proof aggregation strategy</strong> — batch many small attestations into one proof for gas efficiency?</li>
+<li><strong>Privacy-vs-audit tradeoff</strong> — how do we give auditors enough verification power without leaking content?</li>
+<li><strong>Governance of the circuit</strong> — who approves updates to the ZK circuit? Who audits the circuit itself?</li>
+</ol>
+<p>Each is part of the ZK attribution research direction.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Zero-knowledge proofs let contributors prove they produced content (or collaborated, or satisfy properties) without revealing what — enabling NDA-protected audits, private dialogue credit, confidential strategic work to earn DAG attribution without exposing content. Optional, expensive, valuable when privacy matters.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/16_ROSETTA_COVENANTS.html" class="nav-cell prev"><div class="label">&larr; PREV // 16</div><div class="ttl">The Rosetta Protocol and the Ten Covenants of Tet</div></a>
+  <a href="/papers/18_OPTIMISTIC_SHAPLEY.html" class="nav-cell next"><div class="label">NEXT // 18 &rarr;</div><div class="ttl">Optimistic Shapley — Distribution at Scale</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

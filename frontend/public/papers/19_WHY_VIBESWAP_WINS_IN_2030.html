@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Why VibeSwap Wins in 2030 :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">19</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-thought-experiment">A thought experiment</a>
+    <a class="toc-link" href="#the-core-thesis">The core thesis</a>
+    <a class="toc-link" href="#three-scenarios-with-probabilities">Three scenarios with probabilities</a>
+    <a class="toc-link l3" href="#scenario-a-dominant-winner-probability-45">Scenario A — Dominant winner (probability ~45%)</a>
+    <a class="toc-link l3" href="#scenario-b-graceful-niche-probability-35">Scenario B — Graceful niche (probability ~35%)</a>
+    <a class="toc-link l3" href="#scenario-c-underdog-probability-20">Scenario C — Underdog (probability ~20%)</a>
+    <a class="toc-link" href="#expected-value-calculation">Expected value calculation</a>
+    <a class="toc-link" href="#the-2026-2030-execution-path">The 2026-2030 execution path</a>
+    <a class="toc-link l3" href="#2026-current">2026 (current)</a>
+    <a class="toc-link l3" href="#2027">2027</a>
+    <a class="toc-link l3" href="#2028">2028</a>
+    <a class="toc-link l3" href="#2029">2029</a>
+    <a class="toc-link l3" href="#2030">2030</a>
+    <a class="toc-link" href="#five-determinants-rank-ordered-by-leverage">Five determinants rank-ordered by leverage</a>
+    <a class="toc-link l3" href="#determinant-1-execution-cadence">Determinant 1 — Execution cadence</a>
+    <a class="toc-link l3" href="#determinant-2-contributor-recruitment">Determinant 2 — Contributor recruitment</a>
+    <a class="toc-link l3" href="#determinant-3-regulatory-environment">Determinant 3 — Regulatory environment</a>
+    <a class="toc-link l3" href="#determinant-4-competitive-response">Determinant 4 — Competitive response</a>
+    <a class="toc-link l3" href="#determinant-5-partnership-integrations">Determinant 5 — Partnership integrations</a>
+    <a class="toc-link" href="#what-we-need-to-not-do">What we need to NOT do</a>
+    <a class="toc-link l3" href="#anti-pattern-1-premature-scaling">Anti-pattern 1 — Premature scaling</a>
+    <a class="toc-link l3" href="#anti-pattern-2-centralized-intermediation">Anti-pattern 2 — Centralized intermediation</a>
+    <a class="toc-link l3" href="#anti-pattern-3-constitutional-drift">Anti-pattern 3 — Constitutional drift</a>
+    <a class="toc-link l3" href="#anti-pattern-4-core-team-burnout">Anti-pattern 4 — Core-team burnout</a>
+    <a class="toc-link" href="#the-30-doc-pipelines-role">The 30-doc pipeline's role</a>
+    <a class="toc-link" href="#honest-uncertainty">Honest uncertainty</a>
+    <a class="toc-link" href="#for-investors-considering-the-round">For investors considering the round</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">19</span>
+      <span class="badge badge-terminal">ESSAY</span>
+      <span>Why VibeSwap wins in 2030</span>
+    </div>
+    <h1>Why VibeSwap Wins in 2030</h1>
+<div class="tagline">**Status**: Strategic scenario analysis. 5-year projection from 2026-04-22.</div>
+
+<p><strong>Status</strong>: Strategic scenario analysis. 5-year projection from 2026-04-22.
+<strong>Audience</strong>: First-encounter OK. Investor-facing + community-facing.</p>
+<hr />
+<h2 id="a-thought-experiment">A thought experiment</h2>
+<p>Skip forward in your imagination. It's January 2030.</p>
+<p>You're asking: "How did VibeSwap turn out?"</p>
+<p>Three possibilities:</p>
+<p><strong>A</strong>: VibeSwap won. It's the default coordination primitive for meaningful cognitive work attribution. Projects integrate it like they integrate OAuth. Contributors earn DAG credit from dialogue, design, audit, code. A multi-billion-dollar category exists and VibeSwap defines it.</p>
+<p><strong>B</strong>: VibeSwap found a niche. It has a committed but small community. Educational partnerships keep it alive. Not the default, but respected; not dominant, but durable.</p>
+<p><strong>C</strong>: VibeSwap didn't make it. Funding ran out, or contributors drifted, or an extraction drift killed trust. The infrastructure lives on as open-source reference; other projects adopt patterns.</p>
+<p>Which is it?</p>
+<p>Depends on what happens in the next 4 years. This doc walks specific conditions that would produce each outcome.</p>
+<h2 id="the-core-thesis">The core thesis</h2>
+<p>VibeSwap's moat is NOT technology. Every mechanism is open-source; any capable team can fork. The code will be replicated.</p>
+<p>The moat is <strong>accumulated attention-graph</strong>: who trusts whom, who attested whose work, who has cited whom, who has built on whose designs. This takes years. Late-arriving competitors have to build attention-graph from scratch while VibeSwap's graph compounds.</p>
+<p>By 2030, the graph has either:
+- Grown enough to be defensible (Scenario A), or
+- Grown partially (Scenario B), or
+- Not grown enough (Scenario C).</p>
+<h2 id="three-scenarios-with-probabilities">Three scenarios with probabilities</h2>
+<h3 id="scenario-a-dominant-winner-probability-45">Scenario A — Dominant winner (probability ~45%)</h3>
+<p><strong>What it looks like</strong>:
+- Active contributors: 50,000+.
+- External integrations: 1,500+ (projects adopting Chat-to-DAG Traceability).
+- Market-size capture: 2-5% of $1T coordination-primitive market = $20B-$50B annual value routed.
+- Protocol treasury: $100M-$500M.
+- Token market cap (JUL + VIBE combined): $3B-$10B.</p>
+<p><strong>Investor seed return</strong>: 100x-500x on initial investment.</p>
+<p><strong>Conditions for this</strong>:</p>
+<ol>
+<li><strong>Emergence threshold crossed by 2028</strong>. Four-parameter phase transition fires. Collective intelligence emerges. Self-correcting drift observable.</li>
+<li><strong>Attention-graph density &gt; competitors</strong>. Even if well-funded competitor forks our contracts, we maintain attention-graph advantage.</li>
+<li><strong>Constitutional stability</strong>. Governance stays aligned with P-000 and P-001. No drift into extraction.</li>
+<li><strong>External adoption</strong>. Non-VibeSwap-native projects integrate Traceability primitives. Attribution infrastructure becomes industry-standard.</li>
+</ol>
+<p><strong>Probability estimate</strong>: ~45%.</p>
+<h3 id="scenario-b-graceful-niche-probability-35">Scenario B — Graceful niche (probability ~35%)</h3>
+<p><strong>What it looks like</strong>:
+- Active contributors: 5,000-10,000.
+- External integrations: 50-200.
+- Market capture: 0.1-0.5% = $1B-$5B annual.
+- Protocol treasury: $10M-$50M.
+- Token market cap: $300M-$1B.</p>
+<p><strong>Investor seed return</strong>: 15x-50x.</p>
+<p><strong>Conditions for this</strong>:</p>
+<ol>
+<li><strong>Emergence threshold partially crossed</strong>. Some cooperative-intelligence properties emerge, but not across all contribution types. Some communities adopt; most don't.</li>
+<li><strong>Moderate attention-graph density</strong>. Enough to sustain but not grow dominantly.</li>
+<li><strong>Competitor captures mainstream</strong>. A more aggressive-marketing competitor captures broader market. VibeSwap retains "serious/philosophical" niche.</li>
+<li><strong>Educational partnerships succeed</strong>. Eridu Labs and similar academic partners adopt VibeSwap for teaching. Niche is durable.</li>
+</ol>
+<p><strong>Probability estimate</strong>: ~35%. Very plausible; not ideal but not failure.</p>
+<h3 id="scenario-c-underdog-probability-20">Scenario C — Underdog (probability ~20%)</h3>
+<p><strong>What it looks like</strong>:
+- Active contributors: 100-500 (stagnant).
+- External integrations: 0-5.
+- Market capture: minimal.
+- Protocol treasury: $1M-$5M.
+- Token market cap: $10M-$50M.</p>
+<p><strong>Investor seed return</strong>: 0.5x-2x. Possibly negative in real terms.</p>
+<p><strong>Conditions for this</strong>:</p>
+<ol>
+<li><strong>Bootstrap prolonged</strong>. Emergence threshold not crossed. Mechanisms execute but collective doesn't emerge.</li>
+<li><strong>Attention-graph thin</strong>. Handshake structure sparse; trust-scores concentrate in small cliques.</li>
+<li><strong>Core team attrition</strong>. Will or key collaborators burnout/redirect. Successor-team can't fill capability gap.</li>
+<li><strong>Funding exhausted</strong> before adoption reaches self-sustaining levels.</li>
+</ol>
+<p><strong>Probability estimate</strong>: ~20%.</p>
+<h2 id="expected-value-calculation">Expected value calculation</h2>
+<p>Simple-weighted expected return:</p>
+<pre><code>EV = 0.45 × 300x + 0.35 × 30x + 0.20 × 1x
+   = 135x + 10.5x + 0.2x
+   = ~146x
+</code></pre>
+<p>Rough: 150x expected return on seed investment.</p>
+<p><strong>Not a promise</strong>. A model with stated assumptions.</p>
+<p>Sensitivity:
+- If Scenario A probability drops to 30%: EV becomes ~100x.
+- If Scenario C probability rises to 40%: EV ~70x.
+- If black-swan exogenous shock included at 10%: EV drops 10-15%.</p>
+<p>Realistic under worst reasonable assumptions: 30-50x.
+Under best: 200-500x.</p>
+<h2 id="the-2026-2030-execution-path">The 2026-2030 execution path</h2>
+<p>Year-by-year what has to happen.</p>
+<h3 id="2026-current">2026 (current)</h3>
+<ul>
+<li>Complete ETM Build Roadmap Gaps 1-3 (C40-C43).</li>
+<li>Launch Chat-to-DAG Traceability in production. First external minting.</li>
+<li>Publish 30-doc content pipeline.</li>
+<li>Grow contributor base from ~20 to ~100 active.</li>
+<li>First Eridu course.</li>
+</ul>
+<h3 id="2027">2027</h3>
+<ul>
+<li>External integrations begin. 2-3 projects adopt Traceability.</li>
+<li>V2 features: permissionless oracle aggregator, IPFS frontend, timelock upgrade governance.</li>
+<li>First high-profile contributor acquisition — recognized researcher or designer joins core.</li>
+<li>Contributor base ~300-500; emergence-threshold-approaching.</li>
+</ul>
+<h3 id="2028">2028</h3>
+<ul>
+<li>Emergence phenomena observable. Self-correcting drift. Cross-substrate routing working.</li>
+<li>V3 features: ZK attribution, cross-chain LayerZero, automated CI minting.</li>
+<li>External integrations: 5-10 substantial projects.</li>
+<li>Contributor base 1,000+.</li>
+</ul>
+<h3 id="2029">2029</h3>
+<ul>
+<li>VibeSwap is cited example in cooperative-economics research.</li>
+<li>Several DAOs use Traceability as default attribution infrastructure.</li>
+<li>Fork threat: low. Attention-graph too dense to replicate.</li>
+</ul>
+<h3 id="2030">2030</h3>
+<ul>
+<li>Scenario A, B, or C materializes.</li>
+<li>Conditional on execution + recruitment + regulation + competition.</li>
+</ul>
+<h2 id="five-determinants-rank-ordered-by-leverage">Five determinants rank-ordered by leverage</h2>
+<h3 id="determinant-1-execution-cadence">Determinant 1 — Execution cadence</h3>
+<p>Current: ~3-5 cycles per week. 12 months at this cadence = ~250-300 shipped items.</p>
+<p>If cadence slows: fewer gaps close; Priority 1 items pile up; momentum flags → Scenario C.</p>
+<p>If cadence holds: roadmap gaps close; V2 features land; we're competitive at tech layer by 2027 → A or B.</p>
+<h3 id="determinant-2-contributor-recruitment">Determinant 2 — Contributor recruitment</h3>
+<p>At current rate (1-3/month): ~50-100 active by end 2027. Bottom of emergence-threshold.
+At 5x (10-15/month): ~500 active. Clear emergence.
+At 25x (50/month): ~1500 active. Dominant trajectory.</p>
+<p>Multiplier from: deliberate outreach, credible educational partnerships (Eridu), community events, high-profile acquisitions.</p>
+<h3 id="determinant-3-regulatory-environment">Determinant 3 — Regulatory environment</h3>
+<p>Crypto regulation 2026-2030 uncertain. Two regimes:</p>
+<ul>
+<li><strong>Permissive</strong>: operations free; growth unconstrained.</li>
+<li><strong>Restrictive</strong>: governance tokens classified as securities; attestation-based attribution restricted.</li>
+</ul>
+<p><a href="../../architecture/AUGMENTED_GOVERNANCE.md">Augmented Governance</a> is designed to be regulatable. Should help under restrictive regimes. Not guaranteed.</p>
+<h3 id="determinant-4-competitive-response">Determinant 4 — Competitive response</h3>
+<p>Current competitors (Gitcoin, Optimism RetroPGF) are adjacent. If one pivots into VibeSwap's space with more funding, pressure intensifies.</p>
+<p>Mitigation: own the narrative. "Coordination primitive, not a casino" is our positioning. Continuous publication reinforces.</p>
+<h3 id="determinant-5-partnership-integrations">Determinant 5 — Partnership integrations</h3>
+<p>External projects integrating Traceability compound our moat. 5-10 serious integrations by 2028 → Scenario A likely. 0-2 → Scenario B/C.</p>
+<h2 id="what-we-need-to-not-do">What we need to NOT do</h2>
+<h3 id="anti-pattern-1-premature-scaling">Anti-pattern 1 — Premature scaling</h3>
+<p>Don't chase contributor count without ensuring heterogeneity + connectivity + feedback speed.</p>
+<h3 id="anti-pattern-2-centralized-intermediation">Anti-pattern 2 — Centralized intermediation</h3>
+<p>Don't add intermediaries for short-term friction. Solve structurally, not compromisingly.</p>
+<h3 id="anti-pattern-3-constitutional-drift">Anti-pattern 3 — Constitutional drift</h3>
+<p>Don't let governance override P-000 or P-001 "just this once." First override legitimates more. Extraction normalizes. Dead protocol.</p>
+<h3 id="anti-pattern-4-core-team-burnout">Anti-pattern 4 — Core-team burnout</h3>
+<p>Don't run past sustainable capacity. Burnout is Scenario-C trigger.</p>
+<h2 id="the-30-doc-pipelines-role">The 30-doc pipeline's role</h2>
+<p>Publishing fresh technical-philosophical content has 2030-relevant effects:</p>
+<ul>
+<li><strong>Narrative control</strong>: whoever publishes definitive framings owns category.</li>
+<li><strong>Contributor attraction</strong>: serious thinkers self-select into community.</li>
+<li><strong>Educational scaffolding</strong>: Eridu + similar partners use as course material.</li>
+<li><strong>Regulatory legibility</strong>: regulators see coherent approach, not "another crypto thing."</li>
+</ul>
+<p>Intellectual capital compounds into positioning advantage.</p>
+<h2 id="honest-uncertainty">Honest uncertainty</h2>
+<p>I don't know which scenario materializes. Probabilities estimated from pattern-matching to similar-stage protocols. Edge cases excluded.</p>
+<p>What I can say confidently:</p>
+<ul>
+<li><strong>Design is sound</strong> — constitutional axioms + Augmented Governance + three-token + Shapley + Lawson compose coherently.</li>
+<li><strong>Execution is on pace</strong> — current cadence sustainable and productive.</li>
+<li><strong>Differentiation is real</strong> — GEV-resistance + non-code attribution + cooperative-intelligence framing are genuinely novel.</li>
+</ul>
+<p>Necessary conditions, not sufficient. 2030 outcome depends on next 24 months.</p>
+<h2 id="for-investors-considering-the-round">For investors considering the round</h2>
+<p>Before committing:
+- Read the 30-doc content pipeline. Judge intellectual substance.
+- Review the repo. Judge technical substance.
+- Talk to the team. Judge personal fit.
+- Model your own scenario probabilities. Don't take ours.</p>
+<p>After committing:
+- Track cadence metrics (commits/week, contributor growth, integration progress).
+- Participate in governance if aligned with P-000/P-001.
+- Hold for 4-5 year horizon. Early liquidation defeats the thesis.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>2030 outcome ~45% dominant (100-500x return) / 35% niche (15-50x) / 20% underdog (0.5-2x). EV ~150x. Moat is attention-graph density, not technology. Five determinants rank-ordered: execution cadence, contributor recruitment, regulation, competition, integrations. Four anti-patterns to avoid. 30-doc pipeline contributes narrative control. Honest uncertainty acknowledged; design+execution+differentiation are necessary not sufficient.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/18_OPTIMISTIC_SHAPLEY.html" class="nav-cell prev"><div class="label">&larr; PREV // 18</div><div class="ttl">Optimistic Shapley — Distribution at Scale</div></a>
+  <a href="/papers/20_THE_COORDINATION_PRIMITIVE_MARKET.html" class="nav-cell next"><div class="label">NEXT // 20 &rarr;</div><div class="ttl">The Coordination Primitive Market</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

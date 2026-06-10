@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Investor Economic Model :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">21</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#honest-framing-upfront">Honest framing upfront</a>
+    <a class="toc-link" href="#the-three-value-sources">The three value sources</a>
+    <a class="toc-link l3" href="#source-1-transaction-value-fees">Source 1 — Transaction-value fees</a>
+    <a class="toc-link l3" href="#source-2-protocol-owned-liquidity-pol-returns">Source 2 — Protocol-owned liquidity (POL) returns</a>
+    <a class="toc-link l3" href="#source-3-token-appreciation">Source 3 — Token appreciation</a>
+    <a class="toc-link" href="#three-scenarios-with-probabilities">Three scenarios with probabilities</a>
+    <a class="toc-link l3" href="#scenario-a-dominant-winner-45">Scenario A — Dominant winner (~45%)</a>
+    <a class="toc-link l3" href="#scenario-b-graceful-niche-35">Scenario B — Graceful niche (~35%)</a>
+    <a class="toc-link l3" href="#scenario-c-underdog-20">Scenario C — Underdog (~20%)</a>
+    <a class="toc-link" href="#expected-value-calculation">Expected value calculation</a>
+    <a class="toc-link" href="#time-horizon">Time horizon</a>
+    <a class="toc-link" href="#key-parameter-sensitivities">Key parameter sensitivities</a>
+    <a class="toc-link l3" href="#sensitivity-1-active-contributor-growth-rate">Sensitivity 1 — Active-contributor growth rate</a>
+    <a class="toc-link l3" href="#sensitivity-2-integration-rate">Sensitivity 2 — Integration rate</a>
+    <a class="toc-link l3" href="#sensitivity-3-constitutional-stability">Sensitivity 3 — Constitutional stability</a>
+    <a class="toc-link l3" href="#sensitivity-4-competitive-response">Sensitivity 4 — Competitive response</a>
+    <a class="toc-link" href="#the-dilution-question">The dilution question</a>
+    <a class="toc-link" href="#token-unlock-schedules">Token unlock schedules</a>
+    <a class="toc-link" href="#comparison-vs-public-crypto-markets">Comparison vs public crypto markets</a>
+    <a class="toc-link" href="#risks-enumerated-honestly">Risks enumerated honestly</a>
+    <a class="toc-link l3" href="#risk-1-execution-risk">Risk 1 — Execution risk</a>
+    <a class="toc-link l3" href="#risk-2-market-risk">Risk 2 — Market risk</a>
+    <a class="toc-link l3" href="#risk-3-regulatory-risk">Risk 3 — Regulatory risk</a>
+    <a class="toc-link l3" href="#risk-4-competition-risk">Risk 4 — Competition risk</a>
+    <a class="toc-link l3" href="#risk-5-technology-risk">Risk 5 — Technology risk</a>
+    <a class="toc-link l3" href="#risk-6-founder-risk">Risk 6 — Founder risk</a>
+    <a class="toc-link l3" href="#risk-7-category-risk">Risk 7 — Category risk</a>
+    <a class="toc-link" href="#use-of-proceeds-20m-raise">Use of proceeds ($2.0M raise)</a>
+    <a class="toc-link" href="#why-vibeswap-is-credible">Why VibeSwap is credible</a>
+    <a class="toc-link" href="#what-a-potential-investor-should-do">What a potential investor should do</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">21</span>
+      <span class="badge badge-terminal">ESSAY</span>
+      <span>Investor economic model</span>
+    </div>
+    <h1>Investor Economic Model</h1>
+<div class="tagline">**Status**: Transparent financial modeling framework.</div>
+
+<p><strong>Status</strong>: Transparent financial modeling framework.
+<strong>Audience</strong>: Investors + due-diligence teams + anyone modeling VibeSwap's returns.</p>
+<hr />
+<h2 id="honest-framing-upfront">Honest framing upfront</h2>
+<p>This doc is a financial model, not a sales pitch.</p>
+<p>Real financial models have:
+- Stated assumptions.
+- Probabilities attached to scenarios.
+- Sensitivity analysis.
+- Acknowledged risks.
+- Time horizons.
+- Comparable benchmarks.</p>
+<p>Sales pitches usually don't. They skip to "ideal case" and promise.</p>
+<p>VibeSwap is raising a seed round ($2.0M, announced 2026-04-20). An investor considering the round needs the former, not the latter. This doc is the former.</p>
+<p><strong>Not hype. Not downplayed. Math with transparent assumptions.</strong></p>
+<h2 id="the-three-value-sources">The three value sources</h2>
+<p>VibeSwap's token economy has three value sources:</p>
+<h3 id="source-1-transaction-value-fees">Source 1 — Transaction-value fees</h3>
+<p>VibeSwap captures a small fee (currently 0% per <a href="../memory/feedback_zero-fee-principle-enforcement.md">Zero-Fee Principle</a>). External projects adopting Chat-to-DAG Traceability may pay license or subscription fees. <!-- FIXME: ../memory/feedback_zero-fee-principle-enforcement.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --></p>
+<ul>
+<li><strong>Current state</strong>: $0 transaction-fee revenue.</li>
+<li><strong>Target 2028</strong>: $5M-$20M annual from 50-200 external integrations.</li>
+<li><strong>Target 2030</strong>: $50M-$200M annual from 500-2000 integrations.</li>
+</ul>
+<h3 id="source-2-protocol-owned-liquidity-pol-returns">Source 2 — Protocol-owned liquidity (POL) returns</h3>
+<p>A portion of the raise ($800K of $2.0M) deployed as protocol-owned liquidity. POL earns LP fees from internal volume.</p>
+<ul>
+<li><strong>Current</strong>: $0 volume, $0 returns.</li>
+<li><strong>Target 2028</strong>: $100M cumulative volume → ~$300K/year POL returns at 0.3% fee tier (if activated).</li>
+<li><strong>Target 2030</strong>: $1B+ cumulative → ~$3M/year.</li>
+</ul>
+<h3 id="source-3-token-appreciation">Source 3 — Token appreciation</h3>
+<p>JUL is the money-layer token; value scales with network usage. VIBE is governance; value scales with governance activity.</p>
+<p>Modeled via Metcalfe-inspired network-value scaling:</p>
+<pre><code>TokenValue(t) = BaseValue × f(ActiveUsers(t)) × g(IntegrationCount(t)) × h(Age(t))
+</code></pre>
+<p>where:
+- f = user-network component (~ U × log(U) for network effects)
+- g = integration-count (linear per integration)
+- h = maturity discount (1 for mature, &lt;1 for bootstrap)</p>
+<p>At bootstrap (2026): low h, low users, low integrations → token value small.
+At maturity (2030, Scenario A): h ≈ 1; U ~10,000-100,000; integrations ~500-2000 → substantial.</p>
+<h2 id="three-scenarios-with-probabilities">Three scenarios with probabilities</h2>
+<p>Using <a href="../../research/essays/WHY_VIBESWAP_WINS_IN_2030.md">Why VibeSwap Wins in 2030</a>:</p>
+<h3 id="scenario-a-dominant-winner-45">Scenario A — Dominant winner (~45%)</h3>
+<p>By 2030:
+- Active contributors: 50,000+.
+- External integrations: 1,500+.
+- Market-size capture: 2-5% of $1T coordination market = $20-50B routed.
+- Protocol treasury: $100M-$500M.
+- Token market cap (JUL + VIBE combined): $3B-$10B.</p>
+<p><strong>Investor seed return</strong>: 100x-500x.</p>
+<h3 id="scenario-b-graceful-niche-35">Scenario B — Graceful niche (~35%)</h3>
+<p>By 2030:
+- Active contributors: 5,000-10,000.
+- External integrations: 50-200.
+- Market capture: 0.1-0.5% = $1B-$5B routed.
+- Protocol treasury: $10M-$50M.
+- Token market cap: $300M-$1B.</p>
+<p><strong>Investor seed return</strong>: 15x-50x.</p>
+<h3 id="scenario-c-underdog-20">Scenario C — Underdog (~20%)</h3>
+<p>By 2030:
+- Active contributors: 100-500 (stagnant).
+- External integrations: 0-5.
+- Market capture: minimal.
+- Protocol treasury: $1M-$5M.
+- Token market cap: $10M-$50M.</p>
+<p><strong>Investor seed return</strong>: 0.5x-2x. Possibly negative in real terms.</p>
+<h2 id="expected-value-calculation">Expected value calculation</h2>
+<p>Simple-weighted EV:</p>
+<pre><code>EV = 0.45 × 300x + 0.35 × 30x + 0.20 × 1x
+   = 135x + 10.5x + 0.2x
+   ≈ 150x
+</code></pre>
+<p>Rough: 150x expected return on initial seed investment.</p>
+<p><strong>This is not a promise.</strong> It's a model with stated assumptions.</p>
+<p>Model validity depends on:
+- Probability estimates being correct (uncertain).
+- Scenario returns being correct (order-of-magnitude estimates).
+- No black-swan exogenous shocks (regulatory crackdown, crypto winter, exploit).</p>
+<p><strong>Sensitivity analysis</strong>:</p>
+<ul>
+<li>If Scenario A probability drops to 30%: EV → ~100x.</li>
+<li>If Scenario C probability rises to 40%: EV → ~70x.</li>
+<li>If black-swan at 10% probability: EV drops 10-15%.</li>
+</ul>
+<p>Realistic expectation under worst reasonable assumptions: 30-50x.
+Under best: 200-500x.</p>
+<h2 id="time-horizon">Time horizon</h2>
+<ul>
+<li><strong>2026</strong>: bootstrap. Minimal returns.</li>
+<li><strong>2027-2028</strong>: emergence phase. Tokens become liquid; early speculative value.</li>
+<li><strong>2029-2030</strong>: network maturity. Returns materialize.</li>
+<li><strong>2031+</strong>: compound phase. Scenario A: returns continue growing. B: stable niche. C: liquidation.</li>
+</ul>
+<p>Expected time-to-liquid-returns: <strong>4-5 years</strong>.
+Expected time-to-full-Scenario-A-materialization: <strong>6-8 years</strong>.</p>
+<p>Investors with shorter horizons should discount. Longer horizons benefit.</p>
+<h2 id="key-parameter-sensitivities">Key parameter sensitivities</h2>
+<h3 id="sensitivity-1-active-contributor-growth-rate">Sensitivity 1 — Active-contributor growth rate</h3>
+<p>Current rate: ~5-10 new/month.</p>
+<ul>
+<li>Current rate: by 2030 = ~600-1,200 contributors. Scenario B.</li>
+<li>3x rate: ~2,000-4,000. Top of B / bottom of A.</li>
+<li>10x rate: ~6,000-12,000. Scenario A.</li>
+</ul>
+<p>Contributor-recruitment intensity is the MOST leverageable parameter.</p>
+<h3 id="sensitivity-2-integration-rate">Sensitivity 2 — Integration rate</h3>
+<p>Each external project integrating Chat-to-DAG Traceability compounds our moat.</p>
+<ul>
+<li>1-2/year: Scenario C-B boundary.</li>
+<li>5-10/year: Scenario B.</li>
+<li>20-50/year: Scenario A.</li>
+</ul>
+<p>Partnership integrations are second-most-leverageable.</p>
+<h3 id="sensitivity-3-constitutional-stability">Sensitivity 3 — Constitutional stability</h3>
+<p>If governance drifts from P-000/P-001, protocol loses "coordination primitive, not casino" positioning. Fork threats emerge.</p>
+<p>If governance drift in 2027-2028: Scenario A becomes ~15% instead of 45%. EV drops substantially.</p>
+<p>Risk-mitigation: explicit constitutional axioms, on-chain Lawson Constant, cultural reinforcement.</p>
+<h3 id="sensitivity-4-competitive-response">Sensitivity 4 — Competitive response</h3>
+<p>If 2-3 well-funded competitors enter by 2027 with similar architectures:
+- Attention-graph moat partially replicates if they have head-start funding.
+- Market share splits.
+- Scenario B becomes more likely than A.</p>
+<h2 id="the-dilution-question">The dilution question</h2>
+<p>Seed investors take ~15% equity at $14M valuation (2026-04-20 deck). Subsequent rounds dilute.</p>
+<p>Assumed dilution path:
+- Series A (2027): 15-20% dilution at $50M-$100M valuation.
+- Series B (2028): 15-20% at $200M-$500M valuation.
+- Growth rounds (2029+): 10-15% at $1B-$5B.</p>
+<p>Cumulative dilution by 2030: 40-50% of initial stake retained.</p>
+<p>Adjusted scenario returns for dilution:
+- Scenario A: 100-500x × 0.5 = 50-250x realized.
+- Scenario B: 15-50x × 0.5 = 7.5-25x.
+- Scenario C: 0.5-2x × 0.5 = 0.25-1x.</p>
+<p><strong>EV adjusted for dilution</strong>: ~75x. Still strong expected return.</p>
+<h2 id="token-unlock-schedules">Token unlock schedules</h2>
+<ul>
+<li><strong>Founder / core team</strong>: 4-year vesting + 1-year cliff. Standard.</li>
+<li><strong>Investor tokens</strong>: subject to round terms; typical 1-2 year lockup + linear vesting thereafter.</li>
+<li><strong>Community allocation</strong>: mint-on-contribution (no fixed unlock — tokens appear as contributions mined).</li>
+</ul>
+<p>These mean liquid returns materialize gradually over years, not in single large events.</p>
+<h2 id="comparison-vs-public-crypto-markets">Comparison vs public crypto markets</h2>
+<p>Benchmark: $2M invested at seed stage in top-5% crypto projects 2015-2020 achieved (held through 2025):</p>
+<ul>
+<li>Median: ~50x.</li>
+<li>90th percentile: ~500x.</li>
+<li>10th percentile: ~2x.</li>
+</ul>
+<p>VibeSwap's expected return is in line with top-quartile crypto seed investments, with caveat: 2026-2030 may differ from 2015-2020 (regulatory, macro).</p>
+<h2 id="risks-enumerated-honestly">Risks enumerated honestly</h2>
+<h3 id="risk-1-execution-risk">Risk 1 — Execution risk</h3>
+<p>Core team fails to deliver on roadmap.</p>
+<p>Mitigation: publicly-visible cadence; team track record; distributed contributor base.</p>
+<h3 id="risk-2-market-risk">Risk 2 — Market risk</h3>
+<p>Crypto winter 2027-2029.</p>
+<p>Mitigation: protocol continues operating; liquid-returns just delayed.</p>
+<h3 id="risk-3-regulatory-risk">Risk 3 — Regulatory risk</h3>
+<p>Token classifications change; securities or other regulations.</p>
+<p>Mitigation: Augmented Governance designed to be regulatable. See <a href="../../governance/regulatory/REGULATORY_COMPLIANCE_DEEP_DIVE.md">Regulatory Compliance Deep Dive</a>.</p>
+<h3 id="risk-4-competition-risk">Risk 4 — Competition risk</h3>
+<p>Well-funded competitor enters 2027.</p>
+<p>Mitigation: attention-graph moat; continuous publication.</p>
+<h3 id="risk-5-technology-risk">Risk 5 — Technology risk</h3>
+<p>Critical exploit discovered.</p>
+<p>Mitigation: conservative launch; extensive audits; bug-bounty.</p>
+<h3 id="risk-6-founder-risk">Risk 6 — Founder risk</h3>
+<p>Will or key team member departs.</p>
+<p>Mitigation: distributed decision-making; <a href="../ai-native/MIND_PERSISTENCE_MISSION.md">Mind Persistence Mission</a> for knowledge continuity.</p>
+<h3 id="risk-7-category-risk">Risk 7 — Category risk</h3>
+<p>"Coordination primitive" fails to emerge as a category.</p>
+<p>Mitigation: educational partnerships (Eridu Labs).</p>
+<p>Each risk has specific mitigation. Mitigations don't eliminate risk — they reduce it.</p>
+<h2 id="use-of-proceeds-20m-raise">Use of proceeds ($2.0M raise)</h2>
+<ul>
+<li><strong>$400K</strong> — security audits (two independent firms, full coverage).</li>
+<li><strong>$800K</strong> — protocol-owned liquidity.</li>
+<li><strong>$300K</strong> — bounty + security operations.</li>
+<li><strong>$500K</strong> — team runway (12-18 months at current burn).</li>
+</ul>
+<p>Each category mapped to specific milestones; allocations adjust based on actual need.</p>
+<h2 id="why-vibeswap-is-credible">Why VibeSwap is credible</h2>
+<p>Despite risks, factors favoring:</p>
+<ol>
+<li><strong>Novel, defensible positioning</strong>. "Coordination primitive, not casino" is differentiator.</li>
+<li><strong>Substantive underlying work</strong>. Technical + philosophical foundation substantial and public.</li>
+<li><strong>Demonstrated execution cadence</strong>. Hundreds of commits; regular publication.</li>
+<li><strong>Meaningful time horizon</strong>. 4-5 year path matches typical venture timing.</li>
+<li><strong>Large addressable market</strong>. Multi-trillion long-term.</li>
+<li><strong>Aligned team</strong>. Core team holds tokens with standard vesting; incentives aligned long-term.</li>
+</ol>
+<h2 id="what-a-potential-investor-should-do">What a potential investor should do</h2>
+<p>Before committing:
+- Read the 30-doc content pipeline. Judge intellectual substance.
+- Review the repo. Judge technical substance.
+- Talk to the team. Judge personal fit.
+- Model your own scenario probabilities. Don't take ours.
+- Consider portfolio allocation; speculative position sized accordingly.</p>
+<p>After committing:
+- Track cadence metrics (commits/week, contributor growth, integration progress).
+- Participate in governance if aligned with P-000/P-001.
+- Hold for the horizon. Early liquidation defeats thesis.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Expected return 30-500x over 4-5 years under stated probability weights (45%/35%/20% for Dominant/Niche/Underdog). ~75x post-dilution central estimate. Seven specific risks with specific mitigations. Use of proceeds: $400K audits / $800K POL / $300K bounty / $500K runway. Transparent model with stated assumptions, not sales pitch.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/20_THE_COORDINATION_PRIMITIVE_MARKET.html" class="nav-cell prev"><div class="label">&larr; PREV // 20</div><div class="ttl">The Coordination Primitive Market</div></a>
+  <a href="/papers/22_REGULATORY_COMPLIANCE_DEEP_DIVE.html" class="nav-cell next"><div class="label">NEXT // 22 &rarr;</div><div class="ttl">Regulatory Compliance — Deep Dive</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

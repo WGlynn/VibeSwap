@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>NCI Weight Function — Formal Treatment :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">13</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-an-observation-about-consensus">Start with an observation about consensus</a>
+    <a class="toc-link" href="#the-formula">The formula</a>
+    <a class="toc-link" href="#walk-through-an-example">Walk through an example</a>
+    <a class="toc-link l3" href="#pow-component">PoW component</a>
+    <a class="toc-link l3" href="#pos-component">PoS component</a>
+    <a class="toc-link l3" href="#pom-component">PoM component</a>
+    <a class="toc-link l3" href="#total">Total</a>
+    <a class="toc-link" href="#compare-two-validators">Compare two validators</a>
+    <a class="toc-link l3" href="#now-compare-alice-to-a-pom-heavy-validator">Now compare Alice to a PoM-heavy validator</a>
+    <a class="toc-link" href="#why-pom-dominates-60">Why PoM dominates (60%)</a>
+    <a class="toc-link" href="#why-pos-is-middle-30">Why PoS is middle (30%)</a>
+    <a class="toc-link" href="#why-pow-is-lowest-10">Why PoW is lowest (10%)</a>
+    <a class="toc-link" href="#the-log-choice">The log₂ choice</a>
+    <a class="toc-link l3" href="#pow-log-rationale">PoW log₂ rationale</a>
+    <a class="toc-link l3" href="#pom-log-rationale">PoM log₂ rationale</a>
+    <a class="toc-link l3" href="#stake-linear-rationale">Stake linear rationale</a>
+    <a class="toc-link" href="#the-pillar-balance-equilibrium">The pillar-balance equilibrium</a>
+    <a class="toc-link" href="#slashing-parameters">Slashing parameters</a>
+    <a class="toc-link" href="#phase-behavior">Phase behavior</a>
+    <a class="toc-link l3" href="#phase-1-bootstrap-current-2026-04-22">Phase 1 — Bootstrap (current, 2026-04-22)</a>
+    <a class="toc-link l3" href="#phase-2-growth-6-18-months">Phase 2 — Growth (6-18 months)</a>
+    <a class="toc-link l3" href="#phase-3-saturation-3-years">Phase 3 — Saturation (3+ years)</a>
+    <a class="toc-link" href="#failure-modes-analyzed">Failure modes analyzed</a>
+    <a class="toc-link l3" href="#cartel-coordination">Cartel coordination</a>
+    <a class="toc-link l3" href="#mind-score-inflation">Mind-score inflation</a>
+    <a class="toc-link l3" href="#sybil-pow">Sybil PoW</a>
+    <a class="toc-link l3" href="#absentee-validators">Absentee validators</a>
+    <a class="toc-link" href="#gap-1-in-etm-alignment-audit-reconciled-2026-04-23">Gap #1 in ETM Alignment Audit — reconciled 2026-04-23</a>
+    <a class="toc-link l3" href="#shipped-c40-2026-04-23">Shipped C40 (2026-04-23)</a>
+    <a class="toc-link l3" href="#consensus-dynamics-after-c40b">Consensus dynamics after C40b</a>
+    <a class="toc-link" href="#relationship-to-shapley">Relationship to Shapley</a>
+    <a class="toc-link" href="#relationship-to-etm">Relationship to ETM</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">13</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>NCI weight function</span>
+    </div>
+    <h1>NCI Weight Function — Formal Treatment</h1>
+<div class="tagline">**Status**: Live in `contracts/consensus/NakamotoConsensusInfinity.sol`.</div>
+
+<p><strong>Status</strong>: Live in <code>contracts/consensus/NakamotoConsensusInfinity.sol</code>.
+<strong>Audience</strong>: First-encounter OK. Formula walked with numerical examples.</p>
+<hr />
+<h2 id="start-with-an-observation-about-consensus">Start with an observation about consensus</h2>
+<p>Bitcoin pioneered one kind of consensus: Proof of Work. Mine hash puzzles. Longest chain wins. Elegant but energy-intensive.</p>
+<p>Ethereum moved to another: Proof of Stake. Stake ETH. Validators chosen proportional to stake. Less energy but introduces plutocracy risk (richest validators have most influence).</p>
+<p>Most newer chains pick ONE of these. The framing "PoW vs PoS" treats them as rival alternatives.</p>
+<p>VibeSwap rejects this framing. PoW and PoS aren't rivals. Neither is PoM (Proof of Mind). They're three DISTINCT axes of legitimate authority. A durable consensus should weigh all three, not arbitrarily pick one.</p>
+<p>That's what NCI does.</p>
+<h2 id="the-formula">The formula</h2>
+<p>For validator <code>v</code>:</p>
+<pre><code>W(v) = 0.10 × log₂(1 + cumulative_PoW_v)       // work pillar
+     + 0.30 × stakedVIBE_v × POS_SCALE           // stake pillar (linear)
+     + 0.60 × log₂(1 + mindScore_v)              // mind pillar
+</code></pre>
+<p>Weights in basis points:
+- <strong>POW_WEIGHT_BPS</strong> = 1000 (10%)
+- <strong>POS_WEIGHT_BPS</strong> = 3000 (30%)
+- <strong>POM_WEIGHT_BPS</strong> = 6000 (60%)</p>
+<p>Total: 10,000 basis points = 100%.</p>
+<p>The <code>log₂</code> on PoW and PoM is load-bearing. Stake is linear.</p>
+<h2 id="walk-through-an-example">Walk through an example</h2>
+<p>Let me compute W for a specific validator.</p>
+<p><strong>Validator Alice</strong>:
+- Cumulative PoW: 1,000,000 work units mined.
+- Staked VIBE: 1,000 units.
+- Mind score: 100 attestations-weight.</p>
+<h3 id="pow-component">PoW component</h3>
+<p><code>log₂(1 + 1,000,000) ≈ log₂(1,000,001) ≈ 19.93</code></p>
+<p>Weighted: <code>0.10 × 19.93 = 1.99</code></p>
+<h3 id="pos-component">PoS component</h3>
+<p><code>stake × POS_SCALE</code> — suppose POS_SCALE normalizes to same units as PoW component. Let's say <code>POS_SCALE = 0.01</code> such that 1000 stake = 10 in weighted units.</p>
+<p>Weighted: <code>0.30 × 10 = 3.00</code></p>
+<h3 id="pom-component">PoM component</h3>
+<p><code>log₂(1 + 100) ≈ log₂(101) ≈ 6.66</code></p>
+<p>Weighted: <code>0.60 × 6.66 = 3.99</code></p>
+<h3 id="total">Total</h3>
+<p>W(Alice) = 1.99 + 3.00 + 3.99 = <strong>8.98</strong></p>
+<h2 id="compare-two-validators">Compare two validators</h2>
+<p>Let me compare Alice to a pure-stake validator Bob.</p>
+<p><strong>Bob</strong>:
+- Cumulative PoW: 0 (never mined).
+- Staked VIBE: 10,000 units (much more than Alice).
+- Mind score: 0 (no attestations received).</p>
+<p>W(Bob) calculations:</p>
+<ul>
+<li>PoW: <code>0.10 × log₂(1) = 0</code> ← log₂ of 1 is 0, so Bob's PoW contribution = 0.</li>
+<li>PoS: <code>0.30 × 100 = 30</code> (10x Alice's stake → 10x weighted)</li>
+<li>PoM: <code>0.60 × 0 = 0</code></li>
+</ul>
+<p>W(Bob) = 0 + 30 + 0 = <strong>30</strong>.</p>
+<p><strong>Bob has much higher weight than Alice despite 0 PoW and 0 PoM.</strong></p>
+<p>That's the PoS-dominant pattern. Bob is a whale; he dominates via capital.</p>
+<h3 id="now-compare-alice-to-a-pom-heavy-validator">Now compare Alice to a PoM-heavy validator</h3>
+<p><strong>Carol</strong>:
+- Cumulative PoW: 1,000,000 (same as Alice).
+- Staked VIBE: 1,000 (same as Alice).
+- Mind score: 10,000 (100x Alice's).</p>
+<p>W(Carol):
+- PoW: <code>0.10 × log₂(1,000,001) ≈ 1.99</code>
+- PoS: <code>0.30 × 10 = 3.00</code>
+- PoM: <code>0.60 × log₂(10,001) ≈ 0.60 × 13.29 ≈ 7.97</code></p>
+<p>Total: 1.99 + 3.00 + 7.97 = <strong>12.96</strong></p>
+<p><strong>Carol has higher weight than Alice due to her mind-score.</strong> But her mind-score is 100x Alice's, and her final weight is only ~1.5x higher. The <code>log₂</code> scaling prevents disproportionate influence.</p>
+<h2 id="why-pom-dominates-60">Why PoM dominates (60%)</h2>
+<p>VibeSwap's value proposition is cognitive-economy externalization. The mind pillar IS the value-creating axis.</p>
+<p>Weighting it below the other pillars would signal VibeSwap is not really different from prior PoW/PoS projects.</p>
+<p>60% is dominant but not absolute. A validator with PURE PoM and no PoW/PoS (Carol with zero stake, zero PoW) would max out at: <code>0.60 × log₂(1 + mindScore)</code> = substantial but not infinite.</p>
+<p>At <code>mindScore = 10^6</code>: <code>0.60 × log₂(10^6) ≈ 0.60 × 20 = 12</code>.</p>
+<p>A pure-PoM validator with 1M attestations has weight ~12. Alice (balanced) has ~9. Bob (pure-PoS whale at 10,000 stake) has 30.</p>
+<p>Pure-PoM dominance requires astronomical attestation accumulation. At realistic scales, balanced validators outweigh specialists.</p>
+<h2 id="why-pos-is-middle-30">Why PoS is middle (30%)</h2>
+<p>Stake has real cost (capital locked + slashing risk) so it signals commitment. But stake without work or mind means ABSENTEE CAPITAL — validator who locked tokens but doesn't participate.</p>
+<p>30% weight: stake matters but doesn't dominate. Even a large staker can be outweighed by a modest-stake validator contributing substantially in PoW and PoM.</p>
+<h2 id="why-pow-is-lowest-10">Why PoW is lowest (10%)</h2>
+<p>PoW here is contribution to network computation (oracle work, JUL backing), not Bitcoin-style hash racing.</p>
+<p>10% is meaningful but not decisive. Prevents pure-PoM validators from completely dominating (PoW + PoS together = 40%, requiring real resource commitment).</p>
+<h2 id="the-log-choice">The log₂ choice</h2>
+<p>Why log₂ on PoW and PoM, and linear on stake?</p>
+<h3 id="pow-log-rationale">PoW log₂ rationale</h3>
+<p>Bitcoin's lesson: linear PoW leads to mining concentration. Largest miners dominate regardless of security value delivered.</p>
+<p>Log₂ scaling: miner with 4× computational power has 2× weight (not 4×). Concentration dampened.</p>
+<p>At extremes:
+- 10^9 cumulative PoW: weight ≈ 30.
+- 10^4 cumulative PoW: weight ≈ 13.
+- Ratio: 30:13 (far less extreme than raw 10^9:10^4 = 100,000:1).</p>
+<h3 id="pom-log-rationale">PoM log₂ rationale</h3>
+<p>Same. Without log₂, a heavily-cited contributor accumulates arbitrary PoM weight through cumulative attestations. Log₂ caps growth; no single contributor becomes consensus dictator through reputation alone.</p>
+<h3 id="stake-linear-rationale">Stake linear rationale</h3>
+<p>Stake has natural limits — validators can only commit capital they own. Natural scarcity bounds concentration without needing mathematical dampening.</p>
+<p>Linear is also simpler for slashing accounting.</p>
+<h2 id="the-pillar-balance-equilibrium">The pillar-balance equilibrium</h2>
+<p>A balanced validator — equally committed across pillars — has highest effective weight per unit of total commitment.</p>
+<ul>
+<li>Weight grows as log in PoW + PoM, linearly in PoS.</li>
+<li>Over-invest in one pillar (e.g., huge stake, minimal work/mind) → diminishing returns from that pillar, nothing from others.</li>
+<li>Under-invest hurts 10/30/60 balance — missing dominant pillar costs 60% of potential.</li>
+</ul>
+<p>This INCENTIVIZES multi-dimensional participation. Pure speculators (all stake) under-weighted. Pure idealists (all mind, no stake or work) under-weighted. Balanced validators structurally advantaged.</p>
+<h2 id="slashing-parameters">Slashing parameters</h2>
+<ul>
+<li><strong>EQUIVOCATION_STAKE_SLASH_BPS</strong> = 5000 (50%)</li>
+<li><strong>EQUIVOCATION_MIND_SLASH_BPS</strong> = 7500 (75%)</li>
+<li><strong>PoW</strong> is NOT slashed (cumulative work; can't un-do).</li>
+</ul>
+<p>Mind is slashed harder than stake — 75% vs 50%. Why?</p>
+<p>Mind is social. A validator caught equivocating damages the trust-graph's integrity. The cognitive-economic substrate's "trust capital" is most violated; mind-slash reflects this.</p>
+<p>Equivocation also slashes unbonding amounts (validators requesting withdrawal mid-attack don't escape).</p>
+<h2 id="phase-behavior">Phase behavior</h2>
+<h3 id="phase-1-bootstrap-current-2026-04-22">Phase 1 — Bootstrap (current, 2026-04-22)</h3>
+<ul>
+<li>Few validators (&lt;100).</li>
+<li>Mostly unbalanced — early validators have high stake (founders) or high PoM (early contributors) but not yet both.</li>
+<li>Total weight concentrated in few nodes.</li>
+</ul>
+<p>NCI behaves approximately as PoM-dominated (founders have high PoM from early contribution credit).</p>
+<h3 id="phase-2-growth-6-18-months">Phase 2 — Growth (6-18 months)</h3>
+<ul>
+<li>Validator count grows to ~500-2000.</li>
+<li>Pillar distribution diversifies.</li>
+<li>Total weight spreads; no single validator dominates.</li>
+</ul>
+<h3 id="phase-3-saturation-3-years">Phase 3 — Saturation (3+ years)</h3>
+<ul>
+<li>Thousands of validators.</li>
+<li>log₂ scaling means even largest-pillar validators have bounded weight.</li>
+<li>Consensus broad; single-actor capture infeasible.</li>
+</ul>
+<h2 id="failure-modes-analyzed">Failure modes analyzed</h2>
+<h3 id="cartel-coordination">Cartel coordination</h3>
+<p>Several high-stake validators coordinate off-chain. Together their stakes might dominate PoS pillar.</p>
+<p>Mitigation:
+- 30% max on PoS means even 100% stake control = 30% total weight.
+- log₂ on PoW and PoM prevent cartel from also dominating those pillars.
+- Governance can override extreme cases.</p>
+<h3 id="mind-score-inflation">Mind-score inflation</h3>
+<p>High-PoM validators attest each other's contributions.</p>
+<p>Mitigation:
+- Three-branch attestation (<a href="./CONTRIBUTION_ATTESTOR_EXPLAINER.md"><code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code></a>) — cartel in executive branch doesn't capture others.
+- <a href="../../research/theorems/THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus</a> penalizes replication.
+- log₂ dampens inflation payoff.</p>
+<h3 id="sybil-pow">Sybil PoW</h3>
+<p>Attacker splits PoW across many identities.</p>
+<p>Actually doesn't help under log₂. N validators each with C PoW sum to <code>N × log₂(1+C)</code>, which is less than <code>log₂(1+N×C)</code> for meaningful N and C (Jensen's inequality). Splitting is strictly penalized.</p>
+<h3 id="absentee-validators">Absentee validators</h3>
+<p>Validators with large stake (high PoS weight) but no active participation.</p>
+<p>Mitigation: active-validator requirement. <code>totalActiveWeight</code> tracking only counts actively-participating validators. Absentees lose active status over time.</p>
+<h2 id="gap-1-in-etm-alignment-audit-reconciled-2026-04-23">Gap #1 in ETM Alignment Audit — reconciled 2026-04-23</h2>
+<p><strong>Earlier drafts of this doc (and <a href="../monetary/COGNITIVE_RENT_ECONOMICS.md"><code>COGNITIVE_RENT_ECONOMICS.md</code></a>, and <a href="../etm/ETM_BUILD_ROADMAP.md"><code>ETM_BUILD_ROADMAP.md</code></a>) asserted that NCI currently applies linear time-decay: <code>retentionWeight(t) = base - k × t</code>. Verification against the contract contradicts that.</strong></p>
+<p>Actual on-chain state in <code>contracts/consensus/NakamotoConsensusInfinity.sol</code>:
+- <code>cumulativePoW</code> is monotone-cumulative. No time-decay applied.
+- <code>mindScore</code> is refresh-on-demand via <code>refreshMindScore()</code>. No time-decay applied.
+- <code>stakedVibe</code> is linear in stake. No time-decay applied (and should not have one — active capital, not historical record).
+- <code>totalActiveWeight</code> is an O(1) running total; no time-decay sweep exists.</p>
+<p>So the gap is not "linear → convex." It's "retention not implemented; add convex where cognitive substrate demands it."</p>
+<p>The confusion was load-bearing for a reason — it matters WHERE retention belongs. Not every pillar needs it:
+- <strong>PoW should decay</strong>: cognitive parallel is mined-work-as-proof; relevance fades with time.
+- <strong>PoM should decay</strong>: cognitive parallel is attention-to-prior-contributions; the exact substrate Ebbinghaus measured.
+- <strong>PoS should NOT decay</strong>: stake is present-tense locked capital. Decay would double-count slashing/unbonding.</p>
+<p>Retention is a PoW-and-PoM primitive, not a universal weight modifier.</p>
+<h3 id="shipped-c40-2026-04-23">Shipped C40 (2026-04-23)</h3>
+<ul>
+<li><strong>C40a — Pure primitive landed</strong>: <code>calculateRetentionWeight(uint256 elapsedSec, uint256 horizonSec)</code> — returns retention in basis points (0 = fully decayed, 10000 = fresh).</li>
+<li><strong>α = 1.6 hardcoded</strong> (paper §6.4). Implemented via cubic polynomial approximation <code>0.1744·x + 1.116·x² − 0.2904·x³</code>, max error ~3% vs exact <code>x^1.6</code> on [0, 1].</li>
+<li><strong>C40b — Wired into <code>vote()</code></strong>: per-vote weight now retention-adjusts the PoW+PoM portion (decayable record of historical relevance) while leaving the PoS portion untouched (locked capital is present-tense). Six design decisions from the C40a "deferred" list resolved:
+  1. Decay anchor: <code>v.lastHeartbeat</code> (already stored).
+  2. No per-pillar timestamps added.
+  3. Query-time at single call site (<code>vote()</code>), not persisted.
+  4. Horizon: <code>RETENTION_HORIZON_DEFAULT = 365 days</code>.
+  5. <code>totalActiveWeight</code> stays O(1) (base weight); retention only affects accumulated <code>p.weightFor</code> / <code>p.weightAgainst</code>. Threshold unchanged.
+  6. No migration; lastHeartbeat-as-anchor applies naturally for existing validators.</li>
+<li><strong>Governance-tunable α deferred</strong> to C40c. When a real tuning need appears, the polynomial is swapped for a general-α formulation.</li>
+</ul>
+<h3 id="consensus-dynamics-after-c40b">Consensus dynamics after C40b</h3>
+<p>A stale validator's vote contributes LESS toward supermajority than a fresh one, but the 2/3 threshold denominator (total active weight) stays at base. Practical implication: if enough validators go stale, supermajority becomes structurally harder to reach — the network "wants" fresh heartbeats. This IS the intended ETM alignment; stale work cannot silently retain political weight.</p>
+<p>A pure-stake validator (PoM=PoW=0) is unaffected by retention — they vote with constant PoS weight regardless of heartbeat age. Consistent with the principle that locked capital is not a historical record.</p>
+<h2 id="relationship-to-shapley">Relationship to Shapley</h2>
+<p>NCI's weight determines CONSENSUS power. Shapley determines REWARD distribution.</p>
+<p>Different concerns, related inputs. Both use cumulative contribution signals (PoW, PoS, PoM) but for different purposes.</p>
+<p>A validator with high NCI weight gets more say in consensus. A contributor with high Shapley values gets more rewards. Same person can be both; mechanisms route contributions differently.</p>
+<h2 id="relationship-to-etm">Relationship to ETM</h2>
+<p><a href="../etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a> frames consensus as aggregated belief from heterogeneous agents. NCI IS the aggregation formula for heterogeneous-agent consensus — each agent type contributes with appropriate weighting.</p>
+<p>Pure-PoW: only hash-crunching agents count.
+Pure-PoS: only capital-holders count.
+NCI: work + capital + mind all count, with mind dominating.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: compute W(v) for three validators with different pillar profiles:</p>
+<p><strong>Validator 1</strong>: heavy PoW (10M), modest stake (100), modest mind (50).
+<strong>Validator 2</strong>: modest PoW (1K), heavy stake (10K), no mind.
+<strong>Validator 3</strong>: modest PoW (1K), modest stake (100), heavy mind (10K).</p>
+<p>Compare who has highest weight. Observe how the 10/30/60 weighting + log₂ scaling shapes outcomes.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>NCI aggregates PoW + PoS + PoM with coefficients 0.10 / 0.30 / 0.60. log₂ on PoW and PoM prevents concentration (Bitcoin's lesson inverted); linear on stake (natural capital limit). Alice (balanced) beats Bob (pure-whale stake) in long run. Slashing 50% stake / 75% mind / 0% PoW — mind-slash is hardest because trust-capital is most damaged. Multi-dimensional consensus as cognitive-economy mirror.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/12_CLAWBACK_CASCADE_MECHANICS.html" class="nav-cell prev"><div class="label">&larr; PREV // 12</div><div class="ttl">Clawback Cascade — Mechanics</div></a>
+  <a href="/papers/14_THE_LAWSON_FLOOR_MATHEMATICS.html" class="nav-cell next"><div class="label">NEXT // 14 &rarr;</div><div class="ttl">The Lawson Floor Mathematics</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

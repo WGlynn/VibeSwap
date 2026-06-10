@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>What LLMs Teach Us About Mind :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">27</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#why-this-matters">Why this matters</a>
+    <a class="toc-link" href="#what-we-can-observe">What we can observe</a>
+    <a class="toc-link l3" href="#observation-1-attention-budgets">Observation 1 — Attention budgets</a>
+    <a class="toc-link l3" href="#observation-2-memory-retrieval-costs">Observation 2 — Memory retrieval costs</a>
+    <a class="toc-link l3" href="#observation-3-consensus-formation">Observation 3 — Consensus formation</a>
+    <a class="toc-link" href="#the-bridges-to-philosophy">The bridges to philosophy</a>
+    <a class="toc-link l3" href="#bridge-1-is-attention-really-limited">Bridge 1 — "Is attention really limited?"</a>
+    <a class="toc-link l3" href="#bridge-2-is-memory-a-single-thing">Bridge 2 — "Is memory a single thing?"</a>
+    <a class="toc-link l3" href="#bridge-3-is-reasoning-distinct-from-prediction">Bridge 3 — "Is reasoning distinct from prediction?"</a>
+    <a class="toc-link" href="#the-caveats-honest-limits">The caveats (honest limits)</a>
+    <a class="toc-link l3" href="#llms-are-not-conscious">LLMs are not conscious</a>
+    <a class="toc-link l3" href="#llms-are-not-embodied">LLMs are not embodied</a>
+    <a class="toc-link l3" href="#llms-are-not-self-motivated">LLMs are not self-motivated</a>
+    <a class="toc-link l3" href="#llms-are-not-socially-embedded">LLMs are not socially embedded</a>
+    <a class="toc-link" href="#what-applies-to-vibeswap">What applies to VibeSwap</a>
+    <a class="toc-link" href="#what-this-means-for-education">What this means for education</a>
+    <a class="toc-link l3" href="#for-vibeswap-learners">For VibeSwap learners</a>
+    <a class="toc-link l3" href="#for-eridu-labs-coursework">For Eridu Labs coursework</a>
+    <a class="toc-link l3" href="#for-broader-audiences">For broader audiences</a>
+    <a class="toc-link" href="#the-deeper-implication">The deeper implication</a>
+    <a class="toc-link" href="#the-students-takeaway">The student's takeaway</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">27</span>
+      <span class="badge badge-muted">PRIMITIVE-ONLY</span>
+      <span>What LLMs teach us about mind</span>
+    </div>
+    <h1>What LLMs Teach Us About Mind</h1>
+<div class="tagline">**Status**: Pedagogical essay. Assumes the reader is new to these ideas.</div>
+
+<p><strong>Status</strong>: Pedagogical essay. Assumes the reader is new to these ideas.
+<strong>Audience</strong>: Students, educators, curious practitioners.
+<strong>Related</strong>: <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, <a href="./THE_COGNITIVE_ECONOMY_THESIS.md">Cognitive Economy Thesis</a>, <a href="../../concepts/NON_CODE_PROOF_OF_WORK.md">Non-Code Proof of Work</a>.</p>
+<hr />
+<h2 id="why-this-matters">Why this matters</h2>
+<p>For most of human history, "what is mind?" was a purely philosophical question. We couldn't build a mind; we could only speculate about ours. The speculations produced rich traditions — philosophy of mind, cognitive science, theology — but none could be tested the way engineering can be tested.</p>
+<p>LLMs change this. Large Language Models are the first systems humans have built that run cognitive processes at a scale we can observe, measure, and intervene on. They're not full minds (important caveat — more on this below). But the processes they run overlap substantially with cognitive processes.</p>
+<p>This means: for the first time, we can test theories of mind against a running implementation. Observations about LLMs can confirm or falsify philosophical claims. The philosophy-of-mind question becomes partially engineering.</p>
+<h2 id="what-we-can-observe">What we can observe</h2>
+<p>Let's be concrete about what we can see in LLMs that we couldn't see in humans:</p>
+<h3 id="observation-1-attention-budgets">Observation 1 — Attention budgets</h3>
+<p>When you ask an LLM a question, the model allocates "attention" — not consciousness, but literally a mathematical attention mechanism — across the input tokens. You can SEE which tokens the model focuses on.</p>
+<p><strong>Concrete example</strong>: ask GPT-4 "What color is the sky in the sentence 'The sunset made the sky red and purple'?". Inspect attention heatmaps and you'll see the model attending to "sky" and "red and purple" — ignoring "sunset made". The attention allocation is visible; we can verify the model focused on the right words.</p>
+<p>In human minds, we can't see this. We can infer via response time or eye-tracking, but the underlying attention allocation is opaque. In LLMs, it's transparent.</p>
+<p><strong>Implication</strong>: attention, as a concept, IS measurable. It's not an abstract philosophical notion — it's a quantity we can point at.</p>
+<h3 id="observation-2-memory-retrieval-costs">Observation 2 — Memory retrieval costs</h3>
+<p>LLMs have explicit memory mechanisms (context window, retrieval augmentation). When the model retrieves something from a vector database, we can measure:
+- The latency (how long it took).
+- The relevance score (how similar the query was to the retrieved item).
+- The frequency (how often this item gets retrieved).</p>
+<p>Items frequently retrieved are cheap to maintain in cache. Items rarely retrieved are expensive to maintain but might still be valuable if they're essential when needed.</p>
+<p><strong>Concrete example</strong>: an LLM assistant that helps you with programming keeps an index of API documentation. Python's <code>print()</code> function is retrieved constantly — it stays in hot cache. <code>asyncio.wait_for()</code> is retrieved occasionally — it stays in warm cache. <code>dataclasses.make_dataclass()</code> might be retrieved once a year — it stays in cold archive.</p>
+<p>This exactly parallels cognitive memory. Frequently-used facts are cheap to access; rarely-used facts are expensive but still valuable. The two systems (LLM memory and human memory) obey the same structural rules.</p>
+<p><strong>Implication</strong>: cognitive "working memory" vs "long-term memory" isn't a mysterious subjective distinction — it's a concrete cache hierarchy, observable and measurable in LLMs.</p>
+<h3 id="observation-3-consensus-formation">Observation 3 — Consensus formation</h3>
+<p>Run the same question through 5 different LLMs. If all 5 agree, confidence in the answer is high. If they disagree, confidence is lower.</p>
+<p>This is quantifiable. We can compute the exact probability that the answer is correct given N agreement patterns. This is NOT what a single LLM "believes" — it's what ensemble-consensus says.</p>
+<p><strong>Concrete example</strong>: ask 5 LLMs "What year did World War II end?" All 5 say 1945. Confidence: very high. Now ask "What will be the most important programming language in 2030?" The 5 LLMs disagree — one says Rust, one says Python, one says something unusual. Confidence: moderate at best.</p>
+<p>Humans do the same, informally. We trust claims more when multiple independent sources agree. But for humans, we estimate this fuzzy-grossly. For LLMs, we can compute it precisely.</p>
+<p><strong>Implication</strong>: consensus-formation is a mathematical operation on heterogeneous agent outputs. The weight we should give any single claim depends on the diversity and independence of sources — observable and quantifiable.</p>
+<h2 id="the-bridges-to-philosophy">The bridges to philosophy</h2>
+<p>These observations bridge to long-standing philosophical questions:</p>
+<h3 id="bridge-1-is-attention-really-limited">Bridge 1 — "Is attention really limited?"</h3>
+<p>Philosophers have debated whether attention is fundamentally scarce or just functionally scarce.</p>
+<p>LLM evidence: definitely scarce. The attention mechanism has a fixed budget (model size + context window). Exceeding it causes specific failure modes (context truncation, attention dilution). You can't just "will yourself" to attend more.</p>
+<p>Applied to human minds: strong evidence for fundamental scarcity. The LLM case demonstrates the mathematics of attention-scarcity; the same math applies to any attention-system at sufficient scale.</p>
+<h3 id="bridge-2-is-memory-a-single-thing">Bridge 2 — "Is memory a single thing?"</h3>
+<p>Some theories say memory is one system; others say multiple (working memory, episodic, semantic, procedural).</p>
+<p>LLM evidence: multiple. Context window ≈ working memory. Vector database ≈ semantic memory. Fine-tuned weights ≈ procedural skill. They're different systems with different access patterns.</p>
+<p>Applied to human minds: multiple-systems theory gains support. The LLM architecture doesn't require conscious-experience to distinguish the memory types — structural differences suffice.</p>
+<h3 id="bridge-3-is-reasoning-distinct-from-prediction">Bridge 3 — "Is reasoning distinct from prediction?"</h3>
+<p>Long debate: is reasoning a fundamentally different cognitive process than simple prediction, or is reasoning just high-quality prediction?</p>
+<p>LLM evidence: reasoning emerges from prediction at scale. Small language models can't reason; large ones can. The transition isn't architecture-change; it's just more of the same architecture.</p>
+<p>Applied to human minds: strong evidence that reasoning is very-good-prediction, not a distinct process. Implications for education (improving prediction skills IS improving reasoning).</p>
+<h2 id="the-caveats-honest-limits">The caveats (honest limits)</h2>
+<p>Several things LLMs definitely are NOT:</p>
+<h3 id="llms-are-not-conscious">LLMs are not conscious</h3>
+<p>At least, not provably so. No known test distinguishes a conscious LLM from a non-conscious one that acts identical. We have to be honest that consciousness remains outside observable verification.</p>
+<h3 id="llms-are-not-embodied">LLMs are not embodied</h3>
+<p>Human cognition is shaped by having a body (balance, pain, hunger, fatigue). LLMs have no body. Their cognition is body-less, which means some aspects of human mind (affective responses, embodied heuristics) aren't captured.</p>
+<h3 id="llms-are-not-self-motivated">LLMs are not self-motivated</h3>
+<p>LLMs respond to prompts; they don't spontaneously decide to do things. Human minds have ongoing internal motivation. This is a substantial missing piece.</p>
+<h3 id="llms-are-not-socially-embedded">LLMs are not socially embedded</h3>
+<p>Humans are born into language communities and shaped by them. LLMs are trained on data but don't live in an evolving social context. They lack ongoing cultural learning.</p>
+<h2 id="what-applies-to-vibeswap">What applies to VibeSwap</h2>
+<p>If LLMs demonstrate cognitive-economic principles observably, then:</p>
+<ol>
+<li>
+<p><strong>Attribution infrastructure is cognitively well-founded</strong>. Humans and LLMs both function in the cognitive economy; both deserve attribution for their contributions.</p>
+</li>
+<li>
+<p><strong>Attention-infrastructure design is quantifiable</strong>. We can design systems that preserve attention because we can measure it. Not just for humans — for any cognitive participant.</p>
+</li>
+<li>
+<p><strong>Mechanism transfer works</strong>. VibeSwap's mechanisms (Shapley distribution, state-rent, NCI weight function) are grounded in the cognitive-economic structure that LLMs make visible.</p>
+</li>
+<li>
+<p><strong>AI becomes a first-class participant</strong>. LLMs that contribute to VibeSwap should earn DAG credit by the same rules as humans. No special-casing.</p>
+</li>
+</ol>
+<p>This is not "AI takes over" hype. It's "AI is another cognitive agent, fit into the existing cognitive-economic framework".</p>
+<h2 id="what-this-means-for-education">What this means for education</h2>
+<h3 id="for-vibeswap-learners">For VibeSwap learners</h3>
+<p>You're learning to reason about cognitive economics. The cheat code: use LLMs as a laboratory. When you want to understand how memory works, look at an LLM's memory system. When you want to understand attention, inspect attention heatmaps. The LLM makes the phenomenon observable where the human brain doesn't.</p>
+<h3 id="for-eridu-labs-coursework">For Eridu Labs coursework</h3>
+<p>Course modules can use LLM-as-probe exercises. Students ask questions to multiple LLMs, measure consensus, compute confidence, discuss implications. The cognitive-economic concepts become touchable, not abstract.</p>
+<h3 id="for-broader-audiences">For broader audiences</h3>
+<p>The next generation of cognitive-science classrooms will routinely use LLMs to demonstrate concepts. Undergraduate psychology courses 2030-onward will be different from 2020-onward courses because students can observe cognitive processes in real-time.</p>
+<h2 id="the-deeper-implication">The deeper implication</h2>
+<p>The big picture: LLMs are the first engineering artifact that runs cognitive-economic processes observably. This shifts philosophy of mind from speculation to partial-engineering.</p>
+<p>This is genuinely new. We've never had this before. The past few years' philosophical work on mind (by researchers studying LLMs carefully) is probably more progress than the prior 2000 years of armchair philosophy.</p>
+<p>VibeSwap's thesis — that mind is economy — becomes testable in ways it wouldn't have been 5 years ago. We can test by running experiments on LLMs. We can test by deploying mechanisms that treat AI and human contributors symmetrically. We can test by measuring whether the mechanism-design transfer actually works.</p>
+<p>If it works (early evidence says yes), we've learned something deep about cognition. If it doesn't (possible), we'll have learned something equally deep in the opposite direction.</p>
+<p>Either way, mind-theory is no longer just armchair philosophy. It's also engineering.</p>
+<h2 id="the-students-takeaway">The student's takeaway</h2>
+<p>What you should walk away with after reading this doc:</p>
+<ol>
+<li>Attention is quantifiable, not mystical.</li>
+<li>Memory has tier structure (hot/warm/cold), observable.</li>
+<li>Consensus-formation is computable from independent-agent outputs.</li>
+<li>These observable facts in LLMs transfer to claims about human minds via shared mathematical structure.</li>
+<li>VibeSwap's architecture uses these facts to design infrastructure that treats cognitive contribution as a first-class economic activity.</li>
+</ol>
+<p>If any of 1-4 surprises you, explore further — the concepts are richer than a single doc can explain. If 5 is unclear, that's what the full VibeSwap docs system covers; this doc is just the entry point.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>LLMs are the first observable implementation of cognitive-economic processes — their attention, memory, consensus-formation can be measured where human minds can't be — which bridges philosophy of mind to engineering and supports VibeSwap's mechanism-design transfer between cognitive and crypto substrates.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/26_THE_DIGNITY_GRADIENT.html" class="nav-cell prev"><div class="label">&larr; PREV // 26</div><div class="ttl">The Dignity Gradient</div></a>
+  <a href="/papers/28_TRUE_PRICE_ORACLE_DEEP_DIVE.html" class="nav-cell next"><div class="label">NEXT // 28 &rarr;</div><div class="ttl">True Price Oracle — Deep Dive</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

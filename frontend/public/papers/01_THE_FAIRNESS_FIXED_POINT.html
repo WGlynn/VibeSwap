@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Fairness Fixed Point :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">01</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#the-question-framed-as-an-everyday-situation">The question, framed as an everyday situation</a>
+    <a class="toc-link" href="#why-iteration-matters">Why iteration matters</a>
+    <a class="toc-link" href="#what-fixed-point-means">What "fixed point" means</a>
+    <a class="toc-link" href="#concrete-scenario-3-contributor-system">Concrete scenario — 3-contributor system</a>
+    <a class="toc-link" href="#what-makes-the-difference">What makes the difference</a>
+    <a class="toc-link l3" href="#scenario-a-drift-toward-founder-dominance">Scenario A — Drift toward founder dominance</a>
+    <a class="toc-link l3" href="#scenario-b-bounded-with-decay">Scenario B — Bounded with decay</a>
+    <a class="toc-link l3" href="#scenario-c-contribution-matched">Scenario C — Contribution-matched</a>
+    <a class="toc-link" href="#what-vibeswap-aims-for">What VibeSwap aims for</a>
+    <a class="toc-link" href="#the-formal-claim">The formal claim</a>
+    <a class="toc-link l3" href="#partial-answer-1-existence">Partial answer 1 — Existence</a>
+    <a class="toc-link l3" href="#partial-answer-2-uniqueness">Partial answer 2 — Uniqueness</a>
+    <a class="toc-link l3" href="#partial-answer-3-stability">Partial answer 3 — Stability</a>
+    <a class="toc-link" href="#the-honest-assessment">The honest assessment</a>
+    <a class="toc-link" href="#the-goal-of-simulation">The goal of simulation</a>
+    <a class="toc-link" href="#what-could-break-convergence">What could break convergence</a>
+    <a class="toc-link l3" href="#break-1-reward-to-trust-multiplier-too-aggressive">Break 1 — Reward-to-trust multiplier too aggressive</a>
+    <a class="toc-link l3" href="#break-2-reward-accumulation-feeds-directly-into-voting-power">Break 2 — Reward accumulation feeds directly into voting power</a>
+    <a class="toc-link l3" href="#break-3-acceptance-threshold-tuned-for-founders">Break 3 — Acceptance threshold tuned for founders</a>
+    <a class="toc-link l3" href="#break-4-tribunal-capture">Break 4 — Tribunal capture</a>
+    <a class="toc-link l3" href="#break-5-governance-capture-of-constitutional-amendments">Break 5 — Governance capture of constitutional amendments</a>
+    <a class="toc-link" href="#implications-for-monitoring">Implications for monitoring</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#relationship-to-other-primitives">Relationship to other primitives</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">01</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>Fairness fixed point</span>
+    </div>
+    <h1>The Fairness Fixed Point</h1>
+<div class="tagline">**Status**: Formal convergence analysis with concrete iteration scenarios.</div>
+
+<p><strong>Status</strong>: Formal convergence analysis with concrete iteration scenarios.
+<strong>Audience</strong>: First-encounter OK. Math motivated by concrete examples before formalism.</p>
+<hr />
+<h2 id="the-question-framed-as-an-everyday-situation">The question, framed as an everyday situation</h2>
+<p>Imagine a community that distributes rewards based on contributions every month.</p>
+<p>Month 1: the community is small. A few high-trust founders attest most contributions. Rewards flow mostly to them.</p>
+<p>Month 2: the founders have more accumulated rewards (which often convert to higher trust-weight). Their attestation weight is now higher than month 1's.</p>
+<p>Month 3: with even higher trust-weight, founders' attestations pass acceptance thresholds more easily than newer contributors. More rewards flow to founders.</p>
+<p>...</p>
+<p>Question: does this settle into a stable, fair distribution? Or does it drift — founders accumulating more and more, newcomers accumulating less and less, until the system becomes effectively feudal?</p>
+<p>This is the fairness-fixed-point question. It's about iteration, not single rounds.</p>
+<h2 id="why-iteration-matters">Why iteration matters</h2>
+<p>Shapley distribution (<a href="../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md"><code>SHAPLEY_REWARD_SYSTEM.md</code></a>) is provably fair for a SINGLE round under specific cooperative-game assumptions.</p>
+<p>But VibeSwap runs Shapley ITERATIVELY. Each round's rewards feed back into the trust-graph, which then affects the next round's Shapley computation. This is a feedback loop.</p>
+<p>Feedback loops don't automatically converge. They can:
+- <strong>Converge to a stable fair distribution</strong> (good).
+- <strong>Converge to a stable unfair distribution</strong> (bad).
+- <strong>Oscillate</strong> (worse).
+- <strong>Wander without settling</strong> (worst).</p>
+<p>"Shapley is fair" is a single-round claim. The iterated version is a separate mathematical question. This doc works through it.</p>
+<h2 id="what-fixed-point-means">What "fixed point" means</h2>
+<p>A fixed point of an iteration is a state where applying the iteration leaves the state unchanged. In our case:</p>
+<pre><code>distribution_t+1 = iterate(distribution_t)
+
+distribution* is a fixed point iff
+distribution* = iterate(distribution*)
+</code></pre>
+<p>If iteration converges, it converges to a fixed point. Which fixed point matters — fair ones are the desired outcome.</p>
+<p>Three critical questions about fixed points:</p>
+<ol>
+<li><strong>Existence</strong>: Does any fixed point exist?</li>
+<li><strong>Uniqueness</strong>: Is there only one, or multiple?</li>
+<li><strong>Stability</strong>: Do nearby states flow toward the fixed point (stable) or away (unstable)?</li>
+</ol>
+<p>For "fair distribution under iterated Shapley", we need all three to have good answers.</p>
+<h2 id="concrete-scenario-3-contributor-system">Concrete scenario — 3-contributor system</h2>
+<p>Let's build intuition with a small example. Three contributors: Alice (founder, trust 3.0), Bob (high-trust, trust 2.0), Carol (newcomer, trust 0.5).</p>
+<p>Reward pool per round: $100. Shapley computes each round based on contributions + trust-weights.</p>
+<p>Round 1: Alice contributes 10 units, Bob 10, Carol 10. Trust-weighted Shapley: Alice $50, Bob $35, Carol $15.</p>
+<p><strong>The feedback</strong>: Alice's $50 reward somewhat raises her trust (maybe 3.0 → 3.05). Bob's $35 raises his slightly (2.0 → 2.02). Carol's $15 barely moves her (0.5 → 0.502).</p>
+<p>Round 2: everyone again contributes 10 units. Same Shapley math, but trust-weights are slightly different.
+- Alice: slightly higher share.
+- Bob: slightly higher share.
+- Carol: slightly higher share.</p>
+<p><strong>But the ratios have shifted slightly toward Alice.</strong></p>
+<p>If this drift compounds over many rounds, we converge to a distribution where Alice takes most of the pool.</p>
+<p>Does it actually drift that way? Depends on specific parameters.</p>
+<h2 id="what-makes-the-difference">What makes the difference</h2>
+<h3 id="scenario-a-drift-toward-founder-dominance">Scenario A — Drift toward founder dominance</h3>
+<p>Suppose trust-weights update as <code>trust(new) = trust(old) + 0.01 × reward</code>. Then a $50 reward adds 0.5 to trust. A $15 reward adds 0.15.</p>
+<p>Over 100 rounds, Alice gains ~50 trust. Bob gains ~35. Carol gains ~15. The gap widens.</p>
+<p>The iteration converges to a distribution where Alice takes ~80%+ of each round. Unfair fixed point.</p>
+<h3 id="scenario-b-bounded-with-decay">Scenario B — Bounded with decay</h3>
+<p>Suppose trust-weights decay at 5% per round AND update based on reward, but capped at some maximum. Then trust can't grow unbounded.</p>
+<p>Over 100 rounds, trust-weights asymptote. Alice settles at some fixed (high but bounded) trust level. The distribution stabilizes.</p>
+<p>The iteration converges to a distribution where Alice takes ~40-50% — still high, but bounded. Stable fair-ish fixed point.</p>
+<h3 id="scenario-c-contribution-matched">Scenario C — Contribution-matched</h3>
+<p>Suppose contributions themselves shift. As Alice's rewards grow, she delegates (reduces direct contribution). Bob and Carol step up.</p>
+<p>Now Shapley's input is different each round. The system is partially self-correcting.</p>
+<p>The iteration oscillates or converges to a distribution that actually matches the LONG-RUN marginal contribution, not the initial trust-graph. Stable fair fixed point.</p>
+<p>Three scenarios, three fixed points. Which one VibeSwap is in depends on the actual mechanisms + behaviors.</p>
+<h2 id="what-vibeswap-aims-for">What VibeSwap aims for</h2>
+<p>VibeSwap's architecture targets Scenario C — contribution-matched. But we need to verify this empirically. As of 2026-04-22, the system is still in bootstrap; fixed-point behavior hasn't been measured at scale.</p>
+<p>Mitigations that nudge toward Scenario C:</p>
+<ul>
+<li><strong>Trust-weight cap</strong> at 3.0x for founders. Even with growth, won't exceed.</li>
+<li><strong>15% per-hop decay</strong> in trust-graph BFS. Prevents concentration.</li>
+<li><strong>Six-hop max</strong> for BFS. Prevents distant users from inheriting founder influence.</li>
+<li><strong>Three-branch attestation</strong> (executive/judicial/legislative). Prevents single-branch capture.</li>
+<li><strong>Constitutional axioms</strong> (P-000, P-001). Prevent self-amplifying wealth-capture.</li>
+</ul>
+<p>Each mitigation bounds part of the drift dynamics.</p>
+<h2 id="the-formal-claim">The formal claim</h2>
+<p>Let <code>R_t</code> be the distribution at round <code>t</code>. Let <code>τ(R)</code> be trust-weights derived from R via ContributionDAG's BFS-with-decay.</p>
+<p>The iteration is: <code>R_{t+1} = Shapley(v_τ(R_t))</code>.</p>
+<p>A fixed point satisfies: <code>R* = Shapley(v_τ(R*))</code>.</p>
+<h3 id="partial-answer-1-existence">Partial answer 1 — Existence</h3>
+<p>Fixed points exist when the iteration map is continuous and maps a compact set to itself.</p>
+<ul>
+<li>τ is continuous (BFS with bounded decay is continuous in R).</li>
+<li>Shapley is continuous in the characteristic function.</li>
+<li>The mapping is from the distribution-simplex to itself.</li>
+</ul>
+<p>Brouwer's fixed-point theorem → at least one fixed point exists.</p>
+<h3 id="partial-answer-2-uniqueness">Partial answer 2 — Uniqueness</h3>
+<p>Uniqueness is harder to prove. The iteration is non-linear (trust-weight has path-dependencies; trust-caps create discontinuities).</p>
+<p>Non-linear maps can have multiple fixed points. Likely outcome: one "balanced" fixed point, one "founder-dominant" fixed point. Which basin of attraction the system ends up in depends on initial conditions and noise.</p>
+<h3 id="partial-answer-3-stability">Partial answer 3 — Stability</h3>
+<p>Stability near a fixed point requires the local Jacobian to have eigenvalues with magnitude &lt; 1 (strictly contractive).</p>
+<p>For Shapley-via-trust-weight composition near a balanced fixed point:
+- Shapley is an averaging operator; averaging operators generally have spectral radius &lt; 1.
+- BFS-with-decay is also averaging.
+- Their composition has spectral radius &lt; 1.</p>
+<p>Balanced fixed points are likely stable.</p>
+<h2 id="the-honest-assessment">The honest assessment</h2>
+<p>As of 2026-04-22:
+- <strong>Existence</strong>: confirmed (Brouwer).
+- <strong>Uniqueness</strong>: NOT proven. Multiple fixed points plausible.
+- <strong>Stability of balanced fixed point</strong>: conjectured via local linearization, not verified.
+- <strong>Basin sizes</strong>: founder-dominant basin has narrow reach (capped multipliers + decay); balanced basin is broad.</p>
+<p>Practical implication: VibeSwap is probably operating in a balanced-fixed-point basin. But "probably" is not "proven".</p>
+<p>The <a href="../../concepts/etm/ETM_BUILD_ROADMAP.md">ETM Build Roadmap</a> queues an empirical simulation cycle to verify convergence on a realistic contributor graph. Results will inform whether additional mitigations are needed.</p>
+<h2 id="the-goal-of-simulation">The goal of simulation</h2>
+<p>Queued research cycle: run iterated Shapley on a realistic contributor graph for 100+ rounds. Observe:</p>
+<ul>
+<li>Does the distribution stabilize?</li>
+<li>Does founder-dominance emerge?</li>
+<li>Do mitigations (trust caps, decay, three-branch attestation) prevent drift?</li>
+<li>Are there surprising failure modes?</li>
+</ul>
+<p>Simulations would test the conjectures. Results update the theory.</p>
+<h2 id="what-could-break-convergence">What could break convergence</h2>
+<h3 id="break-1-reward-to-trust-multiplier-too-aggressive">Break 1 — Reward-to-trust multiplier too aggressive</h3>
+<p>If <code>trust(new) = trust(old) × (1 + 0.1 × reward/100)</code>, small rewards produce large trust increases. Compounds rapidly.</p>
+<p>Mitigation: cap the multiplier. VibeSwap's trust-weight is bounded at 3.0x.</p>
+<h3 id="break-2-reward-accumulation-feeds-directly-into-voting-power">Break 2 — Reward accumulation feeds directly into voting power</h3>
+<p>If rewards directly translate to voting power without decay, early-accumulated rewards become permanent voting leverage.</p>
+<p>Mitigation: VibeSwap's voting-multiplier is based on TRUST (not accumulated rewards). Trust decays. Voting power follows decay.</p>
+<h3 id="break-3-acceptance-threshold-tuned-for-founders">Break 3 — Acceptance threshold tuned for founders</h3>
+<p>If the acceptance threshold is low (2.0), a single founder's attestation (trust 3.0 × multiplier 3.0 = 9.0) passes easily. Claims accepted disproportionately when founders attest.</p>
+<p>Mitigation: acceptance threshold at 2.0 is workable for diverse attestors but could bias toward single-founder-attests. Quadratic voting or multi-branch attestation reduce this.</p>
+<h3 id="break-4-tribunal-capture">Break 4 — Tribunal capture</h3>
+<p>If tribunals consistently favor certain claim-types, the judicial branch becomes a bias-amplifier.</p>
+<p>Mitigation: random jury selection from high-trust pool. Less gameable than fixed-tribunal.</p>
+<h3 id="break-5-governance-capture-of-constitutional-amendments">Break 5 — Governance capture of constitutional amendments</h3>
+<p>If governance can amend P-000 or P-001, the constitutional backstop fails.</p>
+<p>Mitigation: constitutional axioms are NOT governance parameters. Amendment would require forking.</p>
+<h2 id="implications-for-monitoring">Implications for monitoring</h2>
+<p>If we assume the fixed-point question matters, we should monitor:</p>
+<ul>
+<li><strong>Rolling-window Shapley distribution</strong>: how has the distribution shifted over the past N rounds? Alert on sustained drift.</li>
+<li><strong>Trust-weight concentration</strong>: Gini coefficient of trust-weights. Alert on increases.</li>
+<li><strong>Founder-hop-distribution</strong>: fraction of rewards flowing to hop-0, hop-1, etc. from founders. Alert on concentration.</li>
+<li><strong>Multi-branch concurrency</strong>: ratio of claims resolving via executive vs. tribunal vs. governance. Alert on dramatic shifts.</li>
+</ul>
+<p>These metrics don't PROVE convergence. But they make drift observable in real-time.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: build a toy simulation of iterated Shapley. Three contributors, 50 rounds. Parameters:
+- Initial contributions: all equal.
+- Trust update: <code>trust(new) = trust(old) × (1 + k × reward)</code> for various k.
+- Trust cap: various values.</p>
+<p>Compute and plot:
+- Rewards per contributor over time.
+- Trust-weights over time.
+- Gini coefficient of rewards.</p>
+<p>Try different k and cap values. Observe:
+- Which configurations converge to balanced fixed points?
+- Which converge to founder-dominant fixed points?
+- Which oscillate or wander?</p>
+<p>This exercise teaches fixed-point intuition via experimentation.</p>
+<h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
+<ul>
+<li><strong><a href="./THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus Theorem</a></strong>: permutation-symmetric Shapley under-rewards novelty. Modifying Shapley for novelty changes the iteration dynamics — a fresh fixed-point analysis is needed for the modified system.</li>
+<li><strong><a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a></strong>: <code>v(S)</code> estimation errors propagate through iteration. Error bounds on the fixed-point estimate are another research direction.</li>
+<li><strong><a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a></strong>: other mechanisms compose with Shapley iteration; their interactions affect the fixed-point structure.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Fairness depends on what Shapley iteration converges to, not what it computes for a single round. Existence of fixed points is proven (Brouwer); uniqueness is open (multiple plausible); stability of balanced-fixed-point is conjectured via spectral analysis. VibeSwap's mitigations (trust caps, decay, three-branch, constitutional axioms) bound drift dynamics. Verification queued as empirical simulation.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <div class="nav-cell empty"><div class="label">&larr; PREV</div><div class="ttl" style="color:var(--muted-dim)">(start of pipeline)</div></div>
+  <a href="/papers/02_SUBSTRATE_INCOMPLETENESS.html" class="nav-cell next"><div class="label">NEXT // 02 &rarr;</div><div class="ttl">Substrate Incompleteness</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

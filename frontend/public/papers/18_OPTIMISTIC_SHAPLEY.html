@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Optimistic Shapley — Distribution at Scale :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">18</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-a-familiar-gas-problem">Start with a familiar gas problem</a>
+    <a class="toc-link" href="#the-pattern-borrowed-from-rollups">The pattern borrowed from rollups</a>
+    <a class="toc-link" href="#optimistic-shapley-stated">Optimistic Shapley, stated</a>
+    <a class="toc-link" href="#step-by-step-flow">Step-by-step flow</a>
+    <a class="toc-link l3" href="#step-1-off-chain-shapley-computation">Step 1 — Off-chain Shapley computation</a>
+    <a class="toc-link l3" href="#step-2-commit-merkle-root">Step 2 — Commit Merkle root</a>
+    <a class="toc-link l3" href="#step-3-challenge-window-opens">Step 3 — Challenge window opens</a>
+    <a class="toc-link l3" href="#step-4-on-chain-adjudication">Step 4 — On-chain adjudication</a>
+    <a class="toc-link l3" href="#step-5-outcome">Step 5 — Outcome</a>
+    <a class="toc-link l3" href="#step-6-finalization">Step 6 — Finalization</a>
+    <a class="toc-link" href="#gas-estimates-worked">Gas estimates — worked</a>
+    <a class="toc-link l3" href="#pure-on-chain-shapley">Pure on-chain Shapley</a>
+    <a class="toc-link l3" href="#optimistic-no-challenges-typical">Optimistic (no challenges, typical)</a>
+    <a class="toc-link l3" href="#optimistic-1-challenge-per-100-rounds">Optimistic (1 challenge per 100 rounds)</a>
+    <a class="toc-link l3" href="#zk-shapley-for-comparison">ZK-Shapley (for comparison)</a>
+    <a class="toc-link" href="#why-this-works">Why this works</a>
+    <a class="toc-link" href="#the-keepers-role">The keeper's role</a>
+    <a class="toc-link" href="#comparison-with-alternatives">Comparison with alternatives</a>
+    <a class="toc-link l3" href="#alternative-1-pure-on-chain-shapley">Alternative 1 — Pure on-chain Shapley</a>
+    <a class="toc-link l3" href="#alternative-2-pure-off-chain-shapley">Alternative 2 — Pure off-chain Shapley</a>
+    <a class="toc-link l3" href="#alternative-3-zk-shapley">Alternative 3 — ZK-Shapley</a>
+    <a class="toc-link" href="#practical-honest-tradeoffs">Practical honest tradeoffs</a>
+    <a class="toc-link l3" href="#finalization-delay">Finalization delay</a>
+    <a class="toc-link l3" href="#keeper-dependency">Keeper dependency</a>
+    <a class="toc-link l3" href="#challenge-cost-asymmetry">Challenge cost asymmetry</a>
+    <a class="toc-link" href="#the-parallel-to-optimistic-rollups">The parallel to optimistic rollups</a>
+    <a class="toc-link" href="#future-directions">Future directions</a>
+    <a class="toc-link l3" href="#aggregated-shapley">Aggregated Shapley</a>
+    <a class="toc-link l3" href="#hybrid-computation">Hybrid computation</a>
+    <a class="toc-link l3" href="#per-contributor-subscription">Per-contributor subscription</a>
+    <a class="toc-link" href="#integration-with-existing-mechanisms">Integration with existing mechanisms</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#educational-framing-for-eridu">Educational framing for Eridu</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">18</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>Optimistic Shapley</span>
+    </div>
+    <h1>Optimistic Shapley — Distribution at Scale</h1>
+<div class="tagline">**Status**: Design proposal for gas-efficient Shapley at production scale.</div>
+
+<p><strong>Status</strong>: Design proposal for gas-efficient Shapley at production scale.
+<strong>Audience</strong>: First-encounter OK. Pattern walked with specific gas estimates.</p>
+<hr />
+<h2 id="start-with-a-familiar-gas-problem">Start with a familiar gas problem</h2>
+<p>You want to distribute rewards to 1,000 contributors. Fair distribution requires Shapley computation — which requires evaluating 2^1000 subsets.</p>
+<p>On-chain, this is impossible. Even at Monte Carlo approximation with 5,000 samples × 1,000 coalition evaluations per sample = 5M operations per distribution round.</p>
+<p>Rough gas cost: ~20M gas per distribution at 2024 prices. At $20/M gas: <strong>$400 per distribution round</strong>. Weekly rounds: ~$20K/year in gas alone. Monthly rounds: ~$5K/year.</p>
+<p>Too expensive for routine distribution.</p>
+<p>We need a way to do Shapley <strong>off-chain</strong> (cheap) while maintaining trust — <strong>on-chain</strong>.</p>
+<p>The solution is optimistic rollups applied to Shapley.</p>
+<h2 id="the-pattern-borrowed-from-rollups">The pattern borrowed from rollups</h2>
+<p>Optimistic rollups (Optimism, Arbitrum) solve EXACTLY this pattern for general computation:</p>
+<ol>
+<li><strong>Sequencer computes off-chain</strong> (cheap).</li>
+<li><strong>Commits result Merkle-root to L1</strong> (one on-chain tx).</li>
+<li><strong>Challenge window opens</strong> (typically 7 days).</li>
+<li><strong>Anyone can dispute</strong>: submit fraud-proof showing sequencer was wrong.</li>
+<li><strong>If dispute succeeds</strong>: sequencer slashed, sequence reverted.</li>
+<li><strong>If window expires without successful dispute</strong>: result finalizes.</li>
+</ol>
+<p>This is <strong>interactive-fraud-proof-with-bonded-challenge</strong>. It's how rollups verify off-chain computation trustlessly.</p>
+<p>We apply the same pattern to Shapley distribution.</p>
+<h2 id="optimistic-shapley-stated">Optimistic Shapley, stated</h2>
+<p>An off-chain keeper computes Shapley values and commits the resulting distribution to the chain as a Merkle root. Challenge window opens. Any party can dispute. If challenged, computation re-runs on-chain for disputed piece (challenger's gas). If challenger right: keeper slashed. If wrong: challenger loses bond. After window closes without successful challenge, distribution finalizes.</p>
+<p>Same pattern as rollup; specific to distribution.</p>
+<h2 id="step-by-step-flow">Step-by-step flow</h2>
+<h3 id="step-1-off-chain-shapley-computation">Step 1 — Off-chain Shapley computation</h3>
+<p>A designated keeper (trust-weighted + stake-bonded) collects all contributions for the round. Runs Monte Carlo Shapley off-chain. Generates per-contributor allocations.</p>
+<h3 id="step-2-commit-merkle-root">Step 2 — Commit Merkle root</h3>
+<p>Allocations organized into Merkle tree (one leaf per contributor). Root committed:</p>
+<pre><code class="language-solidity">function commitDistribution(
+    bytes32 merkleRoot,
+    uint256 totalAmount,
+    uint256 roundNumber
+) external;
+</code></pre>
+<p>Contract records root, totalAmount, commit timestamp. Challenge window (default 7 days) starts.</p>
+<h3 id="step-3-challenge-window-opens">Step 3 — Challenge window opens</h3>
+<p>During the window, anyone can:
+- <strong>Verify independently</strong> — recompute keeper's Shapley off-chain; check match.
+- <strong>Dispute</strong> — if verification differs, submit fraud-proof.</p>
+<p>A dispute requires:
+- Merkle proof against committed root showing keeper's claimed allocation.
+- Alternative allocation challenger claims is correct.
+- Evidence (computational proof) showing alternative matches actual contribution data.
+- Stake bond to prevent frivolous challenges.</p>
+<h3 id="step-4-on-chain-adjudication">Step 4 — On-chain adjudication</h3>
+<p>The chain executes the specific sub-computation at dispute. Could be:
+- Recomputing specific contributor's Shapley value.
+- Re-running Monte Carlo seed keeper claimed.
+- Verifying specific coalition's characteristic function evaluation.</p>
+<p>Expensive but feasible for a single disputed item (we don't re-verify ALL — just the disputed).</p>
+<h3 id="step-5-outcome">Step 5 — Outcome</h3>
+<ul>
+<li><strong>Keeper was right</strong>: challenger's bond slashed. Keeper gets part as reward. Distribution remains.</li>
+<li><strong>Challenger was right</strong>: keeper slashed. Merkle root reverted. New keeper re-computes. Wrongful keeper's reputation damaged.</li>
+</ul>
+<h3 id="step-6-finalization">Step 6 — Finalization</h3>
+<p>After 7 days without successful challenge, distribution finalizes. Contributors claim via Merkle proof.</p>
+<h2 id="gas-estimates-worked">Gas estimates — worked</h2>
+<p>For N = 1,000 contributors:</p>
+<h3 id="pure-on-chain-shapley">Pure on-chain Shapley</h3>
+<ul>
+<li>~20M gas per distribution × $20/M gas = <strong>$400/round</strong>.</li>
+</ul>
+<h3 id="optimistic-no-challenges-typical">Optimistic (no challenges, typical)</h3>
+<ul>
+<li>Keeper computes off-chain (free).</li>
+<li>One Merkle-root commit: ~100K gas.</li>
+<li>$20/M × 100K = <strong>$2/round</strong>.</li>
+</ul>
+<h3 id="optimistic-1-challenge-per-100-rounds">Optimistic (1 challenge per 100 rounds)</h3>
+<ul>
+<li>99 rounds at $2 = $198.</li>
+<li>1 round with challenge: $2 commit + ~20M gas re-computation = $402.</li>
+<li>Average over 100: <strong>$6/round</strong>. Still ~100x cheaper than pure on-chain.</li>
+</ul>
+<h3 id="zk-shapley-for-comparison">ZK-Shapley (for comparison)</h3>
+<ul>
+<li>Proof generation: ~$5.</li>
+<li>On-chain verification: ~$5.</li>
+<li><strong>~$10/round</strong>.</li>
+</ul>
+<p><strong>Optimistic is 200x cheaper than pure on-chain for typical operation.</strong></p>
+<h2 id="why-this-works">Why this works</h2>
+<p>Specific cryptographic-economic properties:</p>
+<p><strong>Safety</strong>: malicious keeper can't get bad distribution through because any party with correct computation can successfully challenge. Keeper's bond exceeds max gain from misallocation. Rational keepers behave.</p>
+<p><strong>Liveness</strong>: challenge window is bounded. After 7 days, distribution executes. No single adversary can block progress indefinitely.</p>
+<p><strong>Cost</strong>: gas paid only on actual challenges (rare, keeper incentivized to be correct). Common case: minimal gas.</p>
+<p><strong>Auditability</strong>: all historical commitments remain on-chain. Auditor can re-verify any past round anytime.</p>
+<h2 id="the-keepers-role">The keeper's role</h2>
+<p>Bonded-yet-trusted intermediary:</p>
+<ul>
+<li><strong>Selected</strong> via governance (elected keeper, term-limited).</li>
+<li><strong>Bonded</strong> with collateral far exceeding potential gain from misbehavior.</li>
+<li><strong>Slashable</strong> via successful challenge.</li>
+<li><strong>Rotatable</strong> — governance can replace keeper without chain disruption.</li>
+</ul>
+<p>This introduces a specific intermediary role. See <a href="../DISINTERMEDIATION_GRADES.md">Disintermediation Grades</a>. Optimistic Shapley is Grade 4 (bonded intermediary with accountability), not Grade 5 (permissionless).</p>
+<p>Grade 5 goal: permissionless keepers. Harder to bootstrap; may come in V2.</p>
+<h2 id="comparison-with-alternatives">Comparison with alternatives</h2>
+<h3 id="alternative-1-pure-on-chain-shapley">Alternative 1 — Pure on-chain Shapley</h3>
+<ul>
+<li>Pros: no keeper, no challenge window, immediate finality.</li>
+<li>Cons: $400/round at N=1000. Way too expensive at scale.</li>
+</ul>
+<h3 id="alternative-2-pure-off-chain-shapley">Alternative 2 — Pure off-chain Shapley</h3>
+<ul>
+<li>Pros: cheap; any keeper can compute.</li>
+<li>Cons: no verification; trust required in keeper; no way to challenge misbehavior.</li>
+</ul>
+<h3 id="alternative-3-zk-shapley">Alternative 3 — ZK-Shapley</h3>
+<p>Keeper computes Shapley + produces ZK proof of correct computation. Submits root + proof.</p>
+<ul>
+<li>Pros: verification on-chain is cheap (ZK-proof verification); no challenge window needed.</li>
+<li>Cons: ZK-proof generation expensive for complex Shapley; proving cost may exceed challenge-window approach for medium N.</li>
+</ul>
+<p>Choice: <strong>Optimistic Shapley for medium N (100-10,000). ZK-Shapley when generation cost drops or N becomes very large (10,000+).</strong></p>
+<h2 id="practical-honest-tradeoffs">Practical honest tradeoffs</h2>
+<p>Optimistic Shapley isn't free. Specific tradeoffs:</p>
+<h3 id="finalization-delay">Finalization delay</h3>
+<p>7 days from commit to claim availability. Some uses (immediate rewards) too slow.</p>
+<h3 id="keeper-dependency">Keeper dependency</h3>
+<p>Mechanism depends on at least one honest keeper willing to serve. Incentives aligned; long-term keeper health is concern.</p>
+<h3 id="challenge-cost-asymmetry">Challenge cost asymmetry</h3>
+<p>Successful challenges profitable; unsuccessful expensive. Well-coordinated adversary might spam frivolous challenges to exhaust keeper's counter-response budget.</p>
+<p>Mitigations: challenge-bond scaling, rate limiting.</p>
+<p>None disqualifies the pattern. Each is solvable engineering.</p>
+<h2 id="the-parallel-to-optimistic-rollups">The parallel to optimistic rollups</h2>
+<p>Optimistic rollups (Optimism, Arbitrum) use exactly this pattern for general computation. Our use: specific application to Shapley.</p>
+<p>Key lessons from rollup experience:
+- Challenge windows in production are 7 days. Shorter proposed; 7 is equilibrium.
+- Fraud-proof-game design subtle; recursive proofs ("is prover's proof of their fraud proof valid?") add complexity.
+- Keepers/sequencers DO get challenged; mechanism fires in practice.</p>
+<p>All lessons transfer to Optimistic Shapley.</p>
+<h2 id="future-directions">Future directions</h2>
+<h3 id="aggregated-shapley">Aggregated Shapley</h3>
+<p>Maintain incremental Shapley state. When new contributions arrive, update via differential calculation rather than re-computing from scratch.</p>
+<h3 id="hybrid-computation">Hybrid computation</h3>
+<p>ZK-proof for specific sub-computations (expensive part) + optimistic commitment for rest. Gas-efficiency of optimistic + immediate-verification of ZK.</p>
+<h3 id="per-contributor-subscription">Per-contributor subscription</h3>
+<p>Contributors pay subscription fee to keep Shapley-involvement active. Passive contributors pruned; computation scales with active participants.</p>
+<h2 id="integration-with-existing-mechanisms">Integration with existing mechanisms</h2>
+<p>Composes cleanly (per <a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a>):</p>
+<ul>
+<li><strong>Lawson Floor</strong> computed alongside Shapley; committed in same Merkle root.</li>
+<li><strong>Novelty Bonus</strong> modifier applied off-chain; verified during challenges.</li>
+<li><strong>Contribution Traceability</strong> feeds claims into Shapley computation.</li>
+</ul>
+<p>Case A (orthogonal) for most interactions.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: design an optimistic-distribution mechanism for a different use case.</p>
+<p>Pick: voting on governance proposals, grant-making, research-paper review, content curation.</p>
+<p>Apply the framework:
+1. What's the expensive computation?
+2. Who's the keeper?
+3. What's the challenge mechanism?
+4. What are the tradeoffs vs alternatives?</p>
+<p>Design your mechanism. Compare to Optimistic Shapley.</p>
+<h2 id="educational-framing-for-eridu">Educational framing for Eridu</h2>
+<p>2-week course segment:
+- <strong>Week 1</strong>: Optimistic rollups as a pattern. How they work. State-of-the-art for L2 scaling.
+- <strong>Week 2</strong>: Optimistic Shapley as specific application. Detailed walk. Student exercise: design an optimistic-distribution mechanism.</p>
+<p>Concrete, buildable, broadly applicable beyond VibeSwap.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Optimistic Shapley borrows from optimistic rollups: keeper computes Shapley off-chain, commits Merkle root + totalAmount, 7-day challenge window with fraud-proof-game on disputed claims. 200x cheaper than pure on-chain (~$2 vs $400 per round at N=1000). Introduces bonded keeper intermediary (Grade 4 in disintermediation scale). Finalization delayed; keeper dependency. Same pattern as L2 rollups, specific to contribution distribution.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/17_ZK_ATTRIBUTION.html" class="nav-cell prev"><div class="label">&larr; PREV // 17</div><div class="ttl">ZK Attribution — Proving Work Without Revealing Content</div></a>
+  <a href="/papers/19_WHY_VIBESWAP_WINS_IN_2030.html" class="nav-cell next"><div class="label">NEXT // 19 &rarr;</div><div class="ttl">Why VibeSwap Wins in 2030</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

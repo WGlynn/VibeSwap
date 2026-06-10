@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Clawback Cascade — Mechanics :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">12</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-story-that-motivates-the-design">A story that motivates the design</a>
+    <a class="toc-link" href="#the-clawback-cascade-approach">The Clawback Cascade approach</a>
+    <a class="toc-link" href="#walk-through-taint-propagation">Walk through taint propagation</a>
+    <a class="toc-link" href="#the-contest-window">The contest window</a>
+    <a class="toc-link" href="#why-this-defeats-address-based-attacks">Why this defeats address-based attacks</a>
+    <a class="toc-link" href="#the-propagation-algorithm">The propagation algorithm</a>
+    <a class="toc-link" href="#contest-window-choice">Contest window choice</a>
+    <a class="toc-link" href="#the-clawback-execution">The clawback execution</a>
+    <a class="toc-link" href="#why-proportional-not-all-or-nothing">Why proportional, not all-or-nothing</a>
+    <a class="toc-link" href="#edge-cases-walked">Edge cases walked</a>
+    <a class="toc-link l3" href="#edge-case-1-cycles-in-the-transaction-graph">Edge Case 1 — Cycles in the transaction graph</a>
+    <a class="toc-link l3" href="#edge-case-2-mixed-origin-liquidity-pools">Edge Case 2 — Mixed-origin liquidity pools</a>
+    <a class="toc-link l3" href="#edge-case-3-flash-loan-through-tainted-source">Edge Case 3 — Flash-loan through tainted source</a>
+    <a class="toc-link l3" href="#edge-case-4-cross-chain">Edge Case 4 — Cross-chain</a>
+    <a class="toc-link l3" href="#edge-case-5-off-chain-recipients">Edge Case 5 — Off-chain recipients</a>
+    <a class="toc-link" href="#who-flags-taint">Who flags taint</a>
+    <a class="toc-link" href="#who-adjudicates">Who adjudicates</a>
+    <a class="toc-link" href="#interaction-with-siren-protocol">Interaction with Siren Protocol</a>
+    <a class="toc-link" href="#the-cognitive-parallel-deeper">The cognitive parallel, deeper</a>
+    <a class="toc-link" href="#governance-role">Governance role</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">12</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Clawback cascade mechanics</span>
+    </div>
+    <h1>Clawback Cascade — Mechanics</h1>
+<div class="tagline">**Status**: Live in `contracts/compliance/ClawbackRegistry.sol` + `ClawbackVault.sol`.</div>
+
+<p><strong>Status</strong>: Live in <code>contracts/compliance/ClawbackRegistry.sol</code> + <code>ClawbackVault.sol</code>.
+<strong>Audience</strong>: First-encounter OK. Walked taint propagation scenario.</p>
+<hr />
+<h2 id="a-story-that-motivates-the-design">A story that motivates the design</h2>
+<p>2021: someone hacks a DEX for $100M. They withdraw funds to their own wallet.</p>
+<p>Standard response: exchanges freeze the attacker's addresses. Hack-linked wallets blacklisted.</p>
+<p>Problem: the attacker moves funds through:
+- CEX deposit + CEX withdrawal (laundered through exchange).
+- Decentralized mixer.
+- Multiple pass-through wallets.
+- AMM swaps for other tokens.</p>
+<p>Each hop makes address-based freezing harder. By the end, "dirty money" is commingled with "clean money" in hundreds of wallets.</p>
+<p>Traditional response: freeze these too. Now many legitimate users have frozen assets because a tiny fraction passed through attacker's funds. Fair? No. Effective? Barely.</p>
+<p>This is the limit of address-based blacklisting. There must be a better way.</p>
+<h2 id="the-clawback-cascade-approach">The Clawback Cascade approach</h2>
+<p>Instead of blacklisting addresses, propagate TAINT along the transaction graph.</p>
+<p>If $100M is tainted at address X, and $1M of it flowed through address Y (alongside $9M of Y's clean funds), then Y is 10% tainted.</p>
+<p>If Y sends $1M to Z, Z is 10% tainted on the $1M = $100K tainted.</p>
+<p>Taint propagates topologically. Proportionally. Every node in the graph carries a partial taint fraction.</p>
+<p>And — crucially — anyone receiving taint has a contest window to dispute.</p>
+<h2 id="walk-through-taint-propagation">Walk through taint propagation</h2>
+<p><strong>Day 0</strong>: Attacker's address A has 100 units of stolen funds.</p>
+<p><strong>Day 1</strong>: A transfers 10 units to B. B was legitimate before; now B has 10 tainted.</p>
+<p>Clawback registry records: B is 100% tainted on those 10 units.</p>
+<p><strong>Day 2</strong>: B has 90 units of clean funds + 10 tainted = 100 total. B transfers 50 units to C.</p>
+<p>Proportional split: 50 × (10/100) = 5 tainted units to C. B keeps 45 clean + 5 tainted = 50.</p>
+<p><strong>Day 3</strong>: C has 5 tainted + some clean funds (let's say 95 clean) = 100 total. C transfers 10 to D.</p>
+<p>D gets 10 × (5/100) = 0.5 tainted. C keeps 95 clean + 4.5 tainted = 99.5.</p>
+<p><strong>Day 4</strong>: The propagation continues through many hops. Each transaction carries proportional taint based on the sending account's taint fraction.</p>
+<h2 id="the-contest-window">The contest window</h2>
+<p>Every address receiving taint gets a contest window (default 7 days). During the window:</p>
+<ul>
+<li>The address holder can dispute the taint attribution.</li>
+<li>Dispute requires evidence the receipt was in good faith.</li>
+<li>Adjudicated by tribunal.</li>
+<li>Resolved disputes either clear the taint or confirm clawback.</li>
+<li>Unresolved disputes at window-end default to clawback.</li>
+</ul>
+<p><strong>Concrete contest example</strong>:</p>
+<p>D (above) receives 0.5 tainted units. D says: "I bought 10 units from C on Uniswap. I didn't know C was laundering. I'm a legitimate buyer."</p>
+<p>D files a contest within the 7-day window. Tribunal reviews:
+- C was indeed passing through Uniswap.
+- D's purchase at the DEX was genuine arbitrage, not coordinated.</p>
+<p>Tribunal verdict: good faith upheld. D's 0.5 tainted units are cleared.</p>
+<p><strong>Non-contested example</strong>:</p>
+<p>Another recipient E received 20 tainted units. Never contests (or their contest is rejected). After 7 days, clawback executes — E's 20 units revert to the recovery destination.</p>
+<h2 id="why-this-defeats-address-based-attacks">Why this defeats address-based attacks</h2>
+<p>Address-based freezing is defeated by Sybil rotation. Attacker moves funds through 100 different addresses; each has to be frozen individually; by the time the 100th is frozen, funds are in address 1000.</p>
+<p>Topological propagation follows the GRAPH automatically. Moving through intermediaries doesn't escape the taint — each intermediary has proportional taint with contest rights.</p>
+<p>Attacker can't outpace the propagation. The propagation is mathematical; it happens simultaneously across the entire graph reachable from the tainted source.</p>
+<h2 id="the-propagation-algorithm">The propagation algorithm</h2>
+<p>Given tainted source T, tainted amount V, and transaction history H:</p>
+<pre><code>function propagateTaint(T, V, H):
+    taintedAccounts = {T: V}
+    queue = [T]
+    while queue is non-empty:
+        current = queue.pop()
+        current_tainted = taintedAccounts[current]
+        current_balance = getBalance(current)
+
+        for each transaction TX in H where TX.from == current:
+            # Proportional taint transfer
+            portion = (current_tainted × TX.amount) / current_balance
+            taintedAccounts[TX.to] += portion
+            queue.append(TX.to)
+    return taintedAccounts
+</code></pre>
+<p>Key properties:
+- <strong>Proportional</strong>: not all-or-nothing. 10% tainted send distributes 10% taint.
+- <strong>Transitive</strong>: taint propagates through multiple hops.
+- <strong>Conservation</strong>: total tainted across reachable addresses = original V (within floating-point tolerance).
+- <strong>Topological</strong>: doesn't depend on address identity, only transaction graph.</p>
+<h2 id="contest-window-choice">Contest window choice</h2>
+<p>7-day window (default) balances:</p>
+<ul>
+<li>Short enough: recovery happens in reasonable time.</li>
+<li>Long enough: legitimate holders have time to respond.</li>
+</ul>
+<p>Shorter (3 days): too quick; some holders in different timezones/busy weeks can't respond.
+Longer (30 days): too slow; recovery delayed past usefulness.</p>
+<p>7 days is empirical. Subject to governance tuning.</p>
+<h2 id="the-clawback-execution">The clawback execution</h2>
+<p>When a window expires with taint uncontested:</p>
+<ol>
+<li><code>ClawbackVault.executeClaw(address, amount)</code> called.</li>
+<li>Vault transfers tainted amount from address balance to recovery destination (usually governance-controlled recovery fund).</li>
+<li>Transfer fires <code>ClawedBack(from, to, amount)</code> event.</li>
+<li>Downstream addresses that derived their taint from this one have their taint-attribution updated.</li>
+</ol>
+<p><strong>Permissionless execution</strong>: anyone can call <code>executeClaw</code> after window-end. Prevents malicious admin from blocking clawback on favored addresses.</p>
+<h2 id="why-proportional-not-all-or-nothing">Why proportional, not all-or-nothing</h2>
+<p>Address-based: whole address frozen. Y loses 100 units because 10 were tainted. Disproportionate.</p>
+<p>Proportional: Y loses 10 tainted units. Y keeps 90 clean. Proportionate.</p>
+<p>Benefits:
+- <strong>Fungibility preserved</strong>: clean funds stay with owner.
+- <strong>Clawback resistance against legitimate owners</strong>: you can't be entirely blacklisted because a tiny fraction of your funds was once tainted.
+- <strong>Fair for intermediaries</strong>: AMMs etc. can receive tainted swap input without entire pool getting blacklisted.</p>
+<h2 id="edge-cases-walked">Edge cases walked</h2>
+<h3 id="edge-case-1-cycles-in-the-transaction-graph">Edge Case 1 — Cycles in the transaction graph</h3>
+<p>Can funds circulate A → B → C → A?</p>
+<p>Yes. When the loop closes, A already has a taint amount from the original tainting. Re-tainted portion added, with attribution tracking preventing double-count.</p>
+<h3 id="edge-case-2-mixed-origin-liquidity-pools">Edge Case 2 — Mixed-origin liquidity pools</h3>
+<p>A liquidity pool receives tainted swap input. LP's share of pool is now partially tainted proportional to pool's total tainted fraction.</p>
+<p>This is real for DeFi integrations. Clawback Cascade handles correctly — applies taint fraction to LP's share, does NOT taint entire pool. Other LPs unaffected unless they themselves had tainted interaction.</p>
+<h3 id="edge-case-3-flash-loan-through-tainted-source">Edge Case 3 — Flash-loan through tainted source</h3>
+<p>Flash loan borrowing from tainted source and repaying in same transaction: funds never really settle. No new taint propagates (inflow matched by equal outflow instantly).</p>
+<h3 id="edge-case-4-cross-chain">Edge Case 4 — Cross-chain</h3>
+<p>Currently limited to same-chain. Bridged funds break the graph (new chain has different tracking).</p>
+<p>Planned: LayerZero integration + cross-chain registry replication. Future cycle.</p>
+<h3 id="edge-case-5-off-chain-recipients">Edge Case 5 — Off-chain recipients</h3>
+<p>Tainted funds sold through CEX end at exchange's hot wallet (on-chain). Downstream off-chain flows outside Clawback Cascade's scope.</p>
+<p>Mitigation: coordinate with exchanges to report downstream. Partial.</p>
+<h2 id="who-flags-taint">Who flags taint</h2>
+<p>Detection is permissionless:</p>
+<pre><code class="language-solidity">function flagTaint(
+    address source,
+    uint256 amount,
+    bytes32 evidenceHash,
+    uint256 incidentId
+) external
+</code></pre>
+<p>Requires:
+- <code>evidenceHash</code> committing to off-chain evidence bundle (court order, stolen-funds proof, sanctions reference).
+- <code>incidentId</code> linking to a tribunal case or governance proposal.
+- Stake bond (default 1 ETH) to prevent spam.</p>
+<p>Frivolous flags lose bond. Real flags get bond back upon tribunal confirmation.</p>
+<h2 id="who-adjudicates">Who adjudicates</h2>
+<p>Tribunal jury or governance, depending on scope:</p>
+<ul>
+<li>Routine taint (clearly stolen, matches on-chain attack patterns) → tribunal jury.</li>
+<li>Complex or ambiguous (legal gray area) → governance proposal.</li>
+</ul>
+<p>Adjudication produces binding outcome.</p>
+<h2 id="interaction-with-siren-protocol">Interaction with Siren Protocol</h2>
+<p><a href="./SIREN_PROTOCOL.md">Siren Protocol</a> deters attacks. Clawback Cascade recovers when deterrence fails.</p>
+<p>Sequence:
+1. Attacker engages with protocol → Siren raises signal-score → attacker pays rent.
+2. If Siren-rent insufficient to deter, attacker proceeds and succeeds.
+3. Post-attack, detection-community flags tainted source.
+4. Clawback Cascade propagates taint through attacker's flow.
+5. Funds recovered, proportional to how much of flow is on-chain + within contest window.</p>
+<p>Together: defense-in-depth. First deter; then recover.</p>
+<h2 id="the-cognitive-parallel-deeper">The cognitive parallel, deeper</h2>
+<p>In cognition, "tainted information" (misinformation, bias, compromised source) propagates through the belief graph. The mind's response is a TOPOLOGICAL re-evaluation: update everything downstream of the compromised source.</p>
+<p>The temporal window parallels cognitive epistemic latency: we don't instantly update every downstream belief — we wait (days to weeks) for context to clarify, allow good-faith re-interpretation, then decisively update.</p>
+<p>VibeSwap's 7-day clawback window implements this cognitive pattern.</p>
+<h2 id="governance-role">Governance role</h2>
+<p>Clawback is powerful. Governance controls:</p>
+<ul>
+<li>Contest window duration.</li>
+<li>Recovery destination.</li>
+<li>Stake bond for flagging.</li>
+<li>Tribunal jury selection criteria.</li>
+<li>Meta-overrides at governance level.</li>
+</ul>
+<p>These prevent Clawback Cascade from being weaponized. Multiple checks prevent any single actor from weaponizing the mechanism.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: trace taint propagation through a specific transaction graph.</p>
+<p>Setup:
+- A has 100 tainted units.
+- A → B: 50 units.
+- B → C: 30 units.
+- B → D: 20 units.
+- C → E: 20 units.</p>
+<p>Compute taint at each node. What percentages? What dollar amounts?</p>
+<p>Apply contest reasoning: which recipients have strongest case for contesting?</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Clawback Cascade propagates taint TOPOLOGICALLY through transaction graph with proportional attribution (10% taint sent = 10% of receive becomes tainted) and 7-day contest windows. Walked propagation (A→B→C→D with specific amounts). Recovers stolen/tainted funds without freezing fungibility. Permissionless detection + adjudicated resolution. Pairs with Siren Protocol: Siren deters, Clawback recovers. Cognitive epistemic-latency update pattern on-chain.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/11_SIREN_PROTOCOL.html" class="nav-cell prev"><div class="label">&larr; PREV // 11</div><div class="ttl">The Siren Protocol</div></a>
+  <a href="/papers/13_NCI_WEIGHT_FUNCTION.html" class="nav-cell next"><div class="label">NEXT // 13 &rarr;</div><div class="ttl">NCI Weight Function — Formal Treatment</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

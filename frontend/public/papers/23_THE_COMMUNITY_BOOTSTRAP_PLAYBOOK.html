@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Community Bootstrap Playbook :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">23</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-stage-name">A stage name</a>
+    <a class="toc-link" href="#why-a-playbook-matters">Why a playbook matters</a>
+    <a class="toc-link" href="#the-recruitment-funnel">The recruitment funnel</a>
+    <a class="toc-link l3" href="#top-of-funnel-awareness">Top of funnel — awareness</a>
+    <a class="toc-link l3" href="#mid-funnel-engagement">Mid-funnel — engagement</a>
+    <a class="toc-link l3" href="#bottom-of-funnel-contribution">Bottom of funnel — contribution</a>
+    <a class="toc-link" href="#the-heterogeneity-mandate">The Heterogeneity Mandate</a>
+    <a class="toc-link" href="#the-onboarding-funnel-five-tactics">The onboarding funnel — five tactics</a>
+    <a class="toc-link l3" href="#tactic-1-smallest-possible-contribution-ramp">Tactic 1 — "Smallest possible contribution" ramp</a>
+    <a class="toc-link l3" href="#tactic-2-paired-onboarding">Tactic 2 — Paired onboarding</a>
+    <a class="toc-link l3" href="#tactic-3-weekly-office-hours">Tactic 3 — Weekly office hours</a>
+    <a class="toc-link l3" href="#tactic-4-problem-solution-matchmaking">Tactic 4 — Problem-solution matchmaking</a>
+    <a class="toc-link l3" href="#tactic-5-discord-telegram-parallel">Tactic 5 — Discord + Telegram parallel</a>
+    <a class="toc-link" href="#anti-grift-filters">Anti-grift filters</a>
+    <a class="toc-link l3" href="#filter-1-long-form-first-engagement">Filter 1 — Long-form first-engagement</a>
+    <a class="toc-link l3" href="#filter-2-no-speculative-rewards-at-bootstrap">Filter 2 — No speculative rewards at bootstrap</a>
+    <a class="toc-link l3" href="#filter-3-multi-type-contribution-required-for-high-weight-st">Filter 3 — Multi-type contribution required for high-weight status</a>
+    <a class="toc-link l3" href="#filter-4-evidence-hash-requirement">Filter 4 — Evidence-hash requirement</a>
+    <a class="toc-link l3" href="#filter-5-community-self-policing">Filter 5 — Community self-policing</a>
+    <a class="toc-link" href="#culture-building">Culture-building</a>
+    <a class="toc-link l3" href="#norm-1-density-first-communication">Norm 1 — Density-first communication</a>
+    <a class="toc-link l3" href="#norm-2-substance-over-marketing">Norm 2 — Substance over marketing</a>
+    <a class="toc-link l3" href="#norm-3-attribution-preservation">Norm 3 — Attribution preservation</a>
+    <a class="toc-link l3" href="#norm-4-honest-failure-acknowledgment">Norm 4 — Honest failure-acknowledgment</a>
+    <a class="toc-link l3" href="#norm-5-mentorship-expectation">Norm 5 — Mentorship expectation</a>
+    <a class="toc-link" href="#specific-risk-patterns">Specific risk patterns</a>
+    <a class="toc-link l3" href="#risk-1-founder-dominance">Risk 1 — Founder-dominance</a>
+    <a class="toc-link l3" href="#risk-2-echo-chamber">Risk 2 — Echo chamber</a>
+    <a class="toc-link l3" href="#risk-3-scaling-capacity-loss">Risk 3 — Scaling capacity loss</a>
+    <a class="toc-link l3" href="#risk-4-token-speculation-emergence">Risk 4 — Token-speculation emergence</a>
+    <a class="toc-link" href="#measuring-bootstrap-progress">Measuring bootstrap progress</a>
+    <a class="toc-link l3" href="#weekly-metrics">Weekly metrics</a>
+    <a class="toc-link l3" href="#monthly-metrics">Monthly metrics</a>
+    <a class="toc-link l3" href="#quarterly-metrics">Quarterly metrics</a>
+    <a class="toc-link" href="#budget">Budget</a>
+    <a class="toc-link" href="#concrete-quarterly-targets">Concrete quarterly targets</a>
+    <a class="toc-link" href="#the-long-arc">The long arc</a>
+    <a class="toc-link" href="#for-contributors">For contributors</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">23</span>
+      <span class="badge badge-terminal">ESSAY</span>
+      <span>The community bootstrap playbook</span>
+    </div>
+    <h1>The Community Bootstrap Playbook</h1>
+<div class="tagline">**Status**: Operational manual for converting early contributors into durable community.</div>
+
+<p><strong>Status</strong>: Operational manual for converting early contributors into durable community.
+<strong>Audience</strong>: First-encounter OK. Tactical, concrete, contributor-facing.</p>
+<hr />
+<h2 id="a-stage-name">A stage name</h2>
+<p>In start-up parlance, "bootstrap phase" is a well-known stage. For a crypto protocol, it's the period between "zero users" and "community has emergent properties" (see <a href="../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md">Cooperative Emergence Threshold</a>).</p>
+<p>For VibeSwap, bootstrap is roughly 2025-2028.</p>
+<p>During bootstrap, ordinary metrics mislead:
+- Active-contributor count grows (mostly early enthusiasts).
+- Handshake density is shallow.
+- The community feels real to insiders but looks sparse from outside.
+- Venture funding perceives it as "not yet critical mass."</p>
+<p>The playbook: specific tactics to cross bootstrap into emergence.</p>
+<h2 id="why-a-playbook-matters">Why a playbook matters</h2>
+<p>Most projects bootstrap by accident — whoever happens to find the project, contributes. Some succeed; most don't.</p>
+<p>With a playbook, bootstrap becomes intentional:
+- Know what you're trying to achieve (emergence threshold crossings).
+- Know what tactics move toward that goal.
+- Know what anti-patterns to avoid.</p>
+<h2 id="the-recruitment-funnel">The recruitment funnel</h2>
+<h3 id="top-of-funnel-awareness">Top of funnel — awareness</h3>
+<p>Who encounters VibeSwap? Where? Why should they care?</p>
+<p><strong>Channels</strong>:
+- Twitter/X accounts discussing crypto mechanism design, coordination, governance.
+- Telegram groups (serious-DeFi and decentralized science).
+- Hacker News (occasional technical discussions).
+- Academic venues (SBC, IC3, DeSciHK conferences).
+- The 30-doc content pipeline (LinkedIn / Medium / X distribution).</p>
+<p><strong>Messaging at this stage</strong>: "VibeSwap is building a coordination primitive for cooperative work."</p>
+<p>NOT: "VibeSwap is a DEX." That invites DEX comparisons and loses differentiation.</p>
+<p><strong>Rejection criteria</strong>: people purely speculation-focused. They filter themselves when reading docs. Don't chase.</p>
+<h3 id="mid-funnel-engagement">Mid-funnel — engagement</h3>
+<p>Who goes deeper? Who reads docs, joins Telegram, tries contracts?</p>
+<p><strong>Expected flow</strong>:
+- Read 1-2 foundational docs (CONTRIBUTION_TRACEABILITY, ECONOMIC_THEORY_OF_MIND).
+- Join Telegram.
+- Try a test transaction on testnet.
+- Submit a <code>[Dialogue]</code> issue or comment on existing discussions.</p>
+<p><strong>Supports needed</strong>:
+- Clear onboarding docs (mostly exist).
+- Responsive Telegram (bot + human).
+- Functional testnet.
+- Low-friction issue-template (shipped 2026-04-22).</p>
+<h3 id="bottom-of-funnel-contribution">Bottom of funnel — contribution</h3>
+<p>Who makes a sustained contribution? Who attests, builds, audits?</p>
+<p><strong>Expected contributors by category</strong>:
+- <strong>Code</strong> — developers. Source: crypto-dev community.
+- <strong>Design</strong> — UI/UX + mechanism designers. Source: crypto-design community, academic mechanism-design.
+- <strong>Research</strong> — writers of memos, analyses. Source: academic, industry R&amp;D.
+- <strong>Security</strong> — auditors, bug-hunters. Source: crypto audit firms.
+- <strong>Governance</strong> — people interested in DAO operations. Source: DAO participants.
+- <strong>Community</strong> — moderators, onboarding helpers. Source: Discord / Telegram community-operators.
+- <strong>Inspiration</strong> — philosophers, framers. Source: public intellectuals, DeSci.</p>
+<p>Each category needs targeted outreach. Shipping docs broadly misses; targeted outreach converts.</p>
+<h2 id="the-heterogeneity-mandate">The Heterogeneity Mandate</h2>
+<p>Per <a href="../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md">Cooperative Emergence Threshold</a>, emergence requires contributor-type heterogeneity (Shannon entropy ≥ 2.5 bits). Means 5-6 contribution types with meaningful presence, not just Code.</p>
+<p>Current state (2026-04-22): heavily skewed Code + Research + Inspiration. Need more Design, Security, Community, Governance.</p>
+<p><strong>Action items</strong>:
+- Partner with a design school or design DAO for Design pipeline.
+- Engage audit firms for recurring Security contributions.
+- Cultivate moderators into Community contributors.
+- Propose to a DAO operating group for Governance contributors.</p>
+<h2 id="the-onboarding-funnel-five-tactics">The onboarding funnel — five tactics</h2>
+<h3 id="tactic-1-smallest-possible-contribution-ramp">Tactic 1 — "Smallest possible contribution" ramp</h3>
+<p>When a prospect shows interest, offer a tiny high-leverage first contribution taking &lt;1 hour:</p>
+<ul>
+<li>Read this doc, flag errors.</li>
+<li>Attest this claim.</li>
+<li>Join this Telegram thread.</li>
+<li>Fix this typo.</li>
+</ul>
+<p>Small contribution earns attestation-weight + first DAG entry. Psychological investment primes for larger contributions.</p>
+<h3 id="tactic-2-paired-onboarding">Tactic 2 — Paired onboarding</h3>
+<p>Each new contributor paired with an existing trusted contributor for first 30 days. The sponsor:</p>
+<ul>
+<li>Answers questions.</li>
+<li>Introduces them to other contributors.</li>
+<li>Provides context on VibeSwap's culture.</li>
+<li>Vouches for their initial contributions (handshake in ContributionDAG).</li>
+</ul>
+<p>Paired onboarding builds trust-graph intentionally.</p>
+<h3 id="tactic-3-weekly-office-hours">Tactic 3 — Weekly office hours</h3>
+<p>Regular 1-hour Zoom where Will or core contributors are available. Invitations sent to active-engaged prospects.</p>
+<p>Low commitment for prospect. High value for VibeSwap (builds relationship).</p>
+<h3 id="tactic-4-problem-solution-matchmaking">Tactic 4 — Problem-solution matchmaking</h3>
+<p>A prospect says "I'm interested in X." VibeSwap has an open issue matching X. Match deliberately; prospect contributes to a real issue their interest aligns with. First contribution feels meaningful.</p>
+<h3 id="tactic-5-discord-telegram-parallel">Tactic 5 — Discord + Telegram parallel</h3>
+<p>Some prefer Discord (structured). Some prefer Telegram (fast). VibeSwap maintains both. Contributors self-select.</p>
+<h2 id="anti-grift-filters">Anti-grift filters</h2>
+<p>Recurring failure mode in crypto bootstraps: people attracted to "free money" not genuine work. These grifters absorb resources without producing value.</p>
+<h3 id="filter-1-long-form-first-engagement">Filter 1 — Long-form first-engagement</h3>
+<p>New prospects must read at least 2 full docs before engaging. Verify via specific question in Telegram onboarding. Grifters don't read; honest prospects do.</p>
+<h3 id="filter-2-no-speculative-rewards-at-bootstrap">Filter 2 — No speculative rewards at bootstrap</h3>
+<p>VibeSwap hasn't distributed tokens yet. No one can be attracted by token-price speculation. Filters out pure speculators during bootstrap.</p>
+<h3 id="filter-3-multi-type-contribution-required-for-high-weight-st">Filter 3 — Multi-type contribution required for high-weight status</h3>
+<p>Can't get high-trust status in just one contribution-type. Requires diverse contributions. Grifters often focus on one gamed-type; honest contributors span multiple.</p>
+<h3 id="filter-4-evidence-hash-requirement">Filter 4 — Evidence-hash requirement</h3>
+<p>All claims need evidence. Frivolous or fake evidence detectable by multi-branch attestation. Slow but effective.</p>
+<h3 id="filter-5-community-self-policing">Filter 5 — Community self-policing</h3>
+<p>Experienced members recognize grifter patterns (over-emphasizing tokens, asking "when airdrop", disengaging after contribution). Flag to core. Trust-graph damage contained.</p>
+<h2 id="culture-building">Culture-building</h2>
+<p>Culture emerges from repeated interactions. VibeSwap's deliberate culture:</p>
+<h3 id="norm-1-density-first-communication">Norm 1 — Density-first communication</h3>
+<p>Per <a href="../../concepts/DENSITY_FIRST.md">Density First</a>. Crisp, direct over wordy.</p>
+<h3 id="norm-2-substance-over-marketing">Norm 2 — Substance over marketing</h3>
+<p>Don't announce "upcoming features." Don't hype. Ship, then describe. Lead-with-Crux feedback applied culturally.</p>
+<h3 id="norm-3-attribution-preservation">Norm 3 — Attribution preservation</h3>
+<p>When citing others' ideas, credit. When building on work, acknowledge. On-chain Lawson Constant applied socially.</p>
+<h3 id="norm-4-honest-failure-acknowledgment">Norm 4 — Honest failure-acknowledgment</h3>
+<p>When something doesn't work, say so openly. Don't hide mistakes. Defend-Reasoning-When-Wrong feedback applied culturally.</p>
+<h3 id="norm-5-mentorship-expectation">Norm 5 — Mentorship expectation</h3>
+<p>Senior contributors help newer ones. Not optional; cultural.</p>
+<h2 id="specific-risk-patterns">Specific risk patterns</h2>
+<h3 id="risk-1-founder-dominance">Risk 1 — Founder-dominance</h3>
+<p>If Will is always the decision-maker, community never matures.</p>
+<p>Counter: explicit delegation to sub-groups. Founder-change timelock makes founder-shifts legitimate governance actions.</p>
+<h3 id="risk-2-echo-chamber">Risk 2 — Echo chamber</h3>
+<p>Community agrees on everything. Missing contradictory viewpoints.</p>
+<p>Counter: actively invite skeptics. Treat dissent as contribution.</p>
+<h3 id="risk-3-scaling-capacity-loss">Risk 3 — Scaling capacity loss</h3>
+<p>Core team hits capacity. Bottlenecks.</p>
+<p>Counter: progressive delegation. Documentation so new contributors self-onboard.</p>
+<h3 id="risk-4-token-speculation-emergence">Risk 4 — Token-speculation emergence</h3>
+<p>Even in bootstrap, if tokens tradeable, speculation dominates.</p>
+<p>Counter: keep token-utility-first. Defer liquid trading until mechanism stability.</p>
+<h2 id="measuring-bootstrap-progress">Measuring bootstrap progress</h2>
+<h3 id="weekly-metrics">Weekly metrics</h3>
+<ul>
+<li>New contributors onboarded — target 3-5/week at peak.</li>
+<li>Average handshake count per contributor — target 2-5 in first 90 days.</li>
+<li>Issue volume by contribution type — target balanced across 5+ types within 6 months.</li>
+<li>Attestation activity — target 10-20 attestations/week.</li>
+</ul>
+<h3 id="monthly-metrics">Monthly metrics</h3>
+<ul>
+<li>Contributor retention (60-day) — target 50-70%.</li>
+<li>Cross-substrate contributions — target 30% of contributors touching 2+ types.</li>
+<li>Disintermediation Grade average — target rising toward 4.</li>
+</ul>
+<h3 id="quarterly-metrics">Quarterly metrics</h3>
+<ul>
+<li>Narrative health assessment.</li>
+<li>Retention anomalies investigation.</li>
+<li>Governance engagement rate.</li>
+</ul>
+<h2 id="budget">Budget</h2>
+<p>From the $2.0M seed:
+- ~$200-500K community-building (events, travel, grants to significant contributors).
+- ~$100K educational content (Eridu partnerships, course materials).
+- ~$50K moderation / community infrastructure.</p>
+<p>Modest budget. Community-building is about presence + engagement, not spending.</p>
+<h2 id="concrete-quarterly-targets">Concrete quarterly targets</h2>
+<p><strong>Q2 2026</strong>:
+- 20 → 50 active contributors.
+- First 2 external integrations.
+- 3 published 30-doc pipeline articles picked up by external outlets.</p>
+<p><strong>Q3 2026</strong>:
+- 50 → 100 active contributors.
+- First Eridu course launched.
+- 10 new contributors across non-Code types.</p>
+<p><strong>Q4 2026</strong>:
+- 100 → 200 active contributors.
+- Emergence threshold parameters improving visibly.
+- First tribunal case resolved successfully.</p>
+<h2 id="the-long-arc">The long arc</h2>
+<p>Bootstrap ends when community self-sustains. New contributors onboard without core-team intervention. Attestations flow organically. Mechanisms produce outcomes matching intent.</p>
+<p>Expected endpoint: 2027-2028.</p>
+<p>Post-bootstrap, playbook shifts to <a href="../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md">Cooperative Emergence Threshold</a> management — tune for sustained emergence; don't revert to bootstrap patterns.</p>
+<h2 id="for-contributors">For contributors</h2>
+<p>If you're bootstrapping a community:</p>
+<ol>
+<li>Build the funnel explicitly (awareness → engagement → contribution).</li>
+<li>Make the smallest first-contribution easy.</li>
+<li>Use paired onboarding for trust-graph growth.</li>
+<li>Mandate heterogeneity, not just headcount.</li>
+<li>Filter grifters explicitly.</li>
+<li>Deliberately build culture through norms.</li>
+<li>Measure progress via specific metrics.</li>
+</ol>
+<p>Apply to any decentralized community — VibeSwap-specific or not.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Bootstrap (2025-2028) converts early contributors into durable community. Specific funnel tactics (small-contribution ramp, paired onboarding, office hours, problem-match) + anti-grift filters (long-form first-engagement, no-speculation, multi-type required, evidence-hash, community-policing) + culture norms (density, substance, attribution, failure-honesty, mentorship). Weekly/monthly/quarterly metrics track progress. Budget ~$500K for community + education + moderation. End state: community self-sustains by 2027-2028.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/22_REGULATORY_COMPLIANCE_DEEP_DIVE.html" class="nav-cell prev"><div class="label">&larr; PREV // 22</div><div class="ttl">Regulatory Compliance — Deep Dive</div></a>
+  <a href="/papers/24_THE_COGNITIVE_ECONOMY_THESIS.html" class="nav-cell next"><div class="label">NEXT // 24 &rarr;</div><div class="ttl">The Cognitive Economy Thesis</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

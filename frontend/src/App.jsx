@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import HeaderMinimal from './components/HeaderMinimal'
 import AmbientBackground from './components/ui/AmbientBackground'
+import Hero3D from './components/Hero3D'
 import VibePlayer from './components/VibePlayer'
 import { ContributionsProvider } from './contexts/ContributionsContext'
 import { MessagingProvider } from './contexts/MessagingContext'
@@ -464,6 +465,7 @@ function App() {
     <MessagingProvider>
     <ContributionsProvider>
       <AmbientBackground />
+      {isHomePage && <Hero3D />}
       <div className="noise-overlay" />
       <CommandPalette />
       <NetworkBanner />

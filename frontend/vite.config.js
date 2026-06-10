@@ -37,6 +37,17 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/framer-motion')) {
             return 'vendor-motion'
           }
+          // zustand is shared by the wallet stack (@reown) AND @react-three —
+          // keep it in its own tiny chunk so the wallet UI never drags the
+          // 845KB three.js chunk in via a colocated shared module
+          if (id.includes('node_modules/zustand')) {
+            return 'vendor-state'
+          }
+          // three.js stack — only ever imported by the lazy Hero3DScene chunk,
+          // so Rollup loads vendor-three on demand, not at first paint
+          if (id.includes('node_modules/three') || id.includes('node_modules/@react-three')) {
+            return 'vendor-three'
+          }
         }
       }
     },

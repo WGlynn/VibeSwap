@@ -1,10 +1,62 @@
-# Session State — 2026-06-09 JARVIS-monorepo unification + Layer-3/4/5 essays + Layer-1/2/6/7 implementations + Class-elimination hooks (current) → 2026-06-08 ASI-mission + abstraction-phase + PR #3363 merge → 2026-06-07 CKB-sovereign-pivot
+# Session State — 2026-06-10 Self-improving-loop session (6h+, 30+ commits, 31+ class-eliminations) → 2026-06-09 JARVIS-monorepo unification → 2026-06-08 ASI-mission + abstraction-phase + PR #3363 merge → 2026-06-07 CKB-sovereign-pivot
 
 ## ⚠ NEXT SESSION — TOP PRIORITY
 
 ### Continue full-auto self-improving JARVIS substrate
 
 Standing directive set as of 2026-06-09 ~19:46 ET: "continue full auto self improving jarvis" + "elastic subagent launches based on demand" + "so whatever you want." Will-AFK-robust autonomous loop.
+
+**SHIPPED 2026-06-10 07:41→14:18+ ET (6h+ session, ongoing)**:
+
+Meta-rules promoted to primitives (durable):
+- [F·sound-human-no-ai-tells] · [F·respond-with-solution-not-problem] · [F·no-bullshit-do-the-research] (AA#4) · [F·stop-seeking-approval-failure-is-data] · [F·optimize-for-llms] · [F·everything-needs-a-staleness-check] · [F·token-blind-multi-agent-default-is-anti-pattern]
+- [P·self-adversarial-qa] · [P·class-elimination-not-instance-patch] · [P·adoption-roleplay] · [P·state-hash-loop-prevention] · [P·semantic-checkpoint-relevance-gate] · [P·graduation-curve-bootstrap]
+
+New hooks shipped + registered:
+- coordination-mechanism-gate.py (Tier 1 + Tier 1.5: subagent-type prior, score+confidence, ambiguity-flag, CODE_MODE hint, telemetry log) — Rick-credited
+- research-before-capability-claim-gate.py (AA#4) — Rick-credited + self-reference false-positive suppression added 14:15 ET
+- research-tool-call-logger.py (populates jsonl AA#4 consumes; gh-subcommand-drift class-eliminated)
+- discretion-flag-warn-gate.py (warns on memory writes with discretion frontmatter, surfaces history-leakage class)
+- autonomous-continue.py patched with WAL+AUDIT_INDEX staleness checks
+
+New skills: /classify (cost-axis), /critical-qa (quality-axis).
+
+WORK chain in vibeswap/CLAUDE.md extended with conditional branches: AdoptionRP, /critical-qa, AA#4, Class-fix.
+
+JARVIS public substrate (WGlynn/JARVIS) shipped:
+- ARCHITECTURE.md refreshed (41-day stale → live; LLM-optimized prose rewrite)
+- README → ARCHITECTURE canonical pointer
+- CONTRIBUTING.md 10-minute recipes + hook-pretool-template.py
+- substrate/LICENSE (explicit MIT)
+- substrate/ADOPTION.md (fork-and-replace-WWWD-corpus guide + Codex CLI CLAUDE_PLUGIN_ROOT compat + git-history leakage class)
+- substrate/hooks-rs/ROADMAP.md (3/50 = reference patterns, adoption mode)
+- substrate/hooks-rs/jarvis-hook lib: 6 audit fixes from RSAW pilot (BoxError rename, tail_utf8 try_from, docstring prune, serde_json consolidate, PathBuf::join Windows, emit_additional_context Stop-guard)
+- substrate/hooks/tests/ — pytest harness with universal contract tests + schema-shape validation
+- substrate/scripts/render_memory_graph.py — generates static MEMORY.html (DOM textContent, XSS-immune)
+- substrate/scripts/tests/test_sync_subdir_glob.py — regression test for rglob fix
+- .github/workflows/ci.yml — Layer 8 hard-fail (baseline 52), pytest, verify scripts, rust build, YAML self-validate (all *.yml)
+- .github/workflows/baseline-monotonic.yml — fails PRs that raise baseline without reason comment
+
+Other substrate work:
+- Layer 8 broken-refs: 82 → 46→52 over session (5 rename passes + final primitive churn). CI now enforces baseline.
+- Coordination-mechanism Tier 2 (/classify skill), Tier 3 design (Bifrost/Inworld pattern, not built).
+- Telemetry rotation utility + daily 3:47 AM cron (telemetry-rotate-cron.md).
+- Frontmatter `discretion:` mode in sync script (replaces fragile content-scrub) + retroactive mirror cleanup.
+- AA#4 self-reference false-positive fix (data-driven from gate-fire telemetry).
+- Desktop aggressively cleaned: 72 files moved into 18 topic-buckets under `_Archive/2026-06/`; 5 live state files remain.
+- Freedom repo archived (gh repo archive WGlynn/Freedom).
+- ~30 commits dual-pushed across WGlynn/JARVIS, memory remote+backup, vibeswap origin+backup.
+- ~/JARVIS local clone is 41-day stale; ~/jarvis-monorepo is the active working dir for WGlynn/JARVIS.
+- Rick credited in AA#4 primitive + hook source comment for exposing the regex-only weakness.
+
+Partner-thread state at session end:
+- **Rick TG #2858**: Felix-OP replied 2026-06-09T23:18 "Very cool idea, I'd love to help testing" on bi-temporal KG thread. Calendar Tomato ping 10:10 ET. Engagement-aware pause SUSTAINED — Will needs to read + decide reply.
+- **Rick TG coordination-mechanism**: 3 draft replies on Desktop. Rick asked "how does this work?" + "does jervis work with openAi subscription?" Both replies upgraded post-research; Codex CLI hook-compat confirmed; rick credited for AA#4.
+- **Felix on #2528**: 2026-06-08 directional comments still owed Will-read.
+
+Anticipation hook surfaces (still pending Will-triage):
+- 6 stale dated/section-pending items (HIERO L3 pending → marked LIVE by me, but section text still says "pending"; cooperative-game open problem; persist-partner-arch next-session)
+- 8× unactioned recall: feedback_claude-owns-content-distribution-line.md
 
 **SHIPPED 2026-06-09 19:46→20:30 ET (this autonomous block)**:
 1. ✓ **Boot-directive forcer fix** (option B). Diagnosed mid-session: forcer scanned linearly, prior ACTIVE STATE block dropped the canonical `## ⚠ NEXT SESSION — TOP PRIORITY` H2 in favor of an H3 nested under `## ⚡ ACTIVE STATE`, so the scanner fell through to a May-13 USD8 block 27 days stale. Discipline going forward: every ACTIVE STATE block ships with this canonical H2 at top. **This block IS the regression test.** Dry-run verified the forcer now picks the live priorities.

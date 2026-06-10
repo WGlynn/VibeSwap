@@ -451,7 +451,7 @@ function WalletCreatedModal({ isOpen, onClose, onSetupRecovery, onSetupICloudBac
                 {/* Primary: encrypted backup for device wallets */}
                 <button
                   onClick={onSetupICloudBackup}
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base transition-colors"
+                  className="w-full py-3.5 rounded-xl bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold text-base transition-colors"
                 >
                   🔐 Create Encrypted Backup
                 </button>
@@ -623,7 +623,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
           {step === 'intro' && (
             <>
               <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
                   <span className="text-3xl">☁️</span>
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Create Encrypted Backup</h2>
@@ -665,7 +665,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
               <div className="space-y-3">
                 <button
                   onClick={() => setStep('pin')}
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-base transition-colors"
+                  className="w-full py-3.5 rounded-xl bg-terminal-600 hover:bg-terminal-500 text-black-900 font-semibold text-base transition-colors"
                 >
                   ☁️ Create Backup
                 </button>
@@ -683,7 +683,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
           {step === 'pin' && (
             <>
               <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
                   <span className="text-3xl">🔢</span>
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Create Your PIN</h2>
@@ -704,7 +704,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                     setError('')
                   }}
                   placeholder="Enter 6-digit PIN"
-                  className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-xl focus:border-blue-500 focus:outline-none"
+                  className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-xl focus:border-terminal-500 focus:outline-none"
                 />
                 {error && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
               </div>
@@ -719,7 +719,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                 <button
                   onClick={handlePinSubmit}
                   disabled={pin.length !== 6}
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors"
+                  className="w-full py-3.5 rounded-xl bg-terminal-600 hover:bg-terminal-500 disabled:opacity-50 disabled:cursor-not-allowed text-black-900 font-semibold text-base transition-colors"
                 >
                   Continue
                 </button>
@@ -737,7 +737,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
           {step === 'confirm' && (
             <>
               <div className="text-center mb-6">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-terminal-500/20 border border-terminal-500/30 flex items-center justify-center">
                   <span className="text-3xl">🔢</span>
                 </div>
                 <h2 className="text-2xl font-bold mb-2">Confirm Your PIN</h2>
@@ -758,7 +758,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                     setError('')
                   }}
                   placeholder="Confirm 6-digit PIN"
-                  className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-xl focus:border-blue-500 focus:outline-none"
+                  className="w-full px-4 py-4 text-center text-2xl font-mono tracking-[0.5em] bg-black-700 border border-black-600 rounded-xl focus:border-terminal-500 focus:outline-none"
                 />
                 {error && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
               </div>
@@ -767,7 +767,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                 <button
                   onClick={handleConfirmSubmit}
                   disabled={confirmPin.length !== 6}
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base transition-colors"
+                  className="w-full py-3.5 rounded-xl bg-terminal-600 hover:bg-terminal-500 disabled:opacity-50 disabled:cursor-not-allowed text-black-900 font-semibold text-base transition-colors"
                 >
                   Create Backup
                 </button>
@@ -808,7 +808,7 @@ function ICloudBackupModal({ isOpen, onClose, onComplete, walletData }) {
                 </button>
               </div>
 
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 mb-6">
+              <div className="p-4 rounded-xl bg-terminal-500/10 border border-terminal-500/20 mb-6">
                 <p className="text-sm text-black-200 font-medium mb-2">Where to save your backup:</p>
                 <ol className="text-sm text-black-300 space-y-1 list-decimal list-inside">
                   <li>A <strong>password manager</strong> (1Password, Bitwarden, etc.)</li>
@@ -1196,7 +1196,10 @@ function SwapCore() {
             transition={{ duration: 0.6 }}
             className="text-center mb-6"
           >
-            <h1 className="text-3xl sm:text-4xl font-bold mb-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-matrix-600 mb-3">
+              swap.execute(order) → uniform_price
+            </div>
+            <h1 className="font-display font-bold tracking-[-0.04em] text-3xl sm:text-4xl mb-3">
               <span className="text-white">Trade without getting </span>
               <span className="text-matrix-500">robbed.</span>
             </h1>
@@ -1204,17 +1207,17 @@ function SwapCore() {
               VibeSwap eliminates front-running and sandwich attacks.
               Every trade settles at a fair price. No exceptions.
             </p>
-            <div className="flex items-center justify-center gap-4 text-sm text-black-400">
+            <div className="flex items-center justify-center gap-4 font-mono text-[10px] uppercase tracking-[0.18em] text-black-300">
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-matrix-500 animate-pulse" />
+                <div className="w-1.5 h-1.5 rounded-full bg-matrix-500 animate-pulse motion-reduce:animate-none" />
                 <span>MEV-Protected</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-terminal-500 animate-pulse" />
+                <div className="w-1.5 h-1.5 rounded-full bg-terminal-500 animate-pulse motion-reduce:animate-none" />
                 <span>Omnichain</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse motion-reduce:animate-none" />
                 <span>AI-Powered</span>
               </div>
             </div>
@@ -1229,11 +1232,12 @@ function SwapCore() {
           >
           {/* From */}
           <div className="p-4 border-5d rounded-lg">
-            <div className="text-sm text-black-400 mb-2 text-5d">You pay</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-black-300 mb-2 text-5d">You pay</div>
             <div className="flex items-center space-x-3">
               <input
                 type="text"
                 inputMode="decimal"
+                aria-label={`Amount of ${fromToken.symbol} to pay`}
                 value={fromAmount}
                 onChange={(e) => {
                   const v = e.target.value.replace(/[^0-9.]/g, '')
@@ -1244,7 +1248,8 @@ function SwapCore() {
               />
               <button
                 onClick={() => setShowFromTokens(true)}
-                className="flex items-center space-x-2 px-4 py-3 rounded-full bg-black-700 hover:bg-black-600 transition-colors"
+                aria-label={`Change pay token, currently ${fromToken.symbol}`}
+                className="flex items-center space-x-2 px-4 py-3 rounded-full bg-black-700 hover:bg-black-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2"
               >
                 <span className="text-xl">{fromToken.logo}</span>
                 <span className="font-semibold">{fromToken.symbol}</span>
@@ -1288,10 +1293,11 @@ function SwapCore() {
 
           {/* To */}
           <div className="p-4 bg-black-900/50 border-5d rounded-lg">
-            <div className="text-sm text-black-400 mb-2 text-5d">You receive</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-black-300 mb-2 text-5d">You receive</div>
             <div className="flex items-center space-x-3">
               <input
                 type="text"
+                aria-label={`Estimated ${toToken.symbol} you receive`}
                 value={toAmount}
                 readOnly
                 placeholder="0"
@@ -1299,7 +1305,8 @@ function SwapCore() {
               />
               <button
                 onClick={() => setShowToTokens(true)}
-                className="flex items-center space-x-2 px-4 py-3 rounded-full bg-black-700 hover:bg-black-600 transition-colors"
+                aria-label={`Change receive token, currently ${toToken.symbol}`}
+                className="flex items-center space-x-2 px-4 py-3 rounded-full bg-black-700 hover:bg-black-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2"
               >
                 <span className="text-xl">{toToken.logo}</span>
                 <span className="font-semibold">{toToken.symbol}</span>
@@ -1365,8 +1372,9 @@ function SwapCore() {
         </GlassCard>
 
         {/* Subtle info - no clutter */}
-        <div className="mt-4 text-center text-sm text-black-500">
-          {isLive ? 'Live on-chain' : 'Demo mode'} · Protected from price manipulation · Fair rates · Low fees
+        <div className="mt-4 flex items-center justify-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-black-500">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${isLive ? 'bg-matrix-500' : 'bg-amber-400'} animate-pulse motion-reduce:animate-none`} aria-hidden="true" />
+          <span>{isLive ? 'Live on-chain' : 'Demo mode'} · MEV-protected · fair rates · low fees</span>
         </div>
       </div>
 
@@ -1402,31 +1410,31 @@ function SwapCore() {
           transition={{ delay: 0.4, duration: 0.6 }}
           className="mt-6 mb-8"
         >
-          {/* How it works — 3 steps */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
-            <div className="text-center p-3 rounded-xl bg-black-800/50 border border-black-700/50">
-              <div className="text-matrix-500 text-lg font-mono mb-1">1</div>
-              <div className="text-xs text-black-300 font-medium">Commit</div>
-              <div className="text-[10px] text-black-500 mt-0.5">Orders are hidden</div>
+          {/* How it works — 3 steps, op-signature style */}
+          <div className="grid grid-cols-3 gap-3 mb-5" role="list" aria-label="How a batch auction works">
+            <div role="listitem" className="text-center p-3 rounded-xl bg-gradient-to-b from-black-900/95 to-black-700/95 border border-matrix-900/40 transition-colors duration-200 hover:border-matrix-800/60">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-matrix-500 mb-1">commit()</div>
+              <div className="text-xs text-black-200 font-medium">Orders are hidden</div>
+              <div className="font-mono text-[9px] text-black-500 mt-0.5">hash(order ‖ secret)</div>
             </div>
-            <div className="text-center p-3 rounded-xl bg-black-800/50 border border-black-700/50">
-              <div className="text-matrix-500 text-lg font-mono mb-1">2</div>
-              <div className="text-xs text-black-300 font-medium">Reveal</div>
-              <div className="text-[10px] text-black-500 mt-0.5">Verified on-chain</div>
+            <div role="listitem" className="text-center p-3 rounded-xl bg-gradient-to-b from-black-900/95 to-black-700/95 border border-matrix-900/40 transition-colors duration-200 hover:border-matrix-800/60">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-matrix-500 mb-1">reveal()</div>
+              <div className="text-xs text-black-200 font-medium">Verified on-chain</div>
+              <div className="font-mono text-[9px] text-black-500 mt-0.5">order, secret</div>
             </div>
-            <div className="text-center p-3 rounded-xl bg-black-800/50 border border-black-700/50">
-              <div className="text-matrix-500 text-lg font-mono mb-1">3</div>
-              <div className="text-xs text-black-300 font-medium">Settle</div>
-              <div className="text-[10px] text-black-500 mt-0.5">One fair price for all</div>
+            <div role="listitem" className="text-center p-3 rounded-xl bg-gradient-to-b from-black-900/95 to-black-700/95 border border-matrix-900/40 transition-colors duration-200 hover:border-matrix-800/60">
+              <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-matrix-500 mb-1">settle()</div>
+              <div className="text-xs text-black-200 font-medium">One fair price for all</div>
+              <div className="font-mono text-[9px] text-black-500 mt-0.5">→ uniform_price</div>
             </div>
           </div>
 
           {/* Bottom tagline */}
-          <p className="text-center text-xs text-black-500">
-            Commit-reveal batch auctions. Uniform clearing price. Zero MEV.
+          <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-black-500">
+            Commit-reveal batch auctions · uniform clearing price · zero MEV
           </p>
           <p className="text-center text-[10px] text-black-600 mt-1">
-            Built on LayerZero V2 — trade across any chain.
+            Burn-and-mint transfers — trade across any chain.
           </p>
         </motion.div>
       )}

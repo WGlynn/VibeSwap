@@ -1,3 +1,28 @@
+# Session State — 2026-06-10 evening: JarvisOS + skill-mining activation + loop-doctrine absorb + frontend GO
+
+## ⚠ NEXT SESSION — TOP PRIORITY
+
+### Resume the VibeSwap frontend reimagine (Will GO directive, AUGMENT DON'T REPLACE)
+
+Will 2026-06-10 ~18:5x ET: "that should be enough frontend skills to fix and reimagine the frontend vibeswap vercel. GO!" + "remember, augment don't replace" — then context hit 353k and the rotation hook forced this handoff.
+
+**State at handoff (task list is live in the harness, IDs below):**
+1. **3D hero BUILT, commit `53ca66ac` local-only on vibeswap master** (NOT pushed, NOT deployed). Hero3DScene.jsx + Hero3D.jsx + 2-line App.jsx integration + vite manualChunks (vendor-three lazy, 231kB gzip on-demand, +0.05kB eager). Scene = canonical batch auction (8s commit / 2s reveal / 2s settle, ~1400 matrix-green points, 7% cyan priority bids). An independent verifier subagent was IN FLIGHT at handoff checking build/bundle-isolation/aesthetic/timeline — if its verdict isn't in this transcript, RE-VERIFY before pushing: build green + vendor-three not in eager graph + palette-only hexes + 8s/2s constants.
+2. **Reimagine pass NOT STARTED** (task #2). Plan: closed loop — audit pages (RosettaPage = canonical aesthetic) → incremental augmenting fixes → build green per step → independent verifier → /ship-web checklist → prep deploy, Vercel deploy = Will-manual. Tailwind dynamic-class grep is part of it (skill-mining queue item). New skill arsenal installed for this: ~/.claude/skills/design-system (wrapper has vibeswap-aesthetic-precedence rule), frontend-slides; references: ui-agents repo, frontend-design-toolkit (queue entries).
+3. **Twitter post LAST (task #6)**: Will: "once done with EVERYTHING, then we make our own twitter post about jarvis and what we've honestly built." Honest numbers only, Will-voice, draft to Desktop, open-source-contributor framing.
+
+**Shipped this session (all pushed):**
+- WAL 2026-05-17/18 epoch CLOSED via AAP (zero orphans); 2 stale historical ACTIVE epochs demoted; wal-state-loader.py + autonomous-continue.py now read TITLE LINE only (class-fix; the autonomous-continue edit failed silently once in a parallel-edit batch — lesson: reconcile per-result in parallel Edit batches).
+- Skill-mining loop ACTIVE: ~/.claude/cron-prompts/skill-mining.md (3 commandments, 7 veins incl. frontend, verifier-stage maker≠checker), daily cron 11:23 (c38a3251, durable, self-perpetuating). State: _skill-mining-queue.md (10 entries) + _skill-mining-log.md. All mirrored to WGlynn/jarvis-substrate (latest 85acea6+).
+- Loop doctrine absorbed (5 Will-fed threads) → memory/feedback_design-loops-not-prompts.md + MEMORY_INDEX_ACTIVE line (commits 8afe13d, c6c7e26). Core: verifier-in-independent-context > self-critique; fail→investigate→verify→distill→consult; closed-loop default; structural-bets-need-verification-loop.
+- JARVIS monorepo refactor skills test COMPLETE + PUSHED (76d7de0..055138c): pytest 16F/226P → 0F/276P; 11 hook bugs class-eliminated (isinstance guards); independent verifier PASSed all claims pre-push; same guards surgically applied to LIVE ~/.claude hooks (substrate copies are path-scrubbed — never blind-copy substrate→live).
+- Skills installed: frontend-slides, design-system (+ wrapper), token-audit tools (~/.claude/tools/token-audit/); context-rotation-hook REGISTERED in Stop chain (Will approved "task 5 approve") — it produced THIS handoff.
+- Cycle 38 tracker reconciled in nda-locked/project_full-stack-rsi.md (was 50d stale-PENDING; ETM Step 1+2 + withdrawDeposit gate all verified shipped). Remaining: ETM Step 3 verify (positioning) + Step 4 (C39 alignment fix).
+
+**Key paths:** vibeswap/frontend/src/components/Hero3D*.jsx · ~/.claude/cron-prompts/skill-mining.md · memory/feedback_design-loops-not-prompts.md · ~/jarvis-monorepo (active WGlynn/JARVIS clone) · ~/jarvis-os-public (jarvis-substrate clone).
+
+---
+
 # Session State — 2026-06-10 Self-improving-loop session (6h+, 30+ commits, 31+ class-eliminations) → 2026-06-09 JARVIS-monorepo unification → 2026-06-08 ASI-mission + abstraction-phase + PR #3363 merge → 2026-06-07 CKB-sovereign-pivot
 
 ## ⚠ NEXT SESSION — TOP PRIORITY

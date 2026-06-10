@@ -1,10 +1,22 @@
-# Write-Ahead Log — ACTIVE (session 2026-05-17/18 protocol-stack leg)
+# Write-Ahead Log — ACTIVE (2026-06-10 evening: frontend-reimagine in flight)
 
-## Epoch — ACTIVE at 2026-05-17/18 protocol-stack leg (hooks + memory + partner-drafts)
+## Epoch — ACTIVE at 2026-06-10 evening (skill-mining + loop-doctrine + frontend GO)
+- **Opened**: 2026-06-10 ~17:14 ET. Handoff written ~19:30 ET at 353k context (rotation hook).
+- **In flight / uncommitted-to-remote**: vibeswap commit `53ca66ac` (3D hero) LOCAL-ONLY pending verifier verdict + reimagine pass; live-hook isinstance guards applied at ~/.claude (un-versioned by design); SESSION_STATE block above is the manifest.
+- **Everything else pushed**: WGlynn/JARVIS @ 055138c · jarvis-substrate @ 85acea6+ · memory @ c6c7e26.
 
-- **Opened**: 2026-05-17 07:09 ET (Sunday) on session-start. 1d 3h elapsed wall-clock at this entry (2026-05-18 ~10:25 ET).
-- **Branches**: NONE pushed this leg. Memory `main` and VibeSwap `master` untouched on remotes; all work local-only.
-- **Status**: ACTIVE. Will AFK as of ~2026-05-18 10:12 ET; autopilot maintenance housework in progress.
+---
+
+# Write-Ahead Log — CLEAN (epoch 2026-05-17/18 closed via AAP 2026-06-10)
+
+## Epoch — CLOSED at 2026-06-10 17:20 ET via AAP crash-recovery (opened 2026-05-17/18 protocol-stack leg)
+
+- **Opened**: 2026-05-17 07:09 ET (Sunday) on session-start. 1d 3h elapsed wall-clock at last ACTIVE entry (2026-05-18 ~10:25 ET).
+- **Closed**: 2026-06-10 17:20 ET. Prior session never wrote the close; AAP cross-ref confirmed zero orphans:
+  - 4 hooks (atomic-reflection, em-dash, partner-draft-formalize, conflict-detector) on disk at `~/.claude/hooks/` AND registered in `~/.claude/settings.json`.
+  - 6 memory files committed: `cbfa09e` (2026-06-08) covers 5; `reference_pragma-os-crys-contact.md` in `2a49926` carry-forward.
+  - Partner drafts archived in 2026-06-10 Desktop cleanup (`_Archive/2026-06/`); kim reply SENT 2026-05-18.
+- **Status**: CLEAN. No uncommitted work from this epoch.
 
 **Work shipped this leg (NONE pushed to remote — local-only)**:
 
@@ -67,7 +79,7 @@ State files:
 - **Opened**: 2026-05-15 ~13:17 ET on Will's `run autopilot` after Hayden/Devin/saucepoint
   outreach research handoff.
 - **Branches**: VibeSwap `master` push to `origin`. Memory `main` dual-push origin + backup.
-- **Status**: ACTIVE. 7 commits shipped this leg, all pushed.
+- **Status**: CLOSED (historical; was never demoted from ACTIVE — all 7 commits shipped and pushed).
 
 **Vibeswap commits this leg (origin)**:
 - `91b02a52` — `fix(shapley): AA#2 MED-2 — fail-loud sybil gate on Lawson Floor`
@@ -104,12 +116,12 @@ State files:
 
 ---
 
-# Write-Ahead Log — ACTIVE (session 2026-05-06 GH#18 reification + 300-commit run)
+# Write-Ahead Log — CLOSED-HISTORICAL (session 2026-05-06 GH#18 reification + 300-commit run)
 
-## Epoch — ACTIVE at 2026-05-06 GH#18 bidirectional-reification bootstrap + 300-commit autonomous run
+## Epoch — CLOSED (historical; demoted from ACTIVE 2026-06-10, commits all pushed) at 2026-05-06 GH#18 bidirectional-reification bootstrap + 300-commit autonomous run
 - **Opened**: 2026-05-06 ~15:09Z on Will's "respond: GH#18" + pivot to bidirectional-reification primitive + "300 commits" autonomous run.
 - **Branch**: VibeSwap `master` (push to `origin`). Range `7720cb32..HEAD` and counting.
-- **Status**: ACTIVE. Run in progress; targeting 300 atomic commits across vibeswap + memory repo + any adjacent artifacts. Forge tests passing on every reasoning-subsystem suite (31 tests across 3 files, exit 0).
+- **Status**: CLOSED (historical). Run targeted 300 atomic commits across vibeswap + memory repo + any adjacent artifacts. Forge tests passing on every reasoning-subsystem suite (31 tests across 3 files, exit 0).
 
 **Latest tally** (2026-05-07 ~21h elapsed): ~200+ atomic commits across vibeswap (~140) + JARVIS (~14) + memory (~16). Dual-push pattern engaged from commit ~50 onward — effective GitHub commit-graph signal ~400+. Late-session additions: NCI Appendix C/D/E (PoW substrate substitution + per-dimension logic-failure modes + autonomous recovery infrastructure), Anthropic engagement preparation (paper trail + strategic playbook), Pragma OS DM lead, Multi-Level Persistence Framework articulation. Status: ACTIVE pending session-end commit + dual-push.
 

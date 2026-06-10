@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Lawson Floor Mathematics :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">14</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-a-fairness-problem">Start with a fairness problem</a>
+    <a class="toc-link" href="#the-two-lawson-primitives">The two Lawson primitives</a>
+    <a class="toc-link" href="#the-composition-formula">The composition formula</a>
+    <a class="toc-link" href="#worked-numeric-example">Worked numeric example</a>
+    <a class="toc-link l3" href="#a-case-where-floor-actually-fires">A case where floor actually fires</a>
+    <a class="toc-link l3" href="#fairness-interpretation">Fairness interpretation</a>
+    <a class="toc-link" href="#why-both-lawsons-are-needed">Why both Lawsons are needed</a>
+    <a class="toc-link l3" href="#lawson-constant-alone-no-floor">Lawson Constant alone (no Floor)</a>
+    <a class="toc-link l3" href="#lawson-floor-alone-no-constant">Lawson Floor alone (no Constant)</a>
+    <a class="toc-link l3" href="#composed">Composed</a>
+    <a class="toc-link" href="#the-attestation-threshold-gate">The attestation-threshold gate</a>
+    <a class="toc-link" href="#the-floor-fraction">The floor fraction α</a>
+    <a class="toc-link" href="#why-this-isnt-ubi">Why this isn't UBI</a>
+    <a class="toc-link" href="#the-governance-interaction">The governance interaction</a>
+    <a class="toc-link" href="#relationship-to-novelty-bonus-theorem">Relationship to Novelty Bonus Theorem</a>
+    <a class="toc-link" href="#implementation-notes">Implementation notes</a>
+    <a class="toc-link" href="#relationship-to-cognitive-economy">Relationship to cognitive economy</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">14</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Lawson floor mathematics</span>
+    </div>
+    <h1>The Lawson Floor Mathematics</h1>
+<div class="tagline">**Status**: Formal composition of two Lawson primitives.</div>
+
+<p><strong>Status</strong>: Formal composition of two Lawson primitives.
+<strong>Audience</strong>: First-encounter OK. Walked arithmetic with worked examples.</p>
+<hr />
+<h2 id="start-with-a-fairness-problem">Start with a fairness problem</h2>
+<p>Ten people collaborate on a project. Five are heavily involved; five are modestly involved.</p>
+<p>Project succeeds. $1000 in rewards to distribute.</p>
+<p><strong>Option A — Equal split</strong>: each gets $100. Feels fair at first but ignores actual contribution.</p>
+<p><strong>Option B — Pure proportional (Shapley)</strong>: heavily involved might get $200 each, modestly involved might get $0 each.</p>
+<p>The problem with Option B: those who contributed modestly still contributed something. Getting $0 feels punitive.</p>
+<p>Option A over-credits the modest. Option B under-credits them.</p>
+<p><strong>Option C — Lawson Floor</strong>: everyone gets AT LEAST $X (the floor). Remaining distribution is proportional.</p>
+<p>With floor = $50:
+- Everyone: $50 each = $500 allocated.
+- Remaining $500 distributed proportionally to heavy contributors.
+- Each modestly involved person: $50.
+- Each heavily involved person: $50 + bonus proportional to their share of the remaining $500.</p>
+<p>Balanced. The modest aren't ignored; the heavy are still credited disproportionately.</p>
+<p>This is the Lawson Floor concept — and it's a specific mathematical mechanism.</p>
+<h2 id="the-two-lawson-primitives">The two Lawson primitives</h2>
+<p>"Lawson" carries two distinct but complementary primitives:</p>
+<ol>
+<li>
+<p><strong>Lawson Constant</strong> — attribution axiom. Ensures the greatest idea cannot be stolen because authorship is structural. See <a href="./LAWSON_CONSTANT.md">Lawson Constant doc</a>.</p>
+</li>
+<li>
+<p><strong>Lawson Floor</strong> — distribution mechanism. Guarantees every attributed contributor receives at least a floor amount. This doc.</p>
+</li>
+</ol>
+<p>Named after the same person (Lawson). Share a principle (Fairness Above All, P-000). Operate at different layers:</p>
+<ul>
+<li>Lawson Constant: attribution layer (WHO did what).</li>
+<li>Lawson Floor: distribution layer (HOW MUCH they receive).</li>
+</ul>
+<p>This doc establishes the mathematical composition of both.</p>
+<h2 id="the-composition-formula">The composition formula</h2>
+<p>Let the total distributable surplus in a round be <code>S</code>. Let there be <code>N</code> attributed contributors with Shapley values <code>φ_1, ..., φ_N</code>.</p>
+<p><strong>Naive distribution</strong> (no floor):</p>
+<pre><code>reward_i = (φ_i / Σ φ_j) × S
+</code></pre>
+<p>Problem: if <code>φ_i</code> is small, <code>reward_i</code> → 0.</p>
+<p><strong>With Lawson Floor</strong>:</p>
+<pre><code>reward_i = max(F, (φ_i / Σ φ_j) × S)
+</code></pre>
+<p>Where <code>F = S × α / N</code> and <code>α</code> is the floor fraction (default 0.1, meaning 10% of pool reserved for floors).</p>
+<p>The math ensures every attributed contributor gets at least <code>F</code>. Budget constraint: <code>Σ reward_i ≤ S</code> must still hold. Floor reallocates small portion from high-Shapley to low-Shapley.</p>
+<h2 id="worked-numeric-example">Worked numeric example</h2>
+<p>Suppose <code>S = $900</code> (pool size) and <code>α = 0.1</code> (10% floor).</p>
+<p>With 10 contributors:</p>
+<pre><code>F = $900 × 0.1 / 10 = $9 per contributor (minimum).
+</code></pre>
+<p>Now suppose 10 contributors have Shapley values (normalized):</p>
+<table>
+<thead>
+<tr>
+<th>Contributor</th>
+<th>Shapley %</th>
+<th>Shapley-only reward</th>
+<th>With Floor reward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Alice</td>
+<td>50%</td>
+<td>$450</td>
+<td>$450 (no floor needed)</td>
+</tr>
+<tr>
+<td>Bob</td>
+<td>20%</td>
+<td>$180</td>
+<td>$180</td>
+</tr>
+<tr>
+<td>Carol</td>
+<td>10%</td>
+<td>$90</td>
+<td>$90</td>
+</tr>
+<tr>
+<td>Dave</td>
+<td>5%</td>
+<td>$45</td>
+<td>$45</td>
+</tr>
+<tr>
+<td>Eve</td>
+<td>4%</td>
+<td>$36</td>
+<td>$36</td>
+</tr>
+<tr>
+<td>Frank</td>
+<td>3%</td>
+<td>$27</td>
+<td>$27</td>
+</tr>
+<tr>
+<td>Grace</td>
+<td>2%</td>
+<td>$18</td>
+<td>$18</td>
+</tr>
+<tr>
+<td>Henry</td>
+<td>3%</td>
+<td>$27</td>
+<td>$27</td>
+</tr>
+<tr>
+<td>Ivy</td>
+<td>2%</td>
+<td>$18</td>
+<td>$18</td>
+</tr>
+<tr>
+<td>Jack</td>
+<td>1%</td>
+<td>$9</td>
+<td>$9 (floor)</td>
+</tr>
+</tbody>
+</table>
+<p>All 10 have φ ≥ 1%, so Shapley-only gives: $450, $180, $90, $45, $36, $27, $18, $27, $18, $9.</p>
+<p>Total: ~$900 (within rounding).</p>
+<p>Jack's Shapley reward is already $9, matching the floor. Everyone above threshold gets Shapley-proportional.</p>
+<h3 id="a-case-where-floor-actually-fires">A case where floor actually fires</h3>
+<p>Suppose Jack's Shapley was actually 0.5% (not 1%):</p>
+<p>Shapley-only: Jack gets $4.50.</p>
+<p>Lawson Floor kicks in: Jack gets $9.</p>
+<p>The $9 - $4.50 = $4.50 extra comes proportionally from everyone else. Alice's $450 might be reduced slightly to $447; similar for others.</p>
+<p>Total preserved: $900. Jack protected.</p>
+<h3 id="fairness-interpretation">Fairness interpretation</h3>
+<p>Jack contributed genuinely but marginally. Under Shapley-only, his reward ($4.50) barely compensates the effort. He'd exit the protocol after this round.</p>
+<p>Under Lawson Floor ($9), he gets enough to justify continued participation. The protocol retains his participation for future rounds.</p>
+<p>Long-term: Jack might become heavily-involved. Retaining him through floor is strategically valuable.</p>
+<h2 id="why-both-lawsons-are-needed">Why both Lawsons are needed</h2>
+<h3 id="lawson-constant-alone-no-floor">Lawson Constant alone (no Floor)</h3>
+<p>Attribution preserved; economic weight can still be zero. A contribution perfectly attributed can receive no reward if Shapley assigns near-zero.</p>
+<p>Problem: attribution is symbolic if economic weight is absent.</p>
+<h3 id="lawson-floor-alone-no-constant">Lawson Floor alone (no Constant)</h3>
+<p>Economic floor guaranteed; attribution can be gamed. Fake contributions earn the floor; real contributions diluted.</p>
+<p>Problem: without attribution guarantee, floor incentivizes gaming.</p>
+<h3 id="composed">Composed</h3>
+<p>Lawson Constant ensures contribution is recorded truthfully.
+Lawson Floor ensures recorded contribution receives minimum economic acknowledgment.</p>
+<p>Together: every legitimate contribution gets meaningful economic credit + no contribution can be stolen or erased.</p>
+<h2 id="the-attestation-threshold-gate">The attestation-threshold gate</h2>
+<p>Lawson Floor doesn't give EVERY claim the floor. Only claims ACCEPTED by the <a href="../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md">three-branch attestation flow</a>.</p>
+<ul>
+<li>Pending claims: not eligible.</li>
+<li>Rejected claims: not eligible.</li>
+<li>Expired claims (TTL): not eligible.</li>
+<li>Accepted claims (Executive/Judicial/Legislative): eligible for floor.</li>
+</ul>
+<p>Prevents gaming: bad-faith contributor can't submit trivial claims just to collect the floor. Must pass attestation threshold (cost + attention of real attestors).</p>
+<h2 id="the-floor-fraction">The floor fraction α</h2>
+<p>α = 0.1 (10%) is default. Tradeoffs:</p>
+<ul>
+<li><strong>α too low</strong> (e.g., 0.01): floor is nominal; extreme-tail contributors still receive near-zero. Winner-take-all reasserts.</li>
+<li><strong>α too high</strong> (e.g., 0.5): floors consume most of pool; high-Shapley contributors underrewarded. Shapley's fairness weakens.</li>
+</ul>
+<p>10% balances: meaningful floor for low-Shapley + Shapley still routes most of pool.</p>
+<p>Governance can tune α — bounded by constitutional axioms (P-000). Raising α to 0.9 effectively eliminates Shapley; that's a constitutional-amendment, not governance tuning.</p>
+<h2 id="why-this-isnt-ubi">Why this isn't UBI</h2>
+<p>Universal Basic Income gives everyone (citizen, contributor, bystander) a minimum.</p>
+<p>Lawson Floor gives ATTRIBUTED contributors a floor — and attribution requires active contribution + attestation. Bystanders get nothing.</p>
+<p>The comparison that's closer: earned-income-tax-credit. Low earners receive a floor only if they earn income. Non-earners get nothing.</p>
+<p>Lawson Floor is the on-chain analog. Contribute (earn attribution) to be eligible. Floor then protects your contribution from economic nullification.</p>
+<h2 id="the-governance-interaction">The governance interaction</h2>
+<p>Lawson Floor is operationally a parameter (α, N_floor = attributed-contributor count). Both visible to governance.</p>
+<p>Governance CAN:
+- Adjust α within [0.05, 0.30] range.
+- Tune minimum contribution threshold for floor eligibility.</p>
+<p>Governance CANNOT:
+- Eliminate floor entirely (violates P-000 Fairness Above All).
+- Reduce α below 0.05 (effectively eliminates; constitutional).
+- Target specific addresses for exclusion (violates attribution-is-structural).</p>
+<h2 id="relationship-to-novelty-bonus-theorem">Relationship to Novelty Bonus Theorem</h2>
+<p><a href="../theorems/THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus Theorem</a>: permutation-symmetric Shapley under-rewards novelty. Novelty Bonus adds super-linear rewards to novel contributions.</p>
+<p>Composition with Lawson Floor:</p>
+<pre><code>reward_i = max(F, novelty_bonus(i) × (φ_i / Σ φ_j) × S × (1-α))
+</code></pre>
+<p>Floor still applies. Novelty bonus shifts Shapley-proportional portion.</p>
+<p>Together they produce:
+- High-novelty, high-Shapley: heavily rewarded.
+- High-novelty, low-Shapley: floor-protected, modest bonus-enhanced reward.
+- Low-novelty, low-Shapley: floor-protected (minimum).
+- Low-novelty, high-Shapley: Shapley-proportional without novelty boost.</p>
+<p>The composition is additive-then-capped-by-floor, preserving both mechanisms' intents.</p>
+<h2 id="implementation-notes">Implementation notes</h2>
+<p>On-chain, the floor calculation fires during reward distribution rounds. Gas cost scales linearly with N (attributed-contributor count).</p>
+<p>Storage: each round's (α, S, N, F) recorded for audit. Historical floors queriable to verify past rounds respected the floor.</p>
+<p>Edge case: if <code>S &lt; N × F</code>, total pool &lt; sum of floors. In this rare case, everyone receives <code>S / N</code> — uniform distribution for this round. Per-contributor fairness preserved; Shapley weighting suppressed for that round. Signal to governance that reward pool may be insufficient.</p>
+<h2 id="relationship-to-cognitive-economy">Relationship to cognitive economy</h2>
+<p>Under <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognition preserves minor contributions from evict-dominance. Even small memory items retain some persistence-weight. Lawson Floor is the on-chain mirror.</p>
+<p>Diverse-but-small contributions are preserved over pure-marginal-dominance. Matches cognitive substrate geometry.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: work through a distribution scenario with specific numbers.</p>
+<ul>
+<li>Pool: $1000.</li>
+<li>5 contributors with Shapley percentages: 60%, 20%, 10%, 8%, 2%.</li>
+<li>α = 0.1.</li>
+</ul>
+<p>Compute:
+1. Floor F.
+2. Shapley-only rewards.
+3. Post-floor rewards.
+4. Identify who had floor fire.</p>
+<p>Then adjust: contributor 5 at 0.5% instead of 2%. Re-compute. Observe how floor affects distribution.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Lawson Floor composition: reward_i = max(F, Shapley × (1-α)) where F = S × α / N, α = 0.1 default. Protects low-Shapley contributors from economic nullification (not UBI — earned-income-tax-credit analog). Constitutional bounds on α [0.05, 0.30]. Composes with Novelty Bonus (additive then capped). Cognitive parallel: memory preserves minor items from evict-dominance. Both Lawson primitives (Constant + Floor) needed — attribution preservation + economic preservation.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/13_NCI_WEIGHT_FUNCTION.html" class="nav-cell prev"><div class="label">&larr; PREV // 13</div><div class="ttl">NCI Weight Function — Formal Treatment</div></a>
+  <a href="/papers/15_DISINTERMEDIATION_GRADES.html" class="nav-cell next"><div class="label">NEXT // 15 &rarr;</div><div class="ttl">Disintermediation Grades</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

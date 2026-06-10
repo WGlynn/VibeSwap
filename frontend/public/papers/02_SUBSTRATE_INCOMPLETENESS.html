@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Substrate Incompleteness :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">02</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-humbling-observation">A humbling observation</a>
+    <a class="toc-link" href="#the-analogy-to-gdel">The analogy to Gödel</a>
+    <a class="toc-link" href="#why-it-matters">Why it matters</a>
+    <a class="toc-link" href="#five-specific-capture-surfaces-in-vibeswap">Five specific capture surfaces in VibeSwap</a>
+    <a class="toc-link l3" href="#surface-1-the-vs-estimation-gap">Surface 1 — The v(S) estimation gap</a>
+    <a class="toc-link l3" href="#surface-2-unmeasured-contribution">Surface 2 — Unmeasured contribution</a>
+    <a class="toc-link l3" href="#surface-3-the-coalition-beyond-mechanism-reach">Surface 3 — The coalition beyond mechanism reach</a>
+    <a class="toc-link l3" href="#surface-4-the-value-function-mismatch">Surface 4 — The value-function mismatch</a>
+    <a class="toc-link l3" href="#surface-5-etm-blindness-to-phenomenal-states">Surface 5 — ETM-blindness to phenomenal states</a>
+    <a class="toc-link" href="#the-composition-problem">The composition problem</a>
+    <a class="toc-link" href="#design-implications">Design implications</a>
+    <a class="toc-link l3" href="#implication-1-default-to-explicitly-scoped-claims">Implication 1 — Default to explicitly scoped claims</a>
+    <a class="toc-link l3" href="#implication-2-track-capture-surfaces-as-first-class-artifact">Implication 2 — Track capture surfaces as first-class artifacts</a>
+    <a class="toc-link l3" href="#implication-3-resist-one-more-mechanism-closes-it">Implication 3 — Resist "one more mechanism closes it"</a>
+    <a class="toc-link l3" href="#implication-4-name-surfaces-publicly">Implication 4 — Name surfaces publicly</a>
+    <a class="toc-link" href="#the-positive-flip">The positive flip</a>
+    <a class="toc-link" href="#concrete-workflow-for-honest-incompleteness">Concrete workflow for honest incompleteness</a>
+    <a class="toc-link" href="#relationship-to-the-cave-philosophy">Relationship to the Cave Philosophy</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">02</span>
+      <span class="badge badge-muted">PRIMITIVE-ONLY</span>
+      <span>Substrate incompleteness</span>
+    </div>
+    <h1>Substrate Incompleteness</h1>
+<div class="tagline">**Status**: Design humility principle with concrete walked-through surfaces.</div>
+
+<p><strong>Status</strong>: Design humility principle with concrete walked-through surfaces.
+<strong>Audience</strong>: First-encounter OK. Gödel-adjacent but grounded in specific examples.</p>
+<hr />
+<h2 id="a-humbling-observation">A humbling observation</h2>
+<p>You're building a fairness mechanism. You work hard on it. You spot a gaming pattern and block it. Then you spot another. Then another.</p>
+<p>Every mechanism you build catches some cases of unfairness and misses others. The cases it misses are its "capture surface" — places where sophisticated attackers can still exploit.</p>
+<p>You can add more mechanisms. Each new mechanism catches more cases. But it also introduces new capture surfaces — interactions between mechanisms, new parameter tuning opportunities, new operator-discretion points.</p>
+<p>Adding mechanisms is not monotonic progress. Each addition closes some gaps and opens others.</p>
+<p>This is substrate incompleteness. It's a structural property, not a deficiency. Accepting it honestly is itself a form of integrity.</p>
+<h2 id="the-analogy-to-gdel">The analogy to Gödel</h2>
+<p>Gödel's incompleteness theorems say: any sufficiently expressive formal system contains true statements it cannot prove within itself. Completeness and consistency are incompatible.</p>
+<p>Applied to mechanism design: any sufficiently expressive fairness mechanism contains unfair outcomes it cannot prevent within itself. Completeness (catches everything) and implementability (can actually run) are incompatible.</p>
+<p>The parallel isn't mystical. Both arise from the same underlying fact: self-referential systems that are powerful enough to describe themselves must leave some self-descriptions outside their descriptive power.</p>
+<p>A fairness mechanism powerful enough to describe all unfairness would have to describe its own failure modes, which creates infinite regress unless the mechanism is incomplete somewhere.</p>
+<h2 id="why-it-matters">Why it matters</h2>
+<p>Most DeFi projects claim "eliminates MEV", "trustless", "fully decentralized". Each claim usually has asterisks the project doesn't publish.</p>
+<p>Substrate incompleteness says: the claims can't strictly hold. A more honest framing: "eliminates A, B, C; mitigates D, E, F; explicitly does not address G, H, I."</p>
+<p>This isn't weakness. It's strength.</p>
+<ul>
+<li>Adversaries learn the complete threat model from public docs. Informed defenders match their defense investment accordingly.</li>
+<li>Users can calibrate their own risk tolerance.</li>
+<li>Auditors have a clear scope for what to audit.</li>
+<li>Regulators can evaluate what's actually committed.</li>
+</ul>
+<p>Projects that don't name their capture surfaces rely on FUD ("we might be fully fair") to maintain credibility. Projects that do name their surfaces build trust via visibility.</p>
+<h2 id="five-specific-capture-surfaces-in-vibeswap">Five specific capture surfaces in VibeSwap</h2>
+<p>Let's walk through real ones.</p>
+<h3 id="surface-1-the-vs-estimation-gap">Surface 1 — The v(S) estimation gap</h3>
+<p>Shapley distribution depends on the characteristic function <code>v(S)</code>. This function says "what would this coalition produce?"</p>
+<p>In real systems, <code>v(S)</code> is estimated. Different observers produce different estimates, with errors of 20-50%.</p>
+<p><strong>Concrete scenario</strong>: Suppose Alice writes a paper arguing X. Separately, Bob writes a paper arguing X. They collaborate? Not collaborated-coalition; sequentially. What does <code>v({Alice, Bob})</code> equal?</p>
+<ul>
+<li>Observer 1 says: "Both did substantial work; combined ~90% of what each would do alone" → v = 1.8.</li>
+<li>Observer 2 says: "Bob mostly replicated Alice's work; combined = Alice's alone" → v = 1.0.</li>
+<li>Observer 3 says: "They critiqued each other productively; combined &gt; sum of parts" → v = 2.2.</li>
+</ul>
+<p>Three reasonable observers produce estimates differing by 2x. The Shapley computation propagates these differences.</p>
+<p><strong>Mitigation</strong>: multiple estimation paths (peer attestation + tribunal + governance) with cross-validation. Reduces the spread but doesn't eliminate it.</p>
+<p><strong>Capture surface</strong>: a sophisticated adversary could influence multiple observer branches simultaneously to bias v(S). Difficult, but possible with enough resources.</p>
+<h3 id="surface-2-unmeasured-contribution">Surface 2 — Unmeasured contribution</h3>
+<p>Any mechanism records observable contributions. Unobserved contributions go unrecorded.</p>
+<p>Examples of unmeasured contributions:
+- Preventing a fire: nobody sees the fire, but the prevention was valuable.
+- Preserving continuity: the one person who keeps showing up to meetings even when engagement is low; deserves credit but rarely gets it.
+- Emotional labor: the one person who smooths over team conflicts; deserves credit but rarely measurable.
+- Gap-filling: small fixes that prevent bigger problems downstream; often invisible in the moment.</p>
+<p><strong>Concrete scenario</strong>: A community moderator spends years keeping the Telegram healthy, smoothing conflicts, welcoming newcomers. Their work is essential for community retention but never appears in the DAG (no formal "moderation" contributions get recorded).</p>
+<p>When they leave, the Telegram deteriorates. In retrospect, their contribution was huge. But it never earned DAG credit.</p>
+<p><strong>Mitigation</strong>: <code>[Dialogue]</code> issue templates, <code>[Meta]</code> issues for process contributions. Makes some negative-space work recordable. Doesn't fully capture.</p>
+<p><strong>Capture surface</strong>: the most essential contributions can remain invisible.</p>
+<h3 id="surface-3-the-coalition-beyond-mechanism-reach">Surface 3 — The coalition beyond mechanism reach</h3>
+<p>Augmented mechanisms address extraction within their scope. A coalition operating outside the mechanism's scope bypasses the checks.</p>
+<p><strong>Concrete scenario</strong>: Two VibeSwap validators coordinate off-chain. They don't use the on-chain governance; they communicate by telephone. They agree on coordinated votes without the chain seeing coordination.</p>
+<p>The mechanism only sees their on-chain votes — which might look uncorrelated. Their off-chain coordination is invisible. They can bias decisions together without the mechanism detecting.</p>
+<p><strong>Mitigation</strong>: can only detect on-chain patterns. Off-chain coordination is structurally undetectable.</p>
+<p>Secondary mitigations:
+- Random tribunal jury selection reduces the ability to always coordinate.
+- Constitutional axioms (P-000, P-001) prevent the coordinated outcome from being extractive at scale.
+- Community vigilance (external observers notice suspicious patterns).</p>
+<p><strong>Capture surface</strong>: determined off-chain coordinators can bias outcomes. Difficult but not impossible.</p>
+<h3 id="surface-4-the-value-function-mismatch">Surface 4 — The value-function mismatch</h3>
+<p>The cooperative-game formalism assumes contributors optimize against a shared value function <code>v</code>. In practice, contributors have heterogeneous value functions.</p>
+<p><strong>Concrete scenario</strong>: Alice optimizes for money (wants maximum reward). Bob optimizes for craft (wants maximum-quality output). Carol optimizes for impact (wants outcome to matter). Dana optimizes for reputation.</p>
+<p>Each person's "optimal" is different. When the mechanism optimizes for Shapley-weighted aggregate, it represents a COMPOSITE that no individual actually wants perfectly.</p>
+<p>Alice might take less-money actions that optimize reputation (if those shift her total utility up). This creates noise in what the mechanism measures.</p>
+<p><strong>Mitigation</strong>: three-token economy (JUL for money, VIBE for governance, CKB-native for substrate) gives multiple dimensions. Partial — contributors still mix optimization targets.</p>
+<p><strong>Capture surface</strong>: contributors with unusual utility functions can appear to act "irrationally" by the mechanism's standards, muddying the measure.</p>
+<h3 id="surface-5-etm-blindness-to-phenomenal-states">Surface 5 — ETM-blindness to phenomenal states</h3>
+<p><a href="etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a> captures cognitive-economic processes. It doesn't capture phenomenal consciousness, affect, embodiment.</p>
+<p><strong>Concrete scenario</strong>: a mechanism that inadvertently triggers shame-engagement-loops. Users feel bad after using it. The mechanism's Shapley math looks clean; the user experience is harmful.</p>
+<p>ETM-alignment audit says the mechanism is correct. But users are being phenomenally harmed. The math doesn't measure the harm.</p>
+<p><strong>Mitigation</strong>: P-000 (Fairness Above All) as a constitutional override; <a href="../research/essays/THE_DIGNITY_GRADIENT.md">Dignity Gradient</a> consideration; user feedback channels.</p>
+<p><strong>Capture surface</strong>: mechanisms can pass ETM-alignment and still cause phenomenal harm. The capture surface is literally "things ETM doesn't measure."</p>
+<h2 id="the-composition-problem">The composition problem</h2>
+<p>You might hope to close these surfaces by composing more mechanisms.</p>
+<p>Doesn't quite work. Per <a href="../architecture/MECHANISM_COMPOSITION_ALGEBRA.md"><code>MECHANISM_COMPOSITION_ALGEBRA.md</code></a>, composition introduces new surfaces. A mechanism + fix-for-surface-1 composition can have NEW capture surfaces at the composition boundary.</p>
+<p>So adding fixes is asymptotic approach, not convergent progress. You can reduce the total capture surface over time, but you can't eliminate it.</p>
+<p>Honest framing: design is asymptotic.</p>
+<h2 id="design-implications">Design implications</h2>
+<h3 id="implication-1-default-to-explicitly-scoped-claims">Implication 1 — Default to explicitly scoped claims</h3>
+<p>Instead of "VibeSwap eliminates MEV", say:</p>
+<p><em>"VibeSwap eliminates block-ordering MEV structurally (commit-reveal + uniform price). Mitigates oracle-manipulation MEV economically (stake + slashing). Accepts residual informational asymmetry as out-of-scope for mitigation by the current mechanism set."</em></p>
+<p>The longer statement is more accurate and more usable. Adversaries reading the shorter version overestimate protection; those reading the longer version get an accurate threat model.</p>
+<h3 id="implication-2-track-capture-surfaces-as-first-class-artifact">Implication 2 — Track capture surfaces as first-class artifacts</h3>
+<p>Maintain a public list: for each mechanism, the known capture surfaces. Update as new surfaces are discovered. Rank by severity.</p>
+<p>This is the <a href="../memory/project_rsi-backlog.md"><code>memory/project_rsi-backlog.md</code></a> discipline applied architecturally. <!-- FIXME: ../memory/project_rsi-backlog.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --></p>
+<h3 id="implication-3-resist-one-more-mechanism-closes-it">Implication 3 — Resist "one more mechanism closes it"</h3>
+<p>The asymptotic nature means adding mechanisms doesn't converge to complete coverage. At some point, adding is strictly worse than accepting — the composition complexity exceeds the marginal coverage gain.</p>
+<p>Know where to stop. Governance and tribunal are the "human-in-the-loop" backstops for residual surfaces.</p>
+<h3 id="implication-4-name-surfaces-publicly">Implication 4 — Name surfaces publicly</h3>
+<p>An adversary discovers capture surfaces by attack. A defender knows them by design. If defender publishes the surfaces, defenders and adversaries start at the same information level — which is where defenders have structural advantages (patient design, collaborative analysis).</p>
+<p>Hiding surfaces = pretending the mechanism is complete = adversarial advantage. Naming = honesty = defender advantage over time.</p>
+<h2 id="the-positive-flip">The positive flip</h2>
+<p>Incompleteness sounds like defeat. It's not.</p>
+<ul>
+<li><strong>Design is living</strong>. If mechanisms could be complete, design would be a one-shot problem. Incompleteness makes design ongoing.</li>
+<li><strong>Humility scales</strong>. Systems that acknowledge their limits invite collaboration to extend them.</li>
+<li><strong>Diversity has room</strong>. Different mechanisms capture different surfaces. Many honest mechanisms composed cover more than one dishonest "complete" mechanism.</li>
+<li><strong>External checks are legitimate</strong>. Governance and social oversight aren't admissions of failure — they're correct architectural components.</li>
+</ul>
+<h2 id="concrete-workflow-for-honest-incompleteness">Concrete workflow for honest incompleteness</h2>
+<p>VibeSwap's workflow:</p>
+<ol>
+<li><strong>Design mechanism</strong> to address a specific unfair pattern.</li>
+<li><strong>Ship mechanism</strong> with explicit scope statement.</li>
+<li><strong>Identify remaining capture surfaces</strong> (part of design review).</li>
+<li><strong>Document surfaces</strong> in the relevant memory file.</li>
+<li><strong>Triage surfaces</strong> — some become RSI backlog items; others are accepted out-of-scope.</li>
+<li><strong>Monitor</strong> — new attack patterns that exploit known surfaces are escalated.</li>
+<li><strong>Iterate</strong> — next-cycle design addresses highest-priority surfaces.</li>
+</ol>
+<p>This is asymptotic approach in practice.</p>
+<h2 id="relationship-to-the-cave-philosophy">Relationship to the Cave Philosophy</h2>
+<p>Tony Stark built Mark I in a cave. Mark I was incomplete — it could barely fly and had limited firepower. Mark LXXXV (many iterations later) has vastly more capability. Neither is "complete"; each iteration addressed specific limitations of the prior while introducing new ones.</p>
+<p>VibeSwap's mechanism stack follows this pattern. v1 ships with known surfaces. v2 closes some, opens others. v3 iterates. There is no v∞; each version is honest about its limits.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: pick a security mechanism from any domain (not just DeFi). Identify 3 capture surfaces:</p>
+<ol>
+<li>What could an attacker do that the mechanism doesn't prevent?</li>
+<li>What would the fix look like?</li>
+<li>What new surface does the fix introduce?</li>
+</ol>
+<p>Walk through this analysis for two different mechanisms. Notice the asymptotic pattern — you keep finding new surfaces as you dig.</p>
+<p>This exercise teaches design humility.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Every mechanism has capture surfaces it doesn't address; no mechanism is complete (Gödel-adjacent structural property). VibeSwap's five specific surfaces walked: v(S) estimation gap, unmeasured contributions, off-chain coalition, value-function mismatch, ETM-blindness to phenomenal states. Adding mechanisms is asymptotic approach, not convergent progress. Honesty about incompleteness is a security property, not a weakness.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/01_THE_FAIRNESS_FIXED_POINT.html" class="nav-cell prev"><div class="label">&larr; PREV // 01</div><div class="ttl">The Fairness Fixed Point</div></a>
+  <a href="/papers/03_THE_ATTENTION_AUCTION_PARADOX.html" class="nav-cell next"><div class="label">NEXT // 03 &rarr;</div><div class="ttl">The Attention Auction Paradox</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Cooperative Emergence Threshold :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">04</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-an-observation-about-scale">Start with an observation about scale</a>
+    <a class="toc-link" href="#the-question">The question</a>
+    <a class="toc-link" href="#the-santa-fe-research">The Santa Fe research</a>
+    <a class="toc-link" href="#walk-through-each-parameter">Walk through each parameter</a>
+    <a class="toc-link l3" href="#parameter-1-connectivity">Parameter 1 — Connectivity</a>
+    <a class="toc-link l3" href="#parameter-2-heterogeneity">Parameter 2 — Heterogeneity</a>
+    <a class="toc-link l3" href="#parameter-3-feedback-speed">Parameter 3 — Feedback speed</a>
+    <a class="toc-link l3" href="#parameter-4-institutional-fit">Parameter 4 — Institutional fit</a>
+    <a class="toc-link l3" href="#composite">Composite</a>
+    <a class="toc-link" href="#the-emergence-timeline">The emergence timeline</a>
+    <a class="toc-link" href="#what-emergence-looks-like-in-practice">What emergence looks like in practice</a>
+    <a class="toc-link l3" href="#self-correcting-drift">Self-correcting drift</a>
+    <a class="toc-link l3" href="#cross-substrate-routing">Cross-substrate routing</a>
+    <a class="toc-link l3" href="#gaming-resistance">Gaming resistance</a>
+    <a class="toc-link l3" href="#knowledge-compounding">Knowledge compounding</a>
+    <a class="toc-link l3" href="#novel-mechanism-suggestions">Novel mechanism suggestions</a>
+    <a class="toc-link" href="#bootstrap-strategy-for-the-9-15-month-window">Bootstrap strategy for the 9-15 month window</a>
+    <a class="toc-link l3" href="#phase-1-now-3-months-institutional-fit">Phase 1 (now – 3 months) — Institutional fit</a>
+    <a class="toc-link l3" href="#phase-2-3-6-months-heterogeneity">Phase 2 (3-6 months) — Heterogeneity</a>
+    <a class="toc-link l3" href="#phase-3-6-9-months-connectivity">Phase 3 (6-9 months) — Connectivity</a>
+    <a class="toc-link l3" href="#phase-4-9-12-months-emergence">Phase 4 (9-12 months) — Emergence</a>
+    <a class="toc-link l3" href="#phase-5-12-15-months-consolidation">Phase 5 (12-15 months) — Consolidation</a>
+    <a class="toc-link" href="#what-could-prevent-emergence">What could prevent emergence</a>
+    <a class="toc-link l3" href="#trap-1-premature-scaling">Trap 1 — Premature scaling</a>
+    <a class="toc-link l3" href="#trap-2-single-type-dominance">Trap 2 — Single-type dominance</a>
+    <a class="toc-link l3" href="#trap-3-mechanism-drift">Trap 3 — Mechanism drift</a>
+    <a class="toc-link l3" href="#trap-4-economic-constraint">Trap 4 — Economic constraint</a>
+    <a class="toc-link" href="#the-cognitive-parallel">The cognitive parallel</a>
+    <a class="toc-link" href="#quality-over-quantity">Quality over quantity</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#relationship-to-other-primitives">Relationship to other primitives</a>
+    <a class="toc-link" href="#open-research">Open research</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">04</span>
+      <span class="badge badge-amber">SPEC-ONLY</span>
+      <span>Cooperative emergence threshold</span>
+    </div>
+    <h1>Cooperative Emergence Threshold</h1>
+<div class="tagline">**Status**: Research memo with specific 9-15 month projection.</div>
+
+<p><strong>Status</strong>: Research memo with specific 9-15 month projection.
+<strong>Audience</strong>: First-encounter OK. Each parameter walked with concrete state.</p>
+<hr />
+<h2 id="start-with-an-observation-about-scale">Start with an observation about scale</h2>
+<p>If you put 5 people in a room, they can have a conversation. Decisions get made by agreement.</p>
+<p>Put 50 people in the same room, decisions get made by small groups dominating while others watch.</p>
+<p>Put 500 people, chaos. No coherent decisions emerge.</p>
+<p>Something happens between 5 and 50. And something else between 50 and 500. These transitions aren't continuous — they're phase transitions.</p>
+<p>This doc is about VibeSwap's analogous phase transition. When does cooperative intelligence EMERGE from the mechanism set? Below the threshold, the protocol executes but the collective doesn't have emergent properties. Above it, the collective exhibits self-correcting, routing, coordinating behaviors no individual has.</p>
+<h2 id="the-question">The question</h2>
+<p>If VibeSwap has 100 contributors, does "cooperative intelligence" exist?</p>
+<p>With 1,000? 10,000?</p>
+<p>What ABOUT the 100 vs 1,000 transition makes the emergence occur?</p>
+<h2 id="the-santa-fe-research">The Santa Fe research</h2>
+<p>Complex-systems research (Santa Fe Institute, Ostrom, Page, Axelrod, Scott) has identified a pattern: cooperative systems exhibit phase transitions. Below the transition, system = sum of parts. Above, whole &gt; sum of parts.</p>
+<p>The transition depends on four parameters:</p>
+<ol>
+<li><strong>Connectivity</strong> — how densely interconnected participants are.</li>
+<li><strong>Heterogeneity</strong> — how diverse participant types / strategies / information are.</li>
+<li><strong>Feedback speed</strong> — how fast system state propagates to new decisions.</li>
+<li><strong>Institutional fit</strong> — how well coordination mechanism matches substrate.</li>
+</ol>
+<p>Each parameter has an empirically-observed threshold. Below threshold, emergence doesn't fire. Above, it does.</p>
+<p>Meeting 3 of 4 produces degraded coordination (some emergence, some not). Meeting all 4 produces full phase transition.</p>
+<h2 id="walk-through-each-parameter">Walk through each parameter</h2>
+<p>Let me apply each to VibeSwap's current state.</p>
+<h3 id="parameter-1-connectivity">Parameter 1 — Connectivity</h3>
+<p><strong>Measure</strong>: median trust-graph degree in ContributionDAG — how many handshakes per average contributor.</p>
+<p><strong>Critical value</strong>: median degree ≥ 5. Below this, small-world coordination properties don't emerge. Above, they do.</p>
+<p><strong>Current state (2026-04-22)</strong>: bootstrap phase. Median degree probably 1-3. <strong>BELOW threshold.</strong></p>
+<p><strong>To reach threshold</strong>: conscious handshake facilitation. Onboarding pairs new contributors with existing ones. Events that produce handshakes. 12-18 months at current recruitment pace.</p>
+<p><strong>Gap analysis</strong>: we need ~3x growth in handshake density. Achievable.</p>
+<h3 id="parameter-2-heterogeneity">Parameter 2 — Heterogeneity</h3>
+<p><strong>Measure</strong>: Shannon entropy of contribution-type distribution. 9 possible types (Code, Design, Research, Community, Marketing, Security, Governance, Inspiration, Other).</p>
+<p><strong>Critical value</strong>: Shannon entropy ≥ 2.5 bits. Requires meaningful presence of 5-6 types each.</p>
+<p><strong>Current state</strong>: Code + Research + Inspiration dominate. Entropy probably 1.5-2.0 bits. <strong>BELOW threshold.</strong></p>
+<p><strong>Concrete gap</strong>: Design, Security, Community, Governance need more active contributors. Need targeted outreach to specific communities (design DAOs, audit firms, DAO-governance-experienced contributors).</p>
+<p><strong>To reach threshold</strong>: 9-15 months with deliberate effort.</p>
+<h3 id="parameter-3-feedback-speed">Parameter 3 — Feedback speed</h3>
+<p><strong>Measure</strong>: time from contribution → attestation → reward distribution → future-contribution incentive.</p>
+<p><strong>Critical value</strong>: feedback loop ≤ 1 week.</p>
+<p><strong>Current state</strong>: 
+- ContributionAttestor claimTTL = 1 day.
+- Happy-path attestation: hours to a day.
+- Tribunal escalation: days.
+- Governance escalation: weeks.
+- Average happy-path feedback: &lt; 1 week.</p>
+<p><strong>Result</strong>: <strong>ABOVE threshold</strong> (for happy path).</p>
+<p><strong>Risk</strong>: escalation paths can extend feedback dramatically. Need to ensure escalation remains rare.</p>
+<h3 id="parameter-4-institutional-fit">Parameter 4 — Institutional fit</h3>
+<p><strong>Measure</strong>: degree to which mechanisms match substrate geometry. <a href="../SUBSTRATE_GEOMETRY_MATCH.md">Substrate-Geometry Match</a> compliance + <a href="../CORRESPONDENCE_TRIAD.md">Correspondence Triad</a> compliance.</p>
+<p><strong>Critical value</strong>: qualitative — every mechanism passes the Triad gate.</p>
+<p><strong>Current state</strong>: ~80% of mechanisms pass. Some inherited (linear NCI retention) don't. ETM Build Roadmap Gaps 1-3 address these.</p>
+<p><strong>To reach threshold</strong>: 3-6 months if Roadmap gaps ship on cadence.</p>
+<h3 id="composite">Composite</h3>
+<p>Current state: 1 of 4 parameters above threshold (feedback speed). 3 below.</p>
+<p>Bootstrap phase. Protocol executes; collective doesn't yet have emergent properties.</p>
+<h2 id="the-emergence-timeline">The emergence timeline</h2>
+<p>Assuming current trajectory, realistic estimates:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Current state</th>
+<th>Target reach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Connectivity</td>
+<td>~30% of threshold</td>
+<td>12-18 months</td>
+</tr>
+<tr>
+<td>Heterogeneity</td>
+<td>~50% of threshold</td>
+<td>9-15 months</td>
+</tr>
+<tr>
+<td>Feedback speed</td>
+<td>ABOVE</td>
+<td>— (maintain)</td>
+</tr>
+<tr>
+<td>Institutional fit</td>
+<td>~80%</td>
+<td>3-6 months</td>
+</tr>
+</tbody>
+</table>
+<p>Earliest full threshold crossing: <strong>9-15 months</strong> from 2026-04-22.</p>
+<p>Earlier if outreach accelerates. Later if contributor count plateaus.</p>
+<h2 id="what-emergence-looks-like-in-practice">What emergence looks like in practice</h2>
+<p>Once the four parameters cross threshold, observable phenomena:</p>
+<h3 id="self-correcting-drift">Self-correcting drift</h3>
+<p>Someone proposes an extractive mechanism. The community surfaces the extraction via multiple independent attestations BEFORE the proposal reaches governance. The system recognizes the threat without central coordination.</p>
+<h3 id="cross-substrate-routing">Cross-substrate routing</h3>
+<p>A contributor who specializes in Design gets credited for enabling Security outcomes they didn't implement but whose attention-framing prevented the need for.</p>
+<h3 id="gaming-resistance">Gaming resistance</h3>
+<p>Attempts to game attestations fail because multiple attestation branches converge on gaming-awareness. Attacker gets detected, not rewarded.</p>
+<h3 id="knowledge-compounding">Knowledge compounding</h3>
+<p>Later contributors routinely reference earlier work explicitly. DAG develops visible lineage depth. Ideas that would have been forgotten are preserved via lineage.</p>
+<h3 id="novel-mechanism-suggestions">Novel mechanism suggestions</h3>
+<p>Community proposes mechanism refinements that core team hadn't considered. Some are adopted. Contribution extends beyond what the founding team envisioned.</p>
+<p>Before the transition, NONE of these reliably occur. After, they become default operating mode.</p>
+<h2 id="bootstrap-strategy-for-the-9-15-month-window">Bootstrap strategy for the 9-15 month window</h2>
+<h3 id="phase-1-now-3-months-institutional-fit">Phase 1 (now – 3 months) — Institutional fit</h3>
+<p>Ship Roadmap gap fixes (C40-C43). Bring mechanism set to Triad compliance. This is prerequisite — emergent coordination doesn't emerge on mis-fitted mechanisms.</p>
+<h3 id="phase-2-3-6-months-heterogeneity">Phase 2 (3-6 months) — Heterogeneity</h3>
+<p>Recruit across contribution types. Not "more Code contributors" but "Design + Research + Security + Governance contributors." Targeted outreach to:
+- Design DAOs (Frontier Foundation, etc.)
+- Audit firms (Sigma Prime, Trail of Bits, Zellic).
+- DAO-governance-experienced folks (Aragon community, DAOhaus).</p>
+<h3 id="phase-3-6-9-months-connectivity">Phase 3 (6-9 months) — Connectivity</h3>
+<p>Facilitate handshakes systematically. Not left to chance.</p>
+<p>Tactics:
+- Working-group formation around specific topics.
+- Regular community calls producing introductions.
+- Explicit "onboarding pair" protocol for new contributors.
+- Events (hackathons, conferences) that create handshake opportunities.</p>
+<h3 id="phase-4-9-12-months-emergence">Phase 4 (9-12 months) — Emergence</h3>
+<p>All four parameters approaching threshold. Watch for emergence phenomena; respond to them.</p>
+<p>Resist premature optimizations that could push parameters back below threshold.</p>
+<h3 id="phase-5-12-15-months-consolidation">Phase 5 (12-15 months) — Consolidation</h3>
+<p>Emergence phenomena stable. System has collective-intelligence properties.</p>
+<p>Mechanism refinement shifts from "trigger emergence" to "improve efficiency."</p>
+<h2 id="what-could-prevent-emergence">What could prevent emergence</h2>
+<p>Four specific risks:</p>
+<h3 id="trap-1-premature-scaling">Trap 1 — Premature scaling</h3>
+<p>Growing contributor count without growing connectivity or heterogeneity. Result: N increases but parameters 1, 2 stay below threshold.</p>
+<p>Mitigation: resist growth-for-growth's-sake metrics. Prioritize connectivity + heterogeneity over headcount.</p>
+<h3 id="trap-2-single-type-dominance">Trap 2 — Single-type dominance</h3>
+<p>Code contributors continue to dominate. Entropy stays low. Heterogeneity threshold unreached.</p>
+<p>Mitigation: actively credit non-Code contributions. Publicize non-Code contributor stories. Balance the team's own contribution types.</p>
+<h3 id="trap-3-mechanism-drift">Trap 3 — Mechanism drift</h3>
+<p>Triad compliance slips. New mechanisms pass audit but distort substrate. Institutional fit degrades.</p>
+<p>Mitigation: ongoing ETM alignment audits. Triad gate as hard requirement for new mechanisms.</p>
+<h3 id="trap-4-economic-constraint">Trap 4 — Economic constraint</h3>
+<p>Contributors can't afford to work on VibeSwap while waiting for emergence-driven payouts. They leave.</p>
+<p>Mitigation: deploy initial liquidity to seed contribution rewards. Use founder allocations to front-load the compensation curve.</p>
+<h2 id="the-cognitive-parallel">The cognitive parallel</h2>
+<p>Under <a href="../etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognitive intelligence is also a phase-transition phenomenon. Individual neurons don't think; networks of neurons do.</p>
+<p>The transition in cognition depends on connectivity, heterogeneity, feedback speed, and institutional fit within the brain substrate. Same 4-parameter framework.</p>
+<p>If cognitive science knows how to cross the threshold (and it does — extensively studied), we can apply the learnings on-chain.</p>
+<h2 id="quality-over-quantity">Quality over quantity</h2>
+<p>Network-effects theory (Metcalfe's Law): value scales with N². More participants = more value.</p>
+<p>But Metcalfe doesn't distinguish quality. More participants are more value regardless.</p>
+<p>Emergence-threshold theory is stronger: more participants aren't enough. Connectivity + heterogeneity + feedback + institutional-fit are REQUIRED.</p>
+<p>A VibeSwap with 10,000 homogeneous shallow-handshake users might not emerge.
+A VibeSwap with 500 heterogeneous deep-handshake users WOULD emerge.</p>
+<p>Quality over quantity, with specific mechanics determining quality.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: identify a coordination system you're familiar with (team, club, company). For each of the 4 parameters:</p>
+<ol>
+<li>What's its current state?</li>
+<li>Has the system crossed the threshold?</li>
+<li>Do you observe emergence phenomena?</li>
+</ol>
+<p>Apply to academic departments, open-source projects, company departments, etc. Observe: emergence is rare. Most systems stay below threshold.</p>
+<h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
+<ul>
+<li><strong>Depends on</strong>: <a href="../CORRESPONDENCE_TRIAD.md">Correspondence Triad</a> (for Parameter 4).</li>
+<li><strong>Feeds</strong>: <a href="../../research/essays/THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.md">The Community Bootstrap Playbook</a> (operational tactics).</li>
+<li><strong>Grounded in</strong>: <a href="../etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a> (cognitive emergence parallel).</li>
+</ul>
+<h2 id="open-research">Open research</h2>
+<ol>
+<li><strong>Empirical calibration</strong> — what ARE the actual threshold values for VibeSwap specifically?</li>
+<li><strong>Gradient indicators</strong> — leading indicators (clustering coefficient, contribution-type entropy trend) that predict approach to threshold?</li>
+<li><strong>Parameter interactions</strong> — can high connectivity compensate for low heterogeneity, or are thresholds independent?</li>
+</ol>
+<p>Each is research direction. Data from the 9-15 month bootstrap will inform.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Cooperative intelligence emerges at a phase transition (Santa Fe lineage). Four parameters with empirically-observed thresholds: connectivity (median degree ≥ 5), heterogeneity (Shannon entropy ≥ 2.5 bits), feedback speed (≤ 1 week), institutional fit (mechanisms pass Triad). VibeSwap currently: 1/4 above (feedback speed). Emergence timeline 9-15 months with deliberate bootstrap. Four traps to avoid. Quality &gt; quantity; Metcalfe's Law insufficient.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/03_THE_ATTENTION_AUCTION_PARADOX.html" class="nav-cell prev"><div class="label">&larr; PREV // 03</div><div class="ttl">The Attention Auction Paradox</div></a>
+  <a href="/papers/05_THE_FORK_RESISTANCE_CONSTANT.html" class="nav-cell next"><div class="label">NEXT // 05 &rarr;</div><div class="ttl">The Fork Resistance Constant</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

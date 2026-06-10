@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>VibeSwap :: Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Hero */
+.hero { max-width: 1280px; margin: 0 auto; padding: 56px 32px 32px; }
+.kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; color: var(--matrix);
+  font-weight: 600; margin-bottom: 18px; letter-spacing: 0.02em;
+}
+.kicker .caret { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+h1.hero-title {
+  font-size: clamp(48px, 7.5vw, 88px); font-weight: 800;
+  letter-spacing: -0.035em; color: var(--fg-white); line-height: 1;
+}
+.hero-title .dot { color: var(--matrix); }
+.hero-sub {
+  font-size: 20px; color: var(--terminal);
+  margin-top: 18px; font-weight: 600; letter-spacing: -0.015em;
+}
+.hero-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--muted); margin-top: 22px;
+}
+.hero-hint kbd {
+  background: var(--surface-3); border: 1px solid var(--border);
+  padding: 1px 8px; border-radius: 3px; color: var(--fg-white); margin: 0 2px;
+}
+
+/* Filter chips */
+.filters {
+  max-width: 1280px; margin: 0 auto; padding: 8px 32px 24px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.chip {
+  padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: 2px; cursor: pointer;
+  color: var(--muted); transition: all 0.15s;
+  letter-spacing: 0.08em;
+}
+.chip:hover { color: var(--fg); border-color: var(--border-hi); }
+.chip.active {
+  color: var(--matrix); border-color: var(--matrix);
+  background: rgba(0,255,65,0.05);
+}
+
+/* Rolodex */
+.rolodex {
+  max-width: 1280px; margin: 0 auto;
+  padding: 20px 32px 60px;
+  min-height: 620px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.stage {
+  position: relative; width: 100%; height: 500px;
+  perspective: 1400px; perspective-origin: center center;
+  margin-bottom: 30px;
+}
+.paper-card {
+  position: absolute; top: 50%; left: 50%;
+  width: min(560px, 90vw); height: 440px;
+  margin-left: calc(min(560px, 90vw) / -2);
+  margin-top: -220px;
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 4px; padding: 28px 32px; cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease, border-color 0.3s, box-shadow 0.3s;
+  backface-visibility: hidden; will-change: transform, opacity;
+}
+.paper-card.active {
+  border-color: var(--matrix);
+  box-shadow: 0 0 50px -10px rgba(0,255,65,0.28), 0 0 20px -5px rgba(0,255,65,0.15);
+}
+.paper-card.cyan.active {
+  border-color: var(--terminal);
+  box-shadow: 0 0 50px -10px rgba(0,212,255,0.28), 0 0 20px -5px rgba(0,212,255,0.15);
+}
+.paper-chrome {
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted-dim);
+  padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  letter-spacing: 0.05em;
+}
+.paper-chrome .num { color: var(--fg-white); font-weight: 700; }
+.paper-chrome .accent { color: var(--matrix); }
+.paper-card.cyan .paper-chrome .accent { color: var(--terminal); }
+.paper-body { padding-top: 22px; }
+.paper-card h2 {
+  font-size: 30px; font-weight: 800; color: var(--fg-white);
+  letter-spacing: -0.025em; line-height: 1.1; margin-bottom: 14px;
+}
+.paper-tagline {
+  font-size: 14px; color: var(--terminal); font-weight: 500;
+  line-height: 1.4; margin-bottom: 18px; letter-spacing: -0.01em;
+}
+.paper-summary {
+  font-size: 13px; color: var(--muted); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.paper-footer {
+  position: absolute; bottom: 22px; left: 32px; right: 32px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim); padding-top: 14px; border-top: 1px solid var(--border);
+}
+.paper-cta { color: var(--matrix); font-weight: 600; letter-spacing: 0.08em; }
+.paper-card.cyan .paper-cta { color: var(--terminal); }
+
+/* Nav */
+.nav-row {
+  display: flex; align-items: center; gap: 24px; margin-top: 8px;
+}
+.nav-btn {
+  background: var(--surface-1); border: 1px solid var(--border); color: var(--fg);
+  font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700;
+  width: 44px; height: 44px; border-radius: 4px; cursor: pointer;
+  transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+}
+.nav-btn:hover:not(:disabled) {
+  border-color: var(--matrix); color: var(--matrix);
+  box-shadow: 0 0 15px -5px rgba(0,255,65,0.3);
+}
+.nav-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.counter {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  color: var(--muted); min-width: 80px; text-align: center;
+}
+.counter .current { color: var(--matrix); font-weight: 700; }
+
+/* Cmd-K palette */
+.palette-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px); z-index: 200;
+  display: none; align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+}
+.palette-backdrop.open { display: flex; }
+.palette {
+  width: min(560px, 92vw); max-height: 60vh;
+  background: var(--surface-1); border: 1px solid var(--matrix);
+  border-radius: 6px;
+  box-shadow: 0 30px 80px -10px rgba(0,0,0,0.6), 0 0 40px -10px rgba(0,255,65,0.3);
+  display: flex; flex-direction: column;
+}
+.palette input {
+  background: transparent; border: 0; outline: 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 16px;
+  color: var(--fg-white); padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.palette input::placeholder { color: var(--muted-dim); }
+.palette-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+.palette-item {
+  padding: 10px 22px;
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  cursor: pointer; display: flex; align-items: center; gap: 14px;
+  color: var(--fg);
+}
+.palette-item .num { color: var(--muted-dim); width: 28px; }
+.palette-item .ttl { flex: 1; }
+.palette-item.cursor { background: rgba(0,255,65,0.08); color: var(--fg-white); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .topbar-inner { padding: 12px 18px; font-size: 11px; }
+  .topbar-nav a { margin-left: 14px; font-size: 11px; }
+  .hero { padding: 32px 18px 20px; }
+  h1.hero-title { font-size: 40px; }
+  .hero-sub { font-size: 15px; }
+  .filters { padding: 4px 18px 16px; }
+  .rolodex { padding: 12px 18px 40px; min-height: auto; }
+  .stage { height: 400px; perspective: 900px; }
+  .paper-card { width: min(340px, 92vw); height: 380px; margin-left: calc(min(340px, 92vw) / -2); margin-top: -190px; padding: 22px; }
+  .paper-card h2 { font-size: 22px; }
+  .paper-tagline { font-size: 13px; }
+  .paper-summary { font-size: 12px; -webkit-line-clamp: 5; }
+  .paper-footer { left: 22px; right: 22px; bottom: 18px; font-size: 10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/">home</a>
+      <a href="/decks.html">decks</a>
+      <a href="#" onclick="openPalette();return false;">cmd+K</a>
+    </nav>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="kicker">&gt; research // 30 papers <span class="caret">_</span></div>
+  <h1 class="hero-title">Papers<span class="dot">.</span></h1>
+  <div class="hero-sub">Mechanism design, fairness math, substrate philosophy.</div>
+  <div class="hero-hint">
+    <kbd>&#9664;</kbd> <kbd>&#9654;</kbd> rotate &middot; <kbd>Enter</kbd> open &middot; <kbd>Cmd</kbd>+<kbd>K</kbd> search &middot; tap a card to bring to center
+  </div>
+</section>
+
+<div class="filters" id="filters">
+  <span class="chip active" data-filter="ALL">ALL <span style="color:var(--muted-dim);margin-left:6px">30</span></span>
+  <span class="chip" data-filter="IMPLEMENTED">IMPLEMENTED <span style="color:var(--muted-dim);margin-left:6px" id="cnt-IMPLEMENTED"></span></span>
+  <span class="chip" data-filter="PARTIAL">PARTIAL <span style="color:var(--muted-dim);margin-left:6px" id="cnt-PARTIAL"></span></span>
+  <span class="chip" data-filter="ESSAY">ESSAY <span style="color:var(--muted-dim);margin-left:6px" id="cnt-ESSAY"></span></span>
+  <span class="chip" data-filter="PRIMITIVE-ONLY">PRIMITIVE-ONLY <span style="color:var(--muted-dim);margin-left:6px" id="cnt-PRIMITIVE-ONLY"></span></span>
+  <span class="chip" data-filter="SPEC-ONLY">SPEC-ONLY <span style="color:var(--muted-dim);margin-left:6px" id="cnt-SPEC-ONLY"></span></span>
+</div>
+
+<section class="rolodex">
+  <div class="stage" id="stage"></div>
+  <div class="nav-row">
+    <button class="nav-btn" id="prev" aria-label="Previous">&#9664;</button>
+    <span class="counter"><span class="current" id="cur">1</span> / <span id="total">30</span></span>
+    <button class="nav-btn" id="next" aria-label="Next">&#9654;</button>
+  </div>
+</section>
+
+<div class="palette-backdrop" id="palette" onclick="if(event.target===this)closePalette()">
+  <div class="palette">
+    <input id="paletteInput" placeholder="search papers..." autocomplete="off">
+    <div class="palette-list" id="paletteList"></div>
+  </div>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/" style="color: var(--terminal); border: 0;">&larr; vibeswap home</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+const PAPERS = [{"num": 1, "title": "The Fairness Fixed Point", "tagline": "**Status**: Formal convergence analysis with concrete iteration scenarios.", "summary": "Imagine a community that distributes rewards based on contributions every month. Month 1: the community is small. A few high-trust founders attest most contributions. Rewards flow mostly to them.", "status": "PARTIAL", "subject": "Fairness fixed point", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/01_THE_FAIRNESS_FIXED_POINT.html"}, {"num": 2, "title": "Substrate Incompleteness", "tagline": "**Status**: Design humility principle with concrete walked-through surfaces.", "summary": "You're building a fairness mechanism. You work hard on it. You spot a gaming pattern and block it. Then you spot another. Then another. Every mechanism you build catches some cases of unfairness and misses others. The cases it misses are its \"capture surface\" — places where sophisticated attackers can still exploit.", "status": "PRIMITIVE-ONLY", "subject": "Substrate incompleteness", "accent": "muted", "badgeColor": "muted", "href": "/papers/02_SUBSTRATE_INCOMPLETENESS.html"}, {"num": 3, "title": "The Attention Auction Paradox", "tagline": "**Status**: Theoretical tension with walked examples for three senses of positive-sum.", "summary": "You're at a meeting. Your attention is in the room. At that same moment, you're NOT: - Answering email. - Working on a different project. - Thinking about your kids. Your attention can only be in one place. When you choose Option A, Options B, C, D are left unfunded. Pure trade-off.", "status": "IMPLEMENTED", "subject": "Attention auction paradox", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/03_THE_ATTENTION_AUCTION_PARADOX.html"}, {"num": 4, "title": "Cooperative Emergence Threshold", "tagline": "**Status**: Research memo with specific 9-15 month projection.", "summary": "If you put 5 people in a room, they can have a conversation. Decisions get made by agreement. Put 50 people in the same room, decisions get made by small groups dominating while others watch.", "status": "SPEC-ONLY", "subject": "Cooperative emergence threshold", "accent": "amber", "badgeColor": "amber", "href": "/papers/04_COOPERATIVE_EMERGENCE_THRESHOLD.html"}, {"num": 5, "title": "The Fork Resistance Constant", "tagline": "**Status**: Analysis of the Lawson Constant's fork-immunity properties.", "summary": "\"What stops someone from copying VibeSwap's code and launching a competitor? Won't they just capture the market?\" This is a legitimate worry. DeFi history is full of successful forks: - Uniswap → SushiSwap (captured significant liquidity in 2020). - Compound → Venus (captured BSC users). - Many AMMs have been forked with minor variations.", "status": "IMPLEMENTED", "subject": "Fork resistance constant", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/05_THE_FORK_RESISTANCE_CONSTANT.html"}, {"num": 6, "title": "Kolmogorov Complexity of Attribution", "tagline": "**Status**: Information-theoretic analysis with concrete compression examples.", "summary": "You have a 100 MB photo. You email it to a friend. The email takes 10 seconds. You have a 100 MB video of a quiet wall. Same color throughout. You email it. The email takes 0.1 seconds because compression reduces it to a few KB.", "status": "PARTIAL", "subject": "Kolmogorov complexity of attribution", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/06_KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.html"}, {"num": 7, "title": "The Uncomputable Marginal", "tagline": "**Status**: Computability analysis with numeric examples of exponential explosion + Monte Carlo approximation.", "summary": "Imagine you have 2 coins to flip. There are 4 possible outcomes: HH, HT, TH, TT. 3 coins: 8 outcomes. 4 coins: 16 outcomes. 10 coins: 1024 outcomes. 30 coins: ~1 billion outcomes. 50 coins: ~1 quadrillion. 100 coins: 10^30 — vastly more than atoms in the observable universe.", "status": "PARTIAL", "subject": "The uncomputable marginal", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/07_THE_UNCOMPUTABLE_MARGINAL.html"}, {"num": 8, "title": "Entropy Preservation in the DAG", "tagline": "**Status**: Information-theoretic fidelity analysis with concrete N-bit accounting.", "summary": "You record a concert. You can: **Option A — Full-fidelity audio**: lossless recording preserves every acoustic detail. Files are huge. You need expensive storage.", "status": "PARTIAL", "subject": "Entropy preservation in DAG", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/08_ENTROPY_PRESERVATION_IN_DAG.html"}, {"num": 9, "title": "The Observer Effect in Attestation", "tagline": "**Status**: Goodhart's Law applied with concrete gaming scenarios + counter-moves.", "summary": "In 1975, British economist Charles Goodhart made an observation about central banks. When a central bank chose \"M1 money supply\" as a target to control, the market adjusted around it. M1 stopped correlating with the underlying economic health it was supposed to indicate. The metric became a target; the correlation broke. Marilyn...", "status": "PARTIAL", "subject": "Observer effect in attestation", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/09_THE_OBSERVER_EFFECT_IN_ATTESTATION.html"}, {"num": 10, "title": "Rational Ignorance as Mechanism", "tagline": "**Status**: Public-choice theory applied to on-chain governance + attestation.", "summary": "Have you voted in a national election? A local election? A corporate vote? An online poll? Did you deeply research each candidate / issue / option? Or did you go with a heuristic — party line, friend's recommendation, gut feel?", "status": "PARTIAL", "subject": "Rational ignorance as mechanism", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/10_RATIONAL_IGNORANCE_AS_MECHANISM.html"}, {"num": 11, "title": "The Siren Protocol", "tagline": "**Status**: Live in `contracts/core/HoneypotDefense.sol` + `OmniscientAdversaryDefense.sol`.", "summary": "Ask 100 security engineers: \"How do you defend against attackers?\" ~95 will say: **blacklist**. Block attacker addresses. Refuse their transactions. Put their names on ban lists.", "status": "IMPLEMENTED", "subject": "Siren protocol", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/11_SIREN_PROTOCOL.html"}, {"num": 12, "title": "Clawback Cascade — Mechanics", "tagline": "**Status**: Live in `contracts/compliance/ClawbackRegistry.sol` + `ClawbackVault.sol`.", "summary": "2021: someone hacks a DEX for $100M. They withdraw funds to their own wallet. Standard response: exchanges freeze the attacker's addresses. Hack-linked wallets blacklisted.", "status": "IMPLEMENTED", "subject": "Clawback cascade mechanics", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/12_CLAWBACK_CASCADE_MECHANICS.html"}, {"num": 13, "title": "NCI Weight Function — Formal Treatment", "tagline": "**Status**: Live in `contracts/consensus/NakamotoConsensusInfinity.sol`.", "summary": "Bitcoin pioneered one kind of consensus: Proof of Work. Mine hash puzzles. Longest chain wins. Elegant but energy-intensive. Ethereum moved to another: Proof of Stake. Stake ETH. Validators chosen proportional to stake. Less energy but introduces plutocracy risk (richest validators have most influence).", "status": "IMPLEMENTED", "subject": "NCI weight function", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/13_NCI_WEIGHT_FUNCTION.html"}, {"num": 14, "title": "The Lawson Floor Mathematics", "tagline": "**Status**: Formal composition of two Lawson primitives.", "summary": "Ten people collaborate on a project. Five are heavily involved; five are modestly involved. Project succeeds. $1000 in rewards to distribute.", "status": "IMPLEMENTED", "subject": "Lawson floor mathematics", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/14_THE_LAWSON_FLOOR_MATHEMATICS.html"}, {"num": 15, "title": "Disintermediation Grades", "tagline": "**The Cincinnatus Roadmap: A Six-Grade Scale for Measuring Protocol Sovereignty**", "summary": "*Faraday1, March 2026* We present a formal grading system for measuring the degree of peer-to-peer interaction in decentralized protocols. The scale runs from Grade 0 (fully intermediated, every interaction requires a trusted third party) to Grade 5 (pure peer-to-peer, no intermediation point exists). We apply this scale to every...", "status": "IMPLEMENTED", "subject": "Disintermediation grades", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/15_DISINTERMEDIATION_GRADES.html"}, {"num": 16, "title": "The Rosetta Protocol and the Ten Covenants of Tet", "tagline": "**Faraday1**", "summary": "**March 2026** Multi-agent AI systems face a translation problem: each agent operates within its own domain lexicon, and communication between agents degrades when terms carry different meanings in different contexts. We present the Rosetta Protocol --- a universal translation layer for cross-agent communication built on nine domain...", "status": "IMPLEMENTED", "subject": "Rosetta covenants", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/16_ROSETTA_COVENANTS.html"}, {"num": 17, "title": "ZK Attribution — Proving Work Without Revealing Content", "tagline": "**Status**: Research direction + design sketch.", "summary": "Every contribution the DAG records carries an evidence hash pointing to some off-chain artifact. For most contributions this is fine — the artifact is meant to be public. A public commit, a published paper, a public Telegram message. But some valuable contributions have private content:", "status": "PARTIAL", "subject": "ZK attribution", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/17_ZK_ATTRIBUTION.html"}, {"num": 18, "title": "Optimistic Shapley — Distribution at Scale", "tagline": "**Status**: Design proposal for gas-efficient Shapley at production scale.", "summary": "You want to distribute rewards to 1,000 contributors. Fair distribution requires Shapley computation — which requires evaluating 2^1000 subsets. On-chain, this is impossible. Even at Monte Carlo approximation with 5,000 samples × 1,000 coalition evaluations per sample = 5M operations per distribution round.", "status": "PARTIAL", "subject": "Optimistic Shapley", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/18_OPTIMISTIC_SHAPLEY.html"}, {"num": 19, "title": "Why VibeSwap Wins in 2030", "tagline": "**Status**: Strategic scenario analysis. 5-year projection from 2026-04-22.", "summary": "Skip forward in your imagination. It's January 2030. You're asking: \"How did VibeSwap turn out?\"", "status": "ESSAY", "subject": "Why VibeSwap wins in 2030", "accent": "terminal", "badgeColor": "terminal", "href": "/papers/19_WHY_VIBESWAP_WINS_IN_2030.html"}, {"num": 20, "title": "The Coordination Primitive Market", "tagline": "**Status**: Category-creation analysis. What \"coordination primitive\" means as a category.", "summary": "You've heard of DEXes, AMMs, lending platforms, NFT marketplaces. These are product CATEGORIES. Each has multiple projects competing within it. When someone says \"what category is Uniswap?\", you say: DEX.", "status": "ESSAY", "subject": "The coordination primitive market", "accent": "terminal", "badgeColor": "terminal", "href": "/papers/20_THE_COORDINATION_PRIMITIVE_MARKET.html"}, {"num": 21, "title": "Investor Economic Model", "tagline": "**Status**: Transparent financial modeling framework.", "summary": "This doc is a financial model, not a sales pitch. Real financial models have: - Stated assumptions. - Probabilities attached to scenarios. - Sensitivity analysis. - Acknowledged risks. - Time horizons. - Comparable benchmarks.", "status": "ESSAY", "subject": "Investor economic model", "accent": "terminal", "badgeColor": "terminal", "href": "/papers/21_INVESTOR_ECONOMIC_MODEL.html"}, {"num": 22, "title": "Regulatory Compliance — Deep Dive", "tagline": "**Status**: Jurisdictional analysis beyond the existing SEC whitepaper.", "summary": "Crypto projects often treat regulation as \"we'll deal with it after product-market-fit.\" That's a mistake. Regulation shapes who can adopt. A regulator-unfriendly project: - Has harder time raising institutional capital. - Can't partner with regulated entities (banks, exchanges). - Faces uncertainty about token classification. - May...", "status": "ESSAY", "subject": "Regulatory compliance deep dive", "accent": "terminal", "badgeColor": "terminal", "href": "/papers/22_REGULATORY_COMPLIANCE_DEEP_DIVE.html"}, {"num": 23, "title": "The Community Bootstrap Playbook", "tagline": "**Status**: Operational manual for converting early contributors into durable community.", "summary": "In start-up parlance, \"bootstrap phase\" is a well-known stage. For a crypto protocol, it's the period between \"zero users\" and \"community has emergent properties\" (see [Cooperative Emergence Threshold](../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md)). For VibeSwap, bootstrap is roughly 2025-2028.", "status": "ESSAY", "subject": "The community bootstrap playbook", "accent": "terminal", "badgeColor": "terminal", "href": "/papers/23_THE_COMMUNITY_BOOTSTRAP_PLAYBOOK.html"}, {"num": 24, "title": "The Cognitive Economy Thesis", "tagline": "**Status**: Outreach-scale essay. LinkedIn / Medium / course-material adaptation.", "summary": "**The mind is not separate from economics. It IS an economy.** Not \"like\" an economy. *Is*. Same mathematics. Same dynamics. Same failure modes.", "status": "PARTIAL", "subject": "The cognitive economy thesis", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/24_THE_COGNITIVE_ECONOMY_THESIS.html"}, {"num": 25, "title": "Attention as Infrastructure", "tagline": "**Status**: Philosophical essay + design implications.", "summary": "Take a moment right now. Count: - How many tabs are open on your computer? - How many notifications are waiting? - How many emails unread? - How many people are trying to reach you?", "status": "PRIMITIVE-ONLY", "subject": "Attention as infrastructure", "accent": "muted", "badgeColor": "muted", "href": "/papers/25_ATTENTION_AS_INFRASTRUCTURE.html"}, {"num": 26, "title": "The Dignity Gradient", "tagline": "**Status**: Economic + social analysis.", "summary": "Think of a service you use. Maybe it's a social media app, maybe a streaming platform, maybe a bank app. Ask yourself: does this system treat you like a person with dignity, or like a resource to extract from?", "status": "IMPLEMENTED", "subject": "The dignity gradient", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/26_THE_DIGNITY_GRADIENT.html"}, {"num": 27, "title": "What LLMs Teach Us About Mind", "tagline": "**Status**: Pedagogical essay. Assumes the reader is new to these ideas.", "summary": "For most of human history, \"what is mind?\" was a purely philosophical question. We couldn't build a mind; we could only speculate about ours. The speculations produced rich traditions — philosophy of mind, cognitive science, theology — but none could be tested the way engineering can be tested. LLMs change this. Large Language Models...", "status": "PRIMITIVE-ONLY", "subject": "What LLMs teach us about mind", "accent": "muted", "badgeColor": "muted", "href": "/papers/27_WHAT_LLMS_TEACH_US_ABOUT_MIND.html"}, {"num": 28, "title": "True Price Oracle — Deep Dive", "tagline": "**Status**: Pedagogical implementation deep-dive.", "summary": "An AMM (automated market maker) needs to know prices. The simple approach: let trades set the price. When someone buys ETH for USDC, the price goes up; when someone sells, it goes down. Simple. But there's a problem: what if there's only one trader? They could buy a tiny bit, set a silly price, then exploit the silly price. This is...", "status": "IMPLEMENTED", "subject": "True price oracle deep dive", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/28_TRUE_PRICE_ORACLE_DEEP_DIVE.html"}, {"num": 29, "title": "Cross-Chain State Atomicity", "tagline": "**Status**: Pedagogical deep-dive on LayerZero V2 integration + atomicity tradeoffs.", "summary": "You send $100 USDC from Ethereum to Polygon. You want the result: $100 disappeared from Ethereum AND $100 appeared on Polygon. Not one without the other. This is the cross-chain atomicity problem. What does \"atomic\" mean when two separate chains are involved? How do we guarantee both sides complete, or neither completes, with no...", "status": "PARTIAL", "subject": "Cross-chain state atomicity", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/29_CROSS_CHAIN_STATE_ATOMICITY.html"}, {"num": 30, "title": "Storage Slot Ecology", "tagline": "**Status**: Pedagogical deep-dive on UUPS upgrade-discipline for long-arc contract durability.", "summary": "Your smart contract is upgradeable. You deploy v1. Six months later, you upgrade to v2 with new features. Six months after that, v3. Two years in, v7. Each upgrade adds new state variables. Over years, the contract has accumulated layers of state. The concern: do v1, v2, v3 ... v7 all coexist correctly? Can a user who interacts with...", "status": "IMPLEMENTED", "subject": "Storage slot ecology", "accent": "matrix", "badgeColor": "matrix", "href": "/papers/30_STORAGE_SLOT_ECOLOGY.html"}];
+let currentIndex = 0;
+let activeFilter = 'ALL';
+const stage = document.getElementById('stage');
+const counterEl = document.getElementById('cur');
+const totalEl = document.getElementById('total');
+const prevBtn = document.getElementById('prev');
+const nextBtn = document.getElementById('next');
+
+function filteredPapers() {
+  if (activeFilter === 'ALL') return PAPERS;
+  return PAPERS.filter(p => p.status === activeFilter);
+}
+
+function getTransform(rel) {
+  const offsetX = rel * 220;
+  const scale = rel === 0 ? 1 : Math.max(0.7, 1 - Math.abs(rel) * 0.14);
+  const rotY = rel * -22;
+  const z = rel === 0 ? 0 : -Math.min(300, Math.abs(rel) * 140);
+  return `translateX(${offsetX}px) translateZ(${z}px) rotateY(${rotY}deg) scale(${scale})`;
+}
+
+function render() {
+  const list = filteredPapers();
+  totalEl.textContent = list.length;
+  stage.innerHTML = '';
+  if (currentIndex >= list.length) currentIndex = 0;
+  list.forEach((p, i) => {
+    const rel = i - currentIndex;
+    const card = document.createElement('div');
+    const cyanClass = p.accent === 'terminal' ? ' cyan' : '';
+    card.className = 'paper-card' + cyanClass + (rel === 0 ? ' active' : '');
+    card.innerHTML = `
+      <div class="paper-chrome">
+        <div><span class="num">${String(p.num).padStart(2,'0')}</span>&nbsp;&nbsp;<span class="accent">${p.subject}</span></div>
+        <span class="badge badge-${p.badgeColor}">${p.status}</span>
+      </div>
+      <div class="paper-body">
+        <h2>${p.title}</h2>
+        <div class="paper-tagline">${p.tagline}</div>
+        <div class="paper-summary">${p.summary}</div>
+      </div>
+      <div class="paper-footer">
+        <span>${p.href}</span>
+        <span class="paper-cta">${rel === 0 ? 'OPEN &rarr;' : 'BRING TO CENTER'}</span>
+      </div>`;
+    card.style.transform = getTransform(rel);
+    const absRel = Math.abs(rel);
+    card.style.opacity = absRel > 3 ? '0' : String(Math.max(0.2, 1 - absRel * 0.28));
+    card.style.zIndex = String(100 - absRel);
+    card.style.pointerEvents = absRel > 3 ? 'none' : 'auto';
+    card.addEventListener('click', () => {
+      if (rel === 0) window.location.href = p.href;
+      else { currentIndex = i; render(); }
+    });
+    stage.appendChild(card);
+  });
+  counterEl.textContent = currentIndex + 1;
+  prevBtn.disabled = currentIndex === 0;
+  nextBtn.disabled = currentIndex >= list.length - 1;
+}
+
+function next() { const list = filteredPapers(); if (currentIndex < list.length - 1) { currentIndex++; render(); } }
+function prev() { if (currentIndex > 0) { currentIndex--; render(); } }
+prevBtn.addEventListener('click', prev);
+nextBtn.addEventListener('click', next);
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('palette').classList.contains('open')) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  else if (e.key === 'Enter') { e.preventDefault(); const list=filteredPapers(); if(list[currentIndex]) window.location.href = list[currentIndex].href; }
+  else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); }
+});
+
+// Touch swipe
+let touchStartX = null;
+stage.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+stage.addEventListener('touchend', (e) => {
+  if (touchStartX === null) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(dx) > 50) { if (dx < 0) next(); else prev(); }
+  touchStartX = null;
+});
+
+// Filter chips
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeFilter = chip.dataset.filter;
+    currentIndex = 0;
+    render();
+  });
+});
+
+// Populate filter counts
+const counts = {};
+PAPERS.forEach(p => { counts[p.status] = (counts[p.status] || 0) + 1; });
+Object.keys(counts).forEach(k => {
+  const el = document.getElementById('cnt-' + k);
+  if (el) el.textContent = counts[k];
+});
+
+// Cmd-K palette
+const paletteEl = document.getElementById('palette');
+const paletteInput = document.getElementById('paletteInput');
+const paletteList = document.getElementById('paletteList');
+let paletteCursor = 0;
+let paletteResults = PAPERS;
+
+function openPalette() {
+  paletteEl.classList.add('open');
+  paletteInput.value = '';
+  paletteResults = PAPERS;
+  paletteCursor = 0;
+  renderPalette();
+  setTimeout(() => paletteInput.focus(), 50);
+}
+function closePalette() { paletteEl.classList.remove('open'); }
+
+function renderPalette() {
+  paletteList.innerHTML = '';
+  paletteResults.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'palette-item' + (i === paletteCursor ? ' cursor' : '');
+    row.innerHTML = `<span class="num">${String(p.num).padStart(2,'0')}</span><span class="ttl">${p.title}</span><span class="badge badge-${p.badgeColor}">${p.status}</span>`;
+    row.addEventListener('click', () => { window.location.href = p.href; });
+    paletteList.appendChild(row);
+  });
+}
+
+paletteInput.addEventListener('input', () => {
+  const q = paletteInput.value.toLowerCase().trim();
+  paletteResults = PAPERS.filter(p =>
+    p.title.toLowerCase().includes(q) ||
+    p.tagline.toLowerCase().includes(q) ||
+    p.summary.toLowerCase().includes(q) ||
+    p.subject.toLowerCase().includes(q)
+  );
+  paletteCursor = 0;
+  renderPalette();
+});
+paletteInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closePalette(); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); paletteCursor = Math.min(paletteCursor + 1, paletteResults.length - 1); renderPalette(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); paletteCursor = Math.max(paletteCursor - 1, 0); renderPalette(); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (paletteResults[paletteCursor]) window.location.href = paletteResults[paletteCursor].href; }
+});
+
+render();
+</script>
+
+</body>
+</html>

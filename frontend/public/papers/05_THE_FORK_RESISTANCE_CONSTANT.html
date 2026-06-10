@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Fork Resistance Constant :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">05</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#a-common-crypto-concern">A common crypto concern</a>
+    <a class="toc-link" href="#the-observation">The observation</a>
+    <a class="toc-link" href="#the-lawson-constant-as-fork-deterrent">The Lawson Constant as fork deterrent</a>
+    <a class="toc-link" href="#walk-through-fork-scenarios">Walk through fork scenarios</a>
+    <a class="toc-link l3" href="#scenario-1-copycat-fork-simple">Scenario 1 — Copycat fork, simple</a>
+    <a class="toc-link l3" href="#scenario-2-well-funded-hostile-fork">Scenario 2 — Well-funded hostile fork</a>
+    <a class="toc-link l3" href="#scenario-3-friendly-fork-new-frontier">Scenario 3 — Friendly fork (new frontier)</a>
+    <a class="toc-link l3" href="#scenario-4-governance-drift-fork">Scenario 4 — Governance-drift fork</a>
+    <a class="toc-link" href="#when-forking-is-rational">When forking IS rational</a>
+    <a class="toc-link" href="#when-forking-is-self-defeating">When forking is self-defeating</a>
+    <a class="toc-link" href="#the-social-graph-fork-obstacle">The social-graph fork obstacle</a>
+    <a class="toc-link l3" href="#scenario-different-humans-as-fork-founders">Scenario: different humans as fork founders</a>
+    <a class="toc-link l3" href="#scenario-same-humans-with-split-allegiance">Scenario: same humans with split allegiance</a>
+    <a class="toc-link" href="#kfork-the-fork-resistance-metric">K_fork — the fork-resistance metric</a>
+    <a class="toc-link" href="#why-vibeswap-doesnt-use-legal-defense">Why VibeSwap doesn't use legal defense</a>
+    <a class="toc-link" href="#the-four-fork-resistance-layers">The four fork-resistance layers</a>
+    <a class="toc-link l3" href="#layer-1-lawson-constant-in-bytecode">Layer 1 — Lawson Constant in bytecode</a>
+    <a class="toc-link l3" href="#layer-2-accumulated-attention-graph">Layer 2 — Accumulated attention-graph</a>
+    <a class="toc-link l3" href="#layer-3-contribution-traceability-chains">Layer 3 — Contribution Traceability chains</a>
+    <a class="toc-link l3" href="#layer-4-three-token-economic-substrate">Layer 4 — Three-token economic substrate</a>
+    <a class="toc-link" href="#the-cincinnatus-pattern">The Cincinnatus pattern</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">05</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Fork resistance constant</span>
+    </div>
+    <h1>The Fork Resistance Constant</h1>
+<div class="tagline">**Status**: Analysis of the Lawson Constant's fork-immunity properties.</div>
+
+<p><strong>Status</strong>: Analysis of the Lawson Constant's fork-immunity properties.
+<strong>Audience</strong>: First-encounter OK. Fork attempt scenarios walked concretely.</p>
+<hr />
+<h2 id="a-common-crypto-concern">A common crypto concern</h2>
+<p>"What stops someone from copying VibeSwap's code and launching a competitor? Won't they just capture the market?"</p>
+<p>This is a legitimate worry. DeFi history is full of successful forks:
+- Uniswap → SushiSwap (captured significant liquidity in 2020).
+- Compound → Venus (captured BSC users).
+- Many AMMs have been forked with minor variations.</p>
+<p>If VibeSwap is just code, forking is easy. What makes VibeSwap hard to fork?</p>
+<p>Answer: the code is trivial to copy. The <strong>accumulated attention-graph</strong> (who trusts whom, who has cited whom, what lineage connects contributors) is NOT. That's where fork-resistance lives.</p>
+<h2 id="the-observation">The observation</h2>
+<p>A fork is a copy of a protocol that diverges from the original. Forks copy:</p>
+<ul>
+<li>Contract bytecode (open source — easy).</li>
+<li>Contract storage state at fork block (with modified owner).</li>
+<li>Frontend (open source — easy).</li>
+<li>Documentation (easy).</li>
+</ul>
+<p>A fork does NOT copy:</p>
+<ul>
+<li>The social graph of trust relationships (handshakes in ContributionDAG).</li>
+<li>The accumulated attestations and their lineage.</li>
+<li>The accumulated reputation of specific contributors.</li>
+<li>The historical Source→Solution→DAG chains from Contribution Traceability.</li>
+<li>The constitutional commitment embedded in the LAWSON_CONSTANT bytes32.</li>
+</ul>
+<p>The asymmetry is load-bearing. What's copyable is cheap. What's NOT copyable is the substrate of value.</p>
+<h2 id="the-lawson-constant-as-fork-deterrent">The Lawson Constant as fork deterrent</h2>
+<pre><code class="language-solidity">bytes32 public constant LAWSON_CONSTANT = keccak256(&quot;FAIRNESS_ABOVE_ALL:W.GLYNN:2026&quot;);
+</code></pre>
+<p>A fork that keeps the Lawson Constant is contractually ADMITTING "this is a fork of Will Glynn's 2026 VibeSwap." The attribution is in the bytecode.</p>
+<p>A fork that removes the Lawson Constant:
+- Breaks tests (contribution-DAG tests assert this exact hash).
+- Can't verify its fork works correctly.
+- Severs the chain of attribution that the constant anchors.</p>
+<p>Attribution-as-load-bearing. The Constant is not decorative; it's a structural gate. Forks that try to strip it break their own verifiability.</p>
+<h2 id="walk-through-fork-scenarios">Walk through fork scenarios</h2>
+<h3 id="scenario-1-copycat-fork-simple">Scenario 1 — Copycat fork, simple</h3>
+<p><strong>Attacker</strong>: a new team deploys identical contracts. Renames the project. Claims to be a "better VibeSwap."</p>
+<p><strong>What they have</strong>: the code. The contracts execute. Users CAN deposit and trade.</p>
+<p><strong>What they don't have</strong>: the trust graph. When a user asks "who's behind this project?", the fork can only show: recent deployment, unknown team, no trust history.</p>
+<p><strong>What happens</strong>:
+- Users risk-averse about unknown teams hesitate.
+- Existing VibeSwap users don't migrate; they have accumulated reputation in VibeSwap.
+- Potential new users evaluate both. Originals have social proof; fork doesn't.</p>
+<p><strong>Outcome</strong>: fork may capture SOME users (arbitrage speculators who don't care about track record). Won't capture the serious-cooperative-producers who are VibeSwap's moat.</p>
+<p><strong>Result</strong>: fork limps along; doesn't actually threaten.</p>
+<h3 id="scenario-2-well-funded-hostile-fork">Scenario 2 — Well-funded hostile fork</h3>
+<p><strong>Attacker</strong>: VC-funded team with substantial capital. Forks VibeSwap + adds their own token + promises high APY.</p>
+<p><strong>What they have</strong>: code + capital + marketing. Can attract capital-motivated users.</p>
+<p><strong>What they don't have</strong>: the trust graph. Can't replicate months of handshakes.</p>
+<p><strong>What happens</strong>:
+- Fork attracts speculators seeking high APY.
+- Speculators exit when APY normalizes.
+- Original contributors stay with VibeSwap (their reputation is there).
+- When the fork's funding runs out, its user base evaporates.</p>
+<p><strong>Outcome</strong>: temporary loss of speculative users. Long-term: fork dies; VibeSwap's cooperative core unaffected.</p>
+<h3 id="scenario-3-friendly-fork-new-frontier">Scenario 3 — Friendly fork (new frontier)</h3>
+<p><strong>Attacker</strong>: a research team wants to explore a different mechanism. Forks VibeSwap to experiment.</p>
+<p><strong>What they have</strong>: code + motivation for specific research.</p>
+<p><strong>What they don't have</strong>: the trust graph. But they don't CARE — they're exploring, not competing.</p>
+<p><strong>What happens</strong>:
+- Friendly fork coexists with original.
+- Ideas from friendly fork can flow back into VibeSwap.
+- No attention-migration; both have their own niches.</p>
+<p><strong>Outcome</strong>: ecosystem expansion, not competition.</p>
+<h3 id="scenario-4-governance-drift-fork">Scenario 4 — Governance-drift fork</h3>
+<p><strong>Scenario</strong>: VibeSwap's governance drifts from P-000/P-001 (extraction normalizes). Community-members who disagree fork to preserve constitutional axioms.</p>
+<p><strong>What happens</strong>:
+- Original becomes extractive (breaks its own constitutional commitment).
+- Fork keeps the Lawson Constant + P-001.
+- Original contributors evaluate: which is the "real" VibeSwap?
+- Those valuing constitutional integrity migrate to fork.
+- Original loses attention-graph because contributors migrated.
+- Fork becomes the successor-in-spirit.</p>
+<p><strong>Outcome</strong>: Cincinnatus pattern. Fork legitimately succeeds because original betrayed its commitment. <strong>This is the only fork-scenario where forking is clearly legitimate.</strong></p>
+<h2 id="when-forking-is-rational">When forking IS rational</h2>
+<p>Forking makes sense when:</p>
+<ol>
+<li><strong>Original is extractive</strong> — contributors want to escape. Fork requires rebuilding attention-graph from scratch, but still worth it if original is truly broken.</li>
+<li><strong>Original is captured</strong> — governance has drifted from constitutional commitments. Fork restores the axioms.</li>
+<li><strong>Architectural change</strong> needed beyond upgrade path. Fork provides clean substrate.</li>
+<li><strong>Subset of contributors</strong> want to coordinate separately. They take attention with them; original and fork coexist.</li>
+</ol>
+<p>None is automatic. Each requires sustained attention-migration — which is expensive.</p>
+<h2 id="when-forking-is-self-defeating">When forking is self-defeating</h2>
+<p>Forks fail when:</p>
+<ol>
+<li><strong>Fork resistance is structural</strong> (Lawson Constant + accumulated DAG + lineage). Can't easily port.</li>
+<li><strong>Fork promises faster rewards</strong> but lacks substrate. Pump-and-dump pattern.</li>
+<li><strong>Fork's attention-migration cost exceeds its value proposition.</strong> Contributors look at switching cost and stay.</li>
+<li><strong>Network effect of original compounds faster than fork catches up.</strong></li>
+</ol>
+<p>VibeSwap's architecture positions it in category 1 — fork resistance is structural. Forks would need to either port the entire DAG (high cost, probably not permitted by the original's license) or rebuild one from scratch (high time cost).</p>
+<h2 id="the-social-graph-fork-obstacle">The social-graph fork obstacle</h2>
+<p>ContributionDAG's web-of-trust is the hardest part to fork.</p>
+<ul>
+<li>Founders at the top have 3.0x voting multipliers.</li>
+<li>Handshakes between founders and early contributors anchor the graph.</li>
+<li>A fork's founders would either be the same humans (attention-conflict with original) or different humans (new graph, no continuity).</li>
+</ul>
+<h3 id="scenario-different-humans-as-fork-founders">Scenario: different humans as fork founders</h3>
+<p>Their graph has no trust-lineage to original's founders. Trust-scores don't propagate. Starting from scratch.</p>
+<h3 id="scenario-same-humans-with-split-allegiance">Scenario: same humans with split allegiance</h3>
+<p>Each founder contributing attention to both projects. Their trust score in each is a fraction of what it would be in one. Net: both projects under-served by founder attention; the one retaining majority wins.</p>
+<p>Either way, the original retains asymmetric advantage.</p>
+<h2 id="kfork-the-fork-resistance-metric">K_fork — the fork-resistance metric</h2>
+<p>The constant K_fork (conceptual) represents the attention-migration cost relative to value:</p>
+<pre><code>K_fork = (attention-rebuild cost) / (fork value proposition)
+</code></pre>
+<ul>
+<li>K_fork &gt; 1: forking is net-negative; forks fail.</li>
+<li>K_fork ≈ 1: forking is break-even; small forks succeed, large ones don't.</li>
+<li>K_fork &lt; 1: forking is net-positive; forks succeed.</li>
+</ul>
+<p>VibeSwap's architecture aims for K_fork &gt;&gt; 1. Attention-rebuild cost substantially exceeds any reasonable fork's value proposition.</p>
+<p>This is NOT a permanent state. If VibeSwap stops delivering value, K_fork can drop (fork value rises). Lawson Constant alone doesn't keep K_fork high indefinitely — it keeps it high CONDITIONAL on original remaining aligned with P-000 and P-001.</p>
+<h2 id="why-vibeswap-doesnt-use-legal-defense">Why VibeSwap doesn't use legal defense</h2>
+<p>Tempting: copyright the code; patent the mechanisms; restrict the license.</p>
+<p><strong>Resist.</strong> Legal fork-resistance runs counter to open-source ethos and <a href="../../concepts/NO_EXTRACTION_AXIOM.md">P-001 No Extraction Axiom</a>.</p>
+<p>Legal defense:
+- Invites legal attack in return.
+- Creates trust surfaces for the defender (are they going to sue me?).
+- Produces adversarial relationships with potential contributors.</p>
+<p>Structural defense (Lawson Constant + DAG + attention-graph):
+- Can't be legally attacked.
+- Compounds over time.
+- Transparent to everyone.</p>
+<p>Structural defense wins long-term over legal.</p>
+<h2 id="the-four-fork-resistance-layers">The four fork-resistance layers</h2>
+<p>Stacked, VibeSwap's fork resistance comes from:</p>
+<h3 id="layer-1-lawson-constant-in-bytecode">Layer 1 — Lawson Constant in bytecode</h3>
+<p>Hardcoded. Stripping breaks tests. Non-negotiable.</p>
+<h3 id="layer-2-accumulated-attention-graph">Layer 2 — Accumulated attention-graph</h3>
+<p>Months/years of trust-formation. Non-copyable.</p>
+<h3 id="layer-3-contribution-traceability-chains">Layer 3 — Contribution Traceability chains</h3>
+<p>Source fields + issue metadata + commit messages + closing comments. Together form a lineage graph that's rebuild-expensive.</p>
+<h3 id="layer-4-three-token-economic-substrate">Layer 4 — Three-token economic substrate</h3>
+<p>Each token's value is substrate-dependent. A fork can't cleanly replicate the economic equilibrium.</p>
+<p>Together, the cost of credible VibeSwap fork is measured in MILLIONS OF DOLLARS of coordination work + 12+ months of attention-rebuilding. High enough to deter casual forks.</p>
+<h2 id="the-cincinnatus-pattern">The Cincinnatus pattern</h2>
+<p><a href="../../concepts/CINCINNATUS_ENDGAME.md">Cincinnatus Endgame</a> describes voluntary return to first principles. A protocol durable long-term is one where governance voluntarily constrains itself to constitutional axioms rather than requiring fork-threat to enforce them.</p>
+<p>The Lawson Constant is the architectural reminder. The Cincinnatus pattern is the cultural reminder. Together they keep K_fork high without requiring confrontation.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: analyze a real crypto fork you know. Apply the framework:</p>
+<ol>
+<li>What did the fork copy?</li>
+<li>What did the fork fail to copy?</li>
+<li>What was K_fork in that case?</li>
+<li>Did the fork succeed or fail? Why?</li>
+</ol>
+<p>Projects to analyze: Uniswap → SushiSwap, Compound → Venus, Ethereum Classic fork.</p>
+<p>Compare to VibeSwap's K_fork architecture.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Fork resistance is structural, not legal. Lawson Constant in bytecode + accumulated DAG + Contribution Traceability chains + three-token economic substrate keep K_fork (attention-migration cost / fork-value) &gt;&gt; 1 as long as original honors P-000 and P-001. Four fork scenarios walked (copycat, well-funded hostile, friendly research, governance-drift Cincinnatus). Only the Cincinnatus case is legitimate success.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/04_COOPERATIVE_EMERGENCE_THRESHOLD.html" class="nav-cell prev"><div class="label">&larr; PREV // 04</div><div class="ttl">Cooperative Emergence Threshold</div></a>
+  <a href="/papers/06_KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.html" class="nav-cell next"><div class="label">NEXT // 06 &rarr;</div><div class="ttl">Kolmogorov Complexity of Attribution</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

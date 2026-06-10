@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Kolmogorov Complexity of Attribution :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">06</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#an-intuition-from-file-storage">An intuition from file storage</a>
+    <a class="toc-link" href="#kolmogorov-complexity-stated-plainly">Kolmogorov complexity, stated plainly</a>
+    <a class="toc-link" href="#why-this-applies-to-attribution">Why this applies to attribution</a>
+    <a class="toc-link" href="#the-structure-of-one-attribution">The structure of one attribution</a>
+    <a class="toc-link" href="#what-can-be-compressed">What can be compressed</a>
+    <a class="toc-link l3" href="#compression-1-contributor-address-interning">Compression 1 — Contributor address interning</a>
+    <a class="toc-link l3" href="#compression-2-timestamp-delta-encoding">Compression 2 — Timestamp delta encoding</a>
+    <a class="toc-link l3" href="#compression-3-parent-attestation-index-from-recent">Compression 3 — Parent-attestation index-from-recent</a>
+    <a class="toc-link l3" href="#compression-4-description-templating">Compression 4 — Description templating</a>
+    <a class="toc-link l3" href="#combined-compression">Combined compression</a>
+    <a class="toc-link" href="#what-cannot-be-compressed">What cannot be compressed</a>
+    <a class="toc-link l3" href="#incompressible-1-evidencehash">Incompressible 1 — evidenceHash</a>
+    <a class="toc-link l3" href="#incompressible-2-claimid">Incompressible 2 — ClaimId</a>
+    <a class="toc-link l3" href="#incompressible-3-large-value-fields">Incompressible 3 — Large-value fields</a>
+    <a class="toc-link" href="#the-irreducible-minimum">The irreducible minimum</a>
+    <a class="toc-link" href="#the-retrieval-cost-trade-off">The retrieval-cost trade-off</a>
+    <a class="toc-link l3" href="#cost-1-decompression-latency-per-read">Cost 1 — Decompression latency per read</a>
+    <a class="toc-link l3" href="#cost-2-write-time-complexity">Cost 2 — Write-time complexity</a>
+    <a class="toc-link" href="#storage-tier-architecture">Storage-tier architecture</a>
+    <a class="toc-link l3" href="#hot-tier">Hot tier</a>
+    <a class="toc-link l3" href="#warm-tier">Warm tier</a>
+    <a class="toc-link l3" href="#cold-tier">Cold tier</a>
+    <a class="toc-link" href="#temperature-analogy">Temperature analogy</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#the-dignity-of-storage-argument">The dignity-of-storage argument</a>
+    <a class="toc-link" href="#open-questions">Open questions</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">06</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>Kolmogorov complexity of attribution</span>
+    </div>
+    <h1>Kolmogorov Complexity of Attribution</h1>
+<div class="tagline">**Status**: Information-theoretic analysis with concrete compression examples.</div>
+
+<p><strong>Status</strong>: Information-theoretic analysis with concrete compression examples.
+<strong>Audience</strong>: First-encounter OK. Kolmogorov complexity introduced from scratch.</p>
+<hr />
+<h2 id="an-intuition-from-file-storage">An intuition from file storage</h2>
+<p>You have a 100 MB photo. You email it to a friend. The email takes 10 seconds.</p>
+<p>You have a 100 MB video of a quiet wall. Same color throughout. You email it. The email takes 0.1 seconds because compression reduces it to a few KB.</p>
+<p>Why the difference? The photo contains rich detail — each pixel is different. High "information content". The wall-video contains almost no detail — every frame is nearly identical. Low information content.</p>
+<p>Information content is formal. It's called <strong>Kolmogorov complexity</strong>.</p>
+<h2 id="kolmogorov-complexity-stated-plainly">Kolmogorov complexity, stated plainly</h2>
+<p>The Kolmogorov complexity <code>K(x)</code> of a string <code>x</code> is the length of the shortest program that outputs <code>x</code>.</p>
+<p>Not the length of <code>x</code> itself — the length of the shortest description of <code>x</code>.</p>
+<p>For the wall-video: K is tiny because "output 100MB of color C for each frame, for N frames" is a very short program.</p>
+<p>For the photo: K is close to its length — there's no shorter description than the photo itself.</p>
+<p>Kolmogorov complexity tells us: how much can this data be compressed, losslessly?</p>
+<h2 id="why-this-applies-to-attribution">Why this applies to attribution</h2>
+<p>Attribution chains are data. They live on-chain (expensive) or off-chain (cheaper). Either way, they have some information content. We want to know: can we store attribution chains efficiently?</p>
+<p>If K(attribution) is small, we can compress. If K is large, we can't.</p>
+<p>Let's figure out what K(attribution) looks like.</p>
+<h2 id="the-structure-of-one-attribution">The structure of one attribution</h2>
+<p>Per <a href="../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md"><code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code></a>, each claim has:</p>
+<ul>
+<li>Contributor address: 20 bytes.</li>
+<li>ContributionType enum: 1 byte (but really 3-4 bits needed for 9 values).</li>
+<li>evidenceHash: 32 bytes (cryptographic commitment).</li>
+<li>Description string: variable — typically 50-200 bytes.</li>
+<li>Value: 32 bytes.</li>
+<li>Timestamp: 8 bytes (unix epoch).</li>
+<li>Parent attestations: variable; 0 or more 32-byte hashes each.</li>
+<li>ClaimId: 32 bytes (derived, can be recomputed).</li>
+</ul>
+<p>Naive storage per attestation: ~200-500 bytes.</p>
+<p>For a 10,000-attestation chain: 2-5 MB.
+For a 1M-attestation chain: 200-500 MB.
+For a 10^9 chain (long-arc global): 200-500 GB.</p>
+<p>The big question: how much can we compress?</p>
+<h2 id="what-can-be-compressed">What can be compressed</h2>
+<h3 id="compression-1-contributor-address-interning">Compression 1 — Contributor address interning</h3>
+<p>Many attestations share contributors. If Alice attests 50 claims, her 20-byte address repeats 50 times = 1000 bytes.</p>
+<p>With address interning: store the 20-byte address once, reference it via a 2-byte index 50 times = 120 bytes. ~8x compression for that part.</p>
+<p>For a typical contribution graph with ~500 unique contributors and ~10000 attestations: address interning saves ~80% on the contributor field.</p>
+<h3 id="compression-2-timestamp-delta-encoding">Compression 2 — Timestamp delta encoding</h3>
+<p>Timestamps are monotonic (generally increasing). Instead of storing absolute 8-byte timestamps, store 2-byte deltas from previous.</p>
+<p>A delta ranging from 0 to ~16 hours fits in 2 bytes. For most attestations, this works. For rare cases where the delta exceeds 16 hours, use a flag bit + extended encoding.</p>
+<p>Savings: ~75% on the timestamp field.</p>
+<h3 id="compression-3-parent-attestation-index-from-recent">Compression 3 — Parent-attestation index-from-recent</h3>
+<p>Parent attestations frequently reference recent claims. Instead of storing 32-byte parent hashes, store 2-byte indices pointing to recent claims in the chain.</p>
+<p>For typical chains where parents are within the last 10^6 claims: indices are 3-4 bytes.</p>
+<p>Savings: ~8x per parent attestation.</p>
+<h3 id="compression-4-description-templating">Compression 4 — Description templating</h3>
+<p>Many descriptions have common structure. "Issue #42 — Bug fix for X" appears thousands of times.</p>
+<p>Template + fill-in: "{ISSUE_TEMPLATE} | 42 | Bug fix for X" where {ISSUE_TEMPLATE} is a 2-byte pointer to the template.</p>
+<p>For typical chains with ~20 common templates: descriptions compress by 70-80%.</p>
+<h3 id="combined-compression">Combined compression</h3>
+<p>Naive: 300 bytes/claim average.
+After compression: ~40-50 bytes/claim for typical patterns.</p>
+<p>Compression ratio: ~6-7x.</p>
+<p>For 10^9 claims: 40-50 GB compressed. Still large but feasible for archival.</p>
+<h2 id="what-cannot-be-compressed">What cannot be compressed</h2>
+<p>Some parts of the attestation structure have high intrinsic entropy:</p>
+<h3 id="incompressible-1-evidencehash">Incompressible 1 — evidenceHash</h3>
+<p>Cryptographic commitments are designed to be indistinguishable from random. 32 bytes of high-entropy data. No compression possible.</p>
+<h3 id="incompressible-2-claimid">Incompressible 2 — ClaimId</h3>
+<p>Derived from a hash; also high-entropy. Incompressible.</p>
+<h3 id="incompressible-3-large-value-fields">Incompressible 3 — Large-value fields</h3>
+<p>If values are well-distributed (as they should be under proper Shapley), they can't compress well below ~20 bits precision. 32 bytes (256 bits) is over-allocated; 3-4 bytes suffices.</p>
+<p>Savings: minor.</p>
+<p>The incompressible parts floor at ~40 bytes/claim. Below this, you lose ability to reconstruct.</p>
+<h2 id="the-irreducible-minimum">The irreducible minimum</h2>
+<p>After all compression:</p>
+<ul>
+<li>~2-4 bytes address-index + 1-2 bytes contribType + 2-4 bytes timestamp-delta + 32 bytes evidenceHash + 10-30 bytes description-template-plus-fill + 3-4 bytes parent-index + 2-3 bytes value.</li>
+</ul>
+<p>Total: ~55-80 bytes/claim irreducible.</p>
+<p>Less than that and we've lost reconstructability. The Kolmogorov lower bound for attribution is ~50 bytes/claim.</p>
+<h2 id="the-retrieval-cost-trade-off">The retrieval-cost trade-off</h2>
+<p>Compression has two costs:</p>
+<h3 id="cost-1-decompression-latency-per-read">Cost 1 — Decompression latency per read</h3>
+<p>Every read requires decompression. For a lineage query walking back 10 hops: 10 decompressions × ~0.1 ms = ~1 ms overhead. Acceptable for interactive queries.</p>
+<p>For bulk analysis (compute Shapley over 1M claims): 1M decompressions = 1000 seconds = 16 minutes. Possibly too slow.</p>
+<h3 id="cost-2-write-time-complexity">Cost 2 — Write-time complexity</h3>
+<p>Writing a compressed chain requires address-interning (lookup), timestamp-delta computation, parent-indexing, description-templating. Writes become ~2-3x slower.</p>
+<p>Most chains are read-heavy (many reads per write). Compression is net-positive.</p>
+<h2 id="storage-tier-architecture">Storage-tier architecture</h2>
+<p>For VibeSwap's long-arc storage, three tiers:</p>
+<h3 id="hot-tier">Hot tier</h3>
+<p>~10^5 recent claims. Stored fully decompressed in on-chain state. Accessible in O(1) via mapping.</p>
+<p>Cost: expensive per claim but few claims.</p>
+<h3 id="warm-tier">Warm tier</h3>
+<p>~10^7 middle-age claims. Stored compressed but on readily-accessible L2 or sidechain. Decompression on read.</p>
+<p>Cost: moderate both ways.</p>
+<h3 id="cold-tier">Cold tier</h3>
+<p>~10^9 historical claims. Stored compressed on IPFS/Arweave. Merkle-commitments on-chain for verification.</p>
+<p>Cost: cheap to store, expensive to retrieve but rarely needed.</p>
+<p>Transition between tiers: claims that aren't recently-accessed migrate hot → warm → cold over time.</p>
+<h2 id="temperature-analogy">Temperature analogy</h2>
+<p>Think of claims as having temperature:</p>
+<ul>
+<li><strong>Hot</strong>: frequently accessed. In active cache.</li>
+<li><strong>Warm</strong>: occasionally accessed. In nearby storage.</li>
+<li><strong>Cold</strong>: rarely accessed. In archival.</li>
+</ul>
+<p>Three-tier storage matches this temperature gradient.</p>
+<p>Cognitive parallel: your working memory (hot), episodic long-term (warm), implicit procedural (cold). Same structure in cognitive substrate. Matches ETM's cognitive-economic mirror.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: compute the Kolmogorov complexity of some simple strings:</p>
+<ul>
+<li>"aaaaaaaaaa" (10 a's): K ≈ length of "print 'a' 10 times" ≈ very small.</li>
+<li>"2718281828": K = small ( e truncated).</li>
+<li>Random 10 characters: K ≈ 10 bytes (no compression).</li>
+</ul>
+<p>Apply to attribution: imagine you're archiving 100 claims. Estimate:
+- Naive storage size.
+- Compressed storage size.
+- Compression ratio.</p>
+<p>Do the arithmetic by hand. Observe the savings.</p>
+<h2 id="the-dignity-of-storage-argument">The dignity-of-storage argument</h2>
+<p>There's an ethical dimension to long-arc attribution storage. If the protocol promises contributors that their attestations are "remembered forever", the storage cost to honor that promise is real.</p>
+<p>A protocol that collects attributions and then garbage-collects them at 10 years is breaking an implicit commitment.</p>
+<p>VibeSwap's three-tier architecture + CKB state-rent model (<a href="../../concepts/monetary/THREE_TOKEN_ECONOMY.md">Three-Token Economy</a>) provides a sustainable answer:</p>
+<ul>
+<li>Hot tier claims stay on-chain with state-rent.</li>
+<li>Warm tier migrated to L2 + Merkle-anchored.</li>
+<li>Cold tier archived; retrievable but slow.</li>
+<li>Eviction happens only for unfunded claims whose state-rent can't be paid.</li>
+</ul>
+<p>Claims that continue earning attestation-weight continue paying their own rent. Claims that don't earn fresh attestations over time eventually evict.</p>
+<p>This is natural filtering: the chain keeps what continues mattering.</p>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li><strong>Optimal compression scheme</strong> — something beyond generic gzip exploiting graph structure specifically.</li>
+<li><strong>Cross-tier caching</strong> — when a warm claim cites a cold parent, retrieval spans tiers; what's the right caching strategy?</li>
+<li><strong>Eviction policy</strong> — activity-based? Attestation-weight-based? Random? Each has tradeoffs.</li>
+</ol>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Attribution chains have irreducible storage floor ~40-50 bytes/claim after contributor-address interning + timestamp deltas + parent indexing + description templating. 10^9 claims → ~50 GB compressed. Three-tier storage (hot/warm/cold) mirrors cognitive memory temperature gradient per ETM. Natural eviction is correct — not a failure mode.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/05_THE_FORK_RESISTANCE_CONSTANT.html" class="nav-cell prev"><div class="label">&larr; PREV // 05</div><div class="ttl">The Fork Resistance Constant</div></a>
+  <a href="/papers/07_THE_UNCOMPUTABLE_MARGINAL.html" class="nav-cell next"><div class="label">NEXT // 07 &rarr;</div><div class="ttl">The Uncomputable Marginal</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

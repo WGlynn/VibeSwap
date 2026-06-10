@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Uncomputable Marginal :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">07</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#an-intuition-about-combinatorial-explosion">An intuition about combinatorial explosion</a>
+    <a class="toc-link" href="#shapleys-requirement">Shapley's requirement</a>
+    <a class="toc-link" href="#two-layers-of-uncomputability">Two layers of uncomputability</a>
+    <a class="toc-link l3" href="#uncomputable-layer-1-2n-subset-explosion">Uncomputable layer 1 — 2^N subset explosion</a>
+    <a class="toc-link l3" href="#uncomputable-layer-2-vs-is-counterfactual">Uncomputable layer 2 — v(S) is counterfactual</a>
+    <a class="toc-link" href="#monte-carlo-shapley-the-working-solution">Monte Carlo Shapley — the working solution</a>
+    <a class="toc-link l3" href="#worked-example">Worked example</a>
+    <a class="toc-link" href="#scaling-monte-carlo-to-vibeswap">Scaling Monte Carlo to VibeSwap</a>
+    <a class="toc-link l3" href="#scenario-100-contributors-100000-pool">Scenario: 100 contributors, $100,000 pool</a>
+    <a class="toc-link l3" href="#scenario-1000-contributors-1000000-pool">Scenario: 1,000 contributors, $1,000,000 pool</a>
+    <a class="toc-link l3" href="#scenario-10000-contributors-10000000-pool">Scenario: 10,000 contributors, $10,000,000 pool</a>
+    <a class="toc-link" href="#the-sampling-budget-versus-accuracy-trade-off">The sampling budget-versus-accuracy trade-off</a>
+    <a class="toc-link" href="#the-vs-estimation-budget">The v(S) estimation budget</a>
+    <a class="toc-link l3" href="#approach-1-outcome-based">Approach 1 — Outcome-based</a>
+    <a class="toc-link l3" href="#approach-2-expert-committee">Approach 2 — Expert-committee</a>
+    <a class="toc-link l3" href="#approach-3-simulation-based">Approach 3 — Simulation-based</a>
+    <a class="toc-link" href="#the-total-error-bounds-honestly">The total error bounds, honestly</a>
+    <a class="toc-link" href="#the-philosophical-implication">The philosophical implication</a>
+    <a class="toc-link" href="#the-alternative-mechanism-comparison">The alternative-mechanism comparison</a>
+    <a class="toc-link" href="#disclosure-discipline">Disclosure discipline</a>
+    <a class="toc-link" href="#why-this-is-ok">Why this is OK</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#relationship-to-other-primitives">Relationship to other primitives</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">07</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>The uncomputable marginal</span>
+    </div>
+    <h1>The Uncomputable Marginal</h1>
+<div class="tagline">**Status**: Computability analysis with numeric examples of exponential explosion + Monte Carlo approximation.</div>
+
+<p><strong>Status</strong>: Computability analysis with numeric examples of exponential explosion + Monte Carlo approximation.
+<strong>Audience</strong>: First-encounter OK. Complexity bounds walked through step-by-step.</p>
+<hr />
+<h2 id="an-intuition-about-combinatorial-explosion">An intuition about combinatorial explosion</h2>
+<p>Imagine you have 2 coins to flip. There are 4 possible outcomes: HH, HT, TH, TT.</p>
+<p>3 coins: 8 outcomes.
+4 coins: 16 outcomes.
+10 coins: 1024 outcomes.
+30 coins: ~1 billion outcomes.
+50 coins: ~1 quadrillion.
+100 coins: 10^30 — vastly more than atoms in the observable universe.</p>
+<p>This is <strong>combinatorial explosion</strong>. The growth rate is 2^N where N is the number of coins. For even modest N, 2^N outstrips any computer's capacity.</p>
+<p>Shapley value computation has this same explosion. Let's see why.</p>
+<h2 id="shapleys-requirement">Shapley's requirement</h2>
+<p>Per <a href="../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md">Shapley Reward System</a>, the Shapley value for contributor <code>i</code> is the average over all permutations of their marginal contribution.</p>
+<p>For N contributors, the number of permutations is N! (N-factorial). The number of subsets is 2^N.</p>
+<p>For each subset, we need to evaluate the characteristic function <code>v(S)</code>.</p>
+<p>For 10 contributors: 1024 subsets to evaluate + 3.6M permutations to average over.
+For 20 contributors: 1M subsets + 2.4×10^18 permutations.
+For 50 contributors: 10^15 subsets + way more permutations.
+For 100 contributors: 10^30 subsets.
+For 1000 contributors (realistic for VibeSwap at scale): 10^300 subsets. Infeasible.</p>
+<p>At VibeSwap-scale, exact Shapley is uncomputable.</p>
+<h2 id="two-layers-of-uncomputability">Two layers of uncomputability</h2>
+<p>Actually, Shapley is doubly-uncomputable in practice:</p>
+<h3 id="uncomputable-layer-1-2n-subset-explosion">Uncomputable layer 1 — 2^N subset explosion</h3>
+<p>As shown above. For N &gt; ~30, computing 2^N subsets exceeds any practical computer's time budget.</p>
+<h3 id="uncomputable-layer-2-vs-is-counterfactual">Uncomputable layer 2 — v(S) is counterfactual</h3>
+<p>Even if we could enumerate all subsets, evaluating <code>v(S)</code> for each is expensive.</p>
+<p><code>v(S)</code> = "what value would this coalition S have produced?" This is a counterfactual. Nobody knows what S alone would have produced without running the experiment.</p>
+<p>Per <a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a> Gap #1, <code>v(S)</code> has 10-30% estimation error even when we can estimate it.</p>
+<p>So: the outer sum is infeasibly large, AND each term requires an expensive counterfactual estimate with substantial error.</p>
+<p>Exact Shapley = impossible in practice. We must approximate.</p>
+<h2 id="monte-carlo-shapley-the-working-solution">Monte Carlo Shapley — the working solution</h2>
+<p>Instead of all N! permutations, sample K random permutations. For each sample, compute each contributor's marginal contribution at the position where they appear.</p>
+<p>Average over samples. Error decreases as O(1/√K).</p>
+<h3 id="worked-example">Worked example</h3>
+<p>Suppose N = 100 contributors. Exact Shapley needs 100! ≈ 9×10^157 permutation evaluations. Infeasible.</p>
+<p>Monte Carlo with K = 1,000 samples:
+- Each sample: pick a random permutation; evaluate contributions. Cost ~ N × cost(v).
+- Total cost: K × N × cost(v) = 1,000 × 100 × cost(v) = 100,000 × cost(v).</p>
+<p>That's feasible. 100,000 v(S) evaluations.</p>
+<p>Standard error:
+- Single-sample variance of marginal contribution per contributor: bounded by [0, max_v].
+- Error in the Monte Carlo estimate: O(1/√K).
+- For K = 1,000: error ~ 1/√1000 ≈ 3%.</p>
+<p>3% error per contributor is acceptable for most distribution decisions.</p>
+<h2 id="scaling-monte-carlo-to-vibeswap">Scaling Monte Carlo to VibeSwap</h2>
+<p>For realistic VibeSwap scenarios:</p>
+<h3 id="scenario-100-contributors-100000-pool">Scenario: 100 contributors, $100,000 pool</h3>
+<p>K = 1,000 samples. Error ~3%.</p>
+<p>Each contributor's expected share: $100,000 / 100 = $1,000 (if roughly equal).
+Error per contributor: 3% × $1,000 = $30.</p>
+<p>Tolerable for most purposes. A contributor receiving $970 instead of $1,000 due to Monte Carlo noise won't notice or complain.</p>
+<h3 id="scenario-1000-contributors-1000000-pool">Scenario: 1,000 contributors, $1,000,000 pool</h3>
+<p>K = 5,000 samples.
+Each sample: 1,000 marginal contributions.
+Total: 5M v(S) evaluations.
+Error ~1.4%.</p>
+<p>Per contributor's expected share: $1,000,000 / 1,000 = $1,000.
+Error per contributor: 1.4% × $1,000 = $14.</p>
+<p>Even tighter precision.</p>
+<h3 id="scenario-10000-contributors-10000000-pool">Scenario: 10,000 contributors, $10,000,000 pool</h3>
+<p>K = 10,000 samples.
+Error ~1%.</p>
+<p>Per contributor: $1,000. Error: $10.</p>
+<p>Still tolerable. Scales further but with diminishing returns on precision.</p>
+<h2 id="the-sampling-budget-versus-accuracy-trade-off">The sampling budget-versus-accuracy trade-off</h2>
+<p>More samples = better accuracy but higher gas cost on-chain (or higher compute off-chain).</p>
+<p>For on-chain Monte Carlo: 100 samples costs ~2M gas. 1,000 samples costs ~20M gas. 10,000 costs ~200M gas. 10,000 exceeds block gas limits on most chains.</p>
+<p>Solution: compute off-chain, commit via Optimistic Shapley (<a href="../../concepts/shapley/OPTIMISTIC_SHAPLEY.md"><code>OPTIMISTIC_SHAPLEY.md</code></a>). Off-chain Monte Carlo runs in seconds or minutes; commit result via Merkle root; challenge window allows verification.</p>
+<h2 id="the-vs-estimation-budget">The v(S) estimation budget</h2>
+<p>Monte Carlo bounds the Shapley summation. But v(S) estimation is another source of error.</p>
+<p>For each sampled subset, we estimate v(S). Three approaches:</p>
+<h3 id="approach-1-outcome-based">Approach 1 — Outcome-based</h3>
+<p>Look at actual coalitions that existed; interpolate from observed values.</p>
+<p>Error: O(sample size of historical data). Usually 20-30% for sparse data.</p>
+<h3 id="approach-2-expert-committee">Approach 2 — Expert-committee</h3>
+<p>Have a trusted committee estimate v(S) for key subsets.</p>
+<p>Error: subjective. 15-30% cross-observer variation (see <a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a>).</p>
+<h3 id="approach-3-simulation-based">Approach 3 — Simulation-based</h3>
+<p>Model the counterfactual via simulation. Requires accurate simulation-model.</p>
+<p>Error: depends on model validity. 10-20% typical.</p>
+<p>All three introduce substantial error. The composite Shapley error is the Monte Carlo error × v estimation error ≈ 5-30% per contributor.</p>
+<h2 id="the-total-error-bounds-honestly">The total error bounds, honestly</h2>
+<p>At best-case (large Monte Carlo sample + accurate v estimation): 5-10% per contributor.</p>
+<p>At worst-case (limited Monte Carlo budget + heterogeneous v estimates): 20-30%.</p>
+<p>These are per-contributor errors. In aggregate (all contributors), total distribution error may be larger (correlated errors compound).</p>
+<p>This is VibeSwap's honest promise: Shapley-shaped distribution within ~10-30% of theoretical ideal.</p>
+<h2 id="the-philosophical-implication">The philosophical implication</h2>
+<p><strong>Fairness is not a point; it's a region.</strong></p>
+<p>A protocol can be "fair within 10%" but never "fair to a decimal." Decimal-precision claims are false precision. The bottom digits are uncomputable noise; treating them as meaningful is mis-calibrated.</p>
+<p>When VibeSwap says "Contributor X receives $0.123 ETH", honest framing would be "receives ~$0.12 ± $0.01 (10%)."</p>
+<h2 id="the-alternative-mechanism-comparison">The alternative-mechanism comparison</h2>
+<p>Other distribution mechanisms have their own bounds:</p>
+<ul>
+<li><strong>Pro-rata by stake</strong>: exact but ignores contribution quality. "Error" is structural (wrong function) not computational.</li>
+<li><strong>Committee-allocated</strong>: bounded by committee size (~5 people). Each estimate is biased; aggregation reduces but doesn't eliminate.</li>
+<li><strong>Quadratic voting</strong>: computable exactly. Relies on preference estimates which have their own counterfactual issue.</li>
+</ul>
+<p>None is exactly computable. All are approximations. Shapley is at least axiomatically well-defined even when approximated; others lack the fairness guarantee even at perfect computation.</p>
+<h2 id="disclosure-discipline">Disclosure discipline</h2>
+<p>A transparent Shapley-distribution system should publish:</p>
+<ol>
+<li>Shapley approximation strategy (Monte Carlo? Structured? Proxy?).</li>
+<li>Sampling budget (K for Monte Carlo).</li>
+<li>Estimated approximation error.</li>
+<li>v(S) estimation method.</li>
+<li>Overall error bound.</li>
+</ol>
+<p>VibeSwap's commitment: publish these openly alongside distribution results. Don't claim precision you can't verify.</p>
+<h2 id="why-this-is-ok">Why this is OK</h2>
+<p>Real cooperative production has its own natural variance. Two similar contributors doing similar work produce slightly different outcomes based on context, timing, mood. The "fair reward" is itself a distribution, not a point.</p>
+<p>Monte Carlo error ≈ intrinsic variance of contribution outcomes. Beyond this, extra precision is wasted — computing to the millionth decimal when the real-world signal is noisy at the hundredth.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: work through Shapley approximation for a small case.</p>
+<ul>
+<li>N = 5 contributors, pool = $500.</li>
+<li>Characteristic function: v({i}) = 100 for each i; v(pairs) = 200; v(triples) = 300; etc.</li>
+<li>Compute exact Shapley by hand for each contributor.</li>
+<li>Monte Carlo with K = 100 samples. What's the error?</li>
+<li>Monte Carlo with K = 10 samples. What's the error?</li>
+</ul>
+<p>Compare to exact. Observe the trade-off between K and accuracy.</p>
+<h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
+<ul>
+<li><strong>Parent</strong>: <a href="../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md">Shapley Reward System</a> — the foundation.</li>
+<li><strong>Integration</strong>: <a href="../../concepts/shapley/OPTIMISTIC_SHAPLEY.md">Optimistic Shapley</a> — Monte Carlo off-chain + challenge window on-chain.</li>
+<li><strong>Related</strong>: <a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a> — v(S) estimation is one of five gaps.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Exact Shapley is doubly-uncomputable at VibeSwap scale — exponential in N (2^N subsets) AND requires counterfactual v(S) estimates per subset. Monte Carlo approximation with K = 1,000-10,000 samples gives 1-3% Shapley error; v(S) estimation adds 10-30% more. Total: 5-30% error per contributor. Fairness is a region (within ~10-30% of theoretical ideal), not a point.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/06_KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.html" class="nav-cell prev"><div class="label">&larr; PREV // 06</div><div class="ttl">Kolmogorov Complexity of Attribution</div></a>
+  <a href="/papers/08_ENTROPY_PRESERVATION_IN_DAG.html" class="nav-cell next"><div class="label">NEXT // 08 &rarr;</div><div class="ttl">Entropy Preservation in the DAG</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

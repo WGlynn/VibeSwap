@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Attention Auction Paradox :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">03</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#start-with-a-tension-you-can-feel">Start with a tension you can feel</a>
+    <a class="toc-link" href="#the-tension-explicit">The tension, explicit</a>
+    <a class="toc-link" href="#three-distinct-senses-of-positive-sum">Three distinct senses of positive-sum</a>
+    <a class="toc-link l3" href="#sense-1-positive-sum-over-time">Sense 1 — Positive-sum over TIME</a>
+    <a class="toc-link l3" href="#sense-2-positive-sum-across-substrates">Sense 2 — Positive-sum across SUBSTRATES</a>
+    <a class="toc-link l3" href="#sense-3-positive-sum-via-value-per-unit-routing">Sense 3 — Positive-sum via VALUE-PER-UNIT routing</a>
+    <a class="toc-link" href="#vibeswaps-composition-across-senses">VibeSwap's composition across senses</a>
+    <a class="toc-link l3" href="#commit-reveal-auction-sense-1">Commit-Reveal Auction — Sense 1</a>
+    <a class="toc-link l3" href="#chat-to-dag-traceability-sense-2">Chat-to-DAG Traceability — Sense 2</a>
+    <a class="toc-link l3" href="#shapley-distribution-sense-3">Shapley Distribution — Sense 3</a>
+    <a class="toc-link" href="#the-honest-implication">The honest implication</a>
+    <a class="toc-link" href="#the-contrast-with-casinos">The contrast with casinos</a>
+    <a class="toc-link" href="#the-ethics">The ethics</a>
+    <a class="toc-link" href="#for-contributors">For contributors</a>
+    <a class="toc-link" href="#relationship-to-cognitive-economy">Relationship to cognitive economy</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#relationship-to-other-primitives">Relationship to other primitives</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">03</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>Attention auction paradox</span>
+    </div>
+    <h1>The Attention Auction Paradox</h1>
+<div class="tagline">**Status**: Theoretical tension with walked examples for three senses of positive-sum.</div>
+
+<p><strong>Status</strong>: Theoretical tension with walked examples for three senses of positive-sum.
+<strong>Audience</strong>: First-encounter OK.</p>
+<hr />
+<h2 id="start-with-a-tension-you-can-feel">Start with a tension you can feel</h2>
+<p>You're at a meeting. Your attention is in the room. At that same moment, you're NOT:
+- Answering email.
+- Working on a different project.
+- Thinking about your kids.</p>
+<p>Your attention can only be in one place. When you choose Option A, Options B, C, D are left unfunded. Pure trade-off.</p>
+<p>Now consider any mechanism that wants your attention: a DEX wanting you to trade, a social network wanting you to scroll, a news site wanting you to read. Each is competing with every other thing you could be doing. From your perspective, these are zero-sum: your attention on one is attention NOT on others.</p>
+<p>Question: is there any "positive-sum" way to allocate rival attention? Or is all attention-allocation really zero-sum underneath?</p>
+<p>This is the attention auction paradox.</p>
+<h2 id="the-tension-explicit">The tension, explicit</h2>
+<p>VibeSwap claims to enable positive-sum cooperation. The tagline — <em>"A coordination primitive, not a casino"</em> — explicitly positions against extraction-based zero-sum.</p>
+<p>But if attention is rival (which it is), any mechanism that allocates attention is a zero-sum auction under the hood. Winners of attention get it by displacing losers.</p>
+<p>Two claims appear to contradict: "positive-sum" and "attention-rival."</p>
+<p>How do we reconcile?</p>
+<h2 id="three-distinct-senses-of-positive-sum">Three distinct senses of positive-sum</h2>
+<p>The paradox dissolves when "positive-sum" is defined carefully. Three senses that each mean something different.</p>
+<h3 id="sense-1-positive-sum-over-time">Sense 1 — Positive-sum over TIME</h3>
+<p>A single-round allocation is zero-sum. BUT a repeated game can be positive-sum because earlier allocations produce new value that later rounds distribute.</p>
+<p><strong>Concrete example</strong>: Alice and Bob collaborate on an open-source project.</p>
+<p><strong>Round 1</strong> (zero-sum moment): Alice spends 2 hours on the project. She's NOT spending those 2 hours on other things. Bob similarly. During Round 1, attention is allocated; those Round 1 hours are pure trade-off.</p>
+<p><strong>Round 2</strong> (still zero-sum at that moment): Both spend more time. But the project now has the code from Round 1. Round 2 work builds on Round 1.</p>
+<p><strong>Round 10</strong> (still zero-sum at moment, but bigger pie): The project has grown. It enables OTHER projects, which multiply the impact.</p>
+<p>Each ROUND is zero-sum. The TRAJECTORY compounds. The Round-10 output is much larger than 10 × Round-1 output because cumulative work compounds.</p>
+<p>This is the Sense 1 positive-sum. Not contradicting zero-sum-at-each-moment; expanding time-scale.</p>
+<h3 id="sense-2-positive-sum-across-substrates">Sense 2 — Positive-sum across SUBSTRATES</h3>
+<p>Attention within a substrate is rival. Attention across substrates is additive.</p>
+<p><strong>Concrete example</strong>: You can't simultaneously work on code AND sleep. But you CAN allocate 4 hours of code-attention AND 8 hours of sleep-restoration. These are different substrates; attention is budgeted per-substrate.</p>
+<p>VibeSwap's attention-capture spans substrates:
+- Read-attention (reading docs).
+- Code-attention (writing solutions).
+- Audit-attention (reviewing others' work).
+- Discussion-attention (chatting in Telegram).</p>
+<p>A participant's total attention-investment across substrates compounds. Zero-sum within each substrate; additive across them.</p>
+<p>This is Sense 2 positive-sum.</p>
+<h3 id="sense-3-positive-sum-via-value-per-unit-routing">Sense 3 — Positive-sum via VALUE-PER-UNIT routing</h3>
+<p>Different allocations of attention produce different amounts of value per unit. A well-designed mechanism routes attention to high-value-per-unit activities.</p>
+<p><strong>Concrete example</strong>:</p>
+<ul>
+<li>Alice spends 1 hour on Twitter. Value: ~zero (entertainment, arguable).</li>
+<li>Alice spends 1 hour on a structured contribution via VibeSwap's traceability loop. Value: substantive DAG attribution + future-compounding lineage.</li>
+</ul>
+<p>Same hour of attention. Different value-per-unit. VibeSwap's mechanism routes to the higher-value-per-unit use.</p>
+<p>This is Sense 3 positive-sum. Not more attention created; attention routed to higher-leverage uses.</p>
+<h2 id="vibeswaps-composition-across-senses">VibeSwap's composition across senses</h2>
+<p>VibeSwap employs all three senses simultaneously.</p>
+<h3 id="commit-reveal-auction-sense-1">Commit-Reveal Auction — Sense 1</h3>
+<p>At the trading layer, attention IS zero-sum. Within each batch, users' orders compete. Someone wins; others match. Zero-sum per-batch.</p>
+<p>Sense 1: over many batches, traded volume and liquidity compound. Round-1000 has more going on than Round-1. Positive-sum over time.</p>
+<h3 id="chat-to-dag-traceability-sense-2">Chat-to-DAG Traceability — Sense 2</h3>
+<p>A contributor can allocate different kinds of attention:
+- Reading (research).
+- Speaking (dialogue).
+- Writing (memos, docs).
+- Coding (implementation).</p>
+<p>All earn DAG credit. Zero-sum within a specific substrate at a given moment; additive across substrates.</p>
+<h3 id="shapley-distribution-sense-3">Shapley Distribution — Sense 3</h3>
+<p>Same amount of attention produces different amounts of value depending on how it's routed. Routing to high-leverage activities (well-targeted audit, valuable framing, high-quality implementation) produces more value than routing to low-leverage activities.</p>
+<h2 id="the-honest-implication">The honest implication</h2>
+<p>VibeSwap doesn't eliminate the zero-sum-at-each-moment reality. It CAN'T. Attention is rival.</p>
+<p>What VibeSwap does:
+- <strong>Accept the zero-sum at each moment</strong> (honest framing).
+- <strong>Grow the pie over time</strong> (Sense 1).
+- <strong>Multiply substrates</strong> (Sense 2).
+- <strong>Route to high-leverage use</strong> (Sense 3).</p>
+<p>Net effect: positive-sum trajectory, despite zero-sum-at-moments.</p>
+<h2 id="the-contrast-with-casinos">The contrast with casinos</h2>
+<p>Casinos are the pure-extraction attention-auction. The mechanism's purpose:
+- Maximize time-on-device.
+- Maximize dollars-spent.
+- User experience is increasingly-degraded attention + loss.</p>
+<p>Casino pattern:
+- Zero-sum AT each moment (attention in casino = attention not elsewhere).
+- Zero-sum OVER time (user loses more than wins in expectation).
+- Negative-sum over time (users lose to casino's house edge).
+- Single substrate (casino engagement).</p>
+<p>VibeSwap pattern:
+- Zero-sum AT each moment (same constraint).
+- Positive-sum OVER time (Sense 1).
+- Positive-sum ACROSS substrates (Sense 2).
+- Positive-sum VIA ROUTING (Sense 3).</p>
+<p>Same rival substrate; opposite value-over-time trajectory.</p>
+<h2 id="the-ethics">The ethics</h2>
+<p>If attention IS rival, every attention-demanding system is "taking attention from elsewhere." Is this ethical?</p>
+<p>Answer depends on what the attention would've been doing:
+- Attention displaced from casino-style extraction (net-loss for user) → reallocation is net-positive.
+- Attention displaced from deep-work that user values → net-loss.</p>
+<p>VibeSwap's ethical claim: route attention TO activities that produce compounding value FOR the contributor (DAG credit, reputation growth, skill development, community connection). Not purely away from other uses; toward something better than most alternatives.</p>
+<p>Honest caveat: sometimes VibeSwap competes with legitimate alternatives. A contributor who spends 10 hours on VibeSwap is not spending those hours with family. Not all attention-allocation to VibeSwap is morally superior to alternatives.</p>
+<h2 id="for-contributors">For contributors</h2>
+<p>What to think about:
+- Your attention is finite.
+- Every hour on VibeSwap is an hour not elsewhere.
+- Is the trade-off worth it?</p>
+<p>VibeSwap's value proposition: the hour earns DAG credit, reputation, skill, connection. Compared to common alternatives (scrolling social media, watching ads, gambling), the trade seems favorable.</p>
+<p>But the trade vs. deeper alternatives (family, rest, physical activity) may NOT be favorable. Know your own trade-offs.</p>
+<h2 id="relationship-to-cognitive-economy">Relationship to cognitive economy</h2>
+<p>Under <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, healthy cognition routes attention to activities that compound over time. Pathological cognition routes attention to immediate-pleasure activities that degrade over time.</p>
+<p>VibeSwap's positive-sum architecture is the on-chain reflection of healthy-cognition pattern. Compounding outputs over time; value-per-attention-unit optimization; cross-substrate routing.</p>
+<p>This is what "coordination primitive, not casino" means mechanically. The mechanism's architecture determines which kind of cognition the participant engages.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: track your attention for one day. Categorize each hour:
+- Zero-sum moment (obviously).
+- What substrate?
+- What's the value-per-attention-unit?
+- Does it compound over time?</p>
+<p>Apply to:
+- Work.
+- Social media.
+- Learning.
+- Relationships.
+- Rest.</p>
+<p>Observe: most people are NOT routing to positive-sum uses. Routing improvements are high-leverage.</p>
+<h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
+<ul>
+<li><strong>Parent</strong>: <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a> — attention IS the rival substrate.</li>
+<li><strong>Applications</strong>: <a href="../../concepts/security/SIREN_PROTOCOL.md">Siren Protocol</a> (engagement-until-exhaustion for attackers), <a href="../../concepts/ATTENTION_AS_INFRASTRUCTURE.md">Attention as Infrastructure</a>.</li>
+<li><strong>Positioning</strong>: tagline "coordination primitive, not casino" distinguishes positive-sum trajectory.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Attention is intrinsically rival; every allocation is zero-sum at each moment. "Positive-sum" is NOT contradicting this — it's expanding to three senses: over-time (Sense 1: compounding work), across-substrates (Sense 2: additive attention pools), via-routing (Sense 3: value-per-attention-unit optimization). VibeSwap employs all three simultaneously. Casino has only Sense-1-equivalent which it makes negative-sum; VibeSwap makes all three positive-sum.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/02_SUBSTRATE_INCOMPLETENESS.html" class="nav-cell prev"><div class="label">&larr; PREV // 02</div><div class="ttl">Substrate Incompleteness</div></a>
+  <a href="/papers/04_COOPERATIVE_EMERGENCE_THRESHOLD.html" class="nav-cell next"><div class="label">NEXT // 04 &rarr;</div><div class="ttl">Cooperative Emergence Threshold</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

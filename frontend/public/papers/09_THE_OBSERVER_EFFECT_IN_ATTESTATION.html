@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>The Observer Effect in Attestation :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">09</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#goodharts-law-a-short-history">Goodhart's Law — a short history</a>
+    <a class="toc-link" href="#applied-to-vibeswap">Applied to VibeSwap</a>
+    <a class="toc-link" href="#the-four-goodhart-pressures-on-vibeswap">The four Goodhart pressures on VibeSwap</a>
+    <a class="toc-link l3" href="#pressure-1-attestation-weight-gaming">Pressure 1 — Attestation-weight gaming</a>
+    <a class="toc-link l3" href="#pressure-2-contribution-type-gaming">Pressure 2 — Contribution-type gaming</a>
+    <a class="toc-link l3" href="#pressure-3-evidence-hash-gaming">Pressure 3 — Evidence-hash gaming</a>
+    <a class="toc-link l3" href="#pressure-4-lineage-depth-gaming">Pressure 4 — Lineage-depth gaming</a>
+    <a class="toc-link" href="#why-no-single-tool-prevents-goodhart">Why no single tool prevents Goodhart</a>
+    <a class="toc-link" href="#reverse-goodhart-designing-for-misaligned-optimization">Reverse-Goodhart — designing for misaligned optimization</a>
+    <a class="toc-link" href="#the-honesty-discipline">The honesty discipline</a>
+    <a class="toc-link" href="#the-social-epistemology-dimension">The social-epistemology dimension</a>
+    <a class="toc-link" href="#concrete-counter-culture-tactics">Concrete counter-culture tactics</a>
+    <a class="toc-link" href="#goodhart-metrics-we-can-measure">Goodhart metrics we CAN measure</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#relationship-to-cognitive-economy">Relationship to cognitive economy</a>
+    <a class="toc-link" href="#relationship-to-other-primitives">Relationship to other primitives</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">09</span>
+      <span class="badge badge-matrix">PARTIAL</span>
+      <span>Observer effect in attestation</span>
+    </div>
+    <h1>The Observer Effect in Attestation</h1>
+<div class="tagline">**Status**: Goodhart's Law applied with concrete gaming scenarios + counter-moves.</div>
+
+<p><strong>Status</strong>: Goodhart's Law applied with concrete gaming scenarios + counter-moves.
+<strong>Audience</strong>: First-encounter OK.</p>
+<hr />
+<h2 id="goodharts-law-a-short-history">Goodhart's Law — a short history</h2>
+<p>In 1975, British economist Charles Goodhart made an observation about central banks. When a central bank chose "M1 money supply" as a target to control, the market adjusted around it. M1 stopped correlating with the underlying economic health it was supposed to indicate. The metric became a target; the correlation broke.</p>
+<p>Marilyn Strathern generalized: <em>"When a measure becomes a target, it ceases to be a good measure."</em></p>
+<p>Modern examples:
+- Schools teach to the standardized test (test score becomes a target; doesn't measure actual learning anymore).
+- Researchers publish for citation count (citation count becomes a target; research quality doesn't necessarily improve).
+- Tech workers aim for performance-review metrics (metrics become a target; actual work quality can degrade).</p>
+<p>This is the observer effect applied to measurement. The act of measuring changes what's measured.</p>
+<h2 id="applied-to-vibeswap">Applied to VibeSwap</h2>
+<p>VibeSwap's attestation mechanism weights trust × multiplier. Users contributing earn credit based on attestations. Attestations from high-trust users count more.</p>
+<p>The moment this becomes visible as a reward system, rational contributors will optimize for it. They will work on things that earn attestations. They will seek attestations from high-trust users. They will accumulate handshakes.</p>
+<p>This is fine IF optimizing for the metric produces the behavior we want (good contributions → attestations → rewards). If NOT, Goodhart fires: people optimize for attestation-shaped work rather than actually-good work.</p>
+<h2 id="the-four-goodhart-pressures-on-vibeswap">The four Goodhart pressures on VibeSwap</h2>
+<h3 id="pressure-1-attestation-weight-gaming">Pressure 1 — Attestation-weight gaming</h3>
+<p>Contributors try to accumulate attestation weight directly — not by producing valuable work, but by working the system.</p>
+<p><strong>Concrete gaming scenario</strong>: Alice and Bob form a "handshake ring." They mutually attest each other's claims. Their trust-scores rise rapidly because they each get a high-weight attestation per claim.</p>
+<p><strong>Why this gets through</strong>: plain attestation-weight would reward them equally to legitimately-high-trust contributors.</p>
+<p><strong>Counter-move</strong>: quadratic voting (smaller weight per additional vote from same source). Random selection for tribunals bypasses coordinated-attestation. Three-branch capture-resistance means their executive-branch gaming doesn't carry to tribunal or governance.</p>
+<p><strong>Residual gaming possible</strong>: 2-3 person rings that stay below detection. Small value extracted; acceptable residual.</p>
+<h3 id="pressure-2-contribution-type-gaming">Pressure 2 — Contribution-type gaming</h3>
+<p>Different contribution types (Code, Research, Security, etc.) may have different payoff curves. Contributors will gravitate to the types that pay best per unit effort.</p>
+<p><strong>Concrete gaming scenario</strong>: Code contributions are highly rewarded. Design contributions are less so. Contributors shift toward Code even when their comparative advantage is in Design. Result: lots of mediocre Code; insufficient Design.</p>
+<p><strong>Counter-move</strong>: the heterogeneity mandate (see <a href="../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md">Cooperative Emergence Threshold</a>) — Shannon entropy of contribution types must remain high. Governance can adjust payoff curves per type to restore balance.</p>
+<p><strong>Residual gaming possible</strong>: within a single type, contributors still game relative payoffs.</p>
+<h3 id="pressure-3-evidence-hash-gaming">Pressure 3 — Evidence-hash gaming</h3>
+<p>evidenceHash commits to off-chain content. Rational contributors might commit to content that looks substantive (long, complex, impressive) without actually creating value.</p>
+<p><strong>Concrete gaming scenario</strong>: Alice submits a "security audit" that's really 50 pages of pseudo-formal prose with few actual findings. Looks substantive; doesn't prevent real bugs.</p>
+<p><strong>Why this gets through</strong>: the evidenceHash verifies content exists but doesn't evaluate quality.</p>
+<p><strong>Counter-move</strong>: peer attestations evaluate quality. Tribunal re-evaluation for disputed claims. Multi-branch requirements prevent pure-evidence-hash capture.</p>
+<p><strong>Residual gaming possible</strong>: novice reviewers might be fooled by surface-substantive content. Takes time for community to develop detection.</p>
+<h3 id="pressure-4-lineage-depth-gaming">Pressure 4 — Lineage-depth gaming</h3>
+<p>ParentAttestations create lineage. Contributors benefit from being cited as a parent. Rational contributors position themselves as load-bearing predecessors.</p>
+<p><strong>Concrete gaming scenario</strong>: Alice claims her 2022 Telegram message was the foundational inspiration for Bob's 2026 breakthrough. She retroactively claims lineage credit for significant downstream work.</p>
+<p><strong>Why this gets through</strong>: if Alice's claim has even a modest evidence base, the lineage link gets credit.</p>
+<p><strong>Counter-move</strong>: Novelty Bonus (see <a href="./THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus Theorem</a>) penalizes contributions with high similarity-to-prior. Lineage-claiming requires demonstrable influence, not just priority.</p>
+<p><strong>Residual gaming possible</strong>: subtle lineage-gaming where influence IS plausible but overstated.</p>
+<h2 id="why-no-single-tool-prevents-goodhart">Why no single tool prevents Goodhart</h2>
+<p>Substrate Incompleteness (<a href="../../concepts/SUBSTRATE_INCOMPLETENESS.md"><code>SUBSTRATE_INCOMPLETENESS.md</code></a>) applies. Every mechanism has gaming surfaces. Composing mechanisms doesn't eliminate them; it reduces them.</p>
+<p>The asymmetry VibeSwap aims for: defenders (honest contributors + governance) have structural advantages over attackers (Goodharting actors).</p>
+<p>Specifically:
+- <strong>Defenders see all branches</strong>: executive, judicial, legislative. Attackers must fool multiple.
+- <strong>Defenders have time-integrating audits</strong>: attackers have to maintain gaming across rounds.
+- <strong>Defenders have higher-level governance</strong>: attackers can't modify governance without exposure.</p>
+<p>The asymmetry doesn't eliminate Goodharting. It makes the cost/benefit unfavorable for most adversaries most of the time.</p>
+<h2 id="reverse-goodhart-designing-for-misaligned-optimization">Reverse-Goodhart — designing for misaligned optimization</h2>
+<p>If contributors WILL optimize for the metric, pick metrics whose optimization produces desirable behavior.</p>
+<p><strong>Example of reverse-Goodhart:</strong></p>
+<ul>
+<li>BAD metric: "Number of handshakes per contributor." Contributors handshake with everyone regardless of quality. Metric optimized; behavior bad.</li>
+<li>BETTER metric: "Handshakes weighted by partner's trust-score." Contributors pursue deliberate cultivation of high-trust relationships. Metric optimized; behavior better.</li>
+</ul>
+<p>Another example:</p>
+<ul>
+<li>BAD: "Number of attestations received." Contributors seek as many attestations as possible, regardless of quality.</li>
+<li>BETTER: "Attestations received weighted by attestor's trust and type-diversity." Contributors pursue multi-type cross-substrate collaboration. Metric optimized; behavior substantively better.</li>
+</ul>
+<p>The iteration: propose metric, predict its Goodhart, refine until Goodharting produces good behavior.</p>
+<h2 id="the-honesty-discipline">The honesty discipline</h2>
+<p>A transparent mechanism documents:
+- The metrics that drive rewards.
+- The known Goodhart pressures on each.
+- The known mitigations.
+- The residual gaming surfaces.</p>
+<p>Don't claim "VibeSwap's attestation is Goodhart-proof." Claim "VibeSwap's attestation has specific Goodhart surfaces with specific mitigations and acknowledged residuals."</p>
+<p>This is honest about limits while maintaining confidence in the overall design.</p>
+<h2 id="the-social-epistemology-dimension">The social-epistemology dimension</h2>
+<p>Goodharting isn't just individual behavior — it can become collective norm. If "building attestation weight" is celebrated as smart participation, more people do it. Culture reinforces Goodharting.</p>
+<p>Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize <a href="../proofs/LAWSON_CONSTANT.md">Lawson Constant</a> attribution as THE goal (who really did this?), not Shapley percentage as the goal (who got how much?).</p>
+<p>This is cultural design, not just mechanism design. Both matter.</p>
+<h2 id="concrete-counter-culture-tactics">Concrete counter-culture tactics</h2>
+<ul>
+<li>Weekly "best contribution" highlight in Telegram celebrates quality, not attestation-weight.</li>
+<li>Public "contribution-of-the-quarter" post describes WHY a contribution was valuable (substance-focused).</li>
+<li>Mentor-new-contributors norm; senior members model substance-focused behavior.</li>
+<li>Governance discussions reference substantive examples rather than weight-statistics.</li>
+</ul>
+<h2 id="goodhart-metrics-we-can-measure">Goodhart metrics we CAN measure</h2>
+<p>Things that indicate Goodharting has started:</p>
+<ul>
+<li><strong>Attestation concentration</strong>: few contributors receiving disproportionate attestations.</li>
+<li><strong>Handshake velocity</strong>: sudden increases in handshake rate per user (potentially ring formation).</li>
+<li><strong>Contribution-type mono-culture</strong>: entropy drops as contributors concentrate in one type.</li>
+<li><strong>Lineage abuse</strong>: sudden increases in "my contribution enabled this" claims.</li>
+</ul>
+<p>Monitoring these via dashboards. Alerts on anomalies. Early-warning for Goodhart drift.</p>
+<h2 id="for-students">For students</h2>
+<p>Exercise: think of a metric in your life (grades, GitHub stars, Twitter followers, step-count). For that metric:</p>
+<ol>
+<li>What's it supposed to measure?</li>
+<li>How do people optimize for it (what behaviors does it produce)?</li>
+<li>Is the behavior good for what the metric was supposed to measure?</li>
+<li>If not, what's a better metric that wouldn't Goodhart?</li>
+</ol>
+<p>This exercise teaches Goodhart detection.</p>
+<h2 id="relationship-to-cognitive-economy">Relationship to cognitive economy</h2>
+<p>Under <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure by productive-hours, you schedule meetings to fill time.</p>
+<p>Cognition's response: periodically reframe what "productive" means. Introspection updates the measure. This prevents long-term Goodhart drift.</p>
+<p>VibeSwap's governance has the same role. Periodic updates to attestation weighting, Shapley parameters, and tribunal criteria are the on-chain analog of cognitive reframing.</p>
+<h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
+<ul>
+<li><strong>Connected</strong>: <a href="../../concepts/RATIONAL_IGNORANCE_AS_MECHANISM.md">Rational Ignorance as Mechanism</a> — attestation-weight gaming is harder when contributors are rationally ignorant about gaming details.</li>
+<li><strong>Counter-weights</strong>: <a href="./THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus</a>, <a href="../../concepts/monetary/WHY_THREE_TOKENS_NOT_TWO.md">Quadratic voting</a>.</li>
+</ul>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>Goodhart's Law — metrics used to govern distort what they measure. Four specific gaming pressures on VibeSwap (attestation-weight, contribution-type, evidence-hash, lineage-depth) with specific mitigations for each. No single tool prevents Goodharting; composition raises cost. Asymmetry favors defenders via multi-branch + time-integration + meta-governance. Reverse-Goodhart design: pick metrics whose optimization produces desirable behavior.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/08_ENTROPY_PRESERVATION_IN_DAG.html" class="nav-cell prev"><div class="label">&larr; PREV // 08</div><div class="ttl">Entropy Preservation in the DAG</div></a>
+  <a href="/papers/10_RATIONAL_IGNORANCE_AS_MECHANISM.html" class="nav-cell next"><div class="label">NEXT // 10 &rarr;</div><div class="ttl">Rational Ignorance as Mechanism</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

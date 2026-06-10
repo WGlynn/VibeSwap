@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>True Price Oracle — Deep Dive :: VibeSwap Papers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  --bg: #000000;
+  --surface-1: #080808;
+  --surface-2: #0d0d0d;
+  --surface-3: #181818;
+  --border: #252525;
+  --border-hi: #424242;
+  --matrix: #00ff41;
+  --matrix-dim: #00cc34;
+  --terminal: #00d4ff;
+  --term-dim: #00a8cc;
+  --amber: #ffaa00;
+  --fg: #e0e0e0;
+  --fg-white: #ffffff;
+  --muted: #808080;
+  --muted-dim: #505050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,255,65,0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+.mono { font-family: 'JetBrains Mono', 'SF Mono', monospace; }
+a { color: var(--matrix); text-decoration: none; border-bottom: 1px solid rgba(0,255,65,0.2); }
+a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
+
+/* Header bar */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 14px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim);
+}
+.brand { color: var(--fg-white); font-weight: 700; letter-spacing: 0.05em; }
+.brand-accent { color: var(--matrix); }
+.brand-sep { color: var(--muted-dim); margin: 0 8px; }
+.topbar-nav a { color: var(--muted); border: none; margin-left: 22px; }
+.topbar-nav a:hover { color: var(--matrix); }
+
+/* Reading progress bar (CSS-only scroll-timeline) */
+.progress {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 2px; transform-origin: left;
+  background: linear-gradient(90deg, var(--matrix), var(--terminal));
+  z-index: 100;
+  transform: scaleX(0);
+  animation: grow linear; animation-timeline: scroll(root);
+}
+@keyframes grow { to { transform: scaleX(1); } }
+
+/* Gradient divider */
+.gdivider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+
+/* Status badges */
+.badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  padding: 4px 10px; border-radius: 2px;
+  border: 1px solid;
+}
+.badge-matrix { color: var(--matrix); border-color: var(--matrix); background: rgba(0,255,65,0.06); }
+.badge-terminal { color: var(--terminal); border-color: var(--terminal); background: rgba(0,212,255,0.06); }
+.badge-amber { color: var(--amber); border-color: var(--amber); background: rgba(255,170,0,0.06); }
+.badge-muted { color: var(--muted); border-color: var(--border-hi); background: var(--surface-2); }
+
+/* Footer */
+.site-footer {
+  max-width: 1280px; margin: 64px auto 0;
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--muted-dim);
+}
+.site-footer .dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--matrix); margin-right: 8px;
+  box-shadow: 0 0 8px rgba(0,255,65,0.4);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+
+/* Layout */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 220px 1fr; gap: 48px;
+  padding: 48px 32px 32px;
+}
+
+/* TOC */
+.toc {
+  position: sticky; top: 64px; align-self: start;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; line-height: 1.7;
+  border-left: 1px solid var(--border);
+  padding-left: 18px; max-height: calc(100vh - 96px); overflow-y: auto;
+}
+.toc-label { color: var(--matrix); font-weight: 600; letter-spacing: 0.18em; margin-bottom: 14px; }
+.toc-link {
+  display: block; color: var(--muted);
+  padding: 4px 0; border: 0; transition: color 0.15s;
+  text-decoration: none;
+}
+.toc-link.l3 { padding-left: 12px; font-size: 10.5px; }
+.toc-link:hover { color: var(--fg); }
+.toc-link.active { color: var(--matrix); }
+
+/* Article */
+.article {
+  font-size: 18px; line-height: 1.75;
+  color: var(--fg); max-width: 760px;
+}
+.article .hero-meta {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: var(--muted-dim); letter-spacing: 0.1em; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 18px;
+}
+.article .hero-meta .num { color: var(--fg-white); font-weight: 700; }
+.article h1 {
+  font-size: clamp(38px, 5.5vw, 56px); font-weight: 800;
+  letter-spacing: -0.03em; color: var(--fg-white);
+  line-height: 1.05; margin-bottom: 18px;
+}
+.article .tagline {
+  font-size: 20px; color: var(--terminal); font-weight: 600;
+  letter-spacing: -0.015em; line-height: 1.4; margin-bottom: 32px;
+}
+.article h2 {
+  font-size: 28px; font-weight: 700;
+  color: var(--fg-white); letter-spacing: -0.02em;
+  margin: 56px 0 18px;
+}
+.article h2::before {
+  content: '> ';
+  color: var(--matrix); font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+.article h3 {
+  font-size: 20px; font-weight: 600;
+  color: var(--fg-white); margin: 36px 0 12px;
+}
+.article p { margin: 0 0 20px; }
+.article p:first-of-type::first-letter {
+  font-family: 'JetBrains Mono', monospace;
+  float: left; font-size: 4.6rem; line-height: 0.85;
+  color: var(--matrix); padding: 0.4rem 0.6rem 0 0; font-weight: 600;
+}
+.article a {
+  color: var(--matrix); border-bottom: 1px solid rgba(0,255,65,0.25);
+  transition: border-color 0.15s;
+}
+.article a:hover { border-bottom-color: var(--matrix); }
+.article strong { color: var(--fg-white); font-weight: 600; }
+.article em { color: var(--terminal); font-style: italic; }
+.article code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 3px;
+  color: var(--matrix); font-size: 0.9em;
+}
+.article pre {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-left: 3px solid var(--matrix);
+  padding: 18px 22px; border-radius: 4px;
+  overflow-x: auto; font-size: 13px; line-height: 1.6;
+  margin: 28px 0; color: var(--fg);
+}
+.article pre code {
+  background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit;
+}
+.article blockquote {
+  border-left: 3px solid var(--terminal);
+  padding: 6px 0 6px 22px; margin: 28px 0;
+  color: var(--terminal); font-style: italic;
+}
+.article ul, .article ol { padding-left: 28px; margin: 0 0 22px; }
+.article li { margin-bottom: 8px; }
+.article table {
+  border-collapse: collapse; width: 100%; margin: 28px 0; font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.article th, .article td {
+  border: 1px solid var(--border); padding: 10px 14px; text-align: left;
+}
+.article th { background: var(--surface-2); color: var(--matrix); font-weight: 600; }
+.article hr {
+  border: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.35), transparent);
+  margin: 48px 0;
+}
+.article img { max-width: 100%; height: auto; border-radius: 4px; margin: 22px 0; }
+
+/* Reveal on scroll (native scroll-driven anim) */
+@supports (animation-timeline: view()) {
+  .article h2, .article h3, .article p, .article ul, .article ol, .article pre, .article blockquote, .article table {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
+  @keyframes reveal-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* Prev/Next nav */
+.paper-nav {
+  max-width: 1280px; margin: 32px auto 0;
+  padding: 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  border-top: 1px solid var(--border);
+}
+.paper-nav .nav-cell {
+  padding: 22px; border: 1px solid var(--border); border-radius: 4px;
+  transition: all 0.2s; cursor: pointer;
+  text-decoration: none; color: var(--fg); border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+}
+.paper-nav .nav-cell:hover {
+  border-color: var(--matrix); transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(0,255,65,0.15);
+}
+.paper-nav .label {
+  font-size: 11px; color: var(--matrix); letter-spacing: 0.15em; margin-bottom: 10px;
+}
+.paper-nav .ttl { font-size: 16px; color: var(--fg-white); font-weight: 600; line-height: 1.3; }
+.paper-nav .nav-cell.next { text-align: right; }
+.paper-nav .nav-cell.empty {
+  border: 1px dashed var(--border); cursor: default; opacity: 0.4;
+}
+.paper-nav .nav-cell.empty:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* Mobile */
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 24px; padding: 24px 18px; }
+  .toc { display: none; }
+  .article { font-size: 17px; max-width: 100%; }
+  .article h1 { font-size: 32px; }
+  .article h2 { font-size: 22px; margin: 40px 0 14px; }
+  .article p:first-of-type::first-letter { font-size: 3.4rem; }
+  .paper-nav { grid-template-columns: 1fr; padding: 24px 18px; }
+  .paper-nav .nav-cell.next { text-align: left; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress"></div>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <span class="brand">VIBESWAP</span><span class="brand-sep">::</span><span class="brand-accent">PAPERS</span><span class="brand-sep">/</span><span style="color:var(--muted)">28</span>
+    </div>
+    <nav class="topbar-nav">
+      <a href="/papers/">index</a>
+      <a href="/">home</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+  <aside class="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a class="toc-link" href="#the-problem-an-oracle-solves">The problem an oracle solves</a>
+    <a class="toc-link" href="#what-a-true-price-is">What a "true price" is</a>
+    <a class="toc-link" href="#the-old-design-centralized-oracle-deviation-gate">The old design — centralized oracle + deviation gate</a>
+    <a class="toc-link" href="#the-new-design-commit-reveal-oracle-aggregation-c39-fat-audi">The new design — commit-reveal oracle aggregation (C39 FAT-AUDIT-2)</a>
+    <a class="toc-link" href="#walking-through-a-concrete-scenario">Walking through a concrete scenario</a>
+    <a class="toc-link l3" href="#step-1-operators-watch-exchanges">Step 1 — Operators watch exchanges</a>
+    <a class="toc-link l3" href="#step-2-commitment-phase">Step 2 — Commitment phase</a>
+    <a class="toc-link l3" href="#step-3-reveal-phase">Step 3 — Reveal phase</a>
+    <a class="toc-link l3" href="#step-4-aggregation">Step 4 — Aggregation</a>
+    <a class="toc-link l3" href="#step-5-publication">Step 5 — Publication</a>
+    <a class="toc-link" href="#why-this-defeats-manipulation">Why this defeats manipulation</a>
+    <a class="toc-link" href="#what-could-still-go-wrong">What could still go wrong</a>
+    <a class="toc-link l3" href="#problem-1-all-operators-are-corrupted">Problem 1 — All operators are corrupted</a>
+    <a class="toc-link l3" href="#problem-2-operator-attrition">Problem 2 — Operator attrition</a>
+    <a class="toc-link l3" href="#problem-3-slow-price-movements">Problem 3 — Slow price movements</a>
+    <a class="toc-link l3" href="#problem-4-oracle-frontrunning">Problem 4 — Oracle frontrunning</a>
+    <a class="toc-link" href="#the-interaction-with-other-mechanisms">The interaction with other mechanisms</a>
+    <a class="toc-link" href="#gas-optimization">Gas optimization</a>
+    <a class="toc-link" href="#why-the-c39-design-is-an-etm-alignment-win">Why the C39 design is an ETM-alignment win</a>
+    <a class="toc-link" href="#how-to-read-the-actual-code">How to read the actual code</a>
+    <a class="toc-link" href="#for-students">For students</a>
+    <a class="toc-link" href="#the-bigger-lesson">The bigger lesson</a>
+    <a class="toc-link" href="#one-line-summary">One-line summary</a>
+  </aside>
+
+  <article class="article">
+    <div class="hero-meta">
+      <span class="num">28</span>
+      <span class="badge badge-matrix">IMPLEMENTED</span>
+      <span>True price oracle deep dive</span>
+    </div>
+    <h1>True Price Oracle — Deep Dive</h1>
+<div class="tagline">**Status**: Pedagogical implementation deep-dive.</div>
+
+<p><strong>Status</strong>: Pedagogical implementation deep-dive.
+<strong>Audience</strong>: Engineers, auditors, curious students. First-encounter with oracle design is OK.
+<strong>Related</strong>: <a href="./KALMAN_FILTER_ORACLE.md">Kalman Filter Oracle</a>, <a href="./TRUE_PRICE_ORACLE.md">True Price Oracle</a>, <a href="../security/GEV_RESISTANCE.md">GEV Resistance</a>.</p>
+<hr />
+<h2 id="the-problem-an-oracle-solves">The problem an oracle solves</h2>
+<p>An AMM (automated market maker) needs to know prices. The simple approach: let trades set the price. When someone buys ETH for USDC, the price goes up; when someone sells, it goes down. Simple.</p>
+<p>But there's a problem: what if there's only one trader? They could buy a tiny bit, set a silly price, then exploit the silly price. This is price manipulation.</p>
+<p><strong>Concrete example</strong>: Alice notices the pool has low liquidity. She deposits $100,000 of USDC and withdraws ETH at current price of $2000. She then executes a large trade that pushes the price to $3000. She sells her ETH back at $3000 and withdraws $150,000 — $50k profit from price manipulation.</p>
+<p>This is an attack. An oracle is the defense: instead of trusting immediate price, the AMM consults an external price feed that reflects broader market reality.</p>
+<h2 id="what-a-true-price-is">What a "true price" is</h2>
+<p>In crypto, "true price" means the actual market-clearing price across many exchanges and trading venues, weighted by their liquidity and reliability. If ETH trades at $2,000 on Coinbase, $1,995 on Binance, $2,010 on Kraken, the "true price" is somewhere around $2,002 (liquidity-weighted average).</p>
+<p>Not a single exchange's price. Not a recent trade. The consensus price.</p>
+<p>VibeSwap's True Price Oracle (TPO) aggregates these sources and maintains a continuously-updated "true price" that contracts can query.</p>
+<h2 id="the-old-design-centralized-oracle-deviation-gate">The old design — centralized oracle + deviation gate</h2>
+<p>Original TPO design (pre-C39):</p>
+<ol>
+<li>A trusted operator pulls prices from N exchanges.</li>
+<li>Operator computes the consensus (Kalman-filtered average).</li>
+<li>Operator signs the result with their cryptographic key.</li>
+<li>Smart contracts verify the signature and use the price.</li>
+</ol>
+<p>To prevent operator misbehavior, a "deviation gate" was added: if the new price differs from the previous by more than 5%, the update is rejected. Operator can't push wildly-different prices without challenge.</p>
+<p><strong>Concrete attack scenario this blocks</strong>: if the operator is compromised and tries to push a $50,000 ETH price (vs. real $2,000), the deviation gate rejects the $50k price because it's &gt;5% off from the previous. Manipulation blocked.</p>
+<p><strong>What the deviation gate doesn't block</strong>: slow drift. If the operator pushes 4% deviations repeatedly (within the gate), they can drift the price over time. Not a sharp manipulation but still a problem.</p>
+<h2 id="the-new-design-commit-reveal-oracle-aggregation-c39-fat-audi">The new design — commit-reveal oracle aggregation (C39 FAT-AUDIT-2)</h2>
+<p>The C39 redesign replaces the deviation gate with a structurally-stronger mechanism: commit-reveal aggregation across multiple operators.</p>
+<p>How it works:</p>
+<ol>
+<li><strong>Commitment phase</strong>: Operators submit <code>hash(price || secret)</code> to the aggregator. The actual price is hidden but committed.</li>
+<li><strong>Reveal phase</strong>: Operators submit <code>(price, secret)</code> matching their commitments. Contract verifies <code>hash(price || secret) == stored_commitment</code>.</li>
+<li><strong>Aggregation</strong>: After reveal window closes, contract computes the aggregate price from all revealed values (median, weighted average, etc.).</li>
+<li><strong>Publication</strong>: The aggregate price is published; AMM contracts use it.</li>
+</ol>
+<p><strong>Why this is better</strong>:</p>
+<ul>
+<li><strong>No single operator can bias the outcome</strong>. Operators' prices are committed before they see others'; they can't strategically match to manipulate.</li>
+<li><strong>Collusion resistance</strong>: for operators to coordinate, they'd need to pre-coordinate both their commitments AND their reveals — expensive coordination required.</li>
+<li><strong>Structural fairness</strong>: the aggregation math is public and deterministic; any observer can verify the published price matches the reveals.</li>
+<li><strong>No deviation gate needed</strong>: the structural design prevents manipulation without arbitrary percentage limits.</li>
+</ul>
+<h2 id="walking-through-a-concrete-scenario">Walking through a concrete scenario</h2>
+<p>Let's trace what happens when VibeSwap needs to know ETH's price.</p>
+<h3 id="step-1-operators-watch-exchanges">Step 1 — Operators watch exchanges</h3>
+<p>Alice, Bob, and Carol are operators. Each watches Binance, Coinbase, Kraken, and other exchanges. At time T, all three see ETH trading around $2,000.</p>
+<h3 id="step-2-commitment-phase">Step 2 — Commitment phase</h3>
+<p>Each operator computes their "best estimate" of ETH price:
+- Alice: $2,001 (she weights her sources slightly differently).
+- Bob: $1,999.
+- Carol: $2,002.</p>
+<p>Each chooses a random secret (let's say 10-byte random number each).</p>
+<p>Each submits <code>hash(price || secret)</code>:
+- Alice submits <code>hash(2001 || aliceSecret) = 0x123abc...</code>
+- Bob submits <code>hash(1999 || bobSecret) = 0x456def...</code>
+- Carol submits <code>hash(2002 || carolSecret) = 0x789ghi...</code></p>
+<p>The chain records these commitments. Anyone can see the hashes, but nobody can figure out the prices from hashes alone.</p>
+<h3 id="step-3-reveal-phase">Step 3 — Reveal phase</h3>
+<p>After the commitment window closes (let's say 10 minutes later), the reveal window opens:</p>
+<p>Alice reveals: <code>(2001, aliceSecret)</code>. Contract verifies hash matches. ✓
+Bob reveals: <code>(1999, bobSecret)</code>. Contract verifies. ✓
+Carol reveals: <code>(2002, carolSecret)</code>. Contract verifies. ✓</p>
+<p>All three prices are now public and cryptographically anchored to their commitments.</p>
+<h3 id="step-4-aggregation">Step 4 — Aggregation</h3>
+<p>The contract computes the aggregate:
+- Median: 2001 (middle of 1999, 2001, 2002).
+- Mean: (2001 + 1999 + 2002) / 3 = 2000.67.
+- Weighted mean (if operators have different weights): similar but adjusted.</p>
+<p>VibeSwap uses median by default (robust to outliers).</p>
+<h3 id="step-5-publication">Step 5 — Publication</h3>
+<p>The aggregate price ($2001) is published. AMM contracts can now query <code>TPO.getPrice()</code> and get $2001.</p>
+<h2 id="why-this-defeats-manipulation">Why this defeats manipulation</h2>
+<p><strong>Single-operator manipulation</strong>: impossible. Alice alone can't change the aggregate; her reveal is one of three.</p>
+<p><strong>Coordinated manipulation</strong>: requires pre-coordination before the commitment phase, which is costly and detectable. Operators who repeatedly collude face slashing.</p>
+<p><strong>Last-mover advantage</strong>: removed. Without commit-reveal, a operator seeing others' prices could strategically set theirs to bias the aggregate. With commit-reveal, their commitment is locked before they see others.</p>
+<p><strong>Operator corruption</strong>: bounded. A compromised operator can only bias their single vote; the aggregate absorbs it via median/average.</p>
+<h2 id="what-could-still-go-wrong">What could still go wrong</h2>
+<p>Honest enumeration:</p>
+<h3 id="problem-1-all-operators-are-corrupted">Problem 1 — All operators are corrupted</h3>
+<p>If every operator is compromised, they can coordinate to push whatever price they want. Defense: diverse operator set (different jurisdictions, different organizations, different incentive structures), stake-and-slash, rotating operator selection.</p>
+<h3 id="problem-2-operator-attrition">Problem 2 — Operator attrition</h3>
+<p>If too many operators become unavailable (crash, leave), the reveal phase can't complete. Defense: require minimum reveal threshold (e.g., at least 2 of 3); graceful degradation to fewer operators for one round.</p>
+<h3 id="problem-3-slow-price-movements">Problem 3 — Slow price movements</h3>
+<p>Prices change over time. A 10-minute commitment+reveal cycle means the published price is always 10+ minutes behind the actual market. This is the oracle-lag problem, unavoidable with any oracle.</p>
+<p>Defense: use TWAP (time-weighted average price) over the lag window to reduce manipulation-via-lag; accept some price-update latency.</p>
+<h3 id="problem-4-oracle-frontrunning">Problem 4 — Oracle frontrunning</h3>
+<p>An attacker sees the new price coming (via mempool monitoring) and front-runs trades in the AMM before the price update lands. This is mitigated by the AMM's own commit-reveal batch auction (<a href="../../../contracts/core/CommitRevealAuction.sol"><code>CommitRevealAuction.sol</code></a>).</p>
+<h2 id="the-interaction-with-other-mechanisms">The interaction with other mechanisms</h2>
+<p>TPO feeds into:
+- <strong>VibeAMM</strong>: uses TPO price to validate trades aren't too far from true price.
+- <strong>TWAP validation</strong>: AMM compares TPO price to recent trade prices; large deviations trigger circuit breakers.
+- <strong>Circuit breakers</strong>: if TPO reports wildly inconsistent prices, trading pauses.</p>
+<p>TPO reads from:
+- <strong>External exchange APIs</strong>: Binance, Coinbase, Kraken, etc. Each operator aggregates their own.
+- <strong>Backup feeds</strong>: Chainlink, Pyth, etc. as failsafe.</p>
+<h2 id="gas-optimization">Gas optimization</h2>
+<p>On-chain commit-reveal costs gas:
+- Commitment: 1 storage slot per operator, ~20K gas each.
+- Reveal: verification + storage update, ~40K gas each.
+- Aggregation: median or average computation, ~10K gas.</p>
+<p>Per price update: ~150K gas for 3 operators. At $20/M gas, that's ~$3/update. Tolerable for frequent updates.</p>
+<p>Batch updates: aggregate multiple price feeds in a single commit-reveal cycle. Amortizes gas across assets.</p>
+<h2 id="why-the-c39-design-is-an-etm-alignment-win">Why the C39 design is an ETM-alignment win</h2>
+<p>The original deviation gate used a fixed percentage (5%) which is a arbitrary number. Arbitrary numbers rarely match substrate geometry (<a href="../SUBSTRATE_GEOMETRY_MATCH.md">Substrate-Geometry Match</a> principle).</p>
+<p>The commit-reveal design has no arbitrary numbers. Manipulation resistance comes from the protocol structure itself — operators can't bias because the protocol structurally prevents bias. Cleaner, more defensible, matches the substrate's geometry (markets are commitment-based, commit-reveal mirrors that).</p>
+<p>Classified as ETM MIRRORS in the <a href="../etm/ETM_ALIGNMENT_AUDIT.md">ETM Alignment Audit</a>.</p>
+<h2 id="how-to-read-the-actual-code">How to read the actual code</h2>
+<p>For engineers who want to inspect:</p>
+<ul>
+<li><strong><code>contracts/oracle/OracleAggregationCRA.sol</code></strong> — the new commit-reveal aggregator.</li>
+<li><strong><code>contracts/oracle/interfaces/IOracleAggregationCRA.sol</code></strong> — the interface.</li>
+<li><strong><code>contracts/oracle/TruePriceOracle.sol</code></strong> — existing TPO with <code>pullFromAggregator</code> wired in.</li>
+<li><strong><code>test/oracles/OracleAggregationCRA.t.sol</code></strong> — 17 tests covering the commit-reveal flow, aggregation, failure modes.</li>
+</ul>
+<p>Reading order for study:
+1. Start with the interface (<code>IOracleAggregationCRA.sol</code>) to see the public API.
+2. Read the struct definitions in the interface.
+3. Read the implementation; trace <code>commitPrice</code> → <code>revealPrice</code> → <code>aggregate</code> → <code>publish</code>.
+4. Run the tests (<code>forge test --match-contract OracleAggregationCRA</code>) to verify behavior.</p>
+<h2 id="for-students">For students</h2>
+<p>Suggested exercise: design a commit-reveal mechanism for a different domain (e.g., predicting election outcomes, rating restaurants, evaluating pull requests). Apply the same principles:
+- Commitment phase hides the claim.
+- Reveal phase verifies the commitment.
+- Aggregation is structural, not discretionary.
+- No arbitrary thresholds.</p>
+<p>Compare your design to VibeSwap's TPO. Where does yours differ? What tradeoffs did you make?</p>
+<h2 id="the-bigger-lesson">The bigger lesson</h2>
+<p>Oracle design has general lessons for any system that aggregates multiple sources:</p>
+<ol>
+<li><strong>Don't trust one source.</strong> Aggregate multiple.</li>
+<li><strong>Don't let sources see each others' inputs before committing.</strong> Commit-reveal.</li>
+<li><strong>Don't add arbitrary thresholds.</strong> Structural design.</li>
+<li><strong>Don't assume honest operators.</strong> Design for cartel-resistance.</li>
+</ol>
+<p>These lessons apply to voting, attestation, data integrity, audit — anywhere you need trustworthy aggregation. The oracle is one concrete instance.</p>
+<h2 id="one-line-summary">One-line summary</h2>
+<p><em>True Price Oracle post-C39 uses commit-reveal aggregation across multiple operators — no single operator can manipulate because commitments are locked before any reveal. Replaces the arbitrary 5% deviation gate with structural fairness. Pedagogical walk-through: Alice/Bob/Carol example shows how commitment-hashing and reveal-verification compose to prevent last-mover advantage.</em></p>
+  </article>
+</div>
+
+<div class="paper-nav">
+  <a href="/papers/27_WHAT_LLMS_TEACH_US_ABOUT_MIND.html" class="nav-cell prev"><div class="label">&larr; PREV // 27</div><div class="ttl">What LLMs Teach Us About Mind</div></a>
+  <a href="/papers/29_CROSS_CHAIN_STATE_ATOMICITY.html" class="nav-cell next"><div class="label">NEXT // 29 &rarr;</div><div class="ttl">Cross-Chain State Atomicity</div></a>
+</div>
+
+<div class="site-footer">
+  <div><span class="dot"></span>LIVE // 2026</div>
+  <div><a href="/papers/" style="color: var(--terminal); border: 0;">&larr; all papers</a></div>
+  <div>vibeswap.org</div>
+</div>
+
+<script>
+// TOC scroll-spy via IntersectionObserver
+const links = document.querySelectorAll('.toc-link');
+const headings = Array.from(document.querySelectorAll('.article h2, .article h3'));
+if (headings.length && 'IntersectionObserver' in window) {
+  const byId = new Map(Array.from(links).map(l => [l.getAttribute('href').slice(1), l]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      const link = byId.get(e.target.id);
+      if (!link) return;
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  headings.forEach(h => io.observe(h));
+}
+</script>
+
+</body>
+</html>

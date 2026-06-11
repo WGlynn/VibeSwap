@@ -7,6 +7,7 @@ import { useBridge } from '../hooks/useBridge'
 import toast from 'react-hot-toast'
 import GlassCard from './ui/GlassCard'
 import InteractiveButton from './ui/InteractiveButton'
+import Accent3D from './ui/terminal/Accent3D'
 
 const PHI = 1.618033988749895
 const CYAN = '#06b6d4'
@@ -160,11 +161,19 @@ function BridgePage() {
 
   return (
     <div className="max-w-lg mx-auto px-4">
-      {/* Header */}
+      {/* Header — op-signature + locked divider */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Send</h1>
-        <p className="text-black-400 mt-1">Transfer money across networks instantly. No wire fees.</p>
-        <div className="flex items-center space-x-2 mt-2 flex-wrap gap-y-1">
+        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-matrix-600 mb-2">
+          bridge.send(token, chain) → burn · transit · mint
+        </div>
+        <h1 className="text-2xl font-display font-bold tracking-[-0.02em] text-white">Send</h1>
+        <p className="text-black-300 mt-1">Transfer money across networks instantly. No wire fees.</p>
+        <div
+          aria-hidden="true"
+          className="mt-3 h-px w-full"
+          style={{ background: 'linear-gradient(90deg, rgba(0,255,65,0.18), transparent)' }}
+        />
+        <div className="flex items-center space-x-2 mt-3 flex-wrap gap-y-1">
           <span className="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-matrix-500/10 border border-matrix-500/20">
             <svg className="w-3 h-3 text-matrix-500" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -179,10 +188,10 @@ function BridgePage() {
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex mb-4 p-1 rounded-xl bg-black-800/60 border border-black-700/50">
+      <div className="flex mb-4 p-1 rounded-xl bg-black-800/60 border border-black-700/50" role="tablist" aria-label="Send or history">
         {['send', 'history'].map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${tab === t ? 'bg-black-700 text-white shadow-sm' : 'text-black-400 hover:text-black-200'}`}>
+          <button key={t} onClick={() => setTab(t)} role="tab" aria-selected={tab === t}
+            className={`flex-1 py-2 rounded-lg font-mono text-[11px] uppercase tracking-[0.18em] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2 ${tab === t ? 'bg-black-700 text-matrix-400 shadow-sm' : 'text-black-400 hover:text-black-200'}`}>
             {t === 'send' ? 'Send' : 'History'}
           </button>
         ))}
@@ -194,7 +203,7 @@ function BridgePage() {
             <GlassCard className="p-4">
               {/* From */}
               <div className="mb-2">
-                <div className="text-sm text-black-400 mb-2">From</div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-black-300 mb-2">From</div>
                 <div className="flex items-stretch gap-2">
                   <ChainBtn chain={fromChain} open={showFromDD} setOpen={setShowFromDD}
                     exclude={toChain.id} onSelect={c => { setFromChain(c); setShowFromDD(false) }} />
@@ -232,7 +241,7 @@ function BridgePage() {
 
               {/* To */}
               <div className="mt-2">
-                <div className="text-sm text-black-400 mb-2">To</div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-black-300 mb-2">To</div>
                 <div className="flex items-stretch gap-2">
                   <ChainBtn chain={toChain} open={showToDD} setOpen={setShowToDD}
                     exclude={fromChain.id} onSelect={c => { setToChain(c); setShowToDD(false) }} />
@@ -284,7 +293,7 @@ function BridgePage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     </motion.div>
-                    <span className="text-sm font-medium text-white">Transfer in Progress</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-terminal-400">bridge.transfer(amount) → in_flight</span>
                   </div>
                   <div className="flex items-center justify-between">
                     {STEPS.map((s, i) => {
@@ -322,7 +331,7 @@ function BridgePage() {
                     <svg className="w-4 h-4 text-black-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                     </svg>
-                    <span className="text-sm font-medium text-white">Available Routes</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-matrix-400">route.compare(security, fee, time)</span>
                   </div>
                   <div className="space-y-2">
                     {routes.map(r => (
@@ -348,13 +357,16 @@ function BridgePage() {
               </motion.div>
             )}
 
+            {/* Network mesh accent — lazy 3D, mounts on scroll-into-view */}
+            <Accent3D variant="network" label="mesh.topology(chains) → routes" className="h-32 mt-4" />
+
             {/* Supported Chains Grid */}
-            <GlassCard className="mt-4 p-4">
+            <GlassCard className="mt-2 p-4">
               <div className="flex items-center space-x-2 mb-3">
                 <svg className="w-4 h-4 text-black-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-sm font-medium text-white">Supported Networks</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-matrix-400">chains.supported() → 5 live</span>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {CHAINS.map(c => (
@@ -375,11 +387,9 @@ function BridgePage() {
             {history.length === 0 ? (
               <GlassCard className="p-8">
                 <div className="text-center">
-                  <svg className="w-12 h-12 mx-auto text-black-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-black-400 text-sm">No transfers yet</p>
-                  <p className="text-black-500 text-xs mt-1">Your transfer history will appear here</p>
+                  <Accent3D variant="points" label="" className="h-24 mb-3" />
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-black-300">bridge.history() → []</p>
+                  <p className="text-black-500 text-xs mt-2">Your transfer history will appear here</p>
                 </div>
               </GlassCard>
             ) : (

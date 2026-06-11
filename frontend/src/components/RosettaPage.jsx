@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import GlassCard from './ui/GlassCard'
+import Accent3D from './ui/terminal/Accent3D'
 import { useWallet } from '../hooks/useWallet'
 import { useDeviceWallet } from '../hooks/useDeviceWallet'
 import { anchorCKGLog, previewCKGAnchor } from '../utils/rosetta-anchor'
@@ -6186,6 +6187,11 @@ export default function RosettaPage() {
             filter: 'blur(40px)',
           }}
         />
+
+        {/* Universal-form accent — lazy 3D, desktop only, behind the headline */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-72 hidden lg:block opacity-70 pointer-events-none">
+          <Accent3D variant="icosahedron" label="universal.form() → projection" className="h-72" />
+        </div>
 
         {/* Op signature */}
         <motion.div

@@ -1,4 +1,10 @@
-# Write-Ahead Log — CLEAN (2026-06-10 evening epoch closed ~19:25 ET — all work pushed + deployed)
+# Write-Ahead Log — CLEAN (2026-06-11 ~18:01 ET — 3h50m session checkpointed, clean reboot)
+
+## Epoch — CLOSED 2026-06-11 ~18:01 ET (contribution-graph + JARVIS positioning + private stealth R&D)
+- **Status: CLEAN.** No orphans. Everything committed + pushed; integrity attested + signed (632 files).
+- **Public** (pushed): contribution-graph hardened + DeepFunding fact-checked; OpenClaw comparison + venn live; JARVIS FEATURES.md + README; tamper-resistance (signed merkle attestation); session-chain public head-commitment; fail-closed privacy leak-gate; 7 new primitives; SESSION_STATE checkpoint (codeword-free).
+- **Private stealth R&D** (front-run-sensitive, do NOT name in public): committed to the private remote; handoff in `memory/nda-locked/_NOESIS_HANDOFF.md` (local) + the private repo `CONTINUE.md`. Auto-continued by cron `3b8e2f47` (every 3h). OPEN decision next session: token↔proof mapping (verify vs NCI, tokenomics-zero-tolerance).
+- Reboot-safe. See `SESSION_STATE.md` top block for the full next-session frame.
 
 ## Epoch — CLOSED 2026-06-10 ~19:25 ET (skill-mining + loop-doctrine + frontend GO — complete)
 - **Opened**: 2026-06-10 ~17:14 ET. Handoff written ~19:30 ET at 353k context (rotation hook).

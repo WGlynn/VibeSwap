@@ -2,7 +2,7 @@
 
 ## ⚠ NEXT SESSION — TOP PRIORITY
 
-### Resume the VibeSwap frontend reimagine (Will GO directive, AUGMENT DON'T REPLACE)
+### DONE 2026-06-10 ~19:25 ET — recode shipped + deployed. Next: Will reads post draft (Desktop/jarvis-honest-built-post-2026-06-10-v0.md) + triages skill-mining queue. Remaining recode breadth (~160 minor routes inherit the new terminal primitives; dynamic-class offenders logged in frontend/RECODE_PLAN.md) = follow-up pass.
 
 Will 2026-06-10 ~18:5x ET: "that should be enough frontend skills to fix and reimagine the frontend vibeswap vercel. GO!" + "remember, augment don't replace" — then context hit 353k and the rotation hook forced this handoff.
 

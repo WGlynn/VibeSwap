@@ -1,8 +1,8 @@
-# Write-Ahead Log — ACTIVE (2026-06-10 evening: frontend-reimagine in flight)
+# Write-Ahead Log — CLEAN (2026-06-10 evening epoch closed ~19:25 ET — all work pushed + deployed)
 
-## Epoch — ACTIVE at 2026-06-10 evening (skill-mining + loop-doctrine + frontend GO)
+## Epoch — CLOSED 2026-06-10 ~19:25 ET (skill-mining + loop-doctrine + frontend GO — complete)
 - **Opened**: 2026-06-10 ~17:14 ET. Handoff written ~19:30 ET at 353k context (rotation hook).
-- **In flight / uncommitted-to-remote**: vibeswap commit `53ca66ac` (3D hero) LOCAL-ONLY pending verifier verdict + reimagine pass; live-hook isinstance guards applied at ~/.claude (un-versioned by design); SESSION_STATE block above is the manifest.
+- **Closed out**: 3D hero verified (PUSH-READY, 6/6 claims) + deployed; full site recode (6 commits) verified (REVISE→fixed: untracked rosetta-anchor.js committed) + pushed `e27a168f` + deployed to vibeswap-app.vercel.app. Post draft READY at Desktop/jarvis-honest-built-post-2026-06-10-v0.md (Will-gated). Remaining items are Will-triage only (skill-mining queue, primitives-pending).
 - **Everything else pushed**: WGlynn/JARVIS @ 055138c · jarvis-substrate @ 85acea6+ · memory @ c6c7e26.
 
 ---

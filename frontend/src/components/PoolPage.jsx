@@ -7,6 +7,8 @@ import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
 import Sparkline, { generateSparklineData } from './ui/Sparkline'
+import OpSig from './ui/terminal/OpSig'
+import Accent3D from './ui/terminal/Accent3D'
 
 // ============ Constants ============
 const PHI = 1.618033988749895
@@ -68,7 +70,7 @@ function SortBtn({ label, sortKey, sort, onSort }) {
   const active = sort.key === sortKey
   return (
     <button onClick={() => onSort(sortKey)}
-      className={`text-right text-xs font-mono uppercase tracking-wider transition-colors ${active ? 'text-green-400' : 'text-black-500 hover:text-black-300'}`}>
+      className={`text-right text-xs font-mono uppercase tracking-wider transition-colors ${active ? 'text-matrix-400' : 'text-black-500 hover:text-black-300'}`}>
       {label}{active ? (sort.dir === 'desc' ? ' \u2193' : ' \u2191') : ''}
     </button>
   )
@@ -92,11 +94,11 @@ function PositionCard({ p, i }) {
             </div>
           </div>
           {ilProtected ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-              <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-matrix-500/10 border border-matrix-500/20">
+              <svg className="w-3 h-3 text-matrix-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <span className="text-[10px] text-green-400 font-medium">{coveragePct}% IL covered</span>
+              <span className="text-[10px] text-matrix-400 font-medium">{coveragePct}% IL covered</span>
             </div>
           ) : (
             <div className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
@@ -108,9 +110,9 @@ function PositionCard({ p, i }) {
           <div><div className="text-[10px] text-black-500 mb-0.5">Value</div>
             <div className="text-sm font-semibold font-mono">{fmt(value)}</div></div>
           <div><div className="text-[10px] text-black-500 mb-0.5">Unclaimed Fees</div>
-            <div className="text-sm font-semibold font-mono text-green-400">{fmt(unclaimedFees)}</div></div>
+            <div className="text-sm font-semibold font-mono text-matrix-400">{fmt(unclaimedFees)}</div></div>
           <div><div className="text-[10px] text-black-500 mb-0.5">IL Impact</div>
-            <div className={`text-sm font-semibold font-mono ${ilPercent < 0 ? 'text-red-400' : 'text-green-400'}`}>
+            <div className={`text-sm font-semibold font-mono ${ilPercent < 0 ? 'text-red-400' : 'text-matrix-400'}`}>
               {ilPercent > 0 ? '+' : ''}{fmtPct(ilPercent)}</div></div>
         </div>
         <div className="flex items-center justify-between pt-3 border-t border-black-700/50">
@@ -118,7 +120,7 @@ function PositionCard({ p, i }) {
             <span className="text-[10px] text-black-500 font-mono">Loyalty:</span>
             <span className={`text-[10px] font-semibold ${loyaltyTier === 'Gold' ? 'text-amber-400' : loyaltyTier === 'Silver' ? 'text-gray-300' : 'text-orange-400'}`}>{loyaltyTier}</span>
           </div>
-          <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 transition-colors">
+          <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-matrix-500/10 text-matrix-400 hover:bg-matrix-500/20 border border-matrix-500/20 transition-colors">
             Manage
           </button>
         </div>
@@ -137,7 +139,7 @@ function PoolRow({ pool, i, onAdd }) {
         <div className="flex items-center gap-3">
           <div className="flex -space-x-1.5"><span className="text-xl">{tokenA.icon}</span><span className="text-xl">{tokenB.icon}</span></div>
           <div><span className="text-sm font-semibold">{tokenA.symbol}/{tokenB.symbol}</span>
-            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 font-mono">{feeTier}%</span></div>
+            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-matrix-500/10 text-matrix-400 font-mono">{feeTier}%</span></div>
         </div>
       </td>
       <td className="py-3.5 px-4 text-right"><span className="text-sm font-mono">{fmt(tvl)}</span></td>
@@ -145,13 +147,13 @@ function PoolRow({ pool, i, onAdd }) {
       <td className="py-3.5 px-4 text-right hidden lg:table-cell"><span className="text-sm font-mono text-black-300">{fmt(fees24h)}</span></td>
       <td className="py-3.5 px-4 text-right">
         <div className="flex items-center justify-end gap-2">
-          <Sparkline data={sparkData} width={48} height={16} color="#22c55e" />
+          <Sparkline data={sparkData} width={48} height={16} color="#00ff41" />
           <span className="text-sm font-semibold font-mono text-black-300">{fmtPct(feeYield7d)}</span>
         </div>
       </td>
       <td className="py-3.5 px-4 text-right">
         <button onClick={() => onAdd(pool)}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 transition-all opacity-60 group-hover:opacity-100">
+          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-matrix-500/10 text-matrix-400 hover:bg-matrix-500/20 border border-matrix-500/20 transition-all opacity-60 group-hover:opacity-100">
           Add Liquidity
         </button>
       </td>
@@ -169,10 +171,10 @@ function MobilePoolCard({ pool, i, onAdd }) {
         <div className="flex items-center gap-2.5">
           <div className="flex -space-x-1.5"><span className="text-xl">{tokenA.icon}</span><span className="text-xl">{tokenB.icon}</span></div>
           <span className="text-sm font-semibold">{tokenA.symbol}/{tokenB.symbol}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400 font-mono">{feeTier}%</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-matrix-500/10 text-matrix-400 font-mono">{feeTier}%</span>
         </div>
         <div className="flex items-center gap-2">
-          <Sparkline data={sparkData} width={36} height={12} color="#22c55e" />
+          <Sparkline data={sparkData} width={36} height={12} color="#00ff41" />
           <span className="text-sm font-semibold font-mono text-black-300">{fmtPct(feeYield7d)}</span>
         </div>
       </div>
@@ -181,7 +183,7 @@ function MobilePoolCard({ pool, i, onAdd }) {
         <div className="text-right"><div className="text-[10px] text-black-500 mb-0.5">24h Volume</div><div className="text-sm font-mono text-black-300">{fmt(volume24h)}</div></div>
       </div>
       <button onClick={() => onAdd(pool)}
-        className="w-full py-2 text-xs font-medium rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 transition-colors">
+        className="w-full py-2 text-xs font-medium rounded-lg bg-matrix-500/10 text-matrix-400 hover:bg-matrix-500/20 border border-matrix-500/20 transition-colors">
         Add Liquidity
       </button>
     </motion.div>
@@ -205,7 +207,7 @@ function AddLiquidityModal({ pool, onClose }) {
     return w < 200 ? 'High' : w < 800 ? 'Medium' : 'Low'
   }, [pMin, pMax])
 
-  const riskColor = { Low:'text-green-400', Medium:'text-amber-400', High:'text-red-400' }
+  const riskColor = { Low:'text-matrix-400', Medium:'text-amber-400', High:'text-red-400' }
 
   const TokenInput = ({ label, value, onChange, token }) => (
     <div className="p-4 rounded-xl bg-black-900/80 border border-black-700/50">
@@ -258,12 +260,12 @@ function AddLiquidityModal({ pool, onClose }) {
               <div>
                 <label className="text-[10px] text-black-500 mb-1 block">Min Price</label>
                 <input type="number" value={pMin} onChange={(e) => setPMin(e.target.value)} placeholder="0"
-                  className="w-full px-3 py-2 bg-black-800 border border-black-700/50 rounded-lg text-sm font-mono outline-none focus:border-green-500/30 transition-colors" />
+                  className="w-full px-3 py-2 bg-black-800 border border-black-700/50 rounded-lg text-sm font-mono outline-none focus:border-matrix-500/30 transition-colors" />
               </div>
               <div>
                 <label className="text-[10px] text-black-500 mb-1 block">Max Price</label>
                 <input type="number" value={pMax} onChange={(e) => setPMax(e.target.value)} placeholder="\u221E"
-                  className="w-full px-3 py-2 bg-black-800 border border-black-700/50 rounded-lg text-sm font-mono outline-none focus:border-green-500/30 transition-colors" />
+                  className="w-full px-3 py-2 bg-black-800 border border-black-700/50 rounded-lg text-sm font-mono outline-none focus:border-matrix-500/30 transition-colors" />
               </div>
             </div>
             <div className="flex items-center gap-2 mt-2">
@@ -278,14 +280,14 @@ function AddLiquidityModal({ pool, onClose }) {
             {[['7d Fee Yield', <span className="font-semibold font-mono text-black-300">{fmtPct(estFeeYield)}</span>],
               ['IL Risk', <span className={`font-semibold font-mono ${riskColor[ilRisk]}`}>{ilRisk}</span>],
               ['Fee Tier', <span className="font-mono">{pool?.feeTier || 0.3}%</span>],
-              ['Shapley Rewards', <span className="font-mono text-green-400">Active</span>],
+              ['Shapley Rewards', <span className="font-mono text-matrix-400">Active</span>],
             ].map(([l, v]) => (
               <div key={l} className="flex justify-between text-sm"><span className="text-black-500">{l}</span>{v}</div>
             ))}
           </div>
 
           <motion.button whileHover={{ scale:1.01 }} whileTap={{ scale:0.98 }} disabled={!amtA || !amtB}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-black hover:from-green-400 hover:to-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed">
+            className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all bg-matrix-600 text-black-900 hover:bg-matrix-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2 disabled:opacity-30 disabled:cursor-not-allowed">
             Supply Liquidity
           </motion.button>
         </div>
@@ -330,21 +332,21 @@ function CreatePoolModal({ onClose }) {
             <div className="grid grid-cols-4 gap-2">
               {tiers.map((t) => (
                 <button key={t.v} onClick={() => setFee(t.v)}
-                  className={`p-2 rounded-lg border text-center transition-all ${fee === t.v ? 'border-green-500/40 bg-green-500/10 text-green-400' : 'border-black-700/50 bg-black-900/50 text-black-400 hover:border-black-600'}`}>
+                  className={`p-2 rounded-lg border text-center transition-all ${fee === t.v ? 'border-matrix-500/40 bg-matrix-500/10 text-matrix-400' : 'border-black-700/50 bg-black-900/50 text-black-400 hover:border-black-600'}`}>
                   <div className="text-sm font-semibold font-mono">{t.l}</div>
                   <div className="text-[9px] mt-0.5">{t.d}</div>
                 </button>
               ))}
             </div>
           </div>
-          <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10 flex items-start gap-2">
-            <svg className="w-4 h-4 text-green-400 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <div className="p-3 rounded-xl bg-matrix-500/5 border border-matrix-500/10 flex items-start gap-2">
+            <svg className="w-4 h-4 text-matrix-400 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
             <p className="text-[11px] text-black-400 leading-relaxed">
               After creation you will need to add initial liquidity. Shapley rewards activate at $10K TVL.</p>
           </div>
           <motion.button whileHover={{ scale:1.01 }} whileTap={{ scale:0.98 }} disabled={!tokenA || !tokenB}
-            className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all bg-gradient-to-r from-green-500 to-emerald-500 text-black hover:from-green-400 hover:to-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed">
+            className="w-full py-3.5 rounded-xl font-semibold text-sm transition-all bg-matrix-600 text-black-900 hover:bg-matrix-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2 disabled:opacity-30 disabled:cursor-not-allowed">
             Create Pool
           </motion.button>
         </div>
@@ -382,9 +384,9 @@ function PoolPage() {
     <div className="min-h-screen">
       <PageHero category="defi" title="Liquidity Pools"
         subtitle="Provide liquidity, earn fees, get Shapley-distributed rewards"
-        badge="Live" badgeColor="#22c55e">
+        badge="Live" badgeColor="#00ff41">
         <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }} onClick={() => setShowCreate(true)}
-          className="px-4 py-2 text-xs font-medium rounded-lg border border-green-500/20 text-green-400 hover:bg-green-500/10 transition-colors">
+          className="px-4 py-2 text-xs font-medium rounded-lg border border-matrix-500/20 text-matrix-400 hover:bg-matrix-500/10 transition-colors">
           + Create New Pool
         </motion.button>
       </PageHero>
@@ -405,9 +407,9 @@ function PoolPage() {
         {positions.length > 0 && (
           <motion.section initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
             transition={{ delay: STAGGER * 2, duration: STAGGER * PHI }} className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Your Positions</h2>
-              <span className="text-[10px] font-mono text-black-500">{positions.length} active</span>
+            <div className="flex items-end justify-between mb-4 gap-4">
+              <OpSig as="h2" sig={`pool.positions(account) → ${positions.length}`} title="Your Positions" divider={false} className="flex-1" />
+              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-black-500">{positions.length} active</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {positions.map((pos, i) => <PositionCard key={pos.id} p={pos} i={i} />)}
@@ -418,9 +420,9 @@ function PoolPage() {
         {/* Available Pools */}
         <motion.section initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
           transition={{ delay: STAGGER * 3, duration: STAGGER * PHI }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Available Pools</h2>
-            <span className="text-[10px] font-mono text-black-500">{pools.length} pools</span>
+          <div className="flex items-end justify-between mb-4 gap-4">
+            <OpSig as="h2" sig="amm.pools(x·y=k) → list" title="Available Pools" divider={false} className="flex-1" />
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-black-500">{pools.length} pools</span>
           </div>
 
           {/* Desktop */}
@@ -444,16 +446,19 @@ function PoolPage() {
           </GlassCard>
         </motion.section>
 
+        {/* Liquidity torus accent — lazy 3D, mounts on scroll-into-view */}
+        <Accent3D variant="torus" label="vibeAMM.invariant() → x·y=k" className="h-36 mt-8" />
+
         {/* Create Pool CTA */}
         <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          transition={{ delay: STAGGER * 4, duration: STAGGER * PHI }} className="mt-8">
+          transition={{ delay: STAGGER * 4, duration: STAGGER * PHI }} className="mt-2">
           <GlassCard glowColor="matrix" spotlight className="p-6 text-center">
             <h3 className="text-sm font-semibold mb-1">Got an exotic pair?</h3>
             <p className="text-[11px] text-black-400 mb-4 max-w-md mx-auto">
               Create a new liquidity pool for any token pair. Set your own fee tier, seed initial liquidity,
               and start earning from trade volume immediately.</p>
             <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }} onClick={() => setShowCreate(true)}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-500 text-black hover:from-green-400 hover:to-emerald-400 transition-all">
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-matrix-600 text-black-900 hover:bg-matrix-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2 transition-all">
               Create New Pool
             </motion.button>
           </GlassCard>

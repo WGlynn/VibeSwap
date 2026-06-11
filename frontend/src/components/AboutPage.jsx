@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import GlassCard from './ui/GlassCard'
 import PageHero from './ui/PageHero'
 import StatCard from './ui/StatCard'
+import OpSig from './ui/terminal/OpSig'
+import Accent3D from './ui/terminal/Accent3D'
 
 // ============ Constants ============
 
@@ -188,6 +190,8 @@ function AboutPage() {
             </span>{' '}
             Just honest exchange.
           </h2>
+          {/* Order-field accent — lazy 3D, mounts on scroll-into-view */}
+          <Accent3D variant="points" label="orders.flow() → one batch" className="h-32 mt-10" />
         </motion.section>
 
         {/* ============ How It Works ============ */}
@@ -199,12 +203,7 @@ function AboutPage() {
           viewport={{ once: true, margin: '-80px' }}
           custom={0}
         >
-          <h3 className="text-xs font-mono uppercase tracking-wider text-purple-400 mb-2 opacity-70">
-            Mechanism
-          </h3>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-10">
-            How It Works
-          </h2>
+          <OpSig as="h2" sig="auction.batch(10s) → commit · reveal · settle" title="How It Works" className="mb-10" />
 
           <div className="flex flex-col md:flex-row items-stretch md:items-start justify-center gap-4 md:gap-0">
             {STEPS.map((step, i) => (
@@ -251,17 +250,12 @@ function AboutPage() {
           viewport={{ once: true, margin: '-80px' }}
           custom={1}
         >
-          <h3 className="text-xs font-mono uppercase tracking-wider text-purple-400 mb-2 opacity-70">
-            At a Glance
-          </h3>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-8">
-            Key Numbers
-          </h2>
+          <OpSig as="h2" sig="protocol.stats() → at_a_glance" title="Key Numbers" className="mb-8" />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard
-              label="Chains Supported"
-              value={7}
+              label="Chains Live"
+              value={5}
               decimals={0}
               sparkSeed={42}
               size="md"
@@ -302,12 +296,7 @@ function AboutPage() {
           viewport={{ once: true, margin: '-80px' }}
           custom={2}
         >
-          <h3 className="text-xs font-mono uppercase tracking-wider text-purple-400 mb-2 opacity-70">
-            Philosophy
-          </h3>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-8">
-            Cooperative Capitalism
-          </h2>
+          <OpSig as="h2" sig="philosophy.model() → mutual_risk × free_market" title="Cooperative Capitalism" className="mb-8" />
 
           <GlassCard glowColor="terminal" spotlight className="p-6 md:p-10">
             <div className="space-y-6">
@@ -350,12 +339,7 @@ function AboutPage() {
           viewport={{ once: true, margin: '-80px' }}
           custom={3}
         >
-          <h3 className="text-xs font-mono uppercase tracking-wider text-purple-400 mb-2 opacity-70">
-            Origin
-          </h3>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-8">
-            Built in a Cave, With a Box of Scraps
-          </h2>
+          <OpSig as="h2" sig="origin.story() → mark_i" title="Built in a Cave, With a Box of Scraps" className="mb-8" />
 
           <GlassCard glowColor="matrix" spotlight className="p-6 md:p-10">
             {/* Opening quote */}
@@ -412,12 +396,7 @@ function AboutPage() {
           viewport={{ once: true, margin: '-80px' }}
           custom={4}
         >
-          <h3 className="text-xs font-mono uppercase tracking-wider text-purple-400 mb-2 opacity-70">
-            Connect
-          </h3>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-8">
-            Links
-          </h2>
+          <OpSig as="h2" sig="community.links() → [github, telegram, docs, paper]" title="Links" className="mb-8" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {LINKS.map((link, i) => {
@@ -441,7 +420,7 @@ function AboutPage() {
                       className="p-5 cursor-pointer"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                        <div className="w-9 h-9 rounded-lg bg-matrix-500/10 border border-matrix-500/20 flex items-center justify-center text-matrix-400">
                           {link.icon}
                         </div>
                         <span className="font-bold text-white">
@@ -469,6 +448,8 @@ function AboutPage() {
           className="pt-4 pb-8 text-center"
           {...fadeUp(0.3)}
         >
+          {/* Convergence accent — lazy 3D, mounts on scroll-into-view */}
+          <Accent3D variant="icosahedron" label="minds.converge() → movement" className="h-36 mb-8" />
           <div className="max-w-2xl mx-auto">
             <div className="w-12 h-px bg-matrix-500/40 mx-auto mb-8" />
             <blockquote className="text-xl sm:text-2xl md:text-3xl font-bold leading-snug text-white">
@@ -488,7 +469,7 @@ function AboutPage() {
                 whileHover={{ scale: 1.03, y: -2 }}
                 whileTap={{ scale: 0.97 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className="px-10 py-3.5 rounded-xl font-semibold bg-matrix-600 hover:bg-matrix-500 text-black-900 transition-colors"
+                className="px-10 py-3.5 rounded-xl font-semibold bg-matrix-600 hover:bg-matrix-500 text-black-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-matrix-500 focus-visible:outline-offset-2"
               >
                 Start Trading
               </motion.button>

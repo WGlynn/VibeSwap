@@ -1,6 +1,24 @@
-# Session State — 2026-06-10 evening: JarvisOS + skill-mining activation + loop-doctrine absorb + frontend GO
+# Session State — 2026-06-11: contribution-graph + JARVIS positioning + private stealth R&D (clean checkpoint, 3h40m)
 
-## ⚠ NEXT SESSION — TOP PRIORITY
+## ⚠ NEXT SESSION — TOP PRIORITY (2026-06-11 checkpoint)
+
+Long session (3h40m), clean reboot — everything committed + backed up. **AFK mode ACTIVE** (end every response with the 10-item menu).
+
+**Public work shipped today (all pushed/deployed):**
+- `WGlynn/contribution-graph`: hardened — 8 failure modes + `THREAT-MODEL.md` + governance & cooperative-capitalism theory; `dri.py` (.mailmap + split-credit); **DeepFunding numbers fact-checked vs source** (data file = 34 seed / 4,990 dep / 5,024 total / 14,927 edges; the upstream README headline was wrong); Myerson footnote.
+- Live (vibeswap-app.vercel.app): `jarvis-vs-openclaw.html`, `jarvis-openclaw-venn.html` (substrate-geometry stack), `jarvis-chain-commitment.json`.
+- `WGlynn/JARVIS`: `FEATURES.md` (verified moat inventory) + README current; **tamper-evidence → tamper-RESISTANCE** (Ed25519-signed merkle root, `integrity-attest.py`); session-chain public head-commitment framework; **fail-closed privacy leak-gate** in `sync-public-substrate.py`.
+- New primitives (memory): verify-source-before-confessing, gev-precondition-conservation, jarvis-complements-not-competes, open-weights-for-serious-sovereignty, harness-load-bearing-via-coordination, tamper-resistance-via-signed-attestation; feedback: rank-primitives-by-catch-rate.
+
+**Private stealth R&D — DO NOT name or describe in any public repo:**
+- A front-run-sensitive private workstream is active (Will: "tired of being front-run", ~2-week head-start). The pointer + full handoff live in `memory/nda-locked/` (local-only, gitignored) and the private remote.
+- **Auto-continued by durable cron `3b8e2f47`** (every 3h) — it carries the build forward without this session. The substrate-sync leak-gate (PRIVATE patterns in `~/.claude/state/private-leak-patterns.txt`) keeps it out of public.
+
+**Pending public:** task #6 — honest JARVIS twitter post (drafts on Desktop, Will-voice, honest numbers).
+
+---
+
+## (prior) ⚠ NEXT SESSION — TOP PRIORITY
 
 ### DONE 2026-06-10 ~19:25 ET — recode shipped + deployed. Next: Will reads post draft (Desktop/jarvis-honest-built-post-2026-06-10-v0.md) + triages skill-mining queue. Remaining recode breadth (~160 minor routes inherit the new terminal primitives; dynamic-class offenders logged in frontend/RECODE_PLAN.md) = follow-up pass.
 

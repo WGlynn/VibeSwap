@@ -1,20 +1,29 @@
-# Session State — 2026-06-11: contribution-graph + JARVIS positioning + private stealth R&D (clean checkpoint, 3h40m)
+# Session State — 2026-06-12 (evening): Story-Mode 10-loop complete; VM-integration arc on the private workstream
 
-## ⚠ NEXT SESSION — TOP PRIORITY (2026-06-11 checkpoint)
+## ⚠ NEXT SESSION — TOP PRIORITY (2026-06-12 evening checkpoint)
 
-Long session (3h40m), clean reboot — everything committed + backed up. **AFK mode ACTIVE** (end every response with the 10-item menu).
+**Story Mode ACTIVE** (end every response with the 10-item menu). The Will-armed 10-iteration self-play loop COMPLETED cleanly (10/10, loop file deleted; per-iteration commit+push discipline held throughout).
 
-**Public work shipped today (all pushed/deployed):**
-- `WGlynn/contribution-graph`: hardened — 8 failure modes + `THREAT-MODEL.md` + governance & cooperative-capitalism theory; `dri.py` (.mailmap + split-credit); **DeepFunding numbers fact-checked vs source** (data file = 34 seed / 4,990 dep / 5,024 total / 14,927 edges; the upstream README headline was wrong); Myerson footnote.
-- Live (vibeswap-app.vercel.app): `jarvis-vs-openclaw.html`, `jarvis-openclaw-venn.html` (substrate-geometry stack), `jarvis-chain-commitment.json`.
-- `WGlynn/JARVIS`: `FEATURES.md` (verified moat inventory) + README current; **tamper-evidence → tamper-RESISTANCE** (Ed25519-signed merkle root, `integrity-attest.py`); session-chain public head-commitment framework; **fail-closed privacy leak-gate** in `sync-public-substrate.py`.
-- New primitives (memory): verify-source-before-confessing, gev-precondition-conservation, jarvis-complements-not-competes, open-weights-for-serious-sovereignty, harness-load-bearing-via-coordination, tamper-resistance-via-signed-attestation; feedback: rank-primitives-by-catch-rate.
+**Private workstream (front-run-sensitive — do NOT name or describe here):** a full execution-substrate integration arc shipped this session (suite 119 → 145 green, all pushed to the private remote). Resume from the private repo `CONTINUE.md` top block + `HANDOFF.md`; JARVIS-wide WAL has the epoch summary. Auto-continue cron `3b8e2f47` still live; leak-gate enforces the boundary.
 
-**Private stealth R&D — DO NOT name or describe in any public repo:**
-- A front-run-sensitive private workstream is active (Will: "tired of being front-run", ~2-week head-start). The pointer + full handoff live in `memory/nda-locked/` (local-only, gitignored) and the private remote.
-- **Auto-continued by durable cron `3b8e2f47`** (every 3h) — it carries the build forward without this session. The substrate-sync leak-gate (PRIVATE patterns in `~/.claude/state/private-leak-patterns.txt`) keeps it out of public.
+**Public shipped this session:** AFK→Story-Mode naming fix across WGlynn/JARVIS (Will-flagged: STORY-MODE.md claimed the menu title is "AFK"; fixed + 5 similars incl. AFK_MODE.md → STORY_MODE.md rewritten to live hook paths) @ 163a191; stale generated memory view removed.
 
-**Pending public:** task #6 — honest JARVIS twitter post (drafts on Desktop, Will-voice, honest numbers).
+**Pending / Will-gated (unchanged):** confirm Jarvis email address → finalize identity memory; enable YouTube live (24h activation clock); honest JARVIS twitter post (Desktop drafts); EVC-IDE remote + Soham message; patent submit.
+
+---
+
+## (prior) Long continuous Story Mode self-play run (Will armed a 4-hour-runtime-record attempt; `~/.claude/state/story-loop.json` remaining-counter live). **Story Mode ACTIVE** (end every response with the 10-item menu). Everything below committed + pushed.
+
+**Private workstream (front-run-sensitive — do NOT name or describe here): a major hardening arc completed in one continuous run.**
+- Full detail, handoff, and next frontier live ONLY in the private repo `CONTINUE.md` + `memory/nda-locked/` (this file is tracked in the PUBLIC vibeswap repo — keep it generic). Auto-continue cron `3b8e2f47` still live; substrate-sync leak-gate enforces the boundary.
+- Two new general primitives surfaced and are saved to memory (pushed): metric-graduation-runtime-to-delta; adversarial-layering-self-names-next-layer.
+
+**Public / personal shipped today:**
+- **Jarvis civil identity launched:** Will created a dedicated Gmail → YouTube channel for a "Story Mode" vibecoding livestream where chat picks menu numbers to steer the build. Birthday on record = 2026-06-12. Stream prep trilogy on Desktop: `jarvis-youtube-stream-setup`, `-channel-copy`, `-first-stream-runbook`. Facts in `project_jarvis-identity.md` (email-address field still to confirm).
+- **EVC-IDE BLE receiver** built (`~/embedded-vibe-coding`, bleak/Nordic-UART notify stream, client-injectable, 43 tests) — Soham's XIAO demo now has a real BLE leg. Local git only; remote = Will+Soham decision.
+- **Runtime-heartbeat hook** added (Stop + UserPromptSubmit) so the telemetry continuity chain measures real operation, not incidental hook fires. settings.json backup at `~/.claude/settings.json.bak-heartbeat`.
+
+**Pending / Will-gated:** confirm Jarvis email address → finalize identity memory; enable YouTube live (24h activation clock); honest JARVIS twitter post (older task, Desktop drafts); EVC-IDE remote + Soham message.
 
 ---
 

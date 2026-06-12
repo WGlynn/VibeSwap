@@ -111,6 +111,12 @@
     <div style="margin-top:12px">So the right design is <b>two layers, not a swap</b>: keep the AFK 10-menu as the always-on steering wheel, and call AskUserQuestion <i>only</i> for genuine 2–4-way forks where its UX shines and its limits don't bite. Native polish where it fits; Story Mode everywhere else.</div>
   </div>
 
+  <h2>How it knows it's working</h2>
+  <div class="loop">
+    <div class="big">catch-rate <small>· recall@10 · the number that matters</small></div>
+    <p>A self-tuning menu needs a loss function or it just drifts. Story Mode's primary metric is <b>catch-rate</b>: of every turn where a menu was on offer, how often your actual next move was one of the ten — not "did you pick something," but <i>was the right branch even there</i>. Secondary is <b>precision@1–3</b>: when caught, did it rank near the top. And there's a deliberate guard against the obvious trap — maximizing raw pick-rate would push the menu toward bland, always-applicable filler, so a hit that lands only on a generic standing move counts as a miss, not a win. The loop logs every turn, measures catch-rate, and reweights toward the branches you actually take.</p>
+  </div>
+
   <h2>It composes — it isn't a replacement</h2>
   <div class="verdict">
     Story Mode is not a fork of Claude Code and was never trying to out-feature it. Anthropic shipped the <b>menu primitive</b> (AskUserQuestion) and the <b>branch primitive</b> (rewind) — that's the hard part, and it's done. Story Mode answers a narrower question: <b>what if the menu were the default way you steered a long autonomous run, ranked from how you actually decide, and it got better at being you the more you used it?</b><br><br>

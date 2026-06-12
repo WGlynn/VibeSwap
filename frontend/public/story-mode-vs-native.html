@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Story Mode vs native Claude Code — an honest comparison</title>
+<style>
+  :root{ --bg:#05070a; --panel:#0b1016; --line:#1c2733; --matrix:#39ff8b; --cyan:#3ad6ff; --dim:#7d8a99; --text:#d7e2ec; --warn:#ffd166; }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .wrap{max-width:920px;margin:0 auto;padding:48px 22px 80px}
+  h1{font-size:30px;line-height:1.15;margin:0 0 6px;color:#fff;letter-spacing:.2px}
+  h1 .v{color:var(--dim)}
+  .sub{color:var(--dim);margin:0 0 34px;font-size:15px}
+  .thesis{border-left:3px solid var(--matrix);background:var(--panel);padding:16px 18px;border-radius:4px;margin:0 0 30px}
+  .thesis b{color:var(--matrix)}
+  h2{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:38px 0 14px;font-weight:600}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px}
+  .card h3{margin:0 0 4px;font-size:17px}
+  .nat h3{color:var(--cyan)} .sm h3{color:var(--matrix)}
+  .card .role{color:var(--dim);font-size:12.5px;margin:0 0 12px;min-height:34px}
+  .card ul{margin:0;padding-left:18px} .card li{margin:5px 0}
+  .loop{margin:0 0 30px;background:linear-gradient(180deg,#0c1a13,#0b1016);border:1px solid #1d4733;border-radius:8px;padding:20px 22px}
+  .loop .big{font-size:30px;color:var(--matrix);font-weight:700;letter-spacing:.3px;line-height:1.15}
+  .loop .big small{font-size:14px;color:var(--dim);font-weight:400;letter-spacing:0}
+  .loop p{margin:10px 0 0;font-size:13.5px;color:var(--text)}
+  .menu{font-family:ui-monospace,monospace;background:#04140b;border:1px solid #1d4733;border-radius:6px;padding:14px 16px;margin-top:14px;font-size:12.5px;color:var(--dim);white-space:pre-wrap;line-height:1.7}
+  .menu b{color:var(--matrix)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  td.ax{color:var(--text);white-space:nowrap}
+  .win{color:var(--matrix)} .nat-win{color:var(--cyan)} .na{color:var(--dim)}
+  .verdict{margin-top:34px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px}
+  .verdict b{color:var(--matrix)}
+  .verdict .line{color:var(--warn)}
+  .foot{margin-top:30px;color:var(--dim);font-size:12px;line-height:1.7}
+  .foot a{color:var(--cyan);text-decoration:none}
+  @media(max-width:680px){ .wrap{padding:30px 16px 60px} h1{font-size:24px} .cols{grid-template-columns:1fr} .card .role{min-height:0} table{font-size:12.5px} th,td{padding:8px 7px} td.ax{white-space:normal} .loop .big{font-size:24px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Story Mode <span class="v">vs</span> native Claude Code</h1>
+  <p class="sub">An honest comparison. The pieces already ship in the box — Story Mode is what you build out of them.</p>
+
+  <div class="thesis">
+    <b>The one-line.</b> Claude Code already has the <b>menu</b> and the <b>fork</b> as features. Story Mode makes them <b>the interface</b>. Not a new capability — a standing pattern that turns an occasional decision-popup into the whole steering wheel: personalized, default-on, and self-tuning.
+  </div>
+
+  <div class="loop">
+    <div class="big">10 branches <small>· every turn · one keystroke</small></div>
+    <p><b>What Story Mode is.</b> The original game-AI loop — Zork, the dialogue tree, choose-your-own-adventure — running on an LLM. The dungeon master went from a lookup table to a mind, and the dungeon became your actual project. At the end of every turn the agent appends a ranked menu of the most likely next moves, drawn from <i>your</i> decision history. You reply with a number. The branches are generated live; the choices do real work.</p>
+    <div class="menu"><b>AFK:</b>
+1. Add the distinction to the docs
+2. Verify the claim before asserting
+3. Capture it as a memory primitive
+4. Push the comparison page live
+   <span style="color:#5a6675">… reply "3" and option three happens. reply "5,4,1" and they run in order.</span></div>
+  </div>
+
+  <h2>What each one actually is</h2>
+  <div class="cols">
+    <div class="card nat">
+      <h3>Native Claude Code</h3>
+      <p class="role">Ships the primitives — the menu, the plan gate, the rewindable branch tree. Real, in the product today.</p>
+      <ul>
+        <li><b>AskUserQuestion</b> — a 2–4 option labeled menu, fired when the agent hits a real decision</li>
+        <li><b>Plan mode</b> — propose a plan, you approve or reject before it acts</li>
+        <li><b>Rewind / checkpoints</b> — jump back to an earlier message and take a different path</li>
+        <li>Slash commands — user-defined shortcuts you invoke by name</li>
+      </ul>
+    </div>
+    <div class="card sm">
+      <h3>Story Mode (overlay)</h3>
+      <p class="role">A standing interface built on those primitives. Hook-driven, not a fork of the product.</p>
+      <ul>
+        <li>The menu ends <b>every turn</b> — default interface, not an occasional interrupt</li>
+        <li><b>10 options ranked from your own decision corpus</b>, not 2–4 the model invents on the spot</li>
+        <li>One-keystroke <i>forward</i> navigation (<code>3</code> or <code>5,4,1</code>) drives a long run</li>
+        <li>A <b>self-learning loop</b>: it measures hit-rate against your real picks and reweights toward your hand</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Axis by axis — who has what, honestly</h2>
+  <table>
+    <tr><th>Axis</th><th>Native Claude Code</th><th>Story Mode</th></tr>
+    <tr><td class="ax">Choice menu</td><td class="nat-win">AskUserQuestion (2–4 opts) ✓</td><td class="win">10 opts, ranked, every turn</td></tr>
+    <tr><td class="ax">When it fires</td><td class="nat-win">when the agent is blocked ✓</td><td class="win">end of every turn, by default</td></tr>
+    <tr><td class="ax">Branching / fork</td><td class="nat-win">rewind + checkpoints ✓</td><td class="na">forward branches (built on this idea)</td></tr>
+    <tr><td class="ax">Plan approval</td><td class="nat-win">plan mode ✓</td><td class="na">inherits it; not the focus</td></tr>
+    <tr><td class="ax">Options source</td><td>model picks for the live fork</td><td class="win">your signature-response corpus (WWWD)</td></tr>
+    <tr><td class="ax">Navigation</td><td>type a reply each time</td><td class="win">one keystroke, multi-step (5,4,1)</td></tr>
+    <tr><td class="ax">Personalization</td><td class="na">—</td><td class="win">menu learns your hand over time</td></tr>
+    <tr><td class="ax">Self-tuning loop</td><td class="na">—</td><td class="win">hit-rate measured + reweighted</td></tr>
+    <tr><td class="ax">Distribution</td><td class="nat-win">in the product, zero setup ✓</td><td class="na">a hook you wire into settings.json</td></tr>
+  </table>
+
+  <h2>"Can't I just use the native widget?"</h2>
+  <div class="thesis" style="border-left-color:var(--cyan)">
+    The obvious move is to render the AFK menu <i>through</i> AskUserQuestion and get Anthropic's polished selectable component for free. It doesn't work, because the widget and its constraints are a package deal — a hook can only emit text, so the only way to get the native picker is to call the tool, and the tool brings:
+    <ul style="margin:12px 0 0;padding-left:20px">
+      <li><b>A hard cap of 4 options.</b> The menu is 10 ranked moves. You'd have to amputate the wheel down to 4.</li>
+      <li><b>It blocks instead of garnishes.</b> AFK is ignorable — type anything and move on. The native tool stops and demands a selection.</li>
+      <li><b>It's model-discretion, not deterministic.</b> AFK fires from a hook <i>every</i> turn, guaranteed. The tool appears only if the model chooses to call it.</li>
+      <li><b>The learning loop breaks.</b> Native picks don't flow into the corpus-reweighter, so the menu stops getting better at being you.</li>
+    </ul>
+    <div style="margin-top:12px">So the right design is <b>two layers, not a swap</b>: keep the AFK 10-menu as the always-on steering wheel, and call AskUserQuestion <i>only</i> for genuine 2–4-way forks where its UX shines and its limits don't bite. Native polish where it fits; Story Mode everywhere else.</div>
+  </div>
+
+  <h2>It composes — it isn't a replacement</h2>
+  <div class="verdict">
+    Story Mode is not a fork of Claude Code and was never trying to out-feature it. Anthropic shipped the <b>menu primitive</b> (AskUserQuestion) and the <b>branch primitive</b> (rewind) — that's the hard part, and it's done. Story Mode answers a narrower question: <b>what if the menu were the default way you steered a long autonomous run, ranked from how you actually decide, and it got better at being you the more you used it?</b><br><br>
+    <span class="line">You don't switch off native Claude Code to get this — you layer it on top.</span> The primitives stay native; the standing interface is the overlay. <b>Augment, don't replace.</b>
+  </div>
+
+  <p class="foot">
+    Native-feature facts reflect Claude Code as of 2026-06. AskUserQuestion, plan mode, and conversation rewind/checkpoints are shipped product features; the end-of-turn ranked menu, the personal-corpus ranking, and the self-tuning loop are the <a href="https://github.com/WGlynn/JARVIS/blob/main/STORY-MODE.md">JARVIS overlay</a>'s. This page concedes every axis the native product owns on purpose — a comparison that claimed otherwise wouldn't be worth reading.
+  </p>
+</div>
+</body>
+</html>

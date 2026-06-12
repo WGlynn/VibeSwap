@@ -1,0 +1,1 @@
+type Tagline { msg: String } # A coordination primitive, not a casino.

@@ -101,6 +101,21 @@ The WAL is continuity of consciousness across interruptions. Without it, Jarvis 
 
 ---
 
+## Format Evolution (2026-06)
+
+The strict Task Manifest **table** above (per-task rows: `# | Task | Status | Commit`) has evolved in
+practice. The live WAL now uses an **epoch-prose** format, and the granular per-task tracking the
+table reached for is handled by two mechanisms the original spec did not have:
+
+- the **session hash-chain** — one block per checkpoint, cryptographically linked, finer-grained than the table ever was;
+- the **Task/Todo tools** — live task state within a session.
+
+The **function** the table served (know exactly what was in-flight) is fully retained. The literal
+hand-maintained table is not. Treat the table above as the conceptual model, not a required artifact.
+See [`ANTI_AMNESIA_RETENTION_SCORECARD.md`](./ANTI_AMNESIA_RETENTION_SCORECARD.md) for the full audit.
+
+---
+
 ## Protocol
 
 ### Phase 0: Pre-Flight (BEFORE any multi-agent/autopilot work)

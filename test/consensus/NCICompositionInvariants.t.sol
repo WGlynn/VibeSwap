@@ -52,4 +52,28 @@ contract NCICompositionInvariantsTest is Test {
         uint256 gap = t - pom; // the second-dimension sliver required to reach the bar
         assertLe(gap, nci.POS_WEIGHT_BPS(), "the gap is coverable only by a second dimension (coalition, not solo)");
     }
+
+    /// Cognition is the primary power: PoM > PoS > PoW (the 60/30/10 ordering).
+    function test_pom_is_the_primary_power() public view {
+        assertGt(nci.POM_WEIGHT_BPS(), nci.POS_WEIGHT_BPS(), "PoM (cognition) is the largest weight");
+        assertGt(nci.POS_WEIGHT_BPS(), nci.POW_WEIGHT_BPS(), "PoS (capital) exceeds PoW (compute)");
+    }
+
+    /// The finalization bar is exactly a 2/3 supermajority (documents the choice; catches drift).
+    function test_finalization_is_two_thirds() public view {
+        assertEq(nci.FINALIZATION_THRESHOLD_BPS(), 6667, "finalization is a 2/3 supermajority");
+    }
+
+    /// The sliver needed to clear the bar is coverable even by the SMALLEST other dimension (PoW),
+    /// so capture needs PoM + a sliver of *any* second dimension — never PoM alone.
+    function test_capture_sliver_coverable_by_smallest_dimension() public view {
+        uint256 gap = nci.FINALIZATION_THRESHOLD_BPS() - nci.POM_WEIGHT_BPS();
+        assertLe(gap, nci.POW_WEIGHT_BPS(), "even the smallest other dimension covers the gap (coalition required)");
+    }
+
+    /// Anti-sybil + anti-DoS bounds exist: a stake floor and a validator-count cap.
+    function test_sybil_and_dos_bounds_are_set() public view {
+        assertGt(nci.MIN_STAKE(), 0, "MIN_STAKE registration floor exists (sybil cost)");
+        assertGt(nci.MAX_VALIDATORS(), 0, "MAX_VALIDATORS cap exists (iteration DoS bound)");
+    }
 }

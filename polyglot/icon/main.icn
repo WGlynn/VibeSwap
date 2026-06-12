@@ -1,0 +1,3 @@
+procedure main()
+  write("A coordination primitive, not a casino.")
+end

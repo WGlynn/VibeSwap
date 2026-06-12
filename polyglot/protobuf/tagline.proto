@@ -1,0 +1,2 @@
+syntax = "proto3";
+message Tagline { string msg = 1; } // A coordination primitive, not a casino.

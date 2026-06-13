@@ -75,7 +75,7 @@ Predictable emission schedule with halvings. Augmented bonding curves for price 
 
 ## Team
 
-**Will Glynn** — Founder. Mechanism design, smart contract engineering, full-stack development. Author of the VibeSwap whitepaper, Economitra thesis, and 7+ published research papers on DeFi mechanism design and cooperative game theory.
+**Will Glynn** — open source contributor. Mechanism design, smart contract engineering, full-stack development. Author of the VibeSwap whitepaper, Economitra thesis, and 7+ published research papers on DeFi mechanism design and cooperative game theory.
 
 **Jarvis** — AI development partner (Claude/Anthropic). Full-stack engineering, CKB SDK, testing infrastructure, documentation, community engagement. Autonomous 3-node system on Fly.io.
 
@@ -116,7 +116,7 @@ AI:         Claude (Anthropic), Fly.io, 3-node BFT consensus
 
 ## Contact
 
-**William Glynn** — Founder & CEO
+**William Glynn** — open source contributor
 
 - Email: willglynn123@gmail.com
 - Phone: +1 774-571-4257

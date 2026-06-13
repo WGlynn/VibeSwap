@@ -1,8 +1,16 @@
-# Session State — 2026-06-12 (evening): Story-Mode 10-loop complete; VM-integration arc on the private workstream
+# Session State — 2026-06-12 (night): second Story-Mode loop complete; execution tier finished on the private workstream
 
-## ⚠ NEXT SESSION — TOP PRIORITY (2026-06-12 evening checkpoint)
+## ⚠ NEXT SESSION — TOP PRIORITY (2026-06-12 night checkpoint)
 
-**Story Mode ACTIVE** (end every response with the 10-item menu). The Will-armed 10-iteration self-play loop COMPLETED cleanly (10/10, loop file deleted; per-iteration commit+push discipline held throughout).
+**Story Mode ACTIVE** (end every response with the 10-item menu). Two Will-armed self-play loops completed cleanly tonight (loop files deleted; per-iteration commit+push discipline held; one real vulnerability found by an adversarial tick and closed in the same iteration).
+
+**Private workstream (front-run-sensitive — do NOT name or describe here):** the execution-substrate tier is COMPLETE (suite 147 → 176 green, all pushed to the private remote). Resume from the private repo `CONTINUE.md` top block; JARVIS-wide WAL has the epoch. Auto-continue cron `3b8e2f47` still live; leak-gate enforces the boundary.
+
+**Pending / Will-gated (unchanged):** confirm Jarvis email address → finalize identity memory; enable YouTube live (24h activation clock); honest JARVIS twitter post (Desktop drafts); EVC-IDE remote + Soham message; patent submit.
+
+---
+
+## (prior) **Story Mode ACTIVE** (end every response with the 10-item menu). The Will-armed 10-iteration self-play loop COMPLETED cleanly (10/10, loop file deleted; per-iteration commit+push discipline held throughout).
 
 **Private workstream (front-run-sensitive — do NOT name or describe here):** a full execution-substrate integration arc shipped this session (suite 119 → 145 green, all pushed to the private remote). Resume from the private repo `CONTINUE.md` top block + `HANDOFF.md`; JARVIS-wide WAL has the epoch summary. Auto-continue cron `3b8e2f47` still live; leak-gate enforces the boundary.
 

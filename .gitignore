@@ -91,3 +91,9 @@ data/
 *.mp4
 *.mepj
 Video content*/
+
+# Internal agent state — never version-control. The whole .claude/ dir is
+# internal session/memory scaffolding, not protocol code. Blanket-ignore it
+# (the entries above only covered specific subpaths) plus any stray logs.
+.claude/
+*.log

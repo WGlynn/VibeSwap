@@ -23,11 +23,11 @@
 
 ### Fate
 **Lane: Twitter/X Content Deployment**
-- Own the `tweet repo/` — 154 tweets ready to post across 8 categories
+- Own the `docs/marketing/tweet-repo/` — 154 tweets ready to post across 8 categories
 - Start with **hook-threads** (MEV education) and **stats-flex** (achievement posts) — those hit hardest early
 - Use `jarvis-bot/data/tweet-style-guide.json` for voice/tone
 - Post 3-4x/day, rotate categories: hook → feature spotlight → philosophy → engagement
-- Engage in replies on DeFi/crypto accounts — pull from `tweet repo/narrative/` for talking points
+- Engage in replies on DeFi/crypto accounts — pull from `docs/marketing/tweet-repo/narrative/` for talking points
 
 ### Catto
 **Lane: Reddit & Forum Seeding**
@@ -83,7 +83,7 @@
 | Monetization Framework | `docs/pdf/monetization-framework-2026.pdf` |
 | Grant Templates | `docs/grants/` (8 ready-to-submit) |
 | Reddit Posts | `docs/reddit-posts/` (6 subreddit-targeted) |
-| Tweet Repo | `tweet repo/` (154 tweets, 8 categories) |
+| Tweet Repo | `docs/marketing/tweet-repo/` (154 tweets, 8 categories) |
 | Tweet Style Guide | `jarvis-bot/data/tweet-style-guide.json` |
 | Tweet Queue | `jarvis-bot/data/tweet-queue.json` |
 | BD Toolkit | `scripts/bd-toolkit.js` (auto-generates pitches, emails, stats) |

@@ -370,7 +370,7 @@ If you are new, read the Part 4 overview (§4.1.1 *VibeSwap*), then jump to what
 [5] `DOCUMENTATION/SEC_WHITEPAPER_VIBESWAP.md` — Regulator-facing version of the whitepaper.
 [6] `DOCUMENTATION/INVESTOR_SUMMARY.md` — VC-oriented one-pager.
 [7] `WHITEPAPER.md` — Repo-root whitepaper (short form).
-[8] `INVESTOR_SUMMARY.md` — Repo-root investor summary.
+[8] `docs/marketing/INVESTOR_SUMMARY.md` — investor summary (relocated from repo root).
 [9] `README.md` — Repo overview.
 [10] `CLAUDE.md` — Protocol chain, loops, autopilot rules.
 
@@ -1146,7 +1146,7 @@ Treats monetary systems as biological organisms [104]. A healthy economy has met
 
 #### Trinomial Stability
 
-Stability via three-token orthogonality rather than via single-token discipline. Traditional monetary stability requires a single asset to be simultaneously a store of value, medium of exchange, and unit of account — a famous trilemma. Trinomial stability decomposes: **[JUL](#joule-token-jul) carries the medium-of-exchange load** (PoW-objective, fiat-stable, primary liquidity), **[CKB-native](#ckb-native) carries the unit-of-account / state-capital load** (elastic supply matched to state occupation), **[VIBE](#vibe-token) carries the store-of-governance-value load** (21 M cap, Shapley-distributed, unbuyable beyond contribution). Because the three axes are orthogonal, each can optimize for its own role without the traditional trilemma trade-offs. The stability of the whole is the composition of three specialized stabilities, not the compromise of one generalist asset. Covered in `tweet repo/feature-spotlights/04-trinomial-stability.md` and `DOCUMENTATION/THREE_TOKEN_ECONOMY.md`.
+Stability via three-token orthogonality rather than via single-token discipline. Traditional monetary stability requires a single asset to be simultaneously a store of value, medium of exchange, and unit of account — a famous trilemma. Trinomial stability decomposes: **[JUL](#joule-token-jul) carries the medium-of-exchange load** (PoW-objective, fiat-stable, primary liquidity), **[CKB-native](#ckb-native) carries the unit-of-account / state-capital load** (elastic supply matched to state occupation), **[VIBE](#vibe-token) carries the store-of-governance-value load** (21 M cap, Shapley-distributed, unbuyable beyond contribution). Because the three axes are orthogonal, each can optimize for its own role without the traditional trilemma trade-offs. The stability of the whole is the composition of three specialized stabilities, not the compromise of one generalist asset. Covered in `docs/marketing/tweet-repo/feature-spotlights/04-trinomial-stability.md` and `DOCUMENTATION/THREE_TOKEN_ECONOMY.md`.
 
 #### Dual-Cap Monetary Architecture
 

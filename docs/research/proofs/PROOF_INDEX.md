@@ -346,7 +346,7 @@ The Shapley null player axiom ensures zero contribution = zero reward. You canno
 
 **How VibeSwap dissolves it:** Batch auctions with commit-reveal ordering hide order details until batch close. Uniform clearing price eliminates per-order price impact. The information required for extraction provably does not exist during the commit phase (T10). MEV is not discouraged, not made harder — it is made mathematically impossible.
 
-**Source:** `MEDIUM_ARTICLE.md`; `VIBESWAP_WHITEPAPER.md` — Section 3; `FORMAL_FAIRNESS_PROOFS.md` — Section 6.2
+**Source:** `docs/marketing/MEDIUM_ARTICLE.md`; `VIBESWAP_WHITEPAPER.md` — Section 3; `FORMAL_FAIRNESS_PROOFS.md` — Section 6.2
 
 ---
 
@@ -356,7 +356,7 @@ The Shapley null player axiom ensures zero contribution = zero reward. You canno
 
 **How VibeSwap dissolves it:** In batch auctions, there is no speed advantage. No benefit to panicking first. Large selling pressure resolves into one uniform clearing price per batch, not a cascade of increasingly worse fills. The rational response to volatility is unchanged (sell if you want to), but the mechanism prevents the cascade amplification.
 
-**Source:** `MEDIUM_ARTICLE.md`; `TRUE_PRICE_DISCOVERY.md`
+**Source:** `docs/marketing/MEDIUM_ARTICLE.md`; `TRUE_PRICE_DISCOVERY.md`
 
 ---
 
@@ -667,7 +667,7 @@ Tier 2: Institutional, full compliance, optional privacy features
 
 **Key insight:** The quadrilemma assumes speed means latency. For fairness-seeking participants, speed means *certainty of fair execution* — and VibeSwap optimizes for that.
 
-**Source:** `VIBESWAP_WHITEPAPER.md`; `MEDIUM_ARTICLE.md`
+**Source:** `VIBESWAP_WHITEPAPER.md`; `docs/marketing/MEDIUM_ARTICLE.md`
 
 ---
 

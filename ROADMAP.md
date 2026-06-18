@@ -37,7 +37,7 @@ Total: 24–40 weeks from P0 start to P6 mainnet, parallelism-dependent. **No pr
    The file is the contract — anything not in Core or Cross-chain ships when it ships, not at launch.
 2. **Solidity audit-scope manifest** — same exercise for the EVM tree. Names the Solidity contracts that are the reference for each CKB cell, marks the other 24 module dirs explicitly as research surface. Lives at `contracts/LAUNCH_REFERENCE.md`.
 3. **Frontmatter-injector fix** — root-cause and patch the upstream process re-templating memory frontmatter with `originSessionId: <session>` injected into description fields. Logged in `~/.claude/cron-prompts/_primitives-pending.md` from the 2026-06-09 substrate-sync. Until this is fixed, every Edit on a memory file self-defeats.
-4. **Root-level housekeeping**: relocate marketing-grade files at vibeswap root (`INVESTOR_SUMMARY.md`, `LinkedIn_Posts.md`, `MEDIUM_ARTICLE.md`, `NERVOS_PROPOSAL.md`, `PROPOSAL_JOURNEY.md`, `Video content& demos/`, `blog/`, `broadcast/`) into `docs/marketing/` or `docs/_archive/`. Repo root should look like an engineering project, not a media kit.
+4. **Root-level housekeeping** (partially done 2026-06-18): relocated `INVESTOR_SUMMARY.md`, `LinkedIn_Posts.md`, `MEDIUM_ARTICLE.md`, `PROPOSAL_JOURNEY.md`, and `tweet repo/` → `docs/marketing/` (inbound refs repointed). Still at root for a follow-up pass: `NERVOS_PROPOSAL.md` (grant proposal — keep or `docs/`?), `blog/`, `broadcast/`, `Video content& demos/` (untracked/local). Repo root should look like an engineering project, not a media kit.
 5. **License decision queued for Will** — currently "all rights reserved by default" with MIT-intended-for-libraries. Needs resolution before P6.
 
 ### Acceptance criteria

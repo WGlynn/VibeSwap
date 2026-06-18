@@ -14110,7 +14110,7 @@ This master document compiles the complete VibeSwap documentation library:
 
 | Section | Document | Description |
 |---------|----------|-------------|
-| Executive Summary | INVESTOR_SUMMARY.md | High-level overview for stakeholders |
+| Executive Summary | docs/marketing/INVESTOR_SUMMARY.md | High-level overview for stakeholders |
 | 1 | INTRINSIC_ALTRUISM_WHITEPAPER.md | Theoretical framework for IIA |
 | 2 | COOPERATIVE_MARKETS_PHILOSOPHY.md | Design philosophy foundation |
 | 3 | DESIGN_PHILOSOPHY_CONFIGURABILITY.md | Protocol constants vs configurability |

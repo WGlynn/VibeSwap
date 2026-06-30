@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Noesis — Proof of Mind, the value chain for verified contribution</title>
+<style>
+  :root {
+    --bg: #0a0b0e;
+    --bg-soft: #111319;
+    --panel: #161922;
+    --ink: #f4f6fb;
+    --ink-dim: #aab1c4;
+    --ink-faint: #6b7488;
+    --line: #2a2f3d;
+    --accent: #5eead4;
+    --accent-deep: #2dd4bf;
+    --warn: #f5b971;
+    --bad: #f08a8a;
+    --good: #5eead4;
+    --radius: 14px;
+    --maxw: 1120px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    line-height: 1.5;
+  }
+  /* radial wash */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(900px 600px at 78% -8%, rgba(94,234,212,0.10), transparent 60%),
+      radial-gradient(800px 700px at -10% 110%, rgba(94,234,212,0.06), transparent 55%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .deck { position: relative; height: 100vh; width: 100vw; z-index: 1; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    padding: clamp(28px, 5vw, 72px);
+    overflow-y: auto;
+    opacity: 0;
+    animation: fade .55s ease forwards;
+  }
+  .slide.active { display: flex; }
+  .slide-inner {
+    margin: auto;
+    width: 100%;
+    max-width: var(--maxw);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(18px, 2.6vw, 30px);
+  }
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .kicker {
+    font-size: clamp(12px, 1.1vw, 14px);
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .kicker::before {
+    content: ""; width: 28px; height: 2px; background: var(--accent); display: inline-block;
+  }
+
+  h1.title {
+    font-size: clamp(34px, 6vw, 76px);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  h2 {
+    font-size: clamp(26px, 4vw, 50px);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  .lede {
+    font-size: clamp(16px, 1.7vw, 22px);
+    color: var(--ink-dim);
+    max-width: 60ch;
+    font-weight: 400;
+  }
+  .accent { color: var(--accent); }
+  .strong-ink { color: var(--ink); font-weight: 600; }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(20px, 3vw, 40px);
+    align-items: center;
+  }
+  @media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .figure {
+    background: linear-gradient(180deg, var(--panel), var(--bg-soft));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: clamp(16px, 2.4vw, 28px);
+  }
+  .figure svg { width: 100%; height: auto; display: block; }
+  .fig-cap {
+    margin-top: 14px;
+    font-size: clamp(12px, 1.1vw, 14px);
+    color: var(--ink-faint);
+    text-align: center;
+    letter-spacing: .01em;
+  }
+
+  ul.points { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  ul.points li {
+    position: relative; padding-left: 26px;
+    font-size: clamp(15px, 1.5vw, 19px); color: var(--ink-dim);
+  }
+  ul.points li::before {
+    content: ""; position: absolute; left: 0; top: .55em;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 4px rgba(94,234,212,.14);
+  }
+  ul.points li b { color: var(--ink); font-weight: 600; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; letter-spacing: .04em;
+    padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--ink-dim);
+    background: rgba(255,255,255,.02);
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-built { background: var(--good); }
+  .dot-designed { background: var(--warn); }
+  .dot-open { background: var(--bad); }
+
+  .statusrow { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  blockquote.lock {
+    border-left: 3px solid var(--accent);
+    padding: 6px 0 6px 22px;
+    font-size: clamp(16px, 1.9vw, 24px);
+    color: var(--ink);
+    font-weight: 500;
+    max-width: 70ch;
+    line-height: 1.4;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 820px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; background: var(--panel);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card h3 { font-size: clamp(15px, 1.5vw, 18px); }
+  .card p { font-size: clamp(13px, 1.3vw, 15px); color: var(--ink-dim); }
+  .card.built  { border-top: 3px solid var(--good); }
+  .card.designed { border-top: 3px solid var(--warn); }
+  .card.open   { border-top: 3px solid var(--bad); }
+  .card .tag { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; }
+  .card.built .tag { color: var(--good); }
+  .card.designed .tag { color: var(--warn); }
+  .card.open .tag { color: var(--bad); }
+
+  /* progress + nav */
+  .chrome {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px clamp(20px, 5vw, 48px);
+    pointer-events: none;
+  }
+  .brand { font-weight: 700; letter-spacing: .04em; font-size: 14px; color: var(--ink); }
+  .brand span { color: var(--accent); }
+  .footer-note { font-size: 11px; color: var(--ink-faint); letter-spacing: .12em; text-transform: uppercase; }
+  .nav { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+  .nav button {
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+    width: 38px; height: 38px; border-radius: 10px; cursor: pointer;
+    font-size: 16px; transition: .15s; display: grid; place-items: center;
+  }
+  .nav button:hover { border-color: var(--accent); color: var(--accent); }
+  .counter { font-size: 13px; color: var(--ink-dim); min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+
+  .progress {
+    position: fixed; top: 0; left: 0; height: 3px; z-index: 6;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    width: 0%; transition: width .35s ease;
+  }
+
+  .dots { position: fixed; top: 50%; right: 16px; transform: translateY(-50%); z-index: 5;
+    display: flex; flex-direction: column; gap: 9px; pointer-events: auto; }
+  .dots .d { width: 8px; height: 8px; border-radius: 50%; background: var(--line); cursor: pointer; transition: .2s; }
+  .dots .d.on { background: var(--accent); transform: scale(1.35); }
+  @media (max-width: 640px) { .dots { display: none; } }
+
+  /* svg shared */
+  .s-stroke { stroke: var(--ink-dim); stroke-width: 2; fill: none; }
+  .s-accent { stroke: var(--accent); }
+  .s-dim { stroke: var(--ink-faint); }
+  .s-fill-panel { fill: var(--panel); }
+  .s-fill-accent { fill: var(--accent); }
+  .s-label { fill: var(--ink-dim); font: 600 13px var(--font); }
+  .s-label-sm { fill: var(--ink-faint); font: 500 11px var(--font); }
+  .s-label-ink { fill: var(--ink); font: 700 14px var(--font); }
+  .dash { stroke-dasharray: 6 6; }
+
+  @keyframes flow { to { stroke-dashoffset: -200; } }
+  .flowline { stroke-dasharray: 7 9; animation: flow 5s linear infinite; }
+  @keyframes pulse { 0%,100% { opacity:.5 } 50% { opacity:1 } }
+  .pulse { animation: pulse 2.6s ease-in-out infinite; }
+
+  .hint { position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%); z-index: 4;
+    font-size: 11px; color: var(--ink-faint); letter-spacing: .1em; opacity: .8; }
+  @media (max-width: 640px) { .hint { display: none; } }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="deck" id="deck">
+
+  <!-- ===== SLIDE 1 — TITLE ===== -->
+  <section class="slide active">
+    <div class="slide-inner">
+      <div class="kicker">Noesis &nbsp;·&nbsp; Proof of Mind</div>
+      <h1 class="title">Bitcoin priced <span class="accent">possession.</span><br />Noesis prices <span class="accent">contribution.</span></h1>
+      <p class="lede">Noesis is a blockchain whose consensus is <b class="strong-ink">earned by verified contribution</b> — not bought with capital, not burned in electricity. It measures the one quantity no chain has ever measured: how much each participant actually contributed. And it pays for it <b class="strong-ink">provably</b>, so it can't be faked, copied, or bought.</p>
+      <div class="statusrow" style="margin-top:6px">
+        <span class="pill"><span class="dot dot-built"></span> reference node: built &amp; tested</span>
+        <span class="pill"><span class="dot dot-designed"></span> cross-chain adapter: designed</span>
+        <span class="pill"><span class="dot dot-open"></span> un-gameable-at-scale: open</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 2 — THE GAP ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">Why it's new</div>
+      <div class="grid2">
+        <div>
+          <h2>Bitcoin built the market for ownership. Noesis builds the market for <span class="accent">contribution.</span></h2>
+          <p class="lede" style="margin-top:18px">A possession chain never has to measure value — the open market prices its coin for it. A <b class="strong-ink">value chain</b> has to do the measuring itself, on-chain, with no outside oracle. That is genuinely hard, and it is the thing everything else here is built around.</p>
+          <p class="lede" style="margin-top:14px">Same kind of leap as Bitcoin. One market over.</p>
+        </div>
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="Two markets side by side: ownership, priced by Bitcoin, and contribution, priced by Noesis">
+            <rect x="26" y="60" width="160" height="180" rx="12" fill="var(--panel)" stroke="#6b7488" stroke-width="2"/>
+            <text x="106" y="92" text-anchor="middle" class="s-label-ink">OWNERSHIP</text>
+            <text x="106" y="112" text-anchor="middle" class="s-label-sm">priced by the open market</text>
+            <text x="106" y="176" text-anchor="middle" class="s-label" style="fill:#6b7488">Bitcoin</text>
+            <text x="106" y="196" text-anchor="middle" class="s-label-sm">solved</text>
+
+            <text x="210" y="156" text-anchor="middle" class="s-label-sm">one market over →</text>
+
+            <rect x="234" y="60" width="160" height="180" rx="12" fill="#5eead4" opacity="0.10" stroke="#5eead4" stroke-width="2.5"/>
+            <text x="314" y="92" text-anchor="middle" class="s-label-ink">CONTRIBUTION</text>
+            <text x="314" y="112" text-anchor="middle" class="s-label-sm">priced on-chain, no oracle</text>
+            <text x="314" y="176" text-anchor="middle" class="accent s-label">Noesis</text>
+            <text x="314" y="196" text-anchor="middle" class="s-label-sm pulse">the open problem, solved structurally</text>
+          </svg>
+          <div class="fig-cap">The missing market: contribution, measured by the chain itself.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 3 — THE CORE MOVE ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">The core move</div>
+      <div class="grid2">
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="A contribution earns when later work builds on it along provenance">
+            <defs>
+              <marker id="fa" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5eead4"/></marker>
+            </defs>
+            <!-- root contribution -->
+            <circle cx="70" cy="150" r="26" fill="#5eead4" opacity="0.18" stroke="#5eead4" stroke-width="2.5"/>
+            <text x="70" y="154" text-anchor="middle" class="s-label-ink">work</text>
+            <!-- downstream builders -->
+            <g fill="none" stroke="#5eead4" stroke-width="2.5" marker-end="url(#fa)">
+              <path d="M98,140 C150,110 180,96 214,96" class="flowline"/>
+              <path d="M98,150 C160,150 190,150 214,150" class="flowline"/>
+              <path d="M98,160 C150,190 180,204 214,204" class="flowline"/>
+            </g>
+            <g>
+              <circle cx="232" cy="96" r="16" class="s-stroke s-accent"/>
+              <circle cx="232" cy="150" r="16" class="s-stroke s-accent"/>
+              <circle cx="232" cy="204" r="16" class="s-stroke s-accent"/>
+            </g>
+            <text x="320" y="120" text-anchor="middle" class="s-label-ink">built upon</text>
+            <text x="320" y="142" text-anchor="middle" class="s-label-sm">⇒ the root earns</text>
+            <!-- dead end -->
+            <circle cx="70" cy="262" r="16" fill="none" stroke="#6b7488" stroke-width="2"/>
+            <text x="150" y="266" class="s-label-sm" style="fill:#6b7488">nobody builds on it ⇒ earns 0</text>
+          </svg>
+          <div class="fig-cap">Value flows backward along provenance: you earn from what gets built on your work.</div>
+        </div>
+        <div>
+          <h2>The chain becomes its own <span class="accent">market.</span></h2>
+          <p class="lede" style="margin-top:18px">Noesis doesn't ask a committee or a fixed formula what your work is worth. It lets the market reveal it the way every market does — by <b class="strong-ink">what later work actually builds on.</b></p>
+          <p class="lede" style="margin-top:14px">Useful work gets built upon and earns. Dead ends don't. Value is measured on-chain and flows along provenance — priced by realized downstream impact, after the fact, not asserted up front.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 4 — TWO ASSETS / ANTI-PLUTOCRACY ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">What you earn</div>
+      <div class="grid2">
+        <div>
+          <h2>Two things — kept apart <span class="accent">on purpose.</span></h2>
+          <ul class="points" style="margin-top:22px">
+            <li><b>Soulbound standing — Proof of Mind.</b> Reputation and consensus voting weight you <i>earn</i> and cannot sell, buy, or transfer. The franchise.</li>
+            <li><b>A transferable storage credit.</b> A tradable unit of byte-capacity ownership.</li>
+          </ul>
+          <blockquote class="lock" style="margin-top:24px">You can buy storage; you cannot buy consensus.</blockquote>
+          <p class="lede" style="margin-top:16px;font-size:16px">Keeping the franchise off the tradable asset is what holds consensus out of capital's reach.</p>
+        </div>
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="One contribution splits into a soulbound standing and a transferable credit">
+            <circle cx="210" cy="58" r="22" fill="#5eead4" opacity="0.18" stroke="#5eead4" stroke-width="2.5"/>
+            <text x="210" y="62" text-anchor="middle" class="s-label-ink">work</text>
+            <defs>
+              <marker id="sp" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#aab1c4"/></marker>
+            </defs>
+            <line x1="196" y1="76" x2="120" y2="128" stroke="#aab1c4" stroke-width="2" marker-end="url(#sp)"/>
+            <line x1="224" y1="76" x2="300" y2="128" stroke="#aab1c4" stroke-width="2" marker-end="url(#sp)"/>
+            <!-- soulbound -->
+            <rect x="36" y="138" width="150" height="120" rx="12" fill="#5eead4" opacity="0.10" stroke="#5eead4" stroke-width="2.5"/>
+            <text x="111" y="168" text-anchor="middle" class="s-label-ink">PoM standing</text>
+            <text x="111" y="190" text-anchor="middle" class="s-label-sm">soulbound · unsellable</text>
+            <text x="111" y="222" text-anchor="middle" class="accent s-label">decides consensus</text>
+            <text x="111" y="244" text-anchor="middle" class="s-label-sm">🔒 cannot be bought</text>
+            <!-- transferable -->
+            <rect x="234" y="138" width="150" height="120" rx="12" fill="var(--panel)" stroke="#6b7488" stroke-width="2"/>
+            <text x="309" y="168" text-anchor="middle" class="s-label-ink">storage credit</text>
+            <text x="309" y="190" text-anchor="middle" class="s-label-sm">transferable · tradable</text>
+            <text x="309" y="222" text-anchor="middle" class="s-label" style="fill:#aab1c4">a market</text>
+            <text x="309" y="244" text-anchor="middle" class="s-label-sm">↔ freely traded</text>
+          </svg>
+          <div class="fig-cap">One contribution, two outputs: an unbuyable franchise and a tradable credit.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 5 — CONSENSUS ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">Consensus</div>
+      <h2>Weighted by contribution — not money, not hardware.</h2>
+      <p class="lede">Three layers do three different jobs. They are deliberately economic opposites that fit together — and no single layer can finalize the chain alone. A separation of powers, not a majority.</p>
+      <div class="cards" style="margin-top:6px">
+        <div class="card built"><span class="tag">decides</span><h3>Proof of Mind</h3><p>Scarce, inelastic, <b style="color:var(--ink)">unbuyable</b> standing. This is what actually decides consensus.</p></div>
+        <div class="card built"><span class="tag">circulates</span><h3>Energy money (PoW)</h3><p>Proof-of-work isn't wasted — it runs a separate, proportional, energy-priced coin made to stay stable and be <i>spent</i>. PoW's best use: an energy oracle.</p></div>
+        <div class="card built"><span class="tag">voices</span><h3>Stake</h3><p>The stakeholders' voice. Mining and staking are a <b style="color:var(--ink)">liveness floor</b> — they keep blocks flowing, earn no standing, and can't touch the value history.</p></div>
+      </div>
+      <p class="lede" style="font-size:16px;margin-top:4px">Each tool does only its own job. Using proof-of-work here is a strength, not a contradiction.</p>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 6 — COOPERATION BY CONSTRUCTION ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">The first big claim</div>
+      <div class="grid2">
+        <div>
+          <h2>Cooperation isn't a rule here. It's the <span class="accent">equilibrium.</span></h2>
+          <p class="lede" style="margin-top:18px">For a decade, decentralized systems put cooperation in a norm, a regulator, or a vote — all breakable, all leaky. Noesis puts cooperation into <b class="strong-ink">consensus itself</b>: the layer where everyone is alike (the unsellable franchise) is shared; the layer where they differ (tradable storage) is a market.</p>
+          <p class="lede" style="margin-top:14px">Cheating isn't punished. It just doesn't pay. The honest move is the highest-paying one, at every layer.</p>
+        </div>
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="The honest path pays more than every cheating path">
+            <defs>
+              <marker id="ce" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5eead4"/></marker>
+            </defs>
+            <circle cx="60" cy="150" r="9" fill="#aab1c4"/>
+            <text x="60" y="128" text-anchor="middle" class="s-label-sm">you</text>
+            <!-- honest path up -->
+            <path d="M70,146 C160,120 250,86 360,70" fill="none" stroke="#5eead4" stroke-width="3.5" marker-end="url(#ce)"/>
+            <text x="300" y="56" text-anchor="middle" class="accent s-label">honest · highest payoff</text>
+            <!-- cheat paths flat/down -->
+            <path d="M70,156 C160,170 250,176 350,178" fill="none" stroke="#f08a8a" stroke-width="2" stroke-dasharray="6 6"/>
+            <text x="300" y="198" text-anchor="middle" class="s-label-sm" style="fill:#f08a8a">copy / spam · saturates to ~0</text>
+            <path d="M70,162 C160,200 250,224 350,236" fill="none" stroke="#f08a8a" stroke-width="2" stroke-dasharray="6 6"/>
+            <text x="300" y="256" text-anchor="middle" class="s-label-sm" style="fill:#f08a8a">collude / extract · slashed or seen</text>
+          </svg>
+          <div class="fig-cap">No morality required: the highest-paying strategy is the honest one.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 7 — WHY IT CAN'T BE GAMED ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">Why it can't be gamed</div>
+      <h2>One rule — and every attack runs <span class="accent">into it.</span></h2>
+      <p class="lede"><b class="strong-ink">Pay only for novel work that others build on.</b> That single rule wears several faces:</p>
+      <div class="cards" style="margin-top:6px">
+        <div class="card built"><span class="tag">copies → 0</span><h3>No double-pay</h3><p>You can't be paid twice for the same coverage. Copies and re-posts earn zero.</p></div>
+        <div class="card built"><span class="tag">spam → ceiling</span><h3>Flooding saturates</h3><p>Drowning the chain in variations stops paying almost immediately.</p></div>
+        <div class="card built"><span class="tag">rings → visible</span><h3>Collusion is a circle</h3><p>A citation ring is just value moving in a loop — and because provenance is on-chain, the chain sees the loop.</p></div>
+      </div>
+      <p class="lede" style="font-size:16px;margin-top:4px">And the learned judge can only ever <b class="strong-ink">lower</b> a score, never invent one — it can dampen valueless work but can't mint value from nothing. <span style="color:var(--warn)">Honest scope:</span> making this un-gameable against <i>every</i> future attack at scale is the one hard, open problem. We name it as load-bearing, not solved.</p>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 8 — NON-ZERO-SUM / CONVERGE ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">The second big claim</div>
+      <div class="grid2">
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="A normal fork splitting versus a reverse-fork merging in">
+            <text x="105" y="28" text-anchor="middle" class="s-label-ink">normal fork</text>
+            <text x="105" y="46" text-anchor="middle" class="s-label-sm">value splits</text>
+            <g class="s-stroke s-dim" stroke-width="3">
+              <path d="M40,160 L100,160"/>
+              <path d="M100,160 C140,160 150,110 200,110"/>
+              <path d="M100,160 C140,160 150,210 200,210"/>
+            </g>
+            <circle cx="200" cy="110" r="6" fill="#f08a8a"/>
+            <circle cx="200" cy="210" r="6" fill="#f08a8a"/>
+            <line x1="210" y1="60" x2="210" y2="250" stroke="#2a2f3d" stroke-width="1.5" stroke-dasharray="4 5"/>
+            <text x="320" y="28" text-anchor="middle" class="s-label-ink">reverse-fork</text>
+            <text x="320" y="46" text-anchor="middle" class="s-label-sm">value conserved</text>
+            <g fill="none" stroke="#5eead4" stroke-width="3">
+              <path d="M240,110 C290,110 300,160 340,160" class="flowline"/>
+              <path d="M240,210 C290,210 300,160 340,160" class="flowline"/>
+              <path d="M340,160 L395,160" stroke-width="5"/>
+            </g>
+            <circle cx="240" cy="110" r="6" fill="#5eead4"/>
+            <circle cx="240" cy="210" r="6" fill="#5eead4"/>
+          </svg>
+          <div class="fig-cap">Splitting off vs merging in. A reverse-fork is accretion, not a takeover.</div>
+        </div>
+        <div>
+          <h2>The first <span class="accent">non-zero-sum</span> chain. Rivals don't get conquered — they converge.</h2>
+          <p class="lede" style="margin-top:18px">Because value is measured on-chain and conserved along provenance, useful work from <b class="strong-ink">any</b> other chain can be imported, re-priced by the same rule, and credited onto one shared graph without loss — a <b class="strong-ink">reverse-fork</b>, where merging in is accretion, not a contest.</p>
+          <p class="lede" style="margin-top:14px">Picture the Ethereum / Ethereum Classic split running backward: both chains' work lands in one attribution graph, both stay credited. To every other chain, the offer stops being <i>come compete</i> and becomes <span class="accent">come join us.</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 9 — CLAIMABLE ATTRIBUTION ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">The adoption engine</div>
+      <div class="grid2">
+        <div>
+          <h2>You don't start from zero. <span class="accent">Your contribution is already on the map.</span></h2>
+          <p class="lede" style="margin-top:18px">Because provenance is a <b class="strong-ink">fact</b> keyed to an identifier you already have — not a wallet — Noesis attributes the entire pre-existing contribution graph (open-source repos, datasets, prior projects) <b class="strong-ink">before</b> anyone joins.</p>
+          <p class="lede" style="margin-top:14px">Onboarding becomes <i>claiming what's already provably yours.</i> Credit precedes adoption and pulls it. Consent-first throughout: inert until you claim it, you may disclaim an identifier, and nothing pays out without your key.</p>
+        </div>
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="A pre-populated contribution graph with one node already bearing your name">
+            <g class="s-stroke s-dim" stroke-width="1.5" opacity="0.7">
+              <line x1="90" y1="70" x2="180" y2="120"/>
+              <line x1="180" y1="120" x2="300" y2="80"/>
+              <line x1="180" y1="120" x2="240" y2="200"/>
+              <line x1="300" y1="80" x2="340" y2="170"/>
+              <line x1="240" y1="200" x2="340" y2="170"/>
+              <line x1="90" y1="70" x2="120" y2="200"/>
+              <line x1="120" y1="200" x2="240" y2="200"/>
+            </g>
+            <g fill="#aab1c4">
+              <circle cx="90"  cy="70"  r="9"/>
+              <circle cx="300" cy="80"  r="9"/>
+              <circle cx="340" cy="170" r="9"/>
+              <circle cx="240" cy="200" r="9"/>
+              <circle cx="120" cy="200" r="9"/>
+            </g>
+            <circle cx="180" cy="120" r="16" fill="#5eead4" opacity="0.18" stroke="#5eead4" stroke-width="2.5"/>
+            <circle cx="180" cy="120" r="7" fill="#5eead4"/>
+            <text x="180" y="100" text-anchor="middle" class="s-label-ink">your repo</text>
+            <text x="180" y="150" text-anchor="middle" class="s-label-sm pulse">credited · unclaimed</text>
+          </svg>
+          <div class="fig-cap">The whole graph is attributed by identifier on day zero — your name included.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 10 — FAIR LAUNCH ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">Fair launch</div>
+      <div class="grid2">
+        <div>
+          <h2>The builder's head-start is <span class="accent">burned to zero</span> at launch.</h2>
+          <p class="lede" style="margin-top:18px">No premine advantage carried into the live chain. The private head-start is destroyed at genesis, <b class="strong-ink">verifiable on-chain</b>, so everyone starts even.</p>
+          <p class="lede" style="margin-top:14px">A value chain that measures fairness has to launch fairly. This one is built to.</p>
+        </div>
+        <div class="figure">
+          <svg viewBox="0 0 420 300" role="img" aria-label="A head-start stack burning down to zero at launch, everyone level after">
+            <text x="95" y="40" text-anchor="middle" class="s-label-sm">before launch</text>
+            <g transform="translate(60,70)">
+              <rect x="0" y="120" width="70" height="26" rx="4" fill="#f5b971" opacity="0.5"/>
+              <rect x="8" y="90" width="54" height="26" rx="4" fill="#f5b971" opacity="0.4"/>
+              <rect x="16" y="60" width="38" height="26" rx="4" fill="#f5b971" opacity="0.3"/>
+              <text x="35" y="170" text-anchor="middle" class="s-label-sm" style="fill:#f5b971">head-start</text>
+            </g>
+            <defs>
+              <marker id="bz" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5eead4"/></marker>
+            </defs>
+            <line x1="150" y1="150" x2="220" y2="150" stroke="#5eead4" stroke-width="2.5" marker-end="url(#bz)"/>
+            <text x="185" y="135" text-anchor="middle" class="s-label-sm">burned to 0</text>
+            <text x="325" y="40" text-anchor="middle" class="s-label-sm">after launch</text>
+            <g transform="translate(250,70)">
+              <line x1="0" y1="146" x2="150" y2="146" stroke="#2a2f3d" stroke-width="2"/>
+              <circle cx="25" cy="138" r="7" fill="#5eead4"/>
+              <circle cx="62" cy="138" r="7" fill="#5eead4"/>
+              <circle cx="99" cy="138" r="7" fill="#5eead4"/>
+              <circle cx="136" cy="138" r="7" fill="#5eead4"/>
+              <text x="75" y="172" text-anchor="middle" class="accent s-label">everyone even</text>
+            </g>
+          </svg>
+          <div class="fig-cap">Genesis burn, verifiable on-chain: no founder edge into the live chain.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 11 — HONEST STATUS ===== -->
+  <section class="slide">
+    <div class="slide-inner">
+      <div class="kicker">Honest status — the truth line</div>
+      <h2>Exactly what's <span style="color:var(--good)">built</span>, what's <span style="color:var(--warn)">designed</span>, and what's <span style="color:var(--bad)">still open</span>.</h2>
+      <div class="cards" style="margin-top:8px">
+        <div class="card built">
+          <span class="tag">● built &amp; tested</span>
+          <h3>The reference node</h3>
+          <p>Ownership, commit-reveal ordering, contribution pricing, novelty, the anti-flood and anti-ring defenses, the bounded judge, dispute-and-slash, and Proof-of-Mind-weighted finality — all built and tested at the reference layer.</p>
+        </div>
+        <div class="card designed">
+          <span class="tag">● designed, not yet built</span>
+          <h3>The converge-in adapter</h3>
+          <p>The cross-chain reverse-fork adapter is specified end-to-end but unbuilt. No chains are converging today — we won't imply they are.</p>
+        </div>
+        <div class="card open">
+          <span class="tag">● the load-bearing open problem</span>
+          <h3>Un-gameable value at scale</h3>
+          <p>Teaching the value-measure to judge real-world contribution un-gameably at scale is unsolved. The plan isn't a fixed formula — those get gamed on day one — but a measure that adapts faster than it can be gamed.</p>
+        </div>
+      </div>
+      <p class="lede" style="font-size:15px;margin-top:4px">We lead with the thesis because it's framed as a thesis, and qualify every mechanism. Serious builders are converted by the honest version; the overclaimed version repels them.</p>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 12 — CLOSE / TAGLINE ===== -->
+  <section class="slide">
+    <div class="slide-inner" style="text-align:center; align-items:center">
+      <div class="kicker" style="justify-content:center">Noesis &nbsp;·&nbsp; Proof of Mind</div>
+      <blockquote class="lock" style="border:0; padding:0; text-align:center; font-weight:600; max-width:24ch; font-size:clamp(22px,3.4vw,40px); line-height:1.2">
+        You can buy storage. <span class="accent">You cannot buy consensus.</span>
+      </blockquote>
+      <p class="lede" style="max-width:64ch; margin-top:10px">Noesis is the value chain Bitcoin is mistaken for — a chain whose franchise is earned by contribution, priced by what the world actually builds on, and impossible to fake, copy, or buy. The first chain where the honest move is the highest-paying one, by construction.</p>
+      <p class="lede" style="font-size:20px;color:var(--ink);margin-top:14px"><b>Come claim your contribution.</b></p>
+    </div>
+  </section>
+
+</div>
+
+<!-- dots -->
+<div class="dots" id="dots"></div>
+
+<!-- chrome -->
+<div class="chrome">
+  <div>
+    <div class="brand">NOE<span>SIS</span></div>
+    <div class="footer-note">Proof of Mind</div>
+  </div>
+  <div class="nav">
+    <button id="prev" aria-label="Previous slide">‹</button>
+    <div class="counter" id="counter">1 / 12</div>
+    <button id="next" aria-label="Next slide">›</button>
+  </div>
+</div>
+
+<div class="hint">← → arrows · space · click dots to navigate</div>
+
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var total = slides.length;
+  var i = 0;
+  var progress = document.getElementById('progress');
+  var counter = document.getElementById('counter');
+  var dotsWrap = document.getElementById('dots');
+
+  // build dots
+  slides.forEach(function (_, idx) {
+    var d = document.createElement('div');
+    d.className = 'd' + (idx === 0 ? ' on' : '');
+    d.addEventListener('click', function () { go(idx); });
+    dotsWrap.appendChild(d);
+  });
+  var dots = Array.prototype.slice.call(dotsWrap.children);
+
+  function render() {
+    slides.forEach(function (s, idx) {
+      if (idx === i) { s.classList.add('active'); }
+      else { s.classList.remove('active'); }
+    });
+    dots.forEach(function (d, idx) { d.classList.toggle('on', idx === i); });
+    progress.style.width = ((i) / (total - 1) * 100) + '%';
+    counter.textContent = (i + 1) + ' / ' + total;
+  }
+  function go(n) {
+    i = Math.max(0, Math.min(total - 1, n));
+    var cur = slides[i];
+    cur.style.animation = 'none';
+    void cur.offsetWidth;
+    cur.style.animation = '';
+    render();
+  }
+  function nextS() { go(i + 1); }
+  function prevS() { go(i - 1); }
+
+  document.getElementById('next').addEventListener('click', nextS);
+  document.getElementById('prev').addEventListener('click', prevS);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { nextS(); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { prevS(); e.preventDefault(); }
+    else if (e.key === ' ') { nextS(); e.preventDefault(); }
+    else if (e.key === 'Home') { go(0); }
+    else if (e.key === 'End') { go(total - 1); }
+  });
+
+  // touch swipe
+  var sx = null;
+  document.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (sx === null) return;
+    var dx = e.changedTouches[0].clientX - sx;
+    if (Math.abs(dx) > 50) { dx < 0 ? nextS() : prevS(); }
+    sx = null;
+  }, { passive: true });
+
+  render();
+  var _h=parseInt((location.hash||'').replace('#',''),10);if(_h>0){go(_h-1);}
+})();
+</script>
+</body>
+</html>

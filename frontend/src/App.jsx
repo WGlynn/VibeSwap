@@ -498,6 +498,39 @@ function App() {
         </div>
       )}
     <VibePlayer />
+    {isHomePage && (
+      <a
+        href="/decks.html"
+        title="Browse the decks"
+        className="decks-fab"
+        style={{
+          position: 'fixed', bottom: '18px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 40, display: 'inline-flex', alignItems: 'center', gap: '9px',
+          padding: '8px 18px', borderRadius: '11px',
+          border: '1px solid rgba(0,255,65,0.30)',
+          background: 'linear-gradient(180deg, rgba(0,22,9,0.82), rgba(0,8,4,0.92))',
+          color: '#00ff41', fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '11px', fontWeight: 600, letterSpacing: '0.24em', textTransform: 'uppercase',
+          textDecoration: 'none', backdropFilter: 'blur(6px)',
+          boxShadow: '0 0 26px -10px rgba(0,255,65,0.55), inset 0 0 18px -12px rgba(0,255,65,0.45)',
+          transition: 'transform .18s ease, box-shadow .18s ease, border-color .18s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateX(-50%) translateY(-3px)'
+          e.currentTarget.style.boxShadow = '0 0 34px -8px rgba(0,255,65,0.8), inset 0 0 22px -10px rgba(0,255,65,0.6)'
+          e.currentTarget.style.borderColor = 'rgba(0,255,65,0.55)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateX(-50%) translateY(0)'
+          e.currentTarget.style.boxShadow = '0 0 26px -10px rgba(0,255,65,0.55), inset 0 0 18px -12px rgba(0,255,65,0.45)'
+          e.currentTarget.style.borderColor = 'rgba(0,255,65,0.30)'
+        }}
+      >
+        <span style={{ fontSize: '15px', letterSpacing: 0 }}>🃏</span>
+        <span>Decks</span>
+        <span style={{ opacity: 0.55 }}>→</span>
+      </a>
+    )}
     {location.pathname !== '/jarvis' && location.pathname !== '/voice' && <JarvisBubble />}
     <OnboardingTour />
     <SafariGuide />

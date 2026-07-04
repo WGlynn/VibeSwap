@@ -117,6 +117,20 @@ held for Will (two repos: vibeswap + noesis).
   proposer-clamp note. Dismissed (correctly): missing-inputCommitment-test, unregistered-dilution
   (intended), saturating_sub-masking (theta pinned in v1).
 
+## Reputation-consumer surface — SHIPPED 2026-07-03 (PoM-is-the-product)
+Will reframed: **Proof of Mind is the product** (a portable cryptoeconomic primitive), Noesis is its
+reference chain ([[project_proof-of-mind-is-the-product]]). This ships the primitive's 2nd value prop
+(exportable on-chain reputation) as a clean consumer surface:
+- **`IProofOfMindReputation` + `PoMReputationOracle`** (`contracts/pom/`, 6/6 tests): any protocol
+  imports the interface and reads a contributor's earned, math-derived standing to gate/weight by
+  MIND not money (governance weight, allowlists, sybil-resistant airdrops, under-collateralized
+  credit). `recordReputation` verifies a Merkle proof against the hub's live `scoresRoot` and caches
+  it; `reputationOf` / `hasReputationAtLeast` are cheap reads; `verifyLive` is an as-of-now check.
+- **Trust:** immutable hub (no admin/upgrade surface); reputation is a VERIFIED LOWER BOUND as of the
+  recorded nonce (cumulative PoM value is monotone across standings) ⇒ gating is fail-safe (never
+  over-grants). Keyed by soulbound contributor id; address↔id binding is the consumer's identity
+  bridge (same open item as the payout registration, honestly out of scope).
+
 ## Reserved for v2 (the one real gap the review surfaced)
 - **On-chain registrations commitment.** payoutRoot does not commit the registrations map, so `payTo`
   correctness is an off-chain challenger check in v1 (fine, resolver-adjudicated). Before the

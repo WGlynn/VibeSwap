@@ -66,6 +66,23 @@ documentation/trust-boundary clarifications, all folded.
    `challenge()` time (`challengerSlashSliceBpsAtChallenge`) so governance cannot retroactively alter
    a committed challenger's bounty.
 
+## Reputation-consumer surface (`PoMReputationOracle`, 2026-07-03)
+
+The read side of the primitive — how other protocols consume PoM reputation (Proof of Mind is the
+product; the hub is machinery; Noesis is the reference chain).
+
+- **Trust-minimized:** the oracle's `hub` is immutable (no admin key, no upgrade surface); it adds no
+  trust beyond the hub it points at. `recordReputation` is permissionless and verifies against the
+  hub's live `scoresRoot`, so the cache only ever holds a value the finalized standing commits.
+- **Fail-safe freshness:** a recorded reputation is a VERIFIED LOWER BOUND as of `asOfNonce`.
+  Cumulative PoM value is monotone non-decreasing across finalized standings (v1 pins the reduction
+  params), so a cached value can only lag, never overstate ⇒ gating on it never over-grants. Re-post
+  a proof, or use `verifyLive`, for an as-of-now value.
+- **Identity-bridge boundary (deliberate):** reputation is keyed by the soulbound contributor id.
+  Binding it to an EVM address is the consumer's responsibility and requires an authenticated
+  identity proof (the same open item as the payout registration). The oracle does NOT self-bind an
+  address to an id, because an unauthenticated binding would be reputation theft.
+
 ## Accepted v1 boundaries (deliberate, with the v2 path)
 
 - **Registrations are an off-chain trust input.** The `payoutRoot` commits `(contributor, payTo,
@@ -121,3 +138,5 @@ prefix-advance + tip-missing guards, the genesis bond-slice (registry primitive 
 challenge-time lock), and the split-can't-touch-91% guard.
 `pom_export` Rust tests (13/13) pin the same vectors + the payout-tree / schedule / delta-pricing /
 verify-payout / entropy-floor properties. Full node suite 275/275.
+`test/pom/PoMReputationOracle.t.sol` (6/6): record-then-read, threshold gating, bad-proof reject,
+verifyLive-no-write, unknown-is-zero, zero-hub reject. Total pom Solidity suite: 35/35.

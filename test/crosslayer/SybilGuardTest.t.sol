@@ -61,14 +61,19 @@ contract SybilGuardTest is Test {
         distributor.setAuthorizedCreator(creator, true);
     }
 
-    // ============ Without Sybil Guard (original behavior) ============
+    // ============ Without Sybil Guard (fail-loud behavior) ============
 
-    function test_withoutGuard_sybilGetsDoubleFloor() public {
-        // No guard set — original behavior
-
+    /// @dev REWRITTEN (2026-07-06): this test previously ASSERTED the exploit
+    ///      exists ("without guard, sybil profits from splitting") as documented-
+    ///      vulnerable bootstrap behavior. The exploit CLASS is dissolved by the
+    ///      capital-anchored split-neutral weighting: dust identities are genuinely
+    ///      sub-floor, and guard-less sub-floor settlement is defined to fail loud
+    ///      (MED-2 SybilGuardRequiredForFloor). The rewrite documents the defense
+    ///      instead of the hole — a strengthening, not a deletion: the sybil-vs-
+    ///      honest profit comparison lives on in test_withGuard_unverifiedSybilNoFloor.
+    function test_withoutGuard_subFloorSettlementFailsLoud() public {
         uint256 totalValue = 100 * PRECISION;
 
-        // Single honest account
         bytes32 gameId1 = keccak256("honest");
         rewardToken.mint(address(distributor), totalValue);
 
@@ -81,11 +86,12 @@ contract SybilGuardTest is Test {
 
         vm.prank(creator);
         distributor.createGame(gameId1, totalValue, address(rewardToken), ps1);
+
+        // Sub-floor identity + no guard: settlement must fail loud, not pay the floor.
+        vm.expectRevert(ShapleyDistributor.SybilGuardRequiredForFloor.selector);
         distributor.computeShapleyValues(gameId1);
 
-        uint256 honestShare = distributor.getShapleyValue(gameId1, honest);
-
-        // Sybil: same person splits into 2 accounts
+        // Splitting into sybils changes nothing: still sub-floor, still fail-loud.
         bytes32 gameId2 = keccak256("sybil");
         rewardToken.mint(address(distributor), totalValue);
 
@@ -99,13 +105,9 @@ contract SybilGuardTest is Test {
 
         vm.prank(creator);
         distributor.createGame(gameId2, totalValue, address(rewardToken), ps2);
+
+        vm.expectRevert(ShapleyDistributor.SybilGuardRequiredForFloor.selector);
         distributor.computeShapleyValues(gameId2);
-
-        uint256 sybilTotal = distributor.getShapleyValue(gameId2, sybil1) +
-                             distributor.getShapleyValue(gameId2, sybil2);
-
-        // Without guard: sybil gets more than honest (exploiting floor)
-        assertGt(sybilTotal, honestShare, "Without guard: sybil should profit from splitting");
     }
 
     // ============ With Sybil Guard (fixed behavior) ============

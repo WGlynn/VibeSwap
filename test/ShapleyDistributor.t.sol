@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../contracts/incentives/ShapleyDistributor.sol";
+import "../contracts/incentives/ISybilGuard.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -11,6 +12,20 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract MockRewardToken is ERC20 {
     constructor() ERC20("Reward", "RWD") {}
     function mint(address to, uint256 amount) external { _mint(to, amount); }
+}
+
+// ============ Mock Sybil Guard (allowlist) ============
+
+/// @dev HARNESS ADDITION (2026-07-06): under split-neutral weighting a genuinely
+///      small LP is genuinely sub-floor, so the Lawson-floor test must model the
+///      documented deploy-config (guard set + verified LP). Previously the small
+///      LP sat at ~30% via per-identity dimension normalization and the floor
+///      assertion passed vacuously; now the test exercises the guarded lift path
+///      its name claims.
+contract AllowlistGuardUnit is ISybilGuard {
+    mapping(address => bool) public allowed;
+    function approve(address a) external { allowed[a] = true; }
+    function isUniqueIdentity(address a) external view returns (bool) { return allowed[a]; }
 }
 
 // ============ ShapleyDistributor Unit Tests ============
@@ -373,6 +388,15 @@ contract ShapleyDistributorTest is Test {
     function test_lawsonFloor_smallContributorGetsMinimum() public {
         uint256 value = 100 ether;
         vm.deal(address(distributor), value);
+
+        // UPDATED (2026-07-06): bob (1 of 9901 ether) is now genuinely sub-floor
+        // under split-neutral weighting, so the floor path requires the documented
+        // deploy-config: sybil guard set + bob verified. Assertion unchanged — the
+        // test finally exercises the guarded lift its name claims (it previously
+        // passed vacuously with bob at ~30% via per-identity dimension shares).
+        AllowlistGuardUnit lawsonGuard = new AllowlistGuardUnit();
+        lawsonGuard.approve(bob);
+        distributor.setSybilGuard(address(lawsonGuard));
 
         // Alice contributes 99% of direct, bob contributes 1% (tiny)
         ShapleyDistributor.Participant[] memory ps = new ShapleyDistributor.Participant[](2);

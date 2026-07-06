@@ -261,11 +261,21 @@ contract IncentiveSimulationTest is Test {
         assertGt(totalRewards[2], totalRewards[1], "Player 3 > Player 2");
         assertGt(totalRewards[1], totalRewards[0], "Player 2 > Player 1");
 
-        // Verify proportionality (player 3 contributes 3x player 1)
-        // Should receive more but not 3x due to marginal contribution
+        // Verify proportionality (player 3 contributes 3x player 1).
+        //
+        // UPDATED (2026-07-06): under capital-anchored weighting, participants with
+        // IDENTICAL behavior scores are exactly capital-proportional — that
+        // exactness is the split-neutrality (sybil-resistance) property itself.
+        // The old strict "< 3x" encoded per-identity flat-dimension compression,
+        // which is precisely the mechanism identity-splitting exploited (each split
+        // identity re-earned the flat dims, diluting capital ratios). The
+        // anti-plutocracy direction is preserved and strengthened: capital may
+        // never earn SUPER-proportionally. Behavior-driven compression (when
+        // scores differ) is locked by test_behaviorEdge_cappedAt2_5x in
+        // test/incentives/ShapleyScaleInvariantSybil.t.sol.
         uint256 ratio = (totalRewards[2] * 100) / totalRewards[0];
         assertGt(ratio, 150, "Player 3 should get significantly more");
-        assertLt(ratio, 300, "But not proportionally 3x");
+        assertLe(ratio, 300, "Capital must never earn super-proportionally");
 
         emit log_named_uint("Player 1 total", totalRewards[0]);
         emit log_named_uint("Player 2 total", totalRewards[1]);

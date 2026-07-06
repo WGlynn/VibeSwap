@@ -803,19 +803,12 @@ contract ShapleyDistributor is
         uint256[] memory shares;
         uint256[] memory weights;
         {
-            weights = new uint256[](n);
-            uint256 totalWeight = 0;
-            for (uint256 i = 0; i < n; i++) {
-                weights[i] = _calculateWeightedContribution(participants[i], gameId);
-                // C41: apply time-indexed novelty multiplier. Unset defaults to 1.0x
-                // (NOVELTY_DEFAULT_BPS), so games with no keeper / no multiplier set
-                // behave identically to pre-C41 allocation.
-                uint256 mult = noveltyMultiplierBps[gameId][participants[i].participant];
-                if (mult == 0) mult = NOVELTY_DEFAULT_BPS;
-                weights[i] = (weights[i] * mult) / NOVELTY_DEFAULT_BPS;
-                totalWeight += weights[i];
-                weightedContributions[gameId][participants[i].participant] = weights[i];
-            }
+            // Weight computation extracted to _computeWeights to reduce stack depth
+            // and keep the weighting row-local (capital-anchored multiplier — see
+            // _capitalAnchoredBase). No cross-participant pass is needed: pro-rata
+            // division by totalWeight performs the only normalization.
+            uint256 totalWeight;
+            (weights, totalWeight) = _computeWeights(gameId, participants, n);
             if (totalWeight == 0) revert GameNotFound();
             totalWeightedContrib[gameId] = totalWeight;
 
@@ -826,18 +819,22 @@ contract ShapleyDistributor is
         }
 
         // Step 3: Enforce Lawson Fairness Floor + Step 4: Force efficiency
-        _applyFloorAndEfficiency(distributableValue, participants, weights, shares);
+        bool floorEngaged = _applyFloorAndEfficiency(distributableValue, participants, weights, shares);
 
         // AA#2 CRIT-3c (2026-05-12): structural enforcement of axiom 5.
         // Strict pairwise-proportionality holds among non-floor-bumped pairs.
         // The Lawson floor deliberately overrides strict proportionality for
         // participants whose proportional share falls below 1% — that is the
         // documented exception, preserved here so the floor isn't bricked.
+        // FIX (2026-07-06): the exception is scoped to its full CLASS — when the
+        // floor engages, donor deduction also moves donors off strict
+        // proportionality against undeducted sub-floor participants (see
+        // _enforceAxiom5). Same-class pairs remain strictly enforced.
         // Prior to this require, verifyPairwiseFairness was an external-view-
         // only spectator: a game whose final shares violated axiom 5 among
         // non-floor pairs would settle silently. Now: such a game reverts at
         // settlement time, before any state is committed downstream.
-        _enforceAxiom5(distributableValue, weights, shares, totalWeightedContrib[gameId]);
+        _enforceAxiom5(distributableValue, weights, shares, floorEngaged);
 
         // Final assignment
         for (uint256 i = 0; i < n; i++) {
@@ -853,14 +850,53 @@ contract ShapleyDistributor is
         }
     }
 
+    /// @dev Step 1 of computeShapleyValues: compute per-participant weights and their total.
+    /// Extracted to reduce stack depth in the parent function.
+    ///
+    /// FIX (2026-07-06): capital-anchored multiplier weighting — scale-invariant AND
+    /// split-neutral. The previous per-dimension sum-normalization was scale-invariant
+    /// but split-PROFITABLE: time/scarcity/stability are per-identity (replicable)
+    /// scores, so splitting one contribution across N identities multiplied its
+    /// normalized weight (N*s/(N*s + rest) -> 1 as N grows), letting dust identities
+    /// clear the Lawson floor naturally and bypass the sybil-gated floor path.
+    /// Each weight is now a function of that participant's OWN row only (see
+    /// _capitalAnchoredBase); the sole cross-participant operation is the final
+    /// pro-rata by totalWeight, which is invariant under any partition of one
+    /// row's capital. Splitting is therefore exactly value-preserving in the
+    /// proportional region, and the floor region stays guard-gated (MED-2).
+    /// @return weights per-participant weighted contribution (post novelty multiplier)
+    /// @return totalWeight sum of all weights
+    function _computeWeights(
+        bytes32 gameId,
+        Participant[] storage participants,
+        uint256 n
+    ) internal returns (uint256[] memory weights, uint256 totalWeight) {
+        weights = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
+            weights[i] = _calculateWeightedContribution(participants[i], gameId);
+            // C41: apply time-indexed novelty multiplier. Unset defaults to 1.0x
+            // (NOVELTY_DEFAULT_BPS), so games with no keeper / no multiplier set
+            // behave identically to pre-C41 allocation.
+            uint256 mult = noveltyMultiplierBps[gameId][participants[i].participant];
+            if (mult == 0) mult = NOVELTY_DEFAULT_BPS;
+            weights[i] = (weights[i] * mult) / NOVELTY_DEFAULT_BPS;
+            totalWeight += weights[i];
+            weightedContributions[gameId][participants[i].participant] = weights[i];
+        }
+    }
+
     /// @dev Steps 3-4 of computeShapleyValues: Lawson floor enforcement + dust efficiency.
     /// Extracted to reduce stack depth in the parent function.
+    /// @return floorEngaged true iff at least one share was lifted to the floor.
+    ///         The axiom-5 enforcer needs this to scope the documented floor
+    ///         exception to its full class: donor deduction moves donors off
+    ///         strict proportionality against undeducted sub-floor participants.
     function _applyFloorAndEfficiency(
         uint256 totalValue,
         Participant[] storage participants,
         uint256[] memory weights,
         uint256[] memory shares
-    ) internal {
+    ) internal returns (bool floorEngaged) {
         uint256 n = shares.length;
         uint256 floorAmount = (totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
 
@@ -905,13 +941,31 @@ contract ShapleyDistributor is
                     }
                 }
             }
+            floorEngaged = floorDeficit > 0;
         }
 
-        // Step 4: Force efficiency on last non-zero-weight participant.
-        // Preserves null player axiom: weight=0 => share=0.
+        // Step 4: Force efficiency on the last non-zero-weight participant whose
+        // share is NOT floor-exact. Preserves null player axiom: weight=0 => share=0.
+        //
+        // FIX (2026-07-06, liveness): a floor-lifted participant that absorbed the
+        // rounding dust would hold floorAmount + dust, escaping the axiom-5
+        // floor-skip (which matches shares == floorAmount exactly) and reverting
+        // settlement ("axiom 5 violated for non-floor pair") — bricking the game
+        // whenever a verified floor-lifted LP happened to be last in the array.
+        // Preferring a non-floor-exact recipient keeps lifted shares exactly at the
+        // floor. Fallback (every weight>0 share floor-exact): last weight>0 — then
+        // all its axiom-5 pairs are floor-skipped anyway, so the enforcer cannot fire.
         uint256 dustRecipient = n - 1;
+        bool dustFound = false;
         for (uint256 i = n; i > 0; i--) {
-            if (weights[i - 1] > 0) { dustRecipient = i - 1; break; }
+            if (weights[i - 1] > 0 && shares[i - 1] != floorAmount) {
+                dustRecipient = i - 1; dustFound = true; break;
+            }
+        }
+        if (!dustFound) {
+            for (uint256 i = n; i > 0; i--) {
+                if (weights[i - 1] > 0) { dustRecipient = i - 1; break; }
+            }
         }
         uint256 distributed = 0;
         for (uint256 i = 0; i < n; i++) {
@@ -937,13 +991,23 @@ contract ShapleyDistributor is
     ///      enough to catch real axiom violations (e.g., post-floor share-ratio
     ///      drift that exceeds rounding-only precision).
     ///
-    ///      The _outerToleranceUnused parameter is kept on the signature for
-    ///      future calibration without further API churn.
+    ///      FIX (2026-07-06, liveness): when the floor ENGAGED, the lift is funded
+    ///      by deducting DONORS (shares > floor) while sub-floor guard-rejected
+    ///      participants keep undeducted pro-rata crumbs. Cross-class pairs
+    ///      (donor vs sub-floor) therefore deviate from strict proportionality by
+    ///      the floor's own design — the same documented exception as the lifted
+    ///      participant, extended to its full class. Without this scoping, any
+    ///      game containing {lifted, donor, rejected-crumb} simultaneously
+    ///      reverted at settlement, bricking funds until cancelStaleGame.
+    ///      Same-class pairs stay strictly checked: donor/donor shares keep a
+    ///      common factor (V/W − D/NFW) × w_i, crumb/crumb shares are untouched
+    ///      pro-rata. When the floor did NOT engage, all pairs are checked as
+    ///      before, including pairs straddling the floor line.
     function _enforceAxiom5(
         uint256 totalValue,
         uint256[] memory weights,
         uint256[] memory shares,
-        uint256 /* _outerToleranceUnused */
+        bool floorEngaged
     ) internal pure {
         uint256 n = shares.length;
         uint256 floorAmount = (totalValue * LAWSON_FAIRNESS_FLOOR) / BPS_PRECISION;
@@ -951,6 +1015,9 @@ contract ShapleyDistributor is
             if (shares[i] == floorAmount) continue;
             for (uint256 j = i + 1; j < n; j++) {
                 if (shares[j] == floorAmount) continue;
+                if (floorEngaged && ((shares[i] > floorAmount) != (shares[j] > floorAmount))) {
+                    continue; // donor vs sub-floor: floor-exception class (see above)
+                }
                 uint256 perPairTolerance = n * (weights[i] + weights[j]);
                 PairwiseFairness.FairnessResult memory r =
                     PairwiseFairness.verifyPairwiseProportionality(
@@ -1086,29 +1153,27 @@ contract ShapleyDistributor is
 
     /**
      * @notice Calculate weighted contribution for a participant
-     * @dev Implements the "glove game" insight: value comes from cooperation
+     * @dev Implements the "glove game" insight: value comes from cooperation.
      *
-     * Components:
-     * - Direct: Raw liquidity/volume provided
-     * - Enabling: Time in pool (enabled others to trade)
-     * - Scarcity: Provided the scarce side of the market
-     * - Stability: Stayed during volatility (enabled survival)
-     * - Pioneer bonus: multiplier from PriorityRegistry (1.0x to 1.5x)
+     * Capital-anchored decomposition (FIX 2026-07-06):
+     * - Direct: conserved base — capital actually at risk (unit-free via pro-rata)
+     * - Enabling/Scarcity/Stability: bounded row-local multiplier on that base
+     * - Quality / pioneer / novelty multipliers apply on top, unchanged
+     *
+     * The 40/30/20/10 weights decompose the effective-capital multiplier
+     * m in [0.40x, 1.00x]: capital alone counts at 40%; time earns up to +30%,
+     * scarcity up to +20%, stability up to +10%. This is the honest, unit-free
+     * reading of the documented split that is compatible with sybil-resistance;
+     * "each dimension = fixed % of the pot allocated by per-identity score share"
+     * is provably split-profitable and was removed (see _capitalAnchoredBase).
      */
     function _calculateWeightedContribution(
         Participant memory p,
         bytes32 gameId
     ) internal view returns (uint256) {
-        // Normalize each component to PRECISION scale
-        uint256 directScore = p.directContribution;
-
-        // Time score: logarithmic scaling (diminishing returns)
-        // 1 day = 1x, 7 days = ~1.9x, 30 days = ~2.7x, 365 days = ~4.2x
-        uint256 timeScore = _log2Approx(p.timeInPool / 1 days + 1) * PRECISION / 10;
-
-        // Scarcity and stability are already in BPS
-        uint256 scarcityNorm = (p.scarcityScore * PRECISION) / BPS_PRECISION;
-        uint256 stabilityNorm = (p.stabilityScore * PRECISION) / BPS_PRECISION;
+        // Row-local capital-anchored base in its own stack frame (keeps this
+        // function under the stack limit on the default non-via-IR profile).
+        uint256 weighted = _capitalAnchoredBase(p);
 
         // Apply quality weights if enabled.
         // N03 FIX: Read from per-game snapshot (gameQualityWeights) rather than the global
@@ -1123,14 +1188,6 @@ contract ShapleyDistributor is
                 qualityMultiplier = (PRECISION / 2) + (avgQuality * PRECISION / BPS_PRECISION);
             }
         }
-
-        // Weighted sum
-        uint256 weighted = (
-            (directScore * DIRECT_WEIGHT) +
-            (timeScore * ENABLING_WEIGHT) +
-            (scarcityNorm * SCARCITY_WEIGHT) +
-            (stabilityNorm * STABILITY_WEIGHT)
-        ) / BPS_PRECISION;
 
         weighted = (weighted * qualityMultiplier) / PRECISION;
 
@@ -1154,6 +1211,54 @@ contract ShapleyDistributor is
         }
 
         return weighted;
+    }
+
+    /// @dev Capital-anchored, scale-invariant AND split-neutral base weight for one
+    /// participant. Row-local: reads ONLY this participant's inputs — this is the
+    /// load-bearing property for sybil-resistance (no denominator an attacker can
+    /// inflate by adding identities).
+    ///
+    ///   w = directContribution * m / PRECISION, where (BPS-scale, PRECISION-weighted)
+    ///   m = DIRECT_WEIGHT*PRECISION                                     // 4000e18: capital alone
+    ///     + ENABLING_WEIGHT  * min(log2(days+1)*PRECISION/10, PRECISION) // <= 3000e18
+    ///     + SCARCITY_WEIGHT  * scarcityScore*PRECISION/BPS_PRECISION     // <= 2000e18
+    ///     + STABILITY_WEIGHT * stabilityScore*PRECISION/BPS_PRECISION    // <= 1000e18
+    ///   so m in [4000e18, 10000e18] and w is in (capital x BPS) units.
+    ///
+    /// SCALE-INVARIANCE (the reason the 2026-06-18 change exists, preserved): w is
+    /// homogeneous of degree 1 in directContribution and m is unit-free (log-days,
+    /// BPS scores), so scaling every participant's capital by c > 0 scales every
+    /// weight by c and leaves all pro-rata shares unchanged. The units-dominance bug
+    /// (raw wei-scale direct term drowning the [0,PRECISION]-scale behavior terms)
+    /// cannot recur: capital MULTIPLIES the behavior terms instead of being ADDED
+    /// to them, so no choice of units can make one dimension drown another.
+    ///
+    /// SPLIT-NEUTRALITY: time/scarcity/stability are per-identity behaviors an
+    /// attacker can replicate across N funded addresses, but here they only modulate
+    /// capital: sum_j d_j * m = d * m for any partition sum d_j = d with replicated
+    /// scores (exact invariance), and other participants' weights are untouched by
+    /// the split. Splitting is never profitable in the proportional region; the
+    /// sub-floor region remains sybil-guard-gated (MED-2), which is now again a
+    /// COMPLETE defense rather than a bypassed one.
+    ///
+    /// NULL PLAYER (strengthened): m >= DIRECT_WEIGHT*PRECISION > 0, and for any
+    /// d >= 1 wei, w = d*m/PRECISION >= DIRECT_WEIGHT > 0, so w == 0 iff
+    /// directContribution == 0. Behavior with no capital at risk earns nothing —
+    /// that is precisely what makes the behavior dimensions impossible to farm for
+    /// free (and matches SIEShapleyAdapter's zero-direct-means-null-player intent).
+    ///
+    /// Dividing by PRECISION only (not BPS_PRECISION) keeps 1 wei of capital at a
+    /// nonzero weight (>= DIRECT_WEIGHT), so the fail-loud floor gate stays reachable
+    /// for dust capital. w <= d * 1e4; overflow requires d*m > ~1.1e77, i.e.
+    /// d > ~1.1e55 wei — checked arithmetic reverts fail-safe.
+    function _capitalAnchoredBase(Participant memory p) internal pure returns (uint256) {
+        uint256 timeScore = _log2Approx(p.timeInPool / 1 days + 1) * PRECISION / 10;
+        if (timeScore > PRECISION) timeScore = PRECISION; // maxed at ~2.8 years in pool
+        uint256 m = DIRECT_WEIGHT * PRECISION
+            + ENABLING_WEIGHT * timeScore
+            + SCARCITY_WEIGHT * ((p.scarcityScore * PRECISION) / BPS_PRECISION)
+            + STABILITY_WEIGHT * ((p.stabilityScore * PRECISION) / BPS_PRECISION);
+        return (p.directContribution * m) / PRECISION;
     }
 
     /**

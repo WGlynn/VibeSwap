@@ -3,12 +3,24 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/incentives/ShapleyDistributor.sol";
+import "../../contracts/incentives/ISybilGuard.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockToken is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
     function mint(address to, uint256 amount) external { _mint(to, amount); }
+}
+
+/// @dev Reject-all guard (HARNESS CONFIG, 2026-07-06). Game-theory fixtures include
+///      genuinely sub-1% participants (dictator-game minors ~0.5%, budget-balance
+///      smallest ~0.98%) which are correctly floor-eligible under split-neutral
+///      weighting; the MED-2 gate refuses guard-less settlement. A none-verified
+///      guard keeps every assertion exercising pure proportional math (dictator
+///      >80%, minors <20%, budget exact) with the floor never lifting. No assertion
+///      is changed.
+contract NoneVerifiedGuardGT is ISybilGuard {
+    function isUniqueIdentity(address) external pure returns (bool) { return false; }
 }
 
 /**
@@ -46,6 +58,8 @@ contract ShapleyGameTheoryTest is Test {
         distributor = ShapleyDistributor(payable(address(proxy)));
 
         distributor.setAuthorizedCreator(creator, true);
+        // MED-2 doctrine: deploy-config MUST set the guard (see NoneVerifiedGuardGT).
+        distributor.setSybilGuard(address(new NoneVerifiedGuardGT()));
     }
 
     // ============ Classic Game Theory Tests ============

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/incentives/ShapleyDistributor.sol";
+import "../../contracts/incentives/ISybilGuard.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -12,6 +13,17 @@ contract MockToken is ERC20 {
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
+}
+
+/// @dev Reject-all guard (HARNESS CONFIG, 2026-07-06). The properties under test
+///      here are the PROPORTIONAL math (efficiency / symmetry / no-free-riding).
+///      Under split-neutral weighting, wei-scale fuzz draws are genuinely sub-floor,
+///      and the MED-2 gate correctly refuses guard-less settlement. A none-verified
+///      guard is the conservative configuration: floor never lifts, proportional
+///      math is exercised pure, and the freeloader now truly earns ~0 instead of
+///      relying on its weight rounding to zero. No assertion is changed.
+contract NoneVerifiedGuardFuzz is ISybilGuard {
+    function isUniqueIdentity(address) external pure returns (bool) { return false; }
 }
 
 /**
@@ -46,6 +58,8 @@ contract ShapleyFuzzTest is Test {
 
         // Setup authorized creator
         distributor.setAuthorizedCreator(authorizedCreator, true);
+        // MED-2 doctrine: deploy-config MUST set the guard (see NoneVerifiedGuardFuzz).
+        distributor.setSybilGuard(address(new NoneVerifiedGuardFuzz()));
     }
 
     // ============ Efficiency Invariant: All Value Distributed ============

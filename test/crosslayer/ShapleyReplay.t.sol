@@ -3,12 +3,29 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/incentives/ShapleyDistributor.sol";
+import "../../contracts/incentives/ISybilGuard.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockToken is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
     function mint(address to, uint256 amount) external { _mint(to, amount); }
+}
+
+/// @dev Permissive guard (HARNESS CONFIG, 2026-07-06). Three replay vectors
+///      (three_unequal / lawson_floor / extreme_ratio) assert the Lawson floor
+///      APPLIES to sub-floor participants; MED-2 makes guard-less floor payout a
+///      fail-loud misconfiguration, so the harness must carry the documented
+///      deploy-config (guard set + verified identities). Under split-neutral
+///      weighting these vectors' small identities are genuinely sub-floor for the
+///      first time (previously per-identity dimension shares held them >~30%), so
+///      the floor assertions now exercise the guarded lift non-vacuously.
+///      NOTE: the Python reference vectors (oracle/backtest) must be regenerated
+///      against the capital-anchored weighting: w_i = d_i * m_i / 1e18 with
+///      m = 4000e18 + 3000*min(log2(days+1)/10,1)*1e18 + 2000*s/1e4*1e18
+///          + 1000*st/1e4*1e18.
+contract AllVerifiedGuardReplay is ISybilGuard {
+    function isUniqueIdentity(address) external pure returns (bool) { return true; }
 }
 
 /**
@@ -51,6 +68,8 @@ contract ShapleyReplayTest is Test {
         distributor = ShapleyDistributor(payable(address(proxy)));
 
         distributor.setAuthorizedCreator(creator, true);
+        // MED-2 doctrine: deploy-config MUST set the guard (see AllVerifiedGuardReplay).
+        distributor.setSybilGuard(address(new AllVerifiedGuardReplay()));
     }
 
     // ============ Helper ============

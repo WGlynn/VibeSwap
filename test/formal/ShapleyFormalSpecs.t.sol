@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../../contracts/incentives/ShapleyDistributor.sol";
+import "../../contracts/incentives/ISybilGuard.sol";
 import "../../contracts/libraries/PairwiseFairness.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -10,6 +11,19 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract MockToken is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
     function mint(address to, uint256 amount) external { _mint(to, amount); }
+}
+
+/// @dev Permissive guard for the formal-spec harness (HARNESS CONFIG, 2026-07-06).
+///      The MED-2 fail-loud gate makes guard-less deployment a misconfiguration
+///      whenever any participant can be floor-eligible. Under split-neutral
+///      weighting, genuinely-dust fuzz draws (1 wei vs 1000 ether) are correctly
+///      sub-floor — under the previous weighting no draw in these bounds could ever
+///      be floor-eligible (flat behavior scores guaranteed >~30% weight), so SPEC 4
+///      passed vacuously. The harness now carries the documented mainnet config
+///      (guard set), making SPEC 4 (Lawson floor lemma) non-vacuous for the first
+///      time. All spec ASSERTIONS are untouched.
+contract AllVerifiedGuardSpecs is ISybilGuard {
+    function isUniqueIdentity(address) external pure returns (bool) { return true; }
 }
 
 /**
@@ -55,6 +69,8 @@ contract ShapleyFormalSpecs is Test {
         distributor = ShapleyDistributor(payable(address(proxy)));
 
         distributor.setAuthorizedCreator(creator, true);
+        // MED-2 doctrine: deploy-config MUST set the guard (see AllVerifiedGuardSpecs).
+        distributor.setSybilGuard(address(new AllVerifiedGuardSpecs()));
     }
 
     struct TwoPlayerParams {

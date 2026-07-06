@@ -48,9 +48,12 @@ import "../libraries/PairwiseFairness.sol";
  *      sums to the distributable value (Efficiency) and zero-weight players get zero
  *      (Null Player).
  *
- *      The hook never moves funds. afterSwap returns an encoded routing decision that the
- *      settlement path reads; submitExactAllocation records the resolved allocation for a
- *      previously escalated unit. Both are inspectable on-chain.
+ *      The hook never moves funds. afterSwap only EMITS/RECORDS a routing verdict on-chain
+ *      (settledAdditive[sig] for the additive fast path, or an open escalations[sig]); there
+ *      is NO on-chain settlement gate. An OFF-CHAIN settler must honor the verdict: pay
+ *      additive only when settledAdditive[sig] is set, and escrow the unit until
+ *      resolvedExact[sig] is set by submitExactAllocation. Both mappings are inspectable
+ *      on-chain but are not consumed by any on-chain settlement path.
  */
 contract ShapleyAttributionHook is IVibeHook, Ownable {
     // ============ Constants ============

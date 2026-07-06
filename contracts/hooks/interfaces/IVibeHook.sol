@@ -11,9 +11,11 @@ pragma solidity ^0.8.20;
  *         They receive callbacks at configured hook points and can
  *         inspect/modify pool state within the callback.
  *
- *         Each function returns (bool success, bytes returnData).
- *         The registry checks success — if false, behavior depends
- *         on whether the hook point is mandatory or optional.
+ *         Each function returns a single `bytes memory` of hook-defined data
+ *         (no leading success bool). VibeHookRegistry.executeHook determines
+ *         success from the low-level call status, not the payload. For
+ *         ShapleyAttributionHook the first decoded field of afterSwap is
+ *         `escalate` (bool), not success.
  */
 interface IVibeHook {
     function beforeCommit(bytes32 poolId, bytes calldata data) external returns (bytes memory);

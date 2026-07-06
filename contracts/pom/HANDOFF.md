@@ -137,8 +137,23 @@ reference chain ([[project_proof-of-mind-is-the-product]]). This ships the primi
   DA-blob / RISC-V permissionless resolver ships, add `bytes32 registrationsRoot` to `PomStanding` +
   verify in propose/challenge, else "permissionless" is bypassable by registrations substitution.
 
-## Next session
-Commit (both repos) on Will's word — nothing left open in v1.1. Then v2: registrations commitment +
-DA-blob/RISC-V resolver. Loose ends (unchanged): anthropic-github-campaign Lane B critical-qa issue
-DRAFTED + held for Will go (`Desktop/anthropic-github-skills-critical-qa-issue-draft-2026-07-03.md`);
-pre-existing AgentRegistry/psinet repo-compile break (flag to Will — not ours).
+## Status 2026-07-03/04 — SHIPPED + PUSHED (public, no longer stealth)
+Everything below is committed AND pushed to `origin` on both public repos:
+- **vibeswap** `origin/master` = `6cd05ef0` (v1.1 hub/token/registry `236e6d49` + reputation oracle `6cd05ef0`).
+- **noesis** `origin/master` = `6d838b0` (pom_export layer + MindCoin docs).
+- MindCoin v1.1 CLOSED + adversarially reviewed (6 findings folded, no crit/high). Reputation oracle
+  (`IProofOfMindReputation` + `PoMReputationOracle`) shipped. pom Solidity 35/35, node 275/275.
+- **PoM-is-the-product reframe** (Will 2026-07-03) captured: [[project_proof-of-mind-is-the-product]].
+  Noesis stealth status retired at source (CLAUDE.md + boot handoff files rewritten to public).
+
+## Open threads (all Will-gated)
+1. **Positioning propagation** — lead the docs/README with "Proof of Mind, the primitive" over
+   "Noesis, the chain" (MINDCOIN-FOUNDING, export-layer note, noesis README). Not yet done.
+2. **v2 registrations commitment** — add `bytes32 registrationsRoot` to `PomStanding` + verify in
+   propose/challenge BEFORE any permissionless (DA-blob / RISC-V) resolver. The one real gap.
+3. **anthropic-campaign:** Lane-B `critical-qa` issue DRAFTED + held for Will go
+   (`Desktop/anthropic-github-skills-critical-qa-issue-draft-2026-07-03.md`); the 11 cookbook
+   self-proposals #713-723 are ALL cold (0 engagement, ~2wk) → thin to 2-3 (Will's call to close).
+4. **nda-[REDACTED-NDA]-gate.py** may carry stale Noesis keyword triggers (a hook, not memory) — drop them if
+   they ever block a Noesis op (didn't block the pushes today). See [[project_noesis-now-public]].
+5. Pre-existing `AgentRegistry`/psinet repo-compile break — NOT ours; the `pom` profile dodges it.

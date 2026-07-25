@@ -108,7 +108,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 18px 20px;
-    margin-bottom: 28px;
+    margin-bottom: 16px;
   }
 
   .project-name {
@@ -116,6 +116,15 @@
     font-weight: 700;
     color: var(--cyan);
     margin-bottom: 4px;
+  }
+
+  .project-tag {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-left: 8px;
   }
 
   .project-desc {
@@ -151,7 +160,7 @@
   }
 
   /* ============ Section ============ */
-  .section { margin-bottom: 28px; }
+  .section { margin-bottom: 28px; margin-top: 28px; }
 
   .section-title {
     font-size: 11px;
@@ -187,6 +196,15 @@
     font-weight: 600;
     color: var(--green);
     margin-bottom: 2px;
+  }
+
+  .work-meta {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
   }
 
   .work-desc {
@@ -244,16 +262,21 @@
   <!-- Header -->
   <div class="header">
     <div class="name">Will Glynn</div>
-    <div class="title">Mechanism Designer &amp; Full-Stack Blockchain Engineer</div>
+    <div class="title">Open Source Contributor &middot; Mechanism Designer &middot; Protocol Engineer</div>
     <div class="links">
       <div class="link-row">
         <span class="link-icon">&#128279;</span>
-        <a href="https://github.com/wglynn/vibeswap" target="_blank">github.com/wglynn/vibeswap</a>
-        <span class="link-label">— source + 1,845+ commits</span>
+        <a href="https://github.com/WGlynn" target="_blank">github.com/WGlynn</a>
+        <span class="link-label">— two protocols, 2,400+ commits</span>
+      </div>
+      <div class="link-row">
+        <span class="link-icon">&#129504;</span>
+        <a href="https://github.com/WGlynn/noesis" target="_blank">github.com/WGlynn/noesis</a>
+        <span class="link-label">— Proof-of-Mind chain (research-stage)</span>
       </div>
       <div class="link-row">
         <span class="link-icon">&#127760;</span>
-        <a href="https://frontend-jade-five-87.vercel.app" target="_blank">frontend-jade-five-87.vercel.app</a>
+        <a href="https://noesis-poa-demo.vercel.app" target="_blank">noesis-poa-demo.vercel.app</a>
         <span class="link-label">— live demo</span>
       </div>
       <div class="link-row">
@@ -269,11 +292,11 @@
     "An OS that ignores economics is just a VM. An OS that ignores governance is just a dictatorship."
   </div>
 
-  <!-- Project Banner -->
+  <!-- Project Banners -->
   <div class="project-banner">
     <div class="project-name">VibeSwap</div>
     <div class="project-desc">
-      Omnichain DEX on LayerZero V2. MEV eliminated via commit-reveal batch auctions with uniform clearing prices and Fisher-Yates shuffle. Zero protocol fees. Shapley-fair reward distribution.
+      Omnichain DEX. MEV eliminated via commit-reveal batch auctions with uniform clearing prices and Fisher-Yates shuffle. Zero protocol fees. Shapley-fair reward distribution. Canonical burn-and-mint cross-chain messaging with BLS12-381 threshold signatures.
     </div>
     <div class="project-stats">
       <div class="stat">
@@ -295,28 +318,46 @@
     </div>
   </div>
 
+  <div class="project-banner">
+    <div class="project-name">Noesis<span class="project-tag">research-stage &middot; public</span></div>
+    <div class="project-desc">
+      A Proof-of-Mind consensus layer that prices contribution, not just possession. Dual-axis consensus — bonded capital plus earned, soulbound contribution standing — with a per-dimension anti-concentration floor so capital cannot finalize the chain without contribution's consent. Rust + RISC-V (CKB-VM), Cell model.
+    </div>
+    <div class="project-stats">
+      <div class="stat">
+        <span class="stat-val">Rust</span>
+        <span class="stat-lbl">+ RISC-V</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">53</span>
+        <span class="stat-lbl">Test Suites</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">552</span>
+        <span class="stat-lbl">Commits</span>
+      </div>
+      <div class="stat">
+        <span class="stat-val">$0</span>
+        <span class="stat-lbl">Funding</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Key Work -->
   <div class="section">
-    <div class="section-title">Key Work</div>
+    <div class="section-title">Original Contributions</div>
 
     <div class="work-card">
-      <div class="work-title">Economitra</div>
+      <div class="work-title">Proof of Mind</div>
       <div class="work-desc">
-        Information theory meets mechanism design. Shannon entropy applied to market microstructure — price discovery as signal extraction, liquidity as channel capacity. The theoretical backbone of VibeSwap's auction architecture.
+        Contribution priced as a first-class consensus resource, orthogonal to capital. The portable primitive — Proof of Mind is to Noesis what Proof of Work is to Bitcoin.
       </div>
     </div>
 
     <div class="work-card">
-      <div class="work-title">FractalShapley</div>
+      <div class="work-title">Anti-Concentration Finality</div>
       <div class="work-desc">
-        Recursive Shapley attribution for multi-agent systems. Attribution flows through nested coalitions without double-counting. Used in ShapleyDistributor.sol to make governance capture mathematically impossible.
-      </div>
-    </div>
-
-    <div class="work-card">
-      <div class="work-title">VSOS — VibeSwap Operating System</div>
-      <div class="work-desc">
-        DeFi as a full operating system: scheduler (batch auctions), memory manager (AMM state), filesystem (IPFS + on-chain), process isolation (circuit breakers), and cooperative resource allocation across chains.
+        A per-dimension floor requiring capital and contribution to each independently supply their share of finality. Neither axis finalizes alone, so plutocratic capture becomes structurally impossible, not merely costly.
       </div>
     </div>
 
@@ -330,7 +371,51 @@
     <div class="work-card">
       <div class="work-title">Augmented Governance</div>
       <div class="work-desc">
-        Physics (P-001: No Extraction Ever) &gt; Constitution (P-000: Fairness Above All) &gt; DAO. Shapley axioms encoded as on-chain invariants. If the math holds, the governance holds.
+        Physics (P-001: No Extraction Ever) &gt; Constitution (Fairness Above All) &gt; DAO. Shapley axioms encoded as on-chain invariants. If the math holds, the governance holds.
+      </div>
+    </div>
+
+    <div class="work-card">
+      <div class="work-title">MEV &harr; LP Attribution Isomorphism</div>
+      <div class="work-desc">
+        An exact mapping, via Harsanyi dividends, between MEV attribution and LP-reward attribution — "same decomposition, two games." Additive approximations systematically underprice the scarcity- and stability-providing tail.
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Collaborations -->
+  <div class="section">
+    <div class="section-title">Recent Collaborations (2026)</div>
+
+    <div class="work-card">
+      <div class="work-title">Deep3 Labs</div>
+      <div class="work-meta">signal-attribution engine</div>
+      <div class="work-desc">
+        A self-honest evaluation harness measuring the marginal, cost-adjusted, null-tested contribution of each signal source — Shapley attribution over coalitions, deflated Sharpe, purged walk-forward validation — stress-tested against a blind adversarial fixture battery.
+      </div>
+    </div>
+
+    <div class="work-card">
+      <div class="work-title">Formal Verification of Governance-Mutation Safety</div>
+      <div class="work-meta">collaboration with a formal-methods research team</div>
+      <div class="work-desc">
+        A composition theorem checking whether cooperative-game (Shapley) axioms survive rule-set mutations — the confluent-but-axiom-breaking case current tooling misses. Invited as a proof-of-concept reference client.
+      </div>
+    </div>
+
+    <div class="work-card">
+      <div class="work-title">Value-Attribution Research Collaboration</div>
+      <div class="work-meta">with a MEV research team &middot; co-authored paper in progress</div>
+      <div class="work-desc">
+        Established the MEV / LP attribution isomorphism and, in the exchange, found and fixed a scale-invariance bug in VibeSwap's on-chain Shapley distributor. Converging on a routing surrogate that escalates to exact Shapley on the non-additive tail.
+      </div>
+    </div>
+
+    <div class="work-card">
+      <div class="work-title">Open Source</div>
+      <div class="work-meta">contributions to projects I don't own</div>
+      <div class="work-desc">
+        Shipped production code per each repo's norms — a merged PR to remem, an IDE backend for Lithos, a GitHub-integrated Discord bot, and ongoing triage-and-fix on a large open-source client. The merges are public.
       </div>
     </div>
   </div>
@@ -339,26 +424,29 @@
   <div class="section">
     <div class="section-title">Stack</div>
     <div class="tags">
+      <span class="tag">Rust</span>
       <span class="tag">Solidity</span>
+      <span class="tag">Python</span>
+      <span class="tag">TypeScript</span>
       <span class="tag">Foundry</span>
       <span class="tag">OpenZeppelin</span>
       <span class="tag">UUPS</span>
       <span class="tag">React</span>
-      <span class="tag">Vite</span>
-      <span class="tag">ethers.js v6</span>
-      <span class="tag">Python</span>
-      <span class="tag">LayerZero V2</span>
+      <span class="tag">RISC-V / CKB-VM</span>
+      <span class="tag">Nervos CKB</span>
+      <span class="tag">BLS12-381</span>
       <span class="tag">WebAuthn</span>
       <span class="tag">ERC-4337</span>
       <span class="tag">cooperative game theory</span>
+      <span class="tag">agentic AI tooling</span>
     </div>
   </div>
 
   <!-- Footer -->
   <div class="footer">
-    <div class="footer-line">Most founders raise money to build.</div>
-    <div class="footer-line"><strong>I built first.</strong> The code is public. The tests pass. The math works.</div>
-    <div class="footer-code">Built in a cave. &mdash; Cape Cod, MA &mdash; MIT Bitcoin Expo 2026</div>
+    <div class="footer-line">Most projects raise money to build.</div>
+    <div class="footer-line"><strong>This was built first.</strong> The code is public. The tests pass. The math works.</div>
+    <div class="footer-code">Built in a cave. &mdash; Cape Cod, MA</div>
   </div>
 
 </body>

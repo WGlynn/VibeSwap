@@ -35,6 +35,11 @@ import {IMessagingValidatorRegistry} from "./interfaces/IMessagingValidatorRegis
  *           - Pubkey proof-of-possession (PoP) check at registration. v0.1
  *             stores the raw pubkey; v0.2 adds a PoP signature requirement to
  *             rule out rogue-key attacks.
+ *
+ *         v0.1 axiomatic trust base (named + versioned; keep minimal):
+ *           a single owner key on the economic floor (setBondFloor) and the
+ *           UUPS upgrade path (_authorizeUpgrade). Governance handoff intended,
+ *           not yet scheduled; until then every guarantee bottoms out here.
  */
 contract MessagingValidatorRegistry is
     IMessagingValidatorRegistry,

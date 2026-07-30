@@ -507,13 +507,13 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 4. Compare to on-chain storage required.</p>
 <p>Observe: structure is cheap; content dominates.</p>
 <h2 id="relationship-to-etm">Relationship to ETM</h2>
-<p>Under <a href="etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognitive memory has temperature tiers: vivid episodic (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived).</p>
+<p>Under Economic Theory of Mind, cognitive memory has temperature tiers: vivid episodic (high-entropy, short-lived), semantic generalizations (medium-entropy, medium-lived), procedural skills (low-entropy, long-lived).</p>
 <p>The DAG's hot/warm/cold storage tiers mirror this. Cognition doesn't preserve entropy uniformly; it compresses over time. Same pattern.</p>
 <h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
 <ul>
-<li><strong>Companion</strong>: <a href="../research/theorems/KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.md">Kolmogorov Complexity of Attribution</a> — Kolmogorov gives the storage lower bounds; entropy preservation is about which parts we keep.</li>
-<li><strong>Instance</strong>: <a href="identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md">ContributionAttestor</a> — stores the structural layer.</li>
-<li><strong>Enabling</strong>: <a href="identity/CONTRIBUTION_TRACEABILITY.md">Chat-to-DAG Traceability</a> — captures source content that then goes to off-chain tiers.</li>
+<li><strong>Companion</strong>: <a href="/papers/06_KOLMOGOROV_COMPLEXITY_OF_ATTRIBUTION.html">Kolmogorov Complexity of Attribution</a> — Kolmogorov gives the storage lower bounds; entropy preservation is about which parts we keep.</li>
+<li><strong>Instance</strong>: ContributionAttestor — stores the structural layer.</li>
+<li><strong>Enabling</strong>: Chat-to-DAG Traceability — captures source content that then goes to off-chain tiers.</li>
 </ul>
 <h2 id="one-line-summary">One-line summary</h2>
 <p><em>The DAG preserves STRUCTURAL entropy losslessly (who, when, parents, claim-status) but COMMITS to content via evidenceHash rather than storing it. Structure is cheap (~17 KB per 10K chain); content is expensive (~5 MB). Four preservation tiers (on-chain, fast off-chain, cold archive, redundant). Deliberate eviction via state-rent is correct (matches cognitive memory temperature); accidental loss is prevented via redundant archival.</em></p>

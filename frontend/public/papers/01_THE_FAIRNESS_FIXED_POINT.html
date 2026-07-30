@@ -387,7 +387,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>Question: does this settle into a stable, fair distribution? Or does it drift — founders accumulating more and more, newcomers accumulating less and less, until the system becomes effectively feudal?</p>
 <p>This is the fairness-fixed-point question. It's about iteration, not single rounds.</p>
 <h2 id="why-iteration-matters">Why iteration matters</h2>
-<p>Shapley distribution (<a href="../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md"><code>SHAPLEY_REWARD_SYSTEM.md</code></a>) is provably fair for a SINGLE round under specific cooperative-game assumptions.</p>
+<p>Shapley distribution (<code>SHAPLEY_REWARD_SYSTEM.md</code>) is provably fair for a SINGLE round under specific cooperative-game assumptions.</p>
 <p>But VibeSwap runs Shapley ITERATIVELY. Each round's rewards feed back into the trust-graph, which then affects the next round's Shapley computation. This is a feedback loop.</p>
 <p>Feedback loops don't automatically converge. They can:
 - <strong>Converge to a stable fair distribution</strong> (good).
@@ -476,7 +476,7 @@ distribution* = iterate(distribution*)
 - <strong>Stability of balanced fixed point</strong>: conjectured via local linearization, not verified.
 - <strong>Basin sizes</strong>: founder-dominant basin has narrow reach (capped multipliers + decay); balanced basin is broad.</p>
 <p>Practical implication: VibeSwap is probably operating in a balanced-fixed-point basin. But "probably" is not "proven".</p>
-<p>The <a href="../../concepts/etm/ETM_BUILD_ROADMAP.md">ETM Build Roadmap</a> queues an empirical simulation cycle to verify convergence on a realistic contributor graph. Results will inform whether additional mitigations are needed.</p>
+<p>The ETM Build Roadmap queues an empirical simulation cycle to verify convergence on a realistic contributor graph. Results will inform whether additional mitigations are needed.</p>
 <h2 id="the-goal-of-simulation">The goal of simulation</h2>
 <p>Queued research cycle: run iterated Shapley on a realistic contributor graph for 100+ rounds. Observe:</p>
 <ul>
@@ -527,9 +527,9 @@ distribution* = iterate(distribution*)
 <p>This exercise teaches fixed-point intuition via experimentation.</p>
 <h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
 <ul>
-<li><strong><a href="./THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus Theorem</a></strong>: permutation-symmetric Shapley under-rewards novelty. Modifying Shapley for novelty changes the iteration dynamics — a fresh fixed-point analysis is needed for the modified system.</li>
-<li><strong><a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a></strong>: <code>v(S)</code> estimation errors propagate through iteration. Error bounds on the fixed-point estimate are another research direction.</li>
-<li><strong><a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a></strong>: other mechanisms compose with Shapley iteration; their interactions affect the fixed-point structure.</li>
+<li><strong>Novelty Bonus Theorem</strong>: permutation-symmetric Shapley under-rewards novelty. Modifying Shapley for novelty changes the iteration dynamics — a fresh fixed-point analysis is needed for the modified system.</li>
+<li><strong>The Attribution Problem</strong>: <code>v(S)</code> estimation errors propagate through iteration. Error bounds on the fixed-point estimate are another research direction.</li>
+<li><strong>Mechanism Composition Algebra</strong>: other mechanisms compose with Shapley iteration; their interactions affect the fixed-point structure.</li>
 </ul>
 <h2 id="one-line-summary">One-line summary</h2>
 <p><em>Fairness depends on what Shapley iteration converges to, not what it computes for a single round. Existence of fixed points is proven (Brouwer); uniqueness is open (multiple plausible); stability of balanced-fixed-point is conjectured via spectral analysis. VibeSwap's mitigations (trust caps, decay, three-branch, constitutional axioms) bound drift dynamics. Verification queued as empirical simulation.</em></p>

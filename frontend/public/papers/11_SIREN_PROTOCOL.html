@@ -378,7 +378,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 
 <p><strong>Status</strong>: Live in <code>contracts/core/HoneypotDefense.sol</code> + <code>OmniscientAdversaryDefense.sol</code>.
 <strong>Audience</strong>: First-encounter OK. Walked attack + exhaustion scenario.
-<strong>Classification</strong>: ETM MIRRORS (<a href="../etm/ETM_ALIGNMENT_AUDIT.md">audit</a> §5.1).</p>
+<strong>Classification</strong>: ETM MIRRORS (audit §5.1).</p>
 <hr />
 <h2 id="a-paradigm-break">A paradigm break</h2>
 <p>Ask 100 security engineers: "How do you defend against attackers?"</p>
@@ -449,7 +449,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 </code></pre>
 <p><code>OmniscientAdversaryDefense.sol</code> adds honeypot layer. Some apparent state is bait — indistinguishable from real state from attacker's perspective.</p>
 <h2 id="why-this-is-substrate-geometry-matched">Why this is substrate-geometry-matched</h2>
-<p><a href="../SUBSTRATE_GEOMETRY_MATCH.md">Substrate-Geometry Match</a> says mechanisms should match substrate geometry.</p>
+<p>Substrate-Geometry Match says mechanisms should match substrate geometry.</p>
 <p>Attacker motivation has specific shape:
 - <strong>Power-law distribution</strong>: most attackers are opportunistic; few are well-resourced.
 - <strong>Log-scale cost-tolerance</strong>: attackers don't abandon attacks linearly; they abandon at log-scale thresholds.
@@ -460,7 +460,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 - High-signal: prohibitive rent (definite attackers, strong deterrent).</p>
 <p>Linear alternative would be geometrically wrong — either too soft (attackers unimpeded) or too hard (legitimate users hurt).</p>
 <h2 id="the-cognitive-parallel">The cognitive parallel</h2>
-<p>Under <a href="../etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, biological immune systems implement exactly this pattern:</p>
+<p>Under Economic Theory of Mind, biological immune systems implement exactly this pattern:</p>
 <ul>
 <li>Immune system doesn't blacklist specific pathogens; escalates cost against any replicating entity triggering enough signals.</li>
 <li>Early-low-signal: tolerated (normal flora, non-pathogenic bacteria).</li>
@@ -476,15 +476,15 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <h3 id="not-identity-detection">NOT identity detection</h3>
 <p>Siren responds to signals, not identities. Two different wallets with same signal-profile get same treatment. Can't be "target specific users."</p>
 <h3 id="not-fund-recovery">NOT fund recovery</h3>
-<p>That's <a href="./CLAWBACK_CASCADE_MECHANICS.md">Clawback Cascade</a>. Siren deters; Clawback recovers.</p>
+<p>That's <a href="/papers/12_CLAWBACK_CASCADE_MECHANICS.html">Clawback Cascade</a>. Siren deters; Clawback recovers.</p>
 <h3 id="not-eviction">NOT eviction</h3>
 <p>Siren rent doesn't blacklist forever. When attacker stops exhibiting signal, score decays. Behavior returns to normal.</p>
 <p>Each restriction is deliberate. Siren's boundaries keep it narrow and composable.</p>
 <h2 id="interaction-with-other-defenses">Interaction with other defenses</h2>
-<p>Per <a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a>:</p>
+<p>Per Mechanism Composition Algebra:</p>
 <ul>
 <li><strong>Orthogonal</strong> with most defenses — Siren charges rent on-signal; other defenses apply structural constraints. No state collision.</li>
-<li><strong>Serially composable</strong> with <a href="./FIBONACCI_SCALING.md">Fibonacci Scaling</a> — both rate-limit. Siren is signal-triggered; Fibonacci is volume-triggered. Both fire; honest users hit neither; attackers hit both.</li>
+<li><strong>Serially composable</strong> with Fibonacci Scaling — both rate-limit. Siren is signal-triggered; Fibonacci is volume-triggered. Both fire; honest users hit neither; attackers hit both.</li>
 <li><strong>Serially composable</strong> with Circuit Breakers — Circuit Breakers trip on aggregate; Siren on individual. Complementary.</li>
 </ul>
 <p>Defense-in-depth: each layer catches different attack profiles.</p>
@@ -501,7 +501,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 </ul>
 <p>Key reads: <code>getSirenScore(address)</code> returns current rent multiplier.</p>
 <h2 id="relationship-to-gev-resistance">Relationship to GEV resistance</h2>
-<p><a href="./GEV_RESISTANCE.md">GEV Resistance</a> lists flash-loan exploitation, drain-pool arbitrage, oracle-manipulation-style trades as specific extraction categories. Siren addresses these.</p>
+<p>GEV Resistance lists flash-loan exploitation, drain-pool arbitrage, oracle-manipulation-style trades as specific extraction categories. Siren addresses these.</p>
 <p>What Siren doesn't address: subtle informational-asymmetry attacks at normal-looking transaction rates. These don't trigger signals until substantial damage is done. Other defenses (Circuit Breakers, TWAP validation) cover this.</p>
 <h2 id="for-students">For students</h2>
 <p>Exercise: analyze Siren Protocol against a specific historical attack:</p>

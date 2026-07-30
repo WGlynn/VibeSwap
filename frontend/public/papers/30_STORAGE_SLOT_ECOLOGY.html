@@ -375,7 +375,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 
 <p><strong>Status</strong>: Pedagogical deep-dive on UUPS upgrade-discipline for long-arc contract durability.
 <strong>Audience</strong>: Smart-contract engineers. First-encounter with UUPS is OK.
-<strong>Related</strong>: <a href="../memory/primitive_post-upgrade-initialization-gate.md">Post-Upgrade Init Gate</a>, <a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a>, <a href="../../research/essays/THE_LONG_NOW_OF_CONTRIBUTION.md">The Long Now of Contribution</a>. <!-- FIXME: ../memory/primitive_post-upgrade-initialization-gate.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --></p>
+<strong>Related</strong>: Post-Upgrade Init Gate, Mechanism Composition Algebra, The Long Now of Contribution.</p>
 <hr />
 <h2 id="the-problem">The problem</h2>
 <p>Your smart contract is upgradeable. You deploy v1. Six months later, you upgrade to v2 with new features. Six months after that, v3. Two years in, v7.</p>
@@ -514,7 +514,7 @@ uint256[49] private __gap;
 </ul>
 <p>This is why VibeSwap bothers with NatSpec on every gap-shrink. Long-arc insurance.</p>
 <h2 id="relationship-to-cincinnatus-test">Relationship to Cincinnatus Test</h2>
-<p><a href="../DISINTERMEDIATION_GRADES.md">Disintermediation Grades</a> Cincinnatus Test: "If Will disappeared tomorrow, does this still work?"</p>
+<p><a href="/papers/15_DISINTERMEDIATION_GRADES.html">Disintermediation Grades</a> Cincinnatus Test: "If Will disappeared tomorrow, does this still work?"</p>
 <p>Applied to upgrades: if the upgrade-documentation is only in Will's head, future engineers must re-derive it (at risk of mistakes) or avoid upgrades (stagnation).</p>
 <p>Documented discipline makes upgrades transferable. Future team can upgrade confidently; Cincinnatus Test passes.</p>
 <h2 id="for-students">For students</h2>

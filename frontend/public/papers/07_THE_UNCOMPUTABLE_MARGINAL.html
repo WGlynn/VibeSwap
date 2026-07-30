@@ -388,7 +388,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>This is <strong>combinatorial explosion</strong>. The growth rate is 2^N where N is the number of coins. For even modest N, 2^N outstrips any computer's capacity.</p>
 <p>Shapley value computation has this same explosion. Let's see why.</p>
 <h2 id="shapleys-requirement">Shapley's requirement</h2>
-<p>Per <a href="../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md">Shapley Reward System</a>, the Shapley value for contributor <code>i</code> is the average over all permutations of their marginal contribution.</p>
+<p>Per Shapley Reward System, the Shapley value for contributor <code>i</code> is the average over all permutations of their marginal contribution.</p>
 <p>For N contributors, the number of permutations is N! (N-factorial). The number of subsets is 2^N.</p>
 <p>For each subset, we need to evaluate the characteristic function <code>v(S)</code>.</p>
 <p>For 10 contributors: 1024 subsets to evaluate + 3.6M permutations to average over.
@@ -404,7 +404,7 @@ For 1000 contributors (realistic for VibeSwap at scale): 10^300 subsets. Infeasi
 <h3 id="uncomputable-layer-2-vs-is-counterfactual">Uncomputable layer 2 — v(S) is counterfactual</h3>
 <p>Even if we could enumerate all subsets, evaluating <code>v(S)</code> for each is expensive.</p>
 <p><code>v(S)</code> = "what value would this coalition S have produced?" This is a counterfactual. Nobody knows what S alone would have produced without running the experiment.</p>
-<p>Per <a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a> Gap #1, <code>v(S)</code> has 10-30% estimation error even when we can estimate it.</p>
+<p>Per The Attribution Problem Gap #1, <code>v(S)</code> has 10-30% estimation error even when we can estimate it.</p>
 <p>So: the outer sum is infeasibly large, AND each term requires an expensive counterfactual estimate with substantial error.</p>
 <p>Exact Shapley = impossible in practice. We must approximate.</p>
 <h2 id="monte-carlo-shapley-the-working-solution">Monte Carlo Shapley — the working solution</h2>
@@ -444,7 +444,7 @@ Error ~1%.</p>
 <h2 id="the-sampling-budget-versus-accuracy-trade-off">The sampling budget-versus-accuracy trade-off</h2>
 <p>More samples = better accuracy but higher gas cost on-chain (or higher compute off-chain).</p>
 <p>For on-chain Monte Carlo: 100 samples costs ~2M gas. 1,000 samples costs ~20M gas. 10,000 costs ~200M gas. 10,000 exceeds block gas limits on most chains.</p>
-<p>Solution: compute off-chain, commit via Optimistic Shapley (<a href="../../concepts/shapley/OPTIMISTIC_SHAPLEY.md"><code>OPTIMISTIC_SHAPLEY.md</code></a>). Off-chain Monte Carlo runs in seconds or minutes; commit result via Merkle root; challenge window allows verification.</p>
+<p>Solution: compute off-chain, commit via Optimistic Shapley (<a href="/papers/18_OPTIMISTIC_SHAPLEY.html"><code>OPTIMISTIC_SHAPLEY.md</code></a>). Off-chain Monte Carlo runs in seconds or minutes; commit result via Merkle root; challenge window allows verification.</p>
 <h2 id="the-vs-estimation-budget">The v(S) estimation budget</h2>
 <p>Monte Carlo bounds the Shapley summation. But v(S) estimation is another source of error.</p>
 <p>For each sampled subset, we estimate v(S). Three approaches:</p>
@@ -453,7 +453,7 @@ Error ~1%.</p>
 <p>Error: O(sample size of historical data). Usually 20-30% for sparse data.</p>
 <h3 id="approach-2-expert-committee">Approach 2 — Expert-committee</h3>
 <p>Have a trusted committee estimate v(S) for key subsets.</p>
-<p>Error: subjective. 15-30% cross-observer variation (see <a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a>).</p>
+<p>Error: subjective. 15-30% cross-observer variation (see The Attribution Problem).</p>
 <h3 id="approach-3-simulation-based">Approach 3 — Simulation-based</h3>
 <p>Model the counterfactual via simulation. Requires accurate simulation-model.</p>
 <p>Error: depends on model validity. 10-20% typical.</p>
@@ -500,9 +500,9 @@ Error ~1%.</p>
 <p>Compare to exact. Observe the trade-off between K and accuracy.</p>
 <h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
 <ul>
-<li><strong>Parent</strong>: <a href="../../concepts/shapley/SHAPLEY_REWARD_SYSTEM.md">Shapley Reward System</a> — the foundation.</li>
-<li><strong>Integration</strong>: <a href="../../concepts/shapley/OPTIMISTIC_SHAPLEY.md">Optimistic Shapley</a> — Monte Carlo off-chain + challenge window on-chain.</li>
-<li><strong>Related</strong>: <a href="../essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a> — v(S) estimation is one of five gaps.</li>
+<li><strong>Parent</strong>: Shapley Reward System — the foundation.</li>
+<li><strong>Integration</strong>: <a href="/papers/18_OPTIMISTIC_SHAPLEY.html">Optimistic Shapley</a> — Monte Carlo off-chain + challenge window on-chain.</li>
+<li><strong>Related</strong>: The Attribution Problem — v(S) estimation is one of five gaps.</li>
 </ul>
 <h2 id="one-line-summary">One-line summary</h2>
 <p><em>Exact Shapley is doubly-uncomputable at VibeSwap scale — exponential in N (2^N subsets) AND requires counterfactual v(S) estimates per subset. Monte Carlo approximation with K = 1,000-10,000 samples gives 1-3% Shapley error; v(S) estimation adds 10-30% more. Total: 5-30% error per contributor. Fairness is a region (within ~10-30% of theoretical ideal), not a point.</em></p>

@@ -438,14 +438,14 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p><strong>Mitigation</strong>: three-token economy (JUL for money, VIBE for governance, CKB-native for substrate) gives multiple dimensions. Partial — contributors still mix optimization targets.</p>
 <p><strong>Capture surface</strong>: contributors with unusual utility functions can appear to act "irrationally" by the mechanism's standards, muddying the measure.</p>
 <h3 id="surface-5-etm-blindness-to-phenomenal-states">Surface 5 — ETM-blindness to phenomenal states</h3>
-<p><a href="etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a> captures cognitive-economic processes. It doesn't capture phenomenal consciousness, affect, embodiment.</p>
+<p>Economic Theory of Mind captures cognitive-economic processes. It doesn't capture phenomenal consciousness, affect, embodiment.</p>
 <p><strong>Concrete scenario</strong>: a mechanism that inadvertently triggers shame-engagement-loops. Users feel bad after using it. The mechanism's Shapley math looks clean; the user experience is harmful.</p>
 <p>ETM-alignment audit says the mechanism is correct. But users are being phenomenally harmed. The math doesn't measure the harm.</p>
-<p><strong>Mitigation</strong>: P-000 (Fairness Above All) as a constitutional override; <a href="../research/essays/THE_DIGNITY_GRADIENT.md">Dignity Gradient</a> consideration; user feedback channels.</p>
+<p><strong>Mitigation</strong>: P-000 (Fairness Above All) as a constitutional override; <a href="/papers/26_THE_DIGNITY_GRADIENT.html">Dignity Gradient</a> consideration; user feedback channels.</p>
 <p><strong>Capture surface</strong>: mechanisms can pass ETM-alignment and still cause phenomenal harm. The capture surface is literally "things ETM doesn't measure."</p>
 <h2 id="the-composition-problem">The composition problem</h2>
 <p>You might hope to close these surfaces by composing more mechanisms.</p>
-<p>Doesn't quite work. Per <a href="../architecture/MECHANISM_COMPOSITION_ALGEBRA.md"><code>MECHANISM_COMPOSITION_ALGEBRA.md</code></a>, composition introduces new surfaces. A mechanism + fix-for-surface-1 composition can have NEW capture surfaces at the composition boundary.</p>
+<p>Doesn't quite work. Per <code>MECHANISM_COMPOSITION_ALGEBRA.md</code>, composition introduces new surfaces. A mechanism + fix-for-surface-1 composition can have NEW capture surfaces at the composition boundary.</p>
 <p>So adding fixes is asymptotic approach, not convergent progress. You can reduce the total capture surface over time, but you can't eliminate it.</p>
 <p>Honest framing: design is asymptotic.</p>
 <h2 id="design-implications">Design implications</h2>
@@ -455,7 +455,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>The longer statement is more accurate and more usable. Adversaries reading the shorter version overestimate protection; those reading the longer version get an accurate threat model.</p>
 <h3 id="implication-2-track-capture-surfaces-as-first-class-artifact">Implication 2 — Track capture surfaces as first-class artifacts</h3>
 <p>Maintain a public list: for each mechanism, the known capture surfaces. Update as new surfaces are discovered. Rank by severity.</p>
-<p>This is the <a href="../memory/project_rsi-backlog.md"><code>memory/project_rsi-backlog.md</code></a> discipline applied architecturally. <!-- FIXME: ../memory/project_rsi-backlog.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. --></p>
+<p>This is the <code>memory/project_rsi-backlog.md</code> discipline applied architecturally.</p>
 <h3 id="implication-3-resist-one-more-mechanism-closes-it">Implication 3 — Resist "one more mechanism closes it"</h3>
 <p>The asymptotic nature means adding mechanisms doesn't converge to complete coverage. At some point, adding is strictly worse than accepting — the composition complexity exceeds the marginal coverage gain.</p>
 <p>Know where to stop. Governance and tribunal are the "human-in-the-loop" backstops for residual surfaces.</p>

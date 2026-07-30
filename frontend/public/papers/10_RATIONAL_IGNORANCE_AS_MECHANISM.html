@@ -427,14 +427,14 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p><strong>VibeSwap implementation</strong>:
 - <code>previewAttestationWeight</code> — shows attestor their effective weight before committing.
 - Trust-weighted multipliers — high-trust attestors' votes count for more → per-attestation benefit is higher for them → rational to invest.</p>
-<p><strong>Limitation</strong>: only works if "thoroughness" is measurable. <a href="../research/theorems/THE_OBSERVER_EFFECT_IN_ATTESTATION.md">Goodhart's Law</a> bites here too.</p>
+<p><strong>Limitation</strong>: only works if "thoroughness" is measurable. <a href="/papers/09_THE_OBSERVER_EFFECT_IN_ATTESTATION.html">Goodhart's Law</a> bites here too.</p>
 <h3 id="response-2-delegate-to-informed-expert-proxies">Response 2 — Delegate to informed (expert proxies)</h3>
 <p>Most attestors delegate to small number of "expert" attestors who are paid for work. Experts care because they're paid; delegators get representation without individual investment.</p>
 <p><strong>VibeSwap implementation</strong>: partial via trust-weighting. High-trust attestors effectively serve as delegates.</p>
 <p><strong>Limitation</strong>: expert-delegate capture. If small group of experts gains delegation, they can be lobbied or bribed.</p>
 <h3 id="response-3-reduce-the-cost-of-informedness">Response 3 — Reduce the cost of informedness</h3>
 <p>Make information legible. Canonical issue templates + traceability chains + closing comments.</p>
-<p><strong>VibeSwap implementation</strong>: <a href="identity/CONTRIBUTION_TRACEABILITY.md">Chat-to-DAG Traceability</a> canonical format reduces per-attestation evaluation cost from ~30 min to ~5 min.</p>
+<p><strong>VibeSwap implementation</strong>: Chat-to-DAG Traceability canonical format reduces per-attestation evaluation cost from ~30 min to ~5 min.</p>
 <p><strong>Effectiveness</strong>: high — cost side of equation reduced dramatically.</p>
 <h3 id="response-4-accept-and-design-around">Response 4 — Accept and design around</h3>
 <p>Design mechanisms that DON'T ASSUME informed participation.</p>
@@ -499,7 +499,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p><strong>Implication</strong>: rational-ignorance equilibrium is worst for casual one-time attestors, least-bad for sustained participants. Mechanism design should IMPLICITLY FAVOR sustained participation.</p>
 <p>VibeSwap does this: trust compounds with attestation accuracy over time. Long-term attestors accumulate advantage; short-term rubber-stampers don't.</p>
 <h2 id="relationship-to-etm">Relationship to ETM</h2>
-<p>Under <a href="etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, rational ignorance is a cognitive-economic equilibrium. Attention is scarce, decisions are many, most decisions don't justify full attention. Humans evolved heuristics (gut feel, pattern-match, defer-to-expert) that navigate this economy well.</p>
+<p>Under Economic Theory of Mind, rational ignorance is a cognitive-economic equilibrium. Attention is scarce, decisions are many, most decisions don't justify full attention. Humans evolved heuristics (gut feel, pattern-match, defer-to-expert) that navigate this economy well.</p>
 <p>VibeSwap's architecture mirrors these heuristics on-chain. Trust-delegation = defer-to-expert. Pattern-matching = shallow fast evaluation. Tribunal escalation = reach for deep attention when it matters.</p>
 <p>Not fighting cognitive economy; implementing it.</p>
 <h2 id="for-students">For students</h2>

@@ -392,7 +392,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <h3 id="pressure-2-contribution-type-gaming">Pressure 2 — Contribution-type gaming</h3>
 <p>Different contribution types (Code, Research, Security, etc.) may have different payoff curves. Contributors will gravitate to the types that pay best per unit effort.</p>
 <p><strong>Concrete gaming scenario</strong>: Code contributions are highly rewarded. Design contributions are less so. Contributors shift toward Code even when their comparative advantage is in Design. Result: lots of mediocre Code; insufficient Design.</p>
-<p><strong>Counter-move</strong>: the heterogeneity mandate (see <a href="../../concepts/ai-native/COOPERATIVE_EMERGENCE_THRESHOLD.md">Cooperative Emergence Threshold</a>) — Shannon entropy of contribution types must remain high. Governance can adjust payoff curves per type to restore balance.</p>
+<p><strong>Counter-move</strong>: the heterogeneity mandate (see <a href="/papers/04_COOPERATIVE_EMERGENCE_THRESHOLD.html">Cooperative Emergence Threshold</a>) — Shannon entropy of contribution types must remain high. Governance can adjust payoff curves per type to restore balance.</p>
 <p><strong>Residual gaming possible</strong>: within a single type, contributors still game relative payoffs.</p>
 <h3 id="pressure-3-evidence-hash-gaming">Pressure 3 — Evidence-hash gaming</h3>
 <p>evidenceHash commits to off-chain content. Rational contributors might commit to content that looks substantive (long, complex, impressive) without actually creating value.</p>
@@ -404,10 +404,10 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>ParentAttestations create lineage. Contributors benefit from being cited as a parent. Rational contributors position themselves as load-bearing predecessors.</p>
 <p><strong>Concrete gaming scenario</strong>: Alice claims her 2022 Telegram message was the foundational inspiration for Bob's 2026 breakthrough. She retroactively claims lineage credit for significant downstream work.</p>
 <p><strong>Why this gets through</strong>: if Alice's claim has even a modest evidence base, the lineage link gets credit.</p>
-<p><strong>Counter-move</strong>: Novelty Bonus (see <a href="./THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus Theorem</a>) penalizes contributions with high similarity-to-prior. Lineage-claiming requires demonstrable influence, not just priority.</p>
+<p><strong>Counter-move</strong>: Novelty Bonus (see Novelty Bonus Theorem) penalizes contributions with high similarity-to-prior. Lineage-claiming requires demonstrable influence, not just priority.</p>
 <p><strong>Residual gaming possible</strong>: subtle lineage-gaming where influence IS plausible but overstated.</p>
 <h2 id="why-no-single-tool-prevents-goodhart">Why no single tool prevents Goodhart</h2>
-<p>Substrate Incompleteness (<a href="../../concepts/SUBSTRATE_INCOMPLETENESS.md"><code>SUBSTRATE_INCOMPLETENESS.md</code></a>) applies. Every mechanism has gaming surfaces. Composing mechanisms doesn't eliminate them; it reduces them.</p>
+<p>Substrate Incompleteness (<a href="/papers/02_SUBSTRATE_INCOMPLETENESS.html"><code>SUBSTRATE_INCOMPLETENESS.md</code></a>) applies. Every mechanism has gaming surfaces. Composing mechanisms doesn't eliminate them; it reduces them.</p>
 <p>The asymmetry VibeSwap aims for: defenders (honest contributors + governance) have structural advantages over attackers (Goodharting actors).</p>
 <p>Specifically:
 - <strong>Defenders see all branches</strong>: executive, judicial, legislative. Attackers must fool multiple.
@@ -437,7 +437,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>This is honest about limits while maintaining confidence in the overall design.</p>
 <h2 id="the-social-epistemology-dimension">The social-epistemology dimension</h2>
 <p>Goodharting isn't just individual behavior — it can become collective norm. If "building attestation weight" is celebrated as smart participation, more people do it. Culture reinforces Goodharting.</p>
-<p>Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize <a href="../proofs/LAWSON_CONSTANT.md">Lawson Constant</a> attribution as THE goal (who really did this?), not Shapley percentage as the goal (who got how much?).</p>
+<p>Counter-culture: celebrate substantive contribution. Make attestation-weight visible but secondary. Emphasize Lawson Constant attribution as THE goal (who really did this?), not Shapley percentage as the goal (who got how much?).</p>
 <p>This is cultural design, not just mechanism design. Both matter.</p>
 <h2 id="concrete-counter-culture-tactics">Concrete counter-culture tactics</h2>
 <ul>
@@ -465,13 +465,13 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 </ol>
 <p>This exercise teaches Goodhart detection.</p>
 <h2 id="relationship-to-cognitive-economy">Relationship to cognitive economy</h2>
-<p>Under <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure by productive-hours, you schedule meetings to fill time.</p>
+<p>Under Economic Theory of Mind, cognitive self-measurement also has Goodhart dynamics. If you measure yourself by book-pages-read, you read superficially-many. If you measure by productive-hours, you schedule meetings to fill time.</p>
 <p>Cognition's response: periodically reframe what "productive" means. Introspection updates the measure. This prevents long-term Goodhart drift.</p>
 <p>VibeSwap's governance has the same role. Periodic updates to attestation weighting, Shapley parameters, and tribunal criteria are the on-chain analog of cognitive reframing.</p>
 <h2 id="relationship-to-other-primitives">Relationship to other primitives</h2>
 <ul>
-<li><strong>Connected</strong>: <a href="../../concepts/RATIONAL_IGNORANCE_AS_MECHANISM.md">Rational Ignorance as Mechanism</a> — attestation-weight gaming is harder when contributors are rationally ignorant about gaming details.</li>
-<li><strong>Counter-weights</strong>: <a href="./THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus</a>, <a href="../../concepts/monetary/WHY_THREE_TOKENS_NOT_TWO.md">Quadratic voting</a>.</li>
+<li><strong>Connected</strong>: <a href="/papers/10_RATIONAL_IGNORANCE_AS_MECHANISM.html">Rational Ignorance as Mechanism</a> — attestation-weight gaming is harder when contributors are rationally ignorant about gaming details.</li>
+<li><strong>Counter-weights</strong>: Novelty Bonus, Quadratic voting.</li>
 </ul>
 <h2 id="one-line-summary">One-line summary</h2>
 <p><em>Goodhart's Law — metrics used to govern distort what they measure. Four specific gaming pressures on VibeSwap (attestation-weight, contribution-type, evidence-hash, lineage-depth) with specific mitigations for each. No single tool prevents Goodharting; composition raises cost. Asymmetry favors defenders via multi-branch + time-integration + meta-governance. Reverse-Goodhart design: pick metrics whose optimization produces desirable behavior.</em></p>

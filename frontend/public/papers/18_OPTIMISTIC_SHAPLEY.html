@@ -482,7 +482,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <li><strong>Slashable</strong> via successful challenge.</li>
 <li><strong>Rotatable</strong> — governance can replace keeper without chain disruption.</li>
 </ul>
-<p>This introduces a specific intermediary role. See <a href="../DISINTERMEDIATION_GRADES.md">Disintermediation Grades</a>. Optimistic Shapley is Grade 4 (bonded intermediary with accountability), not Grade 5 (permissionless).</p>
+<p>This introduces a specific intermediary role. See <a href="/papers/15_DISINTERMEDIATION_GRADES.html">Disintermediation Grades</a>. Optimistic Shapley is Grade 4 (bonded intermediary with accountability), not Grade 5 (permissionless).</p>
 <p>Grade 5 goal: permissionless keepers. Harder to bootstrap; may come in V2.</p>
 <h2 id="comparison-with-alternatives">Comparison with alternatives</h2>
 <h3 id="alternative-1-pure-on-chain-shapley">Alternative 1 — Pure on-chain Shapley</h3>
@@ -527,7 +527,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <h3 id="per-contributor-subscription">Per-contributor subscription</h3>
 <p>Contributors pay subscription fee to keep Shapley-involvement active. Passive contributors pruned; computation scales with active participants.</p>
 <h2 id="integration-with-existing-mechanisms">Integration with existing mechanisms</h2>
-<p>Composes cleanly (per <a href="../../architecture/MECHANISM_COMPOSITION_ALGEBRA.md">Mechanism Composition Algebra</a>):</p>
+<p>Composes cleanly (per Mechanism Composition Algebra):</p>
 <ul>
 <li><strong>Lawson Floor</strong> computed alongside Shapley; committed in same Merkle root.</li>
 <li><strong>Novelty Bonus</strong> modifier applied off-chain; verified during challenges.</li>

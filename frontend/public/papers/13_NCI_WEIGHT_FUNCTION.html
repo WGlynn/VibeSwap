@@ -522,8 +522,8 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <h3 id="mind-score-inflation">Mind-score inflation</h3>
 <p>High-PoM validators attest each other's contributions.</p>
 <p>Mitigation:
-- Three-branch attestation (<a href="./CONTRIBUTION_ATTESTOR_EXPLAINER.md"><code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code></a>) — cartel in executive branch doesn't capture others.
-- <a href="../../research/theorems/THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus</a> penalizes replication.
+- Three-branch attestation (<code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code>) — cartel in executive branch doesn't capture others.
+- Novelty Bonus penalizes replication.
 - log₂ dampens inflation payoff.</p>
 <h3 id="sybil-pow">Sybil PoW</h3>
 <p>Attacker splits PoW across many identities.</p>
@@ -532,7 +532,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>Validators with large stake (high PoS weight) but no active participation.</p>
 <p>Mitigation: active-validator requirement. <code>totalActiveWeight</code> tracking only counts actively-participating validators. Absentees lose active status over time.</p>
 <h2 id="gap-1-in-etm-alignment-audit-reconciled-2026-04-23">Gap #1 in ETM Alignment Audit — reconciled 2026-04-23</h2>
-<p><strong>Earlier drafts of this doc (and <a href="../monetary/COGNITIVE_RENT_ECONOMICS.md"><code>COGNITIVE_RENT_ECONOMICS.md</code></a>, and <a href="../etm/ETM_BUILD_ROADMAP.md"><code>ETM_BUILD_ROADMAP.md</code></a>) asserted that NCI currently applies linear time-decay: <code>retentionWeight(t) = base - k × t</code>. Verification against the contract contradicts that.</strong></p>
+<p><strong>Earlier drafts of this doc (and <code>COGNITIVE_RENT_ECONOMICS.md</code>, and <code>ETM_BUILD_ROADMAP.md</code>) asserted that NCI currently applies linear time-decay: <code>retentionWeight(t) = base - k × t</code>. Verification against the contract contradicts that.</strong></p>
 <p>Actual on-chain state in <code>contracts/consensus/NakamotoConsensusInfinity.sol</code>:
 - <code>cumulativePoW</code> is monotone-cumulative. No time-decay applied.
 - <code>mindScore</code> is refresh-on-demand via <code>refreshMindScore()</code>. No time-decay applied.
@@ -565,7 +565,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>Different concerns, related inputs. Both use cumulative contribution signals (PoW, PoS, PoM) but for different purposes.</p>
 <p>A validator with high NCI weight gets more say in consensus. A contributor with high Shapley values gets more rewards. Same person can be both; mechanisms route contributions differently.</p>
 <h2 id="relationship-to-etm">Relationship to ETM</h2>
-<p><a href="../etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a> frames consensus as aggregated belief from heterogeneous agents. NCI IS the aggregation formula for heterogeneous-agent consensus — each agent type contributes with appropriate weighting.</p>
+<p>Economic Theory of Mind frames consensus as aggregated belief from heterogeneous agents. NCI IS the aggregation formula for heterogeneous-agent consensus — each agent type contributes with appropriate weighting.</p>
 <p>Pure-PoW: only hash-crunching agents count.
 Pure-PoS: only capital-holders count.
 NCI: work + capital + mind all count, with mind dominating.</p>

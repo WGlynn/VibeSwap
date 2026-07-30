@@ -391,7 +391,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>"Lawson" carries two distinct but complementary primitives:</p>
 <ol>
 <li>
-<p><strong>Lawson Constant</strong> — attribution axiom. Ensures the greatest idea cannot be stolen because authorship is structural. See <a href="./LAWSON_CONSTANT.md">Lawson Constant doc</a>.</p>
+<p><strong>Lawson Constant</strong> — attribution axiom. Ensures the greatest idea cannot be stolen because authorship is structural. See Lawson Constant doc.</p>
 </li>
 <li>
 <p><strong>Lawson Floor</strong> — distribution mechanism. Guarantees every attributed contributor receives at least a floor amount. This doc.</p>
@@ -517,7 +517,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 Lawson Floor ensures recorded contribution receives minimum economic acknowledgment.</p>
 <p>Together: every legitimate contribution gets meaningful economic credit + no contribution can be stolen or erased.</p>
 <h2 id="the-attestation-threshold-gate">The attestation-threshold gate</h2>
-<p>Lawson Floor doesn't give EVERY claim the floor. Only claims ACCEPTED by the <a href="../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md">three-branch attestation flow</a>.</p>
+<p>Lawson Floor doesn't give EVERY claim the floor. Only claims ACCEPTED by the three-branch attestation flow.</p>
 <ul>
 <li>Pending claims: not eligible.</li>
 <li>Rejected claims: not eligible.</li>
@@ -548,7 +548,7 @@ Lawson Floor ensures recorded contribution receives minimum economic acknowledgm
 - Reduce α below 0.05 (effectively eliminates; constitutional).
 - Target specific addresses for exclusion (violates attribution-is-structural).</p>
 <h2 id="relationship-to-novelty-bonus-theorem">Relationship to Novelty Bonus Theorem</h2>
-<p><a href="../theorems/THE_NOVELTY_BONUS_THEOREM.md">Novelty Bonus Theorem</a>: permutation-symmetric Shapley under-rewards novelty. Novelty Bonus adds super-linear rewards to novel contributions.</p>
+<p>Novelty Bonus Theorem: permutation-symmetric Shapley under-rewards novelty. Novelty Bonus adds super-linear rewards to novel contributions.</p>
 <p>Composition with Lawson Floor:</p>
 <pre><code>reward_i = max(F, novelty_bonus(i) × (φ_i / Σ φ_j) × S × (1-α))
 </code></pre>
@@ -564,7 +564,7 @@ Lawson Floor ensures recorded contribution receives minimum economic acknowledgm
 <p>Storage: each round's (α, S, N, F) recorded for audit. Historical floors queriable to verify past rounds respected the floor.</p>
 <p>Edge case: if <code>S &lt; N × F</code>, total pool &lt; sum of floors. In this rare case, everyone receives <code>S / N</code> — uniform distribution for this round. Per-contributor fairness preserved; Shapley weighting suppressed for that round. Signal to governance that reward pool may be insufficient.</p>
 <h2 id="relationship-to-cognitive-economy">Relationship to cognitive economy</h2>
-<p>Under <a href="../../concepts/etm/ECONOMIC_THEORY_OF_MIND.md">Economic Theory of Mind</a>, cognition preserves minor contributions from evict-dominance. Even small memory items retain some persistence-weight. Lawson Floor is the on-chain mirror.</p>
+<p>Under Economic Theory of Mind, cognition preserves minor contributions from evict-dominance. Even small memory items retain some persistence-weight. Lawson Floor is the on-chain mirror.</p>
 <p>Diverse-but-small contributions are preserved over pure-marginal-dominance. Matches cognitive substrate geometry.</p>
 <h2 id="for-students">For students</h2>
 <p>Exercise: work through a distribution scenario with specific numbers.</p>

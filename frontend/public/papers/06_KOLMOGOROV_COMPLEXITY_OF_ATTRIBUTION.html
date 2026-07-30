@@ -396,7 +396,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>If K(attribution) is small, we can compress. If K is large, we can't.</p>
 <p>Let's figure out what K(attribution) looks like.</p>
 <h2 id="the-structure-of-one-attribution">The structure of one attribution</h2>
-<p>Per <a href="../../concepts/identity/CONTRIBUTION_ATTESTOR_EXPLAINER.md"><code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code></a>, each claim has:</p>
+<p>Per <code>CONTRIBUTION_ATTESTOR_EXPLAINER.md</code>, each claim has:</p>
 <ul>
 <li>Contributor address: 20 bytes.</li>
 <li>ContributionType enum: 1 byte (but really 3-4 bits needed for 9 values).</li>
@@ -495,7 +495,7 @@ After compression: ~40-50 bytes/claim for typical patterns.</p>
 <h2 id="the-dignity-of-storage-argument">The dignity-of-storage argument</h2>
 <p>There's an ethical dimension to long-arc attribution storage. If the protocol promises contributors that their attestations are "remembered forever", the storage cost to honor that promise is real.</p>
 <p>A protocol that collects attributions and then garbage-collects them at 10 years is breaking an implicit commitment.</p>
-<p>VibeSwap's three-tier architecture + CKB state-rent model (<a href="../../concepts/monetary/THREE_TOKEN_ECONOMY.md">Three-Token Economy</a>) provides a sustainable answer:</p>
+<p>VibeSwap's three-tier architecture + CKB state-rent model (Three-Token Economy) provides a sustainable answer:</p>
 <ul>
 <li>Hot tier claims stay on-chain with state-rent.</li>
 <li>Warm tier migrated to L2 + Merkle-anchored.</li>

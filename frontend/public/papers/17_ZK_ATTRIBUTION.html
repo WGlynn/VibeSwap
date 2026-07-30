@@ -373,7 +373,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 
 <p><strong>Status</strong>: Research direction + design sketch.
 <strong>Depth</strong>: Pedagogical. Assumes first-encounter with zero-knowledge proofs; builds to concrete VibeSwap application.
-<strong>Related</strong>: <a href="./CONTRIBUTION_TRACEABILITY.md">Contribution Traceability</a>, <a href="./CONTRIBUTION_ATTESTOR_EXPLAINER.md">ContributionAttestor Explainer</a>, <a href="../../research/essays/THE_ATTRIBUTION_PROBLEM.md">The Attribution Problem</a>.</p>
+<strong>Related</strong>: Contribution Traceability, ContributionAttestor Explainer, The Attribution Problem.</p>
 <hr />
 <h2 id="the-problem-were-trying-to-solve">The problem we're trying to solve</h2>
 <p>Every contribution the DAG records carries an evidence hash pointing to some off-chain artifact. For most contributions this is fine — the artifact is meant to be public. A public commit, a published paper, a public Telegram message.</p>
@@ -461,7 +461,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>If any of these assumptions is broken (e.g., a quantum computer breaks elliptic curves), existing ZK proofs become forgeable. Migration to post-quantum-secure ZK proofs is ongoing research.</p>
 <p>For VibeSwap's roadmap: implement ZK attribution with existing SNARKs/STARKs. Plan for migration when post-quantum ZK becomes practical (likely 5-10 years).</p>
 <h2 id="integration-with-contribution-traceability">Integration with Contribution Traceability</h2>
-<p><a href="./CONTRIBUTION_TRACEABILITY.md">Chat-to-DAG Traceability</a> currently uses evidence-hash commitments. The ZK upgrade adds an optional proof field:</p>
+<p>Chat-to-DAG Traceability currently uses evidence-hash commitments. The ZK upgrade adds an optional proof field:</p>
 <pre><code>submitClaim(
     contributor,
     contribType,

@@ -387,7 +387,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 - Faces uncertainty about token classification.
 - May have users stranded by later enforcement action.</p>
 <p>VibeSwap is a serious infrastructure project targeting multi-year horizons. Regulatory approach matters from day 1.</p>
-<p>This doc extends <a href="./SEC_REGULATORY_COMPLIANCE_ANALYSIS.md">SEC Regulatory Compliance Analysis</a> to the jurisdictions VibeSwap will actually operate in.</p>
+<p>This doc extends SEC Regulatory Compliance Analysis to the jurisdictions VibeSwap will actually operate in.</p>
 <h2 id="the-jurisdictions-that-matter">The jurisdictions that matter</h2>
 <p>Not everywhere. Specifically:</p>
 <h3 id="united-states">United States</h3>
@@ -400,7 +400,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 </ul>
 <p>VibeSwap's position summary:
 - <strong>JUL</strong>: likely CFTC commodity (work-anchored). Not SEC security (passive-income/investment-contract prongs of Howey likely fail).
-- <strong>VIBE</strong>: governance token; possible securities classification depending on specifics. <a href="../../architecture/AUGMENTED_GOVERNANCE.md">Augmented Governance</a> designed to be regulatable.
+- <strong>VIBE</strong>: governance token; possible securities classification depending on specifics. Augmented Governance designed to be regulatable.
 - <strong>CKB-native</strong>: substrate-layer; likely outside SEC/CFTC scope (utility).</p>
 <h3 id="european-union">European Union</h3>
 <p>MiCA (Markets in Crypto-Assets Regulation), fully in force 2024-12-30. Applies if offering services to EU residents.</p>
@@ -451,7 +451,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>GDPR requires privacy-preserving architecture from start.</p>
 <p>VibeSwap's design:
 - Pseudonymous by default (addresses, not names).
-- Optional <a href="../../concepts/identity/ZK_ATTRIBUTION.md">ZK attribution</a> for privacy-sensitive contributions.
+- Optional <a href="/papers/17_ZK_ATTRIBUTION.html">ZK attribution</a> for privacy-sensitive contributions.
 - Contributor address-identity binding is user-controlled.</p>
 <p>Argument: VibeSwap's privacy-by-default exceeds GDPR requirements.</p>
 <h3 id="challenge-3-data-transfers-across-borders">Challenge 3 — Data transfers across borders</h3>
@@ -467,9 +467,9 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <h3 id="sanctions-compliance">Sanctions compliance</h3>
 <p>OFAC (US) and similar sanctions lists apply to financial activity. Penalties substantial for serving sanctioned addresses/jurisdictions.</p>
 <p>VibeSwap strategy:
-- <a href="../../concepts/security/CLAWBACK_CASCADE_MECHANICS.md">Clawback Cascade</a> enables response to sanctioned-funds flows without blocking protocol itself.
+- <a href="/papers/12_CLAWBACK_CASCADE_MECHANICS.html">Clawback Cascade</a> enables response to sanctioned-funds flows without blocking protocol itself.
 - Frontends for US residents can pre-screen against sanctions.
-- Protocol itself doesn't implement address-level blocklist (consistent with <a href="../../concepts/NO_EXTRACTION_AXIOM.md"><code>NO_EXTRACTION_AXIOM.md</code></a> + GEV-resistance non-censorship commitment).</p>
+- Protocol itself doesn't implement address-level blocklist (consistent with <code>NO_EXTRACTION_AXIOM.md</code> + GEV-resistance non-censorship commitment).</p>
 <h3 id="tax-compliance">Tax compliance</h3>
 <p>Crypto taxable in most jurisdictions. Specific rules vary.</p>
 <p>Strategy:
@@ -485,7 +485,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 - <strong>Protocol users</strong>: responsible for own compliance in own jurisdictions.</p>
 <p>VibeSwap's architecture distributes responsibility. Each participant bears their compliance burden. Protocol doesn't centralize.</p>
 <h2 id="the-augmented-governance-regulatory-argument">The Augmented Governance regulatory argument</h2>
-<p><a href="../../architecture/AUGMENTED_GOVERNANCE.md">Augmented Governance</a> hierarchy (Physics &gt; Constitution &gt; Governance) is designed for regulatability:</p>
+<p>Augmented Governance hierarchy (Physics &gt; Constitution &gt; Governance) is designed for regulatability:</p>
 <ul>
 <li><strong>Physics layer</strong> (math invariants) — regulators can recognize as stable commitment.</li>
 <li><strong>Constitutional layer</strong> (P-000, P-001 axioms) — self-regulating; regulators can trust these are stable.</li>
@@ -522,7 +522,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 <p>Specific choices depend on Will + legal counsel.</p>
 <h2 id="path-forward">Path forward</h2>
 <ol>
-<li><strong>Existing SEC work</strong> — already substantial (see <a href="./SEC_REGULATORY_COMPLIANCE_ANALYSIS.md"><code>SEC_REGULATORY_COMPLIANCE_ANALYSIS.md</code></a>).</li>
+<li><strong>Existing SEC work</strong> — already substantial (see <code>SEC_REGULATORY_COMPLIANCE_ANALYSIS.md</code>).</li>
 <li><strong>MiCA whitepaper drafting</strong> — TODO, required before EU marketing.</li>
 <li><strong>FINMA consultation</strong> — TODO, for Swiss entity choice.</li>
 <li><strong>FCA authorization</strong> — TODO, for UK marketing.</li>

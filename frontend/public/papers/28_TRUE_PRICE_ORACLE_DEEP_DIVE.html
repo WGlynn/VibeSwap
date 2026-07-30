@@ -375,7 +375,7 @@ a:hover { color: var(--matrix); border-bottom-color: var(--matrix); }
 
 <p><strong>Status</strong>: Pedagogical implementation deep-dive.
 <strong>Audience</strong>: Engineers, auditors, curious students. First-encounter with oracle design is OK.
-<strong>Related</strong>: <a href="./KALMAN_FILTER_ORACLE.md">Kalman Filter Oracle</a>, <a href="./TRUE_PRICE_ORACLE.md">True Price Oracle</a>, <a href="../security/GEV_RESISTANCE.md">GEV Resistance</a>.</p>
+<strong>Related</strong>: Kalman Filter Oracle, <a href="/papers/28_TRUE_PRICE_ORACLE_DEEP_DIVE.html">True Price Oracle</a>, GEV Resistance.</p>
 <hr />
 <h2 id="the-problem-an-oracle-solves">The problem an oracle solves</h2>
 <p>An AMM (automated market maker) needs to know prices. The simple approach: let trades set the price. When someone buys ETH for USDC, the price goes up; when someone sells, it goes down. Simple.</p>
@@ -474,9 +474,9 @@ Carol reveals: <code>(2002, carolSecret)</code>. Contract verifies. ✓</p>
 <p>Per price update: ~150K gas for 3 operators. At $20/M gas, that's ~$3/update. Tolerable for frequent updates.</p>
 <p>Batch updates: aggregate multiple price feeds in a single commit-reveal cycle. Amortizes gas across assets.</p>
 <h2 id="why-the-c39-design-is-an-etm-alignment-win">Why the C39 design is an ETM-alignment win</h2>
-<p>The original deviation gate used a fixed percentage (5%) which is a arbitrary number. Arbitrary numbers rarely match substrate geometry (<a href="../SUBSTRATE_GEOMETRY_MATCH.md">Substrate-Geometry Match</a> principle).</p>
+<p>The original deviation gate used a fixed percentage (5%) which is a arbitrary number. Arbitrary numbers rarely match substrate geometry (Substrate-Geometry Match principle).</p>
 <p>The commit-reveal design has no arbitrary numbers. Manipulation resistance comes from the protocol structure itself — operators can't bias because the protocol structurally prevents bias. Cleaner, more defensible, matches the substrate's geometry (markets are commitment-based, commit-reveal mirrors that).</p>
-<p>Classified as ETM MIRRORS in the <a href="../etm/ETM_ALIGNMENT_AUDIT.md">ETM Alignment Audit</a>.</p>
+<p>Classified as ETM MIRRORS in the ETM Alignment Audit.</p>
 <h2 id="how-to-read-the-actual-code">How to read the actual code</h2>
 <p>For engineers who want to inspect:</p>
 <ul>

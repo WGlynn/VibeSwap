@@ -1,10 +1,10 @@
 # VibeSwap Contracts Catalogue
 
-> Complete reference of all Solidity contracts in the VibeSwap Operating System (VSOS).
+> Reference of Solidity contracts in the VibeSwap Operating System (VSOS).
 >
-> **Total: 290 implementation contracts + 80 interfaces = 370 .sol files**
+> **Disk total (source of truth = README): 438 .sol files across 34 module directories, of which 117 are `I*`-prefixed interfaces.** This catalogue does not enumerate every file — the tables below cover the documented subset; some research/exploration contracts are not individually rowed. For the canonical count and honest project status (not publicly deployed, no mainnet/testnet, `deployments/` empty by design), see the top-level `README.md`.
 >
-> Last updated: 2026-05-01 (refresh covers C39 / C42 / C45 / C46 / C47 / C48 cycles)
+> Last updated: 2026-05-01 (refresh covers C39 / C42 / C45 / C46 / C47 / C48 cycles). Counts in the per-section headers and Table of Contents below may lag the current tree; when a number here disagrees with `README.md` or `find contracts -name '*.sol' | wc -l`, trust the latter.
 
 ---
 
@@ -206,7 +206,7 @@ All community contracts are **UUPS upgradeable**.
 
 | Contract | Purpose | Upgradeable | Key Functions |
 |----------|---------|-------------|---------------|
-| **NakamotoConsensusInfinity** | Three-dimensional consensus (PoW + PoS + PoM) -- first consensus merging all three | UUPS | `registerValidator`, `depositStake`, `submitPoW`, `refreshMindScore`, `propose`, `vote`, `finalizeProposal` |
+| **NakamotoConsensusInfinity** | Three-dimensional consensus (PoW + PoS + PoM) -- design-stage primitive, not deployed on any public network | UUPS | `registerValidator`, `depositStake`, `submitPoW`, `refreshMindScore`, `propose`, `vote`, `finalizeProposal` |
 
 **Dependencies:** INakamotoConsensusInfinity, SoulboundIdentity, ContributionDAG
 
@@ -228,7 +228,7 @@ The core contracts are the beating heart of VibeSwap.
 | **TrinityGuardian** | Immutable BFT node protection for JARVIS Mind Network | No | `proposeAddNode`, `proposeRemoveNode`, `vote`, `executeProposal`, `heartbeat` |
 | **ProofOfMind** | Hybrid PoW/PoS/PoM consensus primitive | No | `joinNetwork`, `exitNetwork`, `startRound`, `finalizeRound` |
 | **HoneypotDefense** | Game-theoretic defense making attackers think they're succeeding | No | `registerSentinel`, `revealTrap`, `recycleResources` |
-| **OmniscientAdversaryDefense** | Security against omniscient attackers | No | `setAnchor`, `attestAnchor`, `resolveChallenge`, `whyOmniscientAdversaryLoses` |
+| **OmniscientAdversaryDefense** | Game-theoretic construction intended to keep an omniscient attacker unprofitable (design intent, not a proven guarantee) | No | `setAnchor`, `attestAnchor`, `resolveChallenge`, `whyOmniscientAdversaryLoses` |
 | **PoolComplianceConfig** | Immutable per-pool access control configurations | Library | (pure configuration) |
 
 **Key Dependencies (VibeSwapCore):** ICommitRevealAuction, IVibeAMM, IDAOTreasury, IwBAR, CircuitBreaker, CrossChainRouter, SecurityLib, ClawbackRegistry, IIncentiveController
@@ -550,7 +550,7 @@ The mechanism directory is the largest -- containing protocol extensions, DeFi p
 
 | Contract | Purpose | Upgradeable | Key Functions |
 |----------|---------|-------------|---------------|
-| **CrossChainRouter** | LayerZero V2 compatible cross-chain router for order submission and liquidity sync | Init | `fundBridgedDeposit`, `getLiquidityState`, `setPeer`, `recoverExpiredDeposit` |
+| **CrossChainRouter** | Legacy LayerZero-V2-style cross-chain router for order submission and liquidity sync. **Deprecation pending** — LayerZero was ditched (2026-04) in favor of canonical burn-and-mint messaging; the chain-native `IMessagingHub` implementation lands on the CKB-fork. This wrapper stays live only until chain-native ships. | Init | `fundBridgedDeposit`, `getLiquidityState`, `setPeer`, `recoverExpiredDeposit` |
 
 **Dependencies:** ICommitRevealAuction
 
@@ -655,10 +655,10 @@ All security contracts are **UUPS upgradeable**.
 | **BiometricAuthBridge** | WebAuthn/passkey on-chain verification | `revokeCredential`, `createChallenge`, `isAuthenticated` |
 | **EmergencyEjector** | Protocol-wide emergency withdrawal system | `registerSafeHouse`, `voteEmergency`, `eject` |
 | **GaslessRescue** | Recover funds without gas (EIP-712 signed relay) | `registerSafe`, `rescueETH` |
-| **KeyRecoveryVault** | Encrypted key backup on-chain (can never be lost) | `configureShamir`, `retrieveKey`, `hasStoredKey` |
+| **KeyRecoveryVault** | Encrypted key backup on-chain via Shamir secret sharing (recovery-oriented design; "can never be lost" is the design goal, not a guarantee) | `configureShamir`, `retrieveKey`, `hasStoredKey` |
 | **TransactionFirewall** | Programmable transaction rules engine | `setRules`, `setWhitelist`, `coSignTransaction` |
 | **VibeSecurityOracle** | Real-time threat intelligence on-chain | `escalate`, `emergencyBlack`, `getLevel` |
-| **WalletGuardian** | Multi-layer recovery (mathematically impossible to lose funds) | `queueTransfer`, `freezeWallet`, `triggerDeadManSwitch`, `heartbeat` |
+| **WalletGuardian** | Multi-layer recovery (7 layers: social recovery, timelock, dead-man's switch, rate limit, freeze, beacon, insurance) -- design principle is a recovery path for every failure mode; "impossible to lose funds" is the aspiration, not a proof | `queueTransfer`, `freezeWallet`, `triggerDeadManSwitch`, `heartbeat` |
 | **WalletRecoveryInsurance** | Fund loss prevention insurance pool | `createPolicy`, `fileClaim`, `executePayout` |
 
 ---
@@ -683,7 +683,9 @@ All security contracts are **UUPS upgradeable**.
 
 ---
 
-## Interfaces Summary (80 total)
+## Interfaces Summary
+
+_On disk there are 117 `I*`-prefixed interface files (`find contracts -name 'I*.sol' | wc -l`); the table below highlights the key unified VSOS interfaces, not the full set._
 
 Interfaces are organized alongside their implementations in `interfaces/` subdirectories. Key unified VSOS interfaces in `contracts/interfaces/`:
 
@@ -707,9 +709,10 @@ Interfaces are organized alongside their implementations in `interfaces/` subdir
 ## Architecture Notes
 
 ### Upgrade Pattern
-- **164 contracts use UUPS** (UUPSUpgradeable + Initializable) -- the dominant pattern
-- **5 contracts use Initializable only** (VibeAMM, VibeAMMLite, CrossChainRouter, DAOTreasury, CommitRevealAuction) -- upgradeable via external proxy
-- **~120 contracts are non-upgradeable** -- libraries, standalone utilities, immutable primitives
+_The exact per-pattern counts below are approximate and predate the current 438-file tree; re-derive from disk before quoting (a raw `grep -rl UUPSUpgradeable contracts` returns ~222 files, but that includes interfaces and abstract mixins, so it over-counts deployable UUPS contracts). Treat these as directional._
+- **UUPS (UUPSUpgradeable + Initializable)** -- the dominant pattern for stateful contracts
+- **Initializable only** (VibeAMM, VibeAMMLite, CrossChainRouter, DAOTreasury, CommitRevealAuction) -- upgradeable via external proxy
+- **Non-upgradeable** -- libraries, standalone utilities, immutable primitives
 
 ### Security Patterns Used Across Contracts
 - `nonReentrant` guards on all state-changing external functions
@@ -725,7 +728,7 @@ Interfaces are organized alongside their implementations in `interfaces/` subdir
 ```
 User -> VibeSwapCore -> CommitRevealAuction -> DeterministicShuffle (shuffle)
                      -> VibeAMM -> BatchMath (clearing price)
-                     -> CrossChainRouter -> LayerZero V2
+                     -> CrossChainRouter -> (legacy LZ-style wrapper; canonical burn-and-mint is the target)
                      -> DAOTreasury (revenue)
                      -> FeeRouter -> BuybackEngine (burn)
                                   -> Insurance

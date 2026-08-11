@@ -7,7 +7,9 @@
 
 ## Executive Summary
 
-Governance is a bootstrapping tool, not a permanent fixture. VibeSwap implements a hardcoded governance decay mechanism — the Ungovernance Time Bomb — that systematically reduces governance power over time until the protocol becomes fully autonomous.
+Governance is a bootstrapping tool, not a permanent fixture. VibeSwap's design calls for a hardcoded governance decay mechanism — the Ungovernance Time Bomb — that systematically reduces governance power over time until the protocol becomes fully autonomous.
+
+The reference implementation lives in `contracts/governance/VibeGovernanceSunset.sol`: decaying voting weights, a dispute-only proposal scope, and a fixed sunset timestamp. It is a reference contract only — VibeSwap is not publicly deployed (no mainnet, no public testnet), so nothing described here is live on a network. Where this spec describes a component that is not yet in the contract (PID controllers, the automated tribunal, corruption monitoring), it is called out inline as design intent.
 
 The decay is not optional. It is not subject to governance vote. It is encoded in the smart contract and executes automatically. The protocol starts with necessary governance and ends with none.
 
@@ -64,40 +66,36 @@ With a 1-year half-life:
 | 8 | 0.39% |
 | 10 | 0.098% |
 
-After 10 years, governance tokens retain less than 0.1% of their original voting power. Governance proposals require supermajority, which becomes mathematically impossible as weight approaches zero.
+After 10 years, governance tokens retain less than 0.1% of their original voting power. Because passing a proposal is measured against votes cast (not a fixed absolute quorum), decay does not by itself make proposals fail; its effect is to shrink the absolute stakes and make the sunset extension supermajority progressively harder to muster in practice. (In the reference contract, decay is a per-voter bit-shift from each voter's own registration time — see 2.2 — not a single global weight curve.)
 
 ### 2.2 Implementation
 
+The shipped reference implementation (`VibeGovernanceSunset._calculateDecayedWeight`) uses a plain per-half-life bit-shift, decaying from each voter's own `registeredAt` timestamp (not a single global genesis). It does **not** currently interpolate within a half-life — weight steps down discretely at each anniversary. A smooth sub-halving interpolation is a possible future refinement, not what is on disk today.
+
 ```solidity
-function getVotingWeight(address voter, uint256 proposalTime) public view returns (uint256) {
-    uint256 balance = governanceToken.balanceOf(voter);
-    uint256 elapsed = proposalTime - GENESIS_TIMESTAMP;
+// contracts/governance/VibeGovernanceSunset.sol
+// weight = baseWeight >> (age / HALF_LIFE_PERIOD)
+// After 4 half-lives: baseWeight / 16 (~6.25%). After 64: 0.
+function _calculateDecayedWeight(
+    uint256 baseWeight,
+    uint256 registeredAt
+) internal view returns (uint256) {
+    uint256 age = block.timestamp - registeredAt;
+    uint256 halfLives = age / HALF_LIFE_PERIOD;   // HALF_LIFE_PERIOD = 365 days
 
-    // Decay: weight halves every HALF_LIFE_SECONDS
-    // Using fixed-point arithmetic to avoid floating point
-    uint256 halvings = elapsed / HALF_LIFE_SECONDS;
-    uint256 remainder = elapsed % HALF_LIFE_SECONDS;
-
-    // Integer halvings
-    uint256 weight = balance >> halvings;  // Divide by 2^halvings
-
-    // Sub-halving interpolation (linear approximation)
-    if (halvings < 64 && remainder > 0) {
-        uint256 nextWeight = weight >> 1;
-        weight = weight - ((weight - nextWeight) * remainder / HALF_LIFE_SECONDS);
-    }
-
-    return weight;
+    if (halfLives >= MAX_HALF_LIVES) return 0;    // MAX_HALF_LIVES = 64
+    return baseWeight >> halfLives;
 }
 ```
 
-### 2.3 Non-Overridable
+### 2.3 Non-Overridable (design intent vs. reference contract)
 
-The decay function is immutable:
-- No admin key can modify HALF_LIFE_SECONDS
-- No governance proposal can extend the decay
-- No upgrade proxy can replace the decay logic
-- The only exception: a supermajority vote (>90% of decayed weight) can extend by ONE additional half-life period — and this extension itself decays
+The design goal is a decay curve that governance cannot vote away:
+- `HALF_LIFE_PERIOD` and `MAX_HALF_LIVES` are `constant` in the reference contract — no setter, no governance path to change them.
+- The dispute-only proposal scope means governance cannot propose to alter the mechanism itself.
+- The only escape is a `SUNSET_EXTENSION` proposal, which in the reference contract requires a **75% supermajority** of votes cast (`SUPERMAJORITY_BPS = 7500`) and extends the sunset by at most **one year** per pass (`MAX_EXTENSION = 365 days`). This spec's earlier references to 90%/95% thresholds are aspirational tuning targets, not the shipped constant.
+
+Caveat, stated honestly: the reference contract is `UUPSUpgradeable` with an owner-gated `_authorizeUpgrade`. So during the bootstrap phase the implementation (including the decay logic) is upgradeable by the owner. True immutability of the decay curve requires renouncing that upgrade authority — a deployment-time step, not something the current code enforces on its own.
 
 ---
 
@@ -117,7 +115,7 @@ As voting power decays, governance scope automatically narrows:
 
 ### 3.2 Scope Enforcement
 
-Each governance function has a `minimumGovernancePower` requirement:
+Note: the reference contract enforces scope by **proposal type** — a fixed `ProposalType` enum (`SLASH_DISPUTE`, `FORK_DISPUTE`, `EMERGENCY_PAUSE`, `PARAMETER_VIOLATION`, `SUNSET_EXTENSION`) constrains what governance can touch to disputes and its own sunset, and only `SUNSET_EXTENSION` carries the supermajority gate. The per-function `minimumGovernancePower` thresholds below are an alternative/complementary design sketch, **not** what `VibeGovernanceSunset.sol` currently implements:
 
 ```solidity
 modifier requiresGovernancePower(uint256 minPower) {
@@ -136,11 +134,13 @@ As total voting power decays below each threshold, that governance function beco
 
 ---
 
-## 4. Automated Replacements
+## 4. Automated Replacements (designed, not yet built)
+
+> Status: the components in this section — PID parameter controllers and the fully automated tribunal — are **design intent**. No `PIDController` exists in `contracts/` today. The `DecentralizedTribunal.sol` contract exists but is a reputation-gated jury with an appeal mechanism (see 4.3), not yet the VRF/precedent system sketched here. Treat the code blocks below as specification, not shipped behavior.
 
 ### 4.1 PID Controllers for Parameters
 
-As governance loses the ability to adjust parameters, PID (Proportional-Integral-Derivative) controllers take over:
+As governance loses the ability to adjust parameters, the design replaces it with PID (Proportional-Integral-Derivative) controllers:
 
 | Parameter | PID Input | Target | Adjustment |
 |-----------|----------|--------|-----------|
@@ -182,14 +182,13 @@ function adjustParameter(PIDController storage pid, int256 measured, int256 targ
 
 ### 4.3 Automated Dispute Resolution
 
-As governance loses dispute resolution authority, the `DecentralizedTribunal.sol` transitions to fully automated adjudication:
+As governance loses dispute resolution authority, the design has `DecentralizedTribunal.sol` transition to fully automated adjudication. What the contract implements **today**:
 
-1. **Schelling point voting**: Random token holder jury selected via VRF
-2. **Stake-weighted consensus**: Jurors stake to participate, slashed for minority vote
-3. **Precedent accumulation**: Past rulings create case law that automated system references
-4. **Appeal reduction**: Each appeal requires 2x the stake, converging to finality
+1. **Reputation-gated juries**: jurors must clear a minimum reputation and identity level (`minJurorReputation`, `minJurorLevel`) via `SoulboundIdentity`; one active trial per juror prevents jury-packing. (Selection is eligibility-gated summoning; a VRF-random draw is a design target, not what is coded.)
+2. **Staked jurors**: jurors post `jurorStakeAmount` to participate (skin in the game). Slashing-the-minority and stake-weighted vote counting are **design intent** — the current contract does not implement minority-slashing.
+3. **Escalating appeals**: an appeal mechanism with growing jury size and `maxAppeals` bound (see the `APPEAL` phase). Precedent/case-law accumulation is **not** in the contract; it is a design aspiration.
 
-After Year 6, the tribunal operates without governance oversight. Disputes are resolved by economic incentives alone.
+Under the design, after ~Year 6 the tribunal would operate without governance oversight, disputes resolved by economic incentives alone.
 
 ---
 
@@ -197,38 +196,35 @@ After Year 6, the tribunal operates without governance oversight. Disputes are r
 
 ### 5.1 Mechanism
 
-At a predetermined block height (estimated Year 8-10 from genesis), the governance module executes its final action:
+In the reference contract the sunset is a **timestamp**, not a block height, and it is set at initialization to **4 years from deployment** (`governanceSunset = block.timestamp + 4 * 365 days`). There is no explicit `executeSunset()` call and no automatic treasury-to-Shapley transfer in the current code — the sunset is enforced *passively*: every state-changing governance entry point carries a `beforeSunset` modifier that reverts once `block.timestamp >= governanceSunset`. After that point, no new proposals, votes, or extensions can be created.
 
 ```solidity
-function executeSunset() external {
-    require(block.number >= SUNSET_BLOCK, "Sunset not reached");
-    require(!sunsetExecuted, "Already sunset");
+// contracts/governance/VibeGovernanceSunset.sol
+uint256 public constant HALF_LIFE_PERIOD = 365 days;
+uint256 public governanceSunset; // set to block.timestamp + 4 years at init
 
-    sunsetExecuted = true;
+modifier beforeSunset() {
+    if (block.timestamp >= governanceSunset) revert GovernanceHasSunset();
+    _;
+}
 
-    // Disable all governance functions
-    governanceEnabled = false;
-
-    // Transfer any remaining governance treasury to Shapley pool
-    uint256 balance = address(this).balance;
-    if (balance > 0) {
-        shapleyDistributor.deposit{value: balance}();
-    }
-
-    // Emit final event
-    emit GovernanceSunset(block.number, block.timestamp);
+function isSunset() external view returns (bool) {
+    return block.timestamp >= governanceSunset;
 }
 ```
 
+The "disable all functions + sweep treasury to the Shapley pool" behavior shown in earlier drafts of this spec is **design intent**, not currently in `VibeGovernanceSunset.sol`. The "Year 8-10" horizon is likewise a target; the shipped default is 4 years plus any extensions.
+
 ### 5.2 Extension Mechanism
 
-The sunset can be delayed ONE time by a supermajority vote:
-- Requires 90% of total (decayed) voting power
-- Extends sunset by exactly one half-life period
-- The extension itself has a sunset
-- A second extension requires 95% supermajority (practically impossible with decayed weights)
+The sunset can be delayed via a `SUNSET_EXTENSION` proposal. In the reference contract:
+- Requires a **75% supermajority** of votes cast (`SUPERMAJORITY_BPS = 7500`), measured on decayed weights.
+- Extends the sunset by at most **one year** per pass (`MAX_EXTENSION = 365 days`, decoded from the proposal calldata).
+- Because voting weight decays, mustering that supermajority gets harder over time.
 
-This ensures that if something genuinely unexpected happens (e.g., a critical vulnerability discovered at Year 7), there is an escape hatch. But the escape hatch is designed to be almost impossible to use — which is the point.
+Note: the current code does **not** hard-limit extensions to a single use, nor does it escalate the second extension's threshold to 95% — those are design refinements described in earlier drafts, not shipped constants. Each extension is an independent proposal subject to the same 75% gate and 1-year cap.
+
+The intent is an escape hatch for genuinely unexpected events (e.g., a critical vulnerability discovered late), deliberately hard to use — which is the point.
 
 ---
 
@@ -238,16 +234,18 @@ This ensures that if something genuinely unexpected happens (e.g., a critical vu
 
 If governance becomes corrupt before it decays (e.g., a whale accumulates enough tokens to pass malicious proposals during the Bootstrap phase), users have a nuclear option: **fork with zero penalty.**
 
-The Fractal Fork Network ensures that:
+The Fractal Fork Network is designed so that:
 1. Any user can fork the protocol permissionlessly
 2. The fork inherits all code and parameters
-3. Fee routing to the corrupt parent can be set to 0% (emergency fork exception)
+3. Fee routing pressures the parent: in the reference `ForkRegistry.sol`, a fork routes a fixed **50%** of fees up to its immediate parent (`feeShareBps = 5000`, geometric decay by fork depth). A fork can withhold its share by simply not forwarding it — the contract sends 50% and the fork keeps the rest. A separate "route 0% to a corrupt parent" emergency exception is **not** a distinct code path today; withholding is the practical lever.
 4. Users migrate their liquidity to the clean fork
 5. The corrupt parent starves as users leave
 
-### 6.2 Governance Corruption Detection
+### 6.2 Governance Corruption Detection (designed, not built)
 
-Automated monitoring detects governance capture:
+> Status: no on-chain corruption-monitoring contract exists in `contracts/` today. The signals below are a **design specification** for detection the protocol intends to add, not shipped behavior. (Note also that the reference `VibeGovernanceSunset` proposal scope is already restricted by `ProposalType` — governance cannot propose to modify fee routing, Shapley, or the decay curve in the first place, which removes some of the surface these detectors are meant to watch.)
+
+Intended automated monitoring for governance capture:
 - Single address controlling >30% of voting power → alert
 - Proposal passing with <10% voter participation → alert
 - Proposal that modifies core invariants (fee routing, Shapley, decay) → auto-reject + alert
@@ -256,6 +254,8 @@ Automated monitoring detects governance capture:
 ---
 
 ## 7. The Endgame
+
+The timeline below is the *aspirational* full-decay narrative. The shipped reference contract uses a shorter default — sunset at **4 years** from deployment (extendable by 75%-supermajority vote, 1 year at a time). Read the years here as illustrative phases of the decay philosophy, not hardcoded milestones.
 
 ```
 Year 0: Human governance (bootstrap)

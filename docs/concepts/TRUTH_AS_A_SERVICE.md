@@ -8,7 +8,7 @@ Faraday1 (Will Glynn) | March 2026
 
 ## Abstract
 
-Existing oracle infrastructure solves a narrow problem: feeding numerical data from the physical world into smart contracts. Chainlink, Pyth, and their successors answer "What is the price of X?" with increasing speed and redundancy. But the vast majority of decisions that decentralized systems need to make are not numerical. They are epistemic. "Is this governance proposal sound?" "Is this insurance claim legitimate?" "Is this code secure?" These questions require *judgment*, not data retrieval. We present **Truth as a Service (TaaS)**, a permissionless oracle protocol for subjective claim evaluation. The mechanism combines commit-reveal blinding to eliminate information cascades, a 64-shard evaluator network to guarantee cognitive diversity, Shapley value attribution for truth discovery, and an accumulating knowledge graph stored as Knowledge Cells on Nervos CKB. The core contract, `CognitiveConsensusMarket.sol`, is implemented and operational. Any protocol can submit a claim with a bounty; evaluators stake on verdicts (TRUE, FALSE, or UNCERTAIN); commit-reveal blinding prevents herding; reputation-weighted majority resolves; correct evaluators earn linear rewards; incorrect evaluators lose quadratic stakes. The protocol extracts no fees (P-001: No Extraction Ever). The resulting knowledge graph is a public good whose value compounds monotonically with every resolved claim.
+Existing oracle infrastructure solves a narrow problem: feeding numerical data from the physical world into smart contracts. Chainlink, Pyth, and their successors answer "What is the price of X?" with increasing speed and redundancy. But the vast majority of decisions that decentralized systems need to make are not numerical. They are epistemic. "Is this governance proposal sound?" "Is this insurance claim legitimate?" "Is this code secure?" These questions require *judgment*, not data retrieval. We present **Truth as a Service (TaaS)**, a permissionless oracle protocol for subjective claim evaluation. The mechanism combines commit-reveal blinding to eliminate information cascades within a batch, a shard-based evaluator pool intended to supply cognitive diversity, Shapley value attribution for truth discovery (currently approximated; full Shapley is a planned upgrade), and an accumulating knowledge graph intended to be stored as Knowledge Cells on Nervos CKB (designed, not yet built). The core contract, `CognitiveConsensusMarket.sol`, is implemented as a reference contract on disk (not yet deployed to any public network). In it, any protocol can submit a claim with a bounty; evaluators stake on verdicts (TRUE, FALSE, or UNCERTAIN); commit-reveal blinding prevents herding; reputation-weighted majority resolves; correct evaluators earn a pro-rata share of the reward pool; incorrect evaluators are slashed a fraction of their stake (currently half; the remainder is returned). The contract extracts no fees (P-001: No Extraction Ever) — the bounty and slashed stakes flow entirely to evaluators and, on no-consensus, back to the proposer; no code path routes value to a protocol treasury. The resulting knowledge graph is designed as a public good whose value is intended to compound with every resolved claim.
 
 ---
 
@@ -134,7 +134,7 @@ The verdict is determined by reputation-weighted majority across the three-way s
 
 **No correct evaluators**: Bounty returned to proposer.
 
-The key asymmetry: *the expected cost of being wrong exceeds the expected reward of being right*. An evaluator correct 50% of the time will lose money. Only evaluators correct more often than not can sustain participation. The mechanism self-selects for competence.
+The intended asymmetry: *the expected cost of being wrong should exceed the expected reward of being right*, so that only evaluators correct more often than chance can sustain participation and the mechanism self-selects for competence. The realized break-even point depends on bounty size, the number of wrong evaluators feeding the slash pool, and reputation weights, so the exact threshold is parameter-dependent rather than a fixed constant (see 6.2). In the current contract an incorrect evaluator loses half of stake with the remainder returned (`SLASH_MULTIPLIER = 2`), not a super-linear penalty.
 
 ### 2.7 Reputation Dynamics
 
@@ -164,7 +164,7 @@ This is exactly the independence condition that Condorcet's Jury Theorem require
 
 $$P(\text{observe } s_j \mid i \neq j) = 0 \quad \forall i, j \text{ during commit phase}$$
 
-This is a hard zero enforced by the preimage resistance of keccak256, not by incentive compatibility. No game-theoretic analysis is needed. The cryptographic commitment makes observation of others' signals physically impossible.
+This is a hard zero that rests on the preimage resistance of keccak256 (an inherited property of the hash function, not an invention of this protocol), not on incentive compatibility. Given that hash assumption, no game-theoretic analysis is needed to rule out in-batch signal observation: a committed evaluator cannot read another's verdict from the blinded hash before reveal. The independence guarantee is only as strong as keccak256's preimage resistance and holds strictly *within* the commit phase; the reveal phase is public (see 10.2).
 
 ---
 
@@ -184,9 +184,11 @@ VibeSwap's AI infrastructure operates as 64 semi-autonomous shards---complete co
 
 The 64 shards begin from a common base but diverge through experience. Each evaluates different claims in different sequences, accumulates different reputation profiles, and develops different heuristics. This experiential divergence satisfies Surowiecki's (2004) preconditions for collective intelligence: diversity of opinion, independence of judgment, and decentralization.
 
-### 4.3 Why 64?
+### 4.3 Why a Shard Pool?
 
-With 64 independent evaluators at accuracy p = 0.7, the probability of incorrect majority verdict is below 10^-6---lower than most numerical oracle error rates. The cost of 64 AI evaluations is a fraction of a single manual audit from a top-tier security firm. Not all 64 evaluate every claim; domain relevance, bounty size, and reputation determine participation.
+The Condorcet math is favorable: with a panel of independent evaluators each at accuracy p = 0.7, the probability of an incorrect majority verdict falls quickly as the panel grows (for n in the low tens it is already on the order of a few percent or less, and it keeps dropping with n) — *conditional on the independence assumption actually holding*, which is exactly the assumption the correlation problem below stresses. The exact figure is sensitive to n and p, so we state the direction rather than a single guaranteed number. The cost of a batch of AI evaluations is a fraction of a single manual audit from a top-tier security firm.
+
+Note a hard constraint the current contract imposes: `MAX_EVALUATORS = 21` and `MIN_EVALUATORS = 3` (see `CognitiveConsensusMarket.sol`). A single claim therefore accepts at most 21 committed evaluators, not 64. The "64 shards" figure describes the size of the off-chain JARVIS shard *pool* that evaluators can be drawn from — not the per-claim panel. Not every shard evaluates every claim; domain relevance, bounty size, and reputation determine which subset (up to 21) participates.
 
 ### 4.4 The Correlation Problem
 
@@ -214,7 +216,7 @@ This satisfies efficiency (full pool distributed) and symmetry (equal weights yi
 
 ### 5.3 Why Shapley Matters
 
-Shapley creates second-order incentives: it rewards non-obvious truths (high marginal contribution on difficult claims), discourages trivial agreement (low marginal value on easy claims), and rewards epistemic courage (voting UNCERTAIN when vindicated later has high marginal value). The optimal strategy under Shapley is to evaluate claims where your expertise provides the highest marginal value, naturally directing attention to the hardest, most valuable questions.
+Full Shapley attribution is designed to create second-order incentives: to reward non-obvious truths (high marginal contribution on difficult claims), discourage trivial agreement (low marginal value on easy claims), and reward epistemic courage (voting UNCERTAIN when vindicated later has high marginal value). Under such a scheme the intended best response is to evaluate claims where your expertise provides the highest marginal value, directing attention to the hardest, most valuable questions. This is the target property of the planned full-Shapley layer; the current contract distributes rewards by reputation-weighted pro-rata (5.2), which does not yet exhibit these second-order incentives.
 
 ---
 
@@ -282,11 +284,11 @@ Research papers are submitted to TaaS for evaluation of methodology, reproducibi
 
 ### 8.1 Claims as Knowledge Cells
 
-Every resolved claim becomes a permanent record stored as a Knowledge Cell on Nervos CKB, containing: the claim content (IPFS CID), verdict, evaluator count and reputation profile, reasoning hashes, timestamp, and cross-references to related claims.
+In the designed end-state (not yet built — see the Roadmap in Section 12), every resolved claim becomes a permanent record stored as a Knowledge Cell on Nervos CKB, containing: the claim content (IPFS CID), verdict, evaluator count and reputation profile, reasoning hashes, timestamp, and cross-references to related claims. The current reference contract keeps this state in EVM storage; the Knowledge-Cell substrate is the CKB-port target.
 
 ### 8.2 Compounding Value
 
-The knowledge graph exhibits monotonically increasing value. Each new resolved claim:
+The knowledge graph is designed so that its value increases as claims accumulate (each resolved claim adds information and is not removed unless economically pressured out under CKB state rent). This is a design property of an as-yet-unbuilt graph, not a measured result. Each new resolved claim is intended to:
 
 1. **Adds a reference point**: "Is this new governance proposal sound?" can be evaluated in the context of structurally similar past proposals and their outcomes. Evaluators reason by analogy to prior resolved claims.
 
@@ -316,7 +318,7 @@ The knowledge graph on CKB is not a database. It is a growing, self-curating lib
 |-----------|-----------|--------|-----|-----------|----------|
 | **Claim type** | Binary future events | Disputes | Assertions | Numerical data | **Arbitrary epistemic** |
 | **Resolution** | External oracle | Schelling point | Token-weighted vote | Data aggregation | **Commit-reveal evaluation** |
-| **Herding risk** | High (prices visible) | High (vote with majority) | High (token plutocracy) | N/A (data, not judgment) | **Zero (blinded commits)** |
+| **Herding risk** | High (prices visible) | High (vote with majority) | High (token plutocracy) | N/A (data, not judgment) | **None in-batch (blinded commits); reveal phase public — see 10.2** |
 | **Evaluator incentive** | Market profit | Vote with majority | Hold UMA tokens | Run node | **Accuracy (stake + reputation)** |
 | **Knowledge accumulation** | None (prices reset) | None | None | None | **Permanent knowledge graph** |
 | **Expressiveness** | Binary | Binary | Binary | Numerical | **Ternary (TRUE/FALSE/UNCERTAIN)** |
@@ -343,7 +345,7 @@ Every oracle faces quis custodiet ipsos custodes. TaaS does not claim to solve t
 
 **Reputation decay** (planned): Exponential decay ensures evaluators cannot rest on historical performance. An attacker who builds reputation through honest easy evaluations, then manipulates a high-value claim, must maintain honest behavior continuously.
 
-**Experiential diversity**: 64 independent evaluators with divergent histories represent 64 independent assessments. Compromising the verdict requires bribing 33+ simultaneously, and defection (honestly evaluating) is more profitable than accepting a bribe smaller than the expected honest reward.
+**Experiential diversity**: a panel of independent evaluators with divergent histories represents that many independent assessments. Compromising the reputation-weighted verdict requires corrupting more than half of the *committed weight* on a claim (a panel capped at 21 in the current contract), and defection (honestly evaluating) is more profitable than accepting a bribe smaller than the expected honest reward. Note the weight is reputation-weighted, not one-evaluator-one-vote, so "more than half" is by weight, not headcount.
 
 ### 10.2 Residual Risk
 
@@ -354,7 +356,7 @@ After all mitigations, residual risk remains:
 - **UNCERTAIN underuse**: Evaluators may perceive UNCERTAIN as signaling incompetence rather than honest calibration, leading to overconfident TRUE/FALSE verdicts on genuinely ambiguous claims.
 - **Collusion during reveal**: While commits are blinded, the reveal phase is public. Evaluators who have not yet revealed could theoretically observe early reveals and adjust behavior (though they cannot change their committed verdict, they could choose not to reveal---accepting the full slash as a strategic loss).
 
-These are genuine risks. They are also risks that every oracle system faces in some form. The relevant comparison is not TaaS versus a perfect oracle (which does not exist) but TaaS versus the status quo: centralized adjudicators, plutocratic voting, and Schelling point games. On every dimension---herding resistance, plutocratic resistance, scalability, knowledge accumulation---TaaS offers structural improvements over every existing alternative.
+These are genuine risks. They are also risks that every oracle system faces in some form. The relevant comparison is not TaaS versus a perfect oracle (which does not exist) but TaaS versus the status quo: centralized adjudicators, plutocratic voting, and Schelling point games. On the dimensions this paper focuses on---herding resistance, plutocratic resistance, scalability, knowledge accumulation---the TaaS design aims at structural improvements over the named alternatives. These are design arguments for a mechanism that is implemented but not yet deployed or empirically measured against those alternatives.
 
 ---
 
@@ -362,21 +364,19 @@ These are genuine risks. They are also risks that every oracle system faces in s
 
 ### 11.1 Incentive Compatibility
 
-**Theorem 1 (Honest Evaluation Dominance)**: For an evaluator with accuracy p > p* (the break-even threshold), honest evaluation is the strictly dominant strategy.
+**Proposition 1 (Honest Evaluation as Best Response)**: For an evaluator with accuracy p > p* (the break-even threshold), and under the model's assumptions (independent evaluators, in-batch blinding, the reward/slash structure below), honest evaluation is the expected-payoff-maximizing strategy. This is an informal argument under stated assumptions, not a machine-checked or peer-reviewed theorem; "strictly dominant" would require ruling out every alternative strategy under all opponent profiles, which is not established here.
 
-*Proof sketch*: Under commit-reveal, an evaluator cannot condition their verdict on others' verdicts. Expected payoff is determined solely by accuracy p and the reward/slash structure. For p > p*, E[honest] = p * r - (1-p) * s > 0. Any deviation from honest evaluation reduces p and thus expected payoff. The evaluator maximizes expected payoff by maximizing accuracy, achieved by honest evaluation.
+*Argument sketch*: Under commit-reveal, an evaluator cannot condition their verdict on others' verdicts within the batch. Expected payoff is then determined largely by accuracy p and the reward/slash structure. For p > p*, E[honest] = p * r - (1-p) * s > 0. Deviations that reduce effective accuracy p reduce expected payoff. The sketch assumes evaluators cannot cheaply raise p by means other than honest evaluation (e.g. off-chain oracle access), which the protocol does not enforce.
 
 ### 11.2 Sybil Resistance
 
-**Theorem 2 (Capital-Bounded Sybil)**: An attacker controlling k sybil identities with total capital C cannot achieve higher expected payoff than a single identity with capital C and equal accuracy.
-
-*Proof sketch*: Each sybil must stake independently. Reputation weight is sqrt per-identity. Total weight of k identities with capital C/k each: k * sqrt(C/k) = sqrt(kC) > sqrt(C). Sybil creation does increase weight, but each sybil must maintain independent reputation, and accuracy is identical across all sybils. The increased weight does not increase accuracy. The authorized evaluator registry provides an additional gatekeeper; future versions will incorporate quadratic voting to further penalize sybil strategies.
+**Claim 2 (Sybil weight-splitting is bounded, not eliminated)**: Splitting capital across k sybil identities increases an attacker's *reputation weight* (since sqrt is concave: k * sqrt(C/k) = sqrt(kC) > sqrt(C) for k > 1), but does not increase *accuracy*, which is what determines whether votes land on the winning verdict and earn rewards. So sybil-splitting can buy influence over the weighted tally without buying correctness. This is a partial mitigation, not a proof of sybil-resistance — a sybil set that is also accurate would gain both weight and reward. The primary sybil gate in the current contract is the `authorizedEvaluators` registry (`setAuthorizedEvaluator`, owner-gated): only whitelisted addresses can commit, so unrestricted sybil registration is not currently possible on-chain. Quadratic voting to penalize identity-splitting is a planned upgrade, not implemented.
 
 ### 11.3 Truth Convergence
 
 **Theorem 3 (Condorcet Convergence)**: For n independent evaluators each with accuracy p > 0.5, the probability that the reputation-weighted majority verdict is correct approaches 1 as n increases.
 
-This follows from the Condorcet Jury Theorem with the independence assumption guaranteed by commit-reveal (Section 3.3). Reputation weighting strengthens convergence by amplifying higher-accuracy evaluators, but convergence holds even with uniform weighting.
+This follows from the Condorcet Jury Theorem *given* the independence assumption, which in-batch blinding supports under the keccak256 preimage assumption (Section 3.3) — the theorem's conclusion is only as strong as that independence actually holding, which the correlation problem (4.4) stresses. Reputation weighting strengthens convergence by amplifying higher-accuracy evaluators, but convergence holds even with uniform weighting.
 
 ### 11.4 Liveness
 
@@ -388,13 +388,13 @@ This follows from the Condorcet Jury Theorem with the independence assumption gu
 
 ## 12. Implementation Status
 
-### 12.1 Deployed Contract
+### 12.1 Reference Contract (implemented, not deployed)
 
-`CognitiveConsensusMarket.sol` is implemented in Solidity 0.8.20 at `contracts/mechanism/CognitiveConsensusMarket.sol`, featuring claim submission with configurable evaluator bounds [3, 21], commit-reveal with keccak256 blinding, reputation-weighted tallying with sqrt dampening, asymmetric reward/slash distribution, and on-chain evaluator profiles.
+`CognitiveConsensusMarket.sol` is implemented in Solidity 0.8.20 at `contracts/mechanism/CognitiveConsensusMarket.sol` as a reference/spec contract. It is **not deployed to any public network** — consistent with the repo-wide status (no public mainnet or testnet; `deployments/` is empty by design). It features claim submission with configurable evaluator bounds [3, 21], commit-reveal with keccak256 blinding, reputation-weighted tallying with sqrt dampening, asymmetric reward/slash distribution, and on-chain evaluator profiles.
 
 ### 12.2 Integration
 
-The contract builds on VibeSwap's existing commit-reveal infrastructure from `CommitRevealAuction.sol`. The `ShapleyDistributor` contract provides the pairwise fairness library for evaluator reward attribution.
+`CognitiveConsensusMarket.sol` currently imports only OpenZeppelin (`Ownable`, `ReentrancyGuard`, `IERC20`, `SafeERC20`); it reimplements its own keccak256 commit-reveal inline rather than importing `CommitRevealAuction.sol`, and it does **not** call `ShapleyDistributor` — reward attribution is the reputation-weighted pro-rata formula in 5.2, computed inside this contract. Sharing VibeSwap's commit-reveal pattern conceptually and wiring the `ShapleyDistributor` pairwise-fairness library in for full-Shapley attribution are both intended future integrations, not present code paths.
 
 ### 12.3 Roadmap
 
@@ -406,7 +406,7 @@ The contract builds on VibeSwap's existing commit-reveal infrastructure from `Co
 | Knowledge Cells | Resolved claims on CKB | Planned |
 | Reputation decay | Time-weighted exponential decay | Planned |
 | Quadratic sybil resistance | Penalize sybil identity splitting | Planned |
-| Cross-chain claims | LayerZero multi-chain submission | Planned |
+| Cross-chain claims | Multi-chain submission via VibeSwap's canonical burn-and-mint messaging (LayerZero was dropped protocol-wide after 2026-04) | Planned |
 
 ---
 
@@ -416,11 +416,11 @@ The oracle problem has been half-solved. Numerical data feeds are reliable and b
 
 Truth as a Service fills this gap with a mechanism that is:
 
-- **Herding-proof**: Commit-reveal eliminates information cascades by construction, not by incentive
-- **Scalable**: 64 independent evaluators provide statistical power exceeding manual review committees
+- **Herding-resistant**: Commit-reveal removes in-batch information cascades by construction (blinded commits), not by incentive — subject to the keccak256 preimage assumption and limited to the commit phase (the public reveal phase is a residual surface, see 10.2)
+- **Scalable**: an off-chain pool of up to 64 shards feeds per-claim panels (capped at 21 committed evaluators in the current contract, see 4.3), intended to provide more statistical power than fixed manual review committees
 - **Meritocratic**: Reputation-weighted evaluation rewards accuracy, not capital
 - **Non-extractive**: Zero protocol fees, full P-001 compliance
-- **Knowledge-accumulating**: Every resolved claim becomes a permanent Knowledge Cell, building a compounding public good whose value grows monotonically with every evaluation
+- **Knowledge-accumulating** (designed, not yet built): every resolved claim is intended to become a permanent Knowledge Cell, building a compounding public good whose value is designed to grow with every evaluation. The current reference contract keeps claim state in EVM storage; the Knowledge-Cell substrate on CKB is a roadmap target (Section 12), and "grows monotonically" is a design aim, not a measured result
 
 The contract exists. The mechanism is defined. The evaluator network is being assembled. What remains is integration, iteration, and the slow accumulation of a knowledge graph that becomes the most valuable oracle on any chain---not because it has the fastest feeds or the most nodes, but because it contains something no other oracle offers: *evaluated human and machine judgment, accumulated and curated, available as a permissionless service to any protocol that needs to know whether something is true*.
 

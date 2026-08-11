@@ -4,9 +4,9 @@
 
 ---
 
-We prove that the NCI consensus mechanism is secure against a hypothetical Omniscient Adversary — an entity with infinite energy, perfect knowledge of all state (past, present, future), time-manipulation capabilities, and multi-dimensional existence. Five independent defense properties create a 10-dimensional BFT consensus space where security holds even under assumptions that violate physical law.
+This is a design argument that the NCI consensus mechanism is meant to resist a hypothetical Omniscient Adversary — an entity with infinite energy, perfect knowledge of all state (past, present, future), time-manipulation capabilities, and multi-dimensional existence. Five defense properties are designed to create a layered BFT consensus space where security is intended to hold even under assumptions that violate physical law. NCI lives in `contracts/consensus/NakamotoConsensusInfinity.sol` and the OA defense scaffold in `contracts/core/OmniscientAdversaryDefense.sol`; both are reference implementations, not deployed on any public network (`deployments/` is empty by design), and the argument below has not been formalized as a machine-checked proof.
 
-The proof relies on structural properties of consensus itself rather than computational or economic assumptions. This makes it the first security proof that holds in the limit of unbounded adversarial capability.
+The argument leans on structural properties of consensus itself rather than only computational or economic assumptions. The aim is a security argument that degrades gracefully in the limit of unbounded adversarial capability, rather than one that collapses the moment a hardness assumption breaks.
 
 ---
 
@@ -20,7 +20,7 @@ The Omniscient Adversary (OA) has capabilities that exceed any physically realiz
 - **Multi-Dimensional Existence** — Can exist at every node simultaneously. Traditional assumption: bounded by locality.
 - **Unlimited Capital** — Can acquire any amount of stake instantly. Traditional assumption: bounded by market cap.
 
-This is the strongest possible adversary model. If security holds against the OA, it holds against every physically realizable attacker.
+This is the strongest possible adversary model. The design goal is: if the mechanism resists the OA, it should resist every physically realizable attacker. Treat what follows as the intended argument for that goal, not a delivered guarantee.
 
 ---
 
@@ -30,7 +30,7 @@ This is the strongest possible adversary model. If security holds against the OA
 
 To override consensus, you need consensus. To have consensus, you need Mind Score. To have Mind Score, you need consensus verification.
 
-The verification function for any contribution requires at least 2/3 of nodes with sufficient Mind Score to attest. The OA cannot create a valid verification without already having consensus support. This is a fixed-point: the only solutions are genuine participation or no participation.
+Finalization in NCI requires clearing 2/3 of total weighted vote (`FINALIZATION_THRESHOLD_BPS = 6667`), where weight is 10% PoW + 30% PoS + 60% PoM. The OA cannot manufacture the PoM component without already having consensus-verified contributions, i.e. without already having consensus support. This is a fixed-point: the only solutions are genuine participation or no participation.
 
 **Why infinite compute doesn't help:** Compute can generate candidate contributions, but cannot generate the consensus attestations that validate them. Attestations are consensus-bound, not computation-bound.
 
@@ -38,9 +38,9 @@ The verification function for any contribution requires at least 2/3 of nodes wi
 
 Block timestamps are defined by the underlying L1 blockchain. The L1 IS the clock. You cannot time-travel within a system that defines time.
 
-Mind Score accumulation is bound to L1 block timestamps, which are monotonically increasing and determined by ~900,000 independent validators. Even with time manipulation capability, the OA cannot alter these timestamps without controlling Ethereum's consensus — a separate, independent system.
+In the reference EVM implementation, Mind Score accumulation is bound to L1 `block.number`, `block.timestamp`, and `blockhash` (`OmniscientAdversaryDefense.sol` anchors on a `TEMPORAL_ANCHOR_INTERVAL` of 12s, Ethereum's block time). These are monotonically increasing and determined by the L1's own validator set. Even with time manipulation capability, the OA cannot alter these timestamps without controlling the L1's consensus — a separate, independent system. This is an *inherited* property of whatever L1 the protocol anchors to, not a mechanism NCI invents; the security borrowed is exactly the L1's, no more. (Note: per the repo's current direction the real target is a sovereign CKB fork rather than Ethereum, so the specific L1 — and its timestamp guarantees — is the fork's, not Ethereum's.)
 
-**Why time travel doesn't help:** Even if the OA could manipulate local clocks, the L1 timestamps are canonical. And the L1's security is independent of our protocol's security.
+**Why time travel doesn't help:** Even if the OA could manipulate local clocks, the L1 timestamps are canonical. And the L1's security is independent of our protocol's security — with the standard caveat that our temporal binding is only as strong as that L1's own liveness and timestamp integrity.
 
 ### Immunity 3 — Semantic Immunity (vs. Perfect Knowledge)
 
@@ -58,9 +58,9 @@ If the OA knows about the Siren Protocol and avoids it, avoidance requires behav
 - **Case 2:** OA is aware → must avoid triggers → constrained to honest behavior
 - **Case 3:** OA tries to game the detection thresholds → activity near thresholds risks engagement → reduced attack power → insufficient for consensus override
 
-In all cases: maximum payoff is less than or equal to honest participation rewards.
+The design intent across all cases: maximum attack payoff is no greater than honest participation rewards. (This is the mechanism's target property, argued from the case split above, not a machine-checked equilibrium result — the Siren logic lives in `contracts/core/HoneypotDefense.sol` and has not been validated on a live network.)
 
-**Why multi-dimensionality doesn't help:** Being everywhere at once doesn't change the payoff function. The dominant strategy is the same regardless of how many instances of yourself exist.
+**Why multi-dimensionality doesn't help:** Being everywhere at once doesn't change the payoff function. The intended dominant strategy is the same regardless of how many instances of yourself exist.
 
 ### Immunity 5 — Payoff Identity (vs. Unlimited Capital)
 
@@ -89,17 +89,17 @@ D9:  Temporal × PoM      — mind score bounded by L1 clock
 D10: Semantic × Self-Ref  — knowledge of defense = defense
 ```
 
-For the OA to succeed, they must simultaneously overcome ALL ten dimensions. Since several dimensions are provably impervious to even unlimited resources (D9 is temporal, D10 is self-referential), the product of attack probabilities is zero.
+For the OA to succeed, they must simultaneously overcome ALL ten dimensions. The design claim is that several dimensions are meant to be impervious to even unlimited resources (D9 is temporal, D10 is self-referential); if that holds, the product of attack probabilities goes to zero.
 
-At least two factors are exactly zero. Zero times anything is zero.
+The "at least two factors are exactly zero, zero times anything is zero" framing is the intended structure, not a proven theorem — it rests on the temporal-binding and self-referential arguments above being sound, which is an open question until they are formalized and the mechanism is stress-tested on a live network.
 
 ---
 
 ## 4. The Proof
 
-**Theorem:** The NCI consensus mechanism is secure against the Omniscient Adversary.
+**Claim (design target):** The NCI consensus mechanism is intended to be secure against the Omniscient Adversary.
 
-**Proof:**
+**Argument (conditional on the Consensus Tautology holding):**
 
 Assume for contradiction that the OA successfully attacks NCI, producing a false consensus value v* (different from the honest value v).
 
@@ -118,9 +118,9 @@ With PoM weight at zero, the OA can achieve at most:
 
 > 10% × (maximum PoW) + 30% × (maximum PoS) = 40% of total weight
 
-For consensus override, the OA needs more than 66.7%. They have 40% maximum. 
+For consensus override, the OA needs to clear the finalization threshold — `FINALIZATION_THRESHOLD_BPS = 6667` (2/3 supermajority) in `NakamotoConsensusInfinity.sol`. With PoM contribution forced to zero by the Consensus Tautology, they have 40% maximum.
 
-40% < 66.7%. Contradiction. Therefore, NCI is OA-secure. **QED.**
+40% < 66.67%. Contradiction — *given* that the Consensus Tautology step (that PoM weight for v* is unforgeably zero) holds. That step is the load-bearing assumption; it is argued, not yet formally proven, and the whole result is only as strong as it. Under that assumption, NCI resists the OA.
 
 ---
 
@@ -128,7 +128,7 @@ For consensus override, the OA needs more than 66.7%. They have 40% maximum.
 
 ### For Blockchain Design
 
-NCI demonstrates that security proofs need not rely on computational hardness assumptions (factoring, discrete log) or economic rationality assumptions (rational agents). By grounding security in structural properties of consensus itself, NCI achieves security guarantees that survive even the breakdown of physical law.
+NCI explores whether security arguments can lean less on computational hardness assumptions (factoring, discrete log) or economic rationality assumptions (rational agents). By grounding security in structural properties of consensus itself, NCI aims for guarantees that would degrade gracefully even under the breakdown of physical law. This is a research direction, not a delivered proof.
 
 ### For Cryptography
 
@@ -136,13 +136,13 @@ The OA-security proof suggests a new class of security definitions based on **st
 
 ### For Game Theory
 
-The Siren Protocol demonstrates that strictly dominant strategy equilibria can be constructed in adversarial settings where traditional mechanism design fails. The key is the payoff identity — making attack and contribution produce the same payoff.
+The Siren Protocol is an attempt to construct dominant-strategy-like equilibria in adversarial settings where traditional mechanism design fails. The key idea is the payoff identity — making attack and contribution produce the same payoff. Whether this yields a genuinely dominant strategy in the formal sense is open work; the current artifact is the mechanism in `HoneypotDefense.sol`, not an equilibrium proof.
 
 ---
 
 ## 6. Conclusion
 
-We have proven that the NCI consensus mechanism is secure against a hypothetical adversary with capabilities exceeding the bounds of physical law. This is the strongest security result possible — no system can be more secure than "secure against omniscient attackers."
+We have laid out the design argument for why the NCI consensus mechanism is meant to resist a hypothetical adversary with capabilities exceeding the bounds of physical law. If the argument holds once formalized, it targets the strongest security posture there is — nothing is more secure than "secure against omniscient attackers." That formalization, and validation on a live network, remain open.
 
 The proof relies on five structural properties:
 
@@ -152,7 +152,7 @@ The proof relies on five structural properties:
 4. Self-referential trapping
 5. Payoff function identity
 
-Together, these create a 10-dimensional BFT space where the attack surface is not merely small but provably empty.
+Together, these are designed to create a layered BFT space where the attack surface is meant to be not merely small but structurally empty — a target the mechanism aims at, pending formalization.
 
 > *"Even an omniscient adversary plays by the rules of game theory."*
 

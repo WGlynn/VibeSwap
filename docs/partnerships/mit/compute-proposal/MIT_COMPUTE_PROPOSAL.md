@@ -26,18 +26,20 @@ This document is not a request. It is a receipt.
 
 ### Codebase Breakdown
 
+Counts below are as of the current repository state (a hostile reader running `find contracts -name '*.sol' | wc -l` should get the contract number; line counts are approximate and drift with each commit):
+
 | Layer | Files | Lines of Code |
 |---|---|---|
-| Smart contracts | 376 | 110,728 |
-| Test suite | 510 | 196,325 |
-| Frontend | 460 | 161,977 |
-| Oracle (Python) | 74 | 13,856 |
-| **Total** | **1,420** | **482,886** |
+| Smart contracts | 438 | ~110,000 |
+| Test suite | 591 | ~196,000 |
+| Frontend | ~470 | ~162,000 |
+| Oracle (Python) | ~77 | ~14,000 |
+| **Total** | **~1,570** | **~482,000** |
 
 ### Depth
 
-- 32 contract subsystem directories (core, AMM, agents, governance, incentives, bridge, settlement, identity, quantum, RWA, DePIN, compliance, oracle, ...)
-- 9,090 automated tests — 96% pass rate
+- 36 contract subsystem directories (core, AMM, agents, governance, incentives, bridge, settlement, identity, quantum, RWA, DePIN, compliance, oracle, ...) — most beyond the core handful are research/extension surface, not on the launch or audit path (see the repo README's audit-scope breakdown)
+- ~9,090 automated test functions (unit + fuzz + invariant); green per-module — there is no single full-suite pass number because the full suite OOMs a 16GB machine, so this is not a single measured all-green run
 - 139 published documents (PDF/DOCX)
 - 297 internal research papers and design documents
 
@@ -49,17 +51,17 @@ Not a fork. Not a tutorial project. Not a wrapper around Uniswap.
 
 **VibeSwap is an omnichain DEX with original mechanism design across every layer:**
 
-1. **Commit-reveal batch auctions** — MEV is not mitigated. It is structurally dissolved. Uniform clearing prices make sandwich attacks mathematically impossible, not just expensive.
+1. **Commit-reveal batch auctions** — MEV is not mitigated, it is structurally dissolved. A sandwich attack needs a distinct "before" and "after" price; a batch settles at one uniform clearing price, so the attack vector does not exist *within a batch*. (Design property of the mechanism, verified in tests against the reference implementation — not yet proven on a live network.)
 
-2. **Fractalized Shapley reward distribution** — Game-theoretic reward allocation where contribution is modeled as a DAG, not a flat list. On-chain verification of five Shapley axioms (efficiency, symmetry, null player, additivity, pairwise proportionality). Novel.
+2. **Fractalized Shapley reward distribution** — Game-theoretic reward allocation where contribution is modeled as a DAG, not a flat list. On-chain the values are cheaply *checked* (efficiency: sum == pool; a per-participant bound; and the Lawson fairness floor; Merkle-proofed) while full axiom satisfaction (symmetry, null-player, additivity) is established off-chain against an exact-arithmetic reference over 500 random games. Applying Shapley allocation to on-chain LP rewards this way is, to our knowledge, novel.
 
-3. **Sovereign Intelligence Exchange** — On-chain AI agent infrastructure: identity, task routing, reputation, marketplace. Not an "AI feature" bolted on — a native protocol layer.
+3. **Sovereign Intelligence Exchange** — On-chain AI agent infrastructure: identity, task routing, reputation, marketplace. Designed as a native protocol layer, not an "AI feature" bolted on. (Research surface — implemented as reference contracts, not on the core launch/audit path.)
 
 4. **Three-token economic model** — VIBE (governance, 21M hard cap), JUL (elastic, PoW, rebase+PI controller), CKB-native (state rent). Each token serves a distinct economic function.
 
-5. **Full security stack** — Circuit breakers, flash loan protection, TWAP validation, quantum-resistant modules, omniscient adversary defense, 50% slashing for invalid reveals.
+5. **Defense-in-depth security stack** — Circuit breakers, flash loan protection, TWAP validation, post-quantum modules (Lamport/hash-based signatures — inherited primitive, not a novel scheme), omniscient-adversary threat modeling, 50% slashing for invalid reveals (`SLASH_RATE_BPS = 5000` in `CommitRevealAuction.sol`). These are implemented and tested against the reference contracts; none has been exercised on a public network.
 
-6. **Cross-chain via LayerZero V2** — Not a bridge. An omnichain protocol where liquidity exists on every chain simultaneously.
+6. **Cross-chain messaging** — Designed as an omnichain protocol where liquidity is native on each chain rather than wrapped by a single bridge. (At the time of writing this used LayerZero V2; the design has since moved to a canonical burn-and-mint messaging layer. Not deployed to any public network.)
 
 7. **Custom Kalman filter oracle** — True price discovery, not just price feeds. Python + Solidity.
 
@@ -130,7 +132,7 @@ The dip in Week 12 is not fatigue. It is the machine saying no while the builder
 
 ## What Compute Unlocks
 
-The architecture exists. The mechanisms are designed, implemented, and tested. What is currently bottlenecked:
+The architecture exists. The mechanisms are designed, implemented, and tested per-module (there is no single all-green full-suite run — it OOMs a 16GB machine, which is exactly the constraint this proposal is about). What is currently bottlenecked:
 
 | Bottleneck | Impact | With Compute |
 |---|---|---|
@@ -157,5 +159,5 @@ Give us compute and see what the next 57 look like.
 - **Public**: github.com/wglynn/vibeswap
 - **Commits**: 2,306 (fully auditable)
 - **Languages**: Solidity, JavaScript/React, Python
-- **Frameworks**: Foundry, Vite, ethers.js v6, LayerZero V2
-- **License**: MIT (libraries), proprietary (protocol)
+- **Frameworks**: Foundry, Vite, ethers.js v6 (cross-chain used LayerZero V2 at authoring time; the design has since moved to a canonical burn-and-mint messaging layer)
+- **License**: not yet finalized — libraries/tooling intended MIT, core protocol reserved; treat as all-rights-reserved until a top-level `LICENSE` lands

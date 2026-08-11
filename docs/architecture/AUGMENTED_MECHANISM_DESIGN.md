@@ -1,7 +1,7 @@
 # Augmented Mechanism Design
 
 **Status**: Methodology. Design philosophy + concrete examples.
-**Audience**: First-encounter OK. Real VibeSwap instances with specific numbers.
+**Audience**: First-encounter OK. Concrete VibeSwap examples with real in-repo constants (spec + reference implementation; nothing here is on a public network — see [`README.md`](../../README.md) Status).
 **Primitive**: [`memory/feedback_augmented-mechanism-design-paper.md`](../memory/feedback_augmented-mechanism-design-paper.md) <!-- FIXME: ../memory/feedback_augmented-mechanism-design-paper.md — target lives outside docs/ tree (e.g., ~/.claude/, sibling repo). Verify intent. -->
 
 ---
@@ -12,13 +12,13 @@ Imagine two approaches to front-running:
 
 **Approach A — Replacement**: "We'll prevent front-running by having an admin decide the order of transactions. No one can front-run because the admin picks the order."
 
-**Approach B — Augmentation**: "We'll prevent front-running by requiring all bids in a batch to clear at the same price. Mathematically, no one can front-run because everyone in the batch gets the same outcome."
+**Approach B — Augmentation**: "We'll prevent front-running by requiring all bids in a batch to clear at the same price. No one can front-run *via ordering within the batch*, because everyone in the batch gets the same clearing price." (This closes the ordering-based vector inside a batch; it is not a claim to remove every MEV surface — see the scoping in the next section.)
 
 Approach A solves the problem but introduces an admin. The admin is now a trust-point, a potential attack surface, and a centralization risk.
 
 Approach B solves the problem without introducing a new trust-point. The math does the work; no admin required.
 
-Both "work". But they're fundamentally different philosophies. Approach A is replacement — substitute a process (free-market ordering) with an intermediary (admin). Approach B is augmentation — add a constraint to free-market ordering that makes front-running impossible by construction.
+Both "work". But they're fundamentally different philosophies. Approach A is replacement — substitute a process (free-market ordering) with an intermediary (admin). Approach B is augmentation — add a constraint to free-market ordering that removes the *ordering-based* front-running vector within a batch by construction (it does not claim to remove every MEV vector; cross-batch and reveal-timing surfaces are handled by other invariants below).
 
 Augmented Mechanism Design is the school of thought that consistently picks Approach B.
 
@@ -63,10 +63,10 @@ Different mechanism problems need different invariant types.
 
 **VibeSwap example 2 — Fisher-Yates shuffle of XORed secrets**:
 - After all reveals, the batch ordering is determined by XOR of all users' secrets.
-- Mathematical consequence: no one can predict the ordering before all reveals are in.
-- No one can manipulate the ordering after reveal (it's deterministic from the combined secrets).
+- No single party controls the seed, and the ordering is deterministic from the combined secrets (no post-reveal manipulation).
+- Caveat (from `DeterministicShuffle.sol`): pure XOR (`generateSeed`) still lets the *last* revealer compute the final seed before revealing. The hardened path `generateSeedSecure` adds unpredictable entropy to close this; the plain-XOR claim of "no one can predict the ordering" holds only under the secure variant.
 
-**Numerical cost**: adding these invariants costs roughly 30% more gas per swap vs. a naive DEX. Users pay slightly more for structural fairness.
+**Numerical cost**: adding these invariants costs more gas per swap than a naive DEX — the commit + reveal + shuffle path is strictly more work than a single-tx swap. (A frequently-cited "~30%" figure is an estimate, not a benchmarked measurement — there is no committed gas snapshot backing an exact number.) Users pay slightly more for structural fairness.
 
 ### Type 2 — Economic Invariants
 
@@ -76,12 +76,12 @@ Different mechanism problems need different invariant types.
 - Each operator cell requires a 10e18 CKB bond.
 - Claim N cells → stake N × 10e18 CKB.
 - Mathematical consequence: Sybil-inflating cells-served-count requires proportional capital commitment.
-- Bond sized (per `memory/feedback_augmented-mechanism-design-paper.md` §6.2) so sybil cost > sybil benefit.
+- Bond sized (per `memory/feedback_augmented-mechanism-design-paper.md` §6.2) with the intent that sybil cost exceeds sybil benefit under the paper's assumed benefit model. Constants are real (`OperatorCellRegistry.sol`: hard floor `MIN_BOND_PER_CELL = 1e18`; `bondPerCell` is constructor-set, `10e18` being the intended deploy-time value from the paper, not a hardcoded contract constant); the cost-exceeds-benefit conclusion is only as strong as that benefit model, and has not been demonstrated against a live adversary (nothing here is on a public network).
 
 **VibeSwap example 2 — Slashable stake for equivocation**:
-- Validator equivocation → 50% of stake slashed + 75% of mind-score reset.
+- Validator equivocation → 50% of stake slashed + 75% of mind-score slashed (`NakamotoConsensusInfinity.sol`: `EQUIVOCATION_STAKE_SLASH_BPS = 5000`, `EQUIVOCATION_MIND_SLASH_BPS = 7500`).
 - Numerical example: validator with 100 VIBE stake + 1000 mind-score. Equivocate → lose 50 VIBE + 750 mind-score.
-- Mathematical consequence: equivocation loses more than it could ever gain.
+- Intended consequence: for an attacker whose gain is bounded by their own stake-weighted influence, equivocation costs more than it gains. This is a sizing argument, not a proof against every payoff model.
 
 **Numerical sizing discipline**: all bond/slash ratios come from `memory/feedback_augmented-mechanism-design-paper.md` paper sections, not from tuning. Paper §6.1 = Temporal, §6.5 = Compensatory.
 
@@ -98,7 +98,7 @@ Different mechanism problems need different invariant types.
 - Mathematical consequence: validators can't withdraw stake immediately before misbehavior. Withdrawal request triggers a slashable-window that covers the unbonding period.
 
 **VibeSwap example 3 — Challenge window**:
-- Claims in ContributionAttestor are `Pending` for 1 day (default TTL).
+- Claims in ContributionAttestor stay `Pending` until their TTL expires (`claimTTL`, constructor-set; hard floor `MIN_CLAIM_TTL = 1 day`).
 - Contested claims escalate; un-contested claims auto-accept after TTL.
 - Mathematical consequence: permissionless detection with time-bounded adjudication.
 
@@ -143,15 +143,15 @@ Combines:
 
 Three invariant types protecting the cell registry from inflation attacks.
 
-### ClawbackCascade
+### Clawback cascade (`ClawbackRegistry` + `ClawbackVault`)
 
 Combines:
-- **Structural**: topological propagation of taint.
-- **Economic**: stake bond for flagging (anti-spam).
-- **Temporal**: 7-day contest window.
+- **Structural**: cascading propagation of taint across wallets (depth-bounded by `maxCascadeDepth`).
+- **Economic**: stake bond for flagging/contesting (`MIN_CONTEST_BOND`, anti-spam).
+- **Temporal**: configurable contest window, bounded by `MAX_CONTEST_WINDOW = 7 days` (floor `MIN_CONTEST_WINDOW = 1 hour`) — 7 days is the ceiling, not a hardcoded value.
 - **Verification**: evidence-hash commitments.
 
-Four invariant types providing property-graph-propagation semantics.
+Four invariant types providing taint-propagation semantics.
 
 ## The paper as parameter authority
 
@@ -166,8 +166,8 @@ For every concrete parameter, the paper at `memory/feedback_augmented-mechanism-
 | Challenger payout | §6.5 | 50% of slashed |
 | Min bond per cell | §6.2 | 1e18 CKB |
 | Unbonding delay | §7.3 | 7 days |
-| Contest window | §7.4 | 7 days |
-| Claim TTL | §5.2 | 1 day |
+| Contest window | §7.4 | 7 days (ceiling; `contestWindow` is configurable, floor 1 hr) |
+| Claim TTL | §5.2 | 1 day (`MIN_CLAIM_TTL` floor; `claimTTL` configurable) |
 
 If a parameter isn't in the paper, derive it from first principles (cost-asymmetry sizing) before inventing.
 

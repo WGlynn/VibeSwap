@@ -7,7 +7,9 @@
 
 ## TL;DR
 
-Every blockchain defense mechanism today is **negative-sum**: both attacker and defender expend resources, and the best outcome is that the defender prevents loss. Bitcoin burns hashpower. Ethereum slashes stake. Optimistic rollups forfeit bonds. The network survives, but it is never *better off* after an attack than before. We designed the **Siren Protocol** -- a defense mechanism that inverts this dynamic entirely. Instead of resisting attackers, the Siren *engages* them in a cryptographically indistinguishable shadow branch where they exhaust their resources mining towards nothing. Upon reveal, all captured resources (stake, compute, fees) are recycled back into the legitimate network. The result: **the network is provably stronger after an attack than before it**. We prove that under the Siren Protocol, the dominant strategy for all agents -- regardless of resources, knowledge, or capability -- is honest participation. And the most interesting part: knowing about the trap does not help you avoid it. CKB's cell model, off-chain computation, and temporal primitives make it a natural substrate for implementing shadow state isolation.
+Every blockchain defense mechanism today is **negative-sum**: both attacker and defender expend resources, and the best outcome is that the defender prevents loss. Bitcoin burns hashpower. Ethereum slashes stake. Optimistic rollups forfeit bonds. The network survives, but it is never *better off* after an attack than before. We designed the **Siren Protocol** -- a defense mechanism that inverts this dynamic entirely. Instead of resisting attackers, the Siren *engages* them in a cryptographically indistinguishable shadow branch where they exhaust their resources mining towards nothing. Upon reveal, all captured resources (stake, compute, fees) are recycled back into the legitimate network. The result, by design: **the network ends up stronger after an attack than before it**. In the accompanying working paper we prove that *under the protocol's assumptions* -- chiefly that the shadow branch is indistinguishable and therefore worthless to the attacker -- the dominant strategy for all agents, regardless of resources, knowledge, or capability, is honest participation. And the most interesting part: knowing about the trap does not help you avoid it. CKB's cell model, off-chain computation, and temporal primitives make it a natural substrate for implementing shadow state isolation.
+
+*Status: this is a mechanism design with a Solidity reference implementation (four contracts, see Implementation Notes). It is not deployed on any public network -- no mainnet, no testnet. The claims below are design intent and a working-paper proof, not results measured against live adversaries.*
 
 ---
 
@@ -54,7 +56,7 @@ When the threat level reaches ENGAGED, the protocol:
 4. Shadow branch PoW difficulty is **4x the real difficulty** (burns compute faster)
 5. Fake rewards are displayed but recorded in a non-claimable ledger
 
-The key property: the shadow state is **computationally indistinguishable** from the real state. Same hash structure (Merkle trees, state roots). Same transaction formats and responses. Same timing characteristics (calibrated latency). Same reward display format.
+The key property the design targets: the shadow state should be **computationally indistinguishable** from the real state. Same hash structure (Merkle trees, state roots). Same transaction formats and responses. Same timing characteristics (calibrated latency). Same reward display format. Achieving this against a sophisticated adversary is the hard, unsolved part -- see Discussion Question 1 -- and the whole game-theoretic argument rests on it.
 
 From the attacker's perspective, everything is working. They are mining blocks, accumulating rewards, approaching majority control. They are not.
 
@@ -129,7 +131,7 @@ For attack to be rational:
 -C_attack + P(success) * V_network > R_honest
 ```
 
-Under the Siren Protocol, P(success) = 0 because the shadow branch is worthless, and C_shadow > 0. Therefore:
+Under the Siren Protocol, *assuming the shadow branch is truly indistinguishable* (see Discussion Question 1 -- this is the load-bearing assumption, not a settled result), P(success) --> 0 because the shadow branch is worthless, and C_shadow > 0. Therefore:
 
 ```
 -C_attack - C_shadow + 0 < R_honest
@@ -141,7 +143,7 @@ Since C_attack > 0 and C_shadow > 0 and R_honest >= 0:
 Payoff(attack) < Payoff(honest) for ALL parameter values
 ```
 
-This is not a Nash equilibrium (which depends on what others do). It is a **strictly dominant strategy** -- optimal regardless of anyone else's behavior. There is no game state, no parameter configuration, no coalition size where attacking is rational.
+Within the paper's model this is not a Nash equilibrium (which depends on what others do) but a **strictly dominant strategy** -- honest beats attack regardless of anyone else's behavior. The result holds for all parameter values *given the model's assumptions*; the assumption that carries it -- perfect shadow indistinguishability -- is exactly the one an implementation has to earn (Discussion Question 1).
 
 ### The Self-Referential Trap
 
@@ -170,7 +172,7 @@ The paper puts it simply: *"He thought he was hacking the system. The system was
 | Optimistic rollup fraud proofs | Reactive | Bond loss | **Neutral** (fraud prevented) |
 | **Siren Protocol** | **Active** | **Total resource destruction** | **Strengthened** (resources recycled) |
 
-The Siren is the first defense mechanism where the network is **provably stronger** after an attack. Every other defense returns to baseline at best.
+To our knowledge, the Siren is the first blockchain defense mechanism designed so the network ends up **stronger** after an attack rather than merely returning to baseline. That "stronger" is a design property of the recycling logic (verifiable in `HoneypotDefense.sol`); the "provably" belongs to the working-paper model, not to any deployment, since none exists yet.
 
 The conceptual shift is from **antifragility by survival** (Nassim Taleb's original framing -- systems that survive stress) to **antifragility by absorption** (systems that convert stress into strength). The network does not just survive attacks. It feeds on them.
 
@@ -236,9 +238,9 @@ This is genuine antifragility in Nassim Taleb's sense: the system gains from dis
 
 ## Implementation Notes
 
-The Siren Protocol is implemented across four contracts: `HoneypotDefense.sol` (core Siren logic, shadow state, recycling), `ProofOfMind.sol` (Mind Score that makes Sybil attacks temporally impossible), `TrinityGuardian.sol` (immutable sentinel infrastructure), and `OmniscientAdversaryDefense.sol` (temporal anchoring against time-manipulation).
+The Siren Protocol is implemented across four contracts: `HoneypotDefense.sol` (core Siren logic, shadow state, recycling), `ProofOfMind.sol` (Mind Score, designed to make Sybil attacks asymptotically costly over time -- the contract slashes 75% of an offender's Mind Score, `mindScore / 4` at line 473), `TrinityGuardian.sol` (immutable sentinel infrastructure), and `OmniscientAdversaryDefense.sol` (temporal anchoring against time-manipulation).
 
-The protocol works in concert with Proof of Mind consensus: Mind Score (60% of vote weight) provides temporal security that makes detection reliable. An attacker cannot accumulate enough Mind Score to avoid detection, because Mind Score requires real time spent doing real work.
+The protocol works in concert with Proof of Mind consensus: Mind Score (60% of vote weight -- `MIND_WEIGHT_BPS = 6000` in `ProofOfMind.sol`) provides temporal security that makes detection more reliable. The design goal is that an attacker cannot cheaply accumulate enough Mind Score to avoid detection, because Mind Score requires real time spent doing real work -- the contract's own comments frame this Sybil resistance as *asymptotic* / economically-costly, not absolute.
 
 ---
 
@@ -256,12 +258,12 @@ The protocol works in concert with Proof of Mind consensus: Mind Score (60% of v
 
 6. **Is positive-sum defense a new category?** The comparison table shows Siren as the only defense that strengthens the network post-attack. Are there other defense mechanisms in any domain (not just blockchain) that achieve this property? Or is this genuinely novel?
 
-The full working paper is available: `docs/papers/siren-protocol.md`
+The full working paper is available: `docs/research/papers/siren-protocol.md`
 
 ---
 
 *"Fairness Above All."*
 *-- P-000, VibeSwap Protocol*
 
-*Full paper: [siren-protocol.md](https://github.com/wglynn/vibeswap/blob/master/docs/papers/siren-protocol.md)*
+*Full paper: [siren-protocol.md](https://github.com/wglynn/vibeswap/blob/master/docs/research/papers/siren-protocol.md)*
 *Code: [github.com/wglynn/vibeswap](https://github.com/wglynn/vibeswap)*

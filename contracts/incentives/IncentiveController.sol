@@ -40,6 +40,12 @@ interface IVolatilityInsuranceQuery {
     function getPoolInsurance(bytes32 poolId, address token) external view returns (PoolInsurance memory);
 }
 
+// Passport (Stage 3.2): LP-set/snapshot sink. All calls are try/catch; a fault never blocks a liquidity add.
+interface IUtilizationLPSink {
+    function registerLP(bytes32 poolId, address lp) external;
+    function snapshotLP(bytes32 poolId, address lp, uint128 liquidity) external;
+}
+
 /**
  * @title IncentiveController
  * @notice Central coordinator for all VibeSwap incentive mechanisms
@@ -121,8 +127,12 @@ contract IncentiveController is
     ///         claimForfeitedAuctionProceeds() even after their LP balance is zero.
     mapping(address => uint256) public pendingForfeitedProceeds;
 
-    /// @dev Reserved storage gap for future upgrades (reduced by 1 for pendingForfeitedProceeds)
-    uint256[47] private __gap;
+    /// @notice Passport (Stage 3.2) LP-set/snapshot sink. address(0) => off. All calls try/catch.
+    /// @dev Appended before __gap (gap reduced 47->46) to keep upgrade-safe storage layout.
+    IUtilizationLPSink public utilizationLPSink;
+
+    /// @dev Reserved storage gap for future upgrades (reduced by 1 pendingForfeitedProceeds - 1 passport sink)
+    uint256[46] private __gap;
 
     // ============ Errors ============
 
@@ -324,6 +334,14 @@ contract IncentiveController is
         // Register with Loyalty Rewards
         if (address(loyaltyRewardsManager) != address(0)) {
             loyaltyRewardsManager.registerStake(poolId, lp, liquidity);
+        }
+
+        // Passport (Stage 3.2): register LP + snapshot post-add balance. NON-BLOCKING.
+        // registerLP reverts LPAlreadyRegistered on repeat adds — catch is the intended path.
+        // Reuses newLpBalance (read above) instead of a redundant cross-contract call.
+        if (address(utilizationLPSink) != address(0)) {
+            try utilizationLPSink.registerLP(poolId, lp) {} catch {}
+            try utilizationLPSink.snapshotLP(poolId, lp, uint128(newLpBalance)) {} catch {}
         }
 
         emit LiquidityAdded(poolId, lp, liquidity, entryPrice);
@@ -631,6 +649,15 @@ contract IncentiveController is
     function setLoyaltyRewardsManager(address _manager) external onlyOwner {
         loyaltyRewardsManager = ILoyaltyRewardsManager(_manager);
         emit LoyaltyRewardsManagerUpdated(_manager);
+    }
+
+    // ============ Passport (Stage 3.2) LP-sink setter ============
+    event UtilizationLPSinkUpdated(address indexed sink);
+
+    /// @notice Set the passport LP-set/snapshot sink. address(0) disables. Owner-only.
+    function setUtilizationLPSink(address _sink) external onlyOwner {
+        utilizationLPSink = IUtilizationLPSink(_sink);
+        emit UtilizationLPSinkUpdated(_sink);
     }
 
     function setAuthorizedCaller(address caller, bool authorized) external onlyOwner {

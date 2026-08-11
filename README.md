@@ -14,7 +14,7 @@
 
 > **VibeSwap is not publicly deployed.** No public mainnet. No public testnet. A local CKB dev chain is up and mining blocks (`contracts-ckb/FIRST_BLOCK_RECEIPT.md`, chain spec `vibeswap_ckb_dev`), but the cells are still spec-only on it — runtime alive, contracts not yet on-chain. `deployments/` is empty by design — the protocol is mid-pivot to a sovereign chain and we don't want a vestigial Solidity deployment competing with the canonical version.
 >
-> - **EVM contracts** (`contracts/`, Solidity 0.8.20): mechanism spec + reference implementation. Used for audits, fuzz testing, and as the source-of-truth for the CKB port. 579 Foundry tests passing.
+> - **EVM contracts** (`contracts/`, Solidity 0.8.20): mechanism spec + reference implementation. Used for audits, fuzz testing, and as the source-of-truth for the CKB port. 591 Foundry test files (unit + fuzz + invariant), run per-module — the full suite OOMs a 16GB machine, so there is no single all-green number; modules are green individually.
 > - **CKB chain** (`contracts-ckb/`, Rust RISC-V cells): the real target. 26 cells building, dev chain mining blocks (`contracts-ckb/FIRST_BLOCK_RECEIPT.md`). Sovereign deployment, not a side-chain. See [`contracts-ckb/FORK_PLAN.md`](contracts-ckb/FORK_PLAN.md).
 > - **Frontend** ([live demo](https://frontend-jade-five-87.vercel.app)): runs against a mock backend. Wallet flows work; swap settles against simulated batches.
 >
@@ -111,13 +111,13 @@ Audits to date are dated and in `docs/audits/` — `2026-04-27-maintenance-synth
 
 ## Game theory
 
-VibeSwap uses [Shapley values](https://en.wikipedia.org/wiki/Shapley_value) from cooperative game theory — the only allocation mechanism that is simultaneously efficient, symmetric, and null-player-safe:
+VibeSwap uses [Shapley values](https://en.wikipedia.org/wiki/Shapley_value) from cooperative game theory — the allocation rule uniquely determined by four axioms together: efficiency, symmetry, null-player, and additivity (all four are required for uniqueness; the first three alone do not pin it down):
 
 - **Shapley distribution** rewards marginal contribution, not just liquidity size.
 - **Priority auctions** let arbitrageurs pay for execution priority — bids go to LPs, not validators.
 - **Insurance pools** mutualize risk (IL protection, slippage guarantees, treasury stabilization).
 
-The mechanism makes virtue the optimal strategy.
+The mechanism is designed so cooperation is the rational strategy, not one imposed by a referee.
 
 > *"Rewards cannot exceed revenue. Compounding is limited to realized events. Cooperation is rational, not moral."*
 
@@ -125,8 +125,8 @@ The mechanism makes virtue the optimal strategy.
 
 | Metric | Value |
 |--------|-------|
-| Solidity files in `contracts/` | **431** across 34 module directories |
-| Foundry test files in `test/` | **579** |
+| Solidity files in `contracts/` | **438** across 34 module directories |
+| Foundry test files in `test/` | **591** (run per-module; no single full-suite pass — it OOMs 16GB) |
 | CKB cell-type-scripts (Rust RISC-V) | **26** building, dev chain mining |
 | Proxy architecture (EVM) | UUPS upgradeable (OpenZeppelin v5.0.1) |
 | Cross-chain | Canonical burn-and-mint — bonded validators, BLS threshold attestations, on-chain economic security ([spec](docs/research/papers/post-layerzero-canonical-messaging.md)) |
@@ -145,7 +145,7 @@ cd vibeswap
 
 forge install
 forge build                                            # default profile = fast, no via_ir
-forge test --match-path test/CommitRevealAuction.t.sol -vvv    # ALWAYS scope test runs — 579 files is too much for one suite
+forge test --match-path test/CommitRevealAuction.t.sol -vvv    # ALWAYS scope test runs — 591 files is too much for one suite
 
 # Frontend (mock backend)
 cd frontend && npm install && npm run dev              # localhost:3000
@@ -179,14 +179,14 @@ CKB cells:      Rust  ·  ckb-std 0.16  ·  RISC-V target  ·  sha2 0.9  ·  bls
 Messaging:      VibeSwap canonical burn-and-mint  ·  BLS12-381 threshold sigs  ·  bonded validator network
 Frontend:       React 18  ·  Vite 5  ·  Tailwind CSS  ·  ethers.js v6  ·  WebAuthn
 Oracle:         Python 3.9+  ·  Kalman filter  ·  Bayesian estimation
-Testing:        Foundry (unit + fuzz + invariant)  ·  Slither  ·  579 .t.sol files
+Testing:        Foundry (unit + fuzz + invariant)  ·  Slither  ·  591 .t.sol files
 ```
 
 ## Project Structure
 
 ```
 vibeswap/
-├── contracts/                 # 431 Solidity files across 34 module dirs
+├── contracts/                 # 438 Solidity files across 34 module dirs
 │   ├── core/                  #   CommitRevealAuction, VibeSwapCore, CircuitBreaker, ProofOfMind, ...
 │   ├── amm/                   #   VibeAMM (x·y=k), VibeLP
 │   ├── governance/            #   DAOTreasury, TreasuryStabilizer, VibeTimelock
@@ -198,7 +198,7 @@ vibeswap/
 │   ├── libraries/             #   DeterministicShuffle, BatchMath, TWAPOracle, FibonacciScaling
 │   └── (24 more module dirs)  #   extension surface — research, not core audit scope
 ├── contracts-ckb/             # Sovereign CKB-fork chain (26 cells building, dev chain mining)
-├── test/                      # 579 Foundry test files
+├── test/                      # 591 Foundry test files
 ├── script/                    # Foundry deployment scripts (local-anvil only — no mainnet)
 ├── frontend/                  # React 18 + Vite 5 (mock backend)
 ├── oracle/                    # Python Kalman filter price oracle
@@ -225,7 +225,7 @@ VibeSwap was built from scratch by one engineer, who is now joined by additional
 Core principles (load-bearing — these constrain code review):
 
 - **Fairness Above All** — if the system is unfair, amend the code.
-- **No Extraction Ever** — Shapley math detects extraction; the system self-corrects autonomously.
+- **No Extraction Ever** — Shapley math is designed to detect extraction so the system self-corrects rather than depending on a governance referee (design intent; not yet demonstrated on a live network).
 - **Cooperative Capitalism** — mutualized risk + free market competition. 100% of swap fees go to LPs. Zero to protocol.
 
 ## License

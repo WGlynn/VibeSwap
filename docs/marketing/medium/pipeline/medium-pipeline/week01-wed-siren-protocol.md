@@ -8,9 +8,9 @@ Traditional blockchain defenses are negative-sum: both attacker and defender exp
 
 The Siren Protocol inverts this. Instead of resisting attacks, it *engages* attackers in a cryptographically indistinguishable shadow branch where they exhaust their resources mining towards nothing. Upon reveal, all captured resources — stake, compute, fees — are recycled back into the legitimate network.
 
-**The network is provably stronger after an attack than before it.**
+**The design goal: the network is stronger after an attack than before it** — because captured resources are recycled rather than merely denied to the attacker.
 
-We prove that under the Siren Protocol, the dominant strategy for all agents — regardless of resources, knowledge, or capability — is honest participation.
+We argue that under the Siren Protocol's payoff structure, honest participation dominates attack for any agent — provided the model's core assumption holds (that the attacker cannot distinguish the shadow branch from the real chain). That assumption is a design target, not yet an empirically validated property; see the caveats in the game-theory section.
 
 ---
 
@@ -47,7 +47,7 @@ When threat level reaches ENGAGED, the protocol:
 4. Shadow branch PoW difficulty is **4x the real difficulty** (burns compute faster)
 5. Fake rewards are displayed but recorded in a non-claimable ledger
 
-**The shadow state is computationally indistinguishable from the real state.** Same hash structure. Same transaction formats. Same timing characteristics. Same reward displays. The attacker sees exactly what they'd expect to see on the real chain.
+**The design intent: the shadow state is indistinguishable from the real state to the attacker.** Same hash structure. Same transaction formats. Same timing characteristics. Same reward displays — the attacker is meant to see exactly what they'd expect on the real chain. In the reference contract (`HoneypotDefense.sol`), the shadow root is supplied by a sentinel (`createShadowState`); the contract stores and tracks the trap, but the actual indistinguishability is an off-chain property of how the shadow branch is served, not something the contract itself proves.
 
 ### Phase 3 — Exhaustion
 
@@ -64,10 +64,10 @@ The protocol runs the exhaustion phase for a minimum of 1 hour, maximum of 7 day
 
 Sentinel consensus triggers the reveal:
 
-1. Shadow branch is proven invalid (state root divergence from canonical chain)
-2. All attacker stake is slashed
-3. 75% of attacker's Mind Score is destroyed
-4. Attack evidence is published permanently on-chain
+1. Shadow branch is declared invalid and deactivated (in the reference contract, `revealTrap` is a sentinel-authorized call gated on `MIN_TRAP_DURATION`; a fully on-chain divergence proof is a design target, not yet in the contract)
+2. All trapped attacker stake is marked slashed and recorded for recycling
+3. Reputation is destroyed — in the sibling `ProofOfMind.sol` contract, an equivocating node loses 75% of its Mind Score (`mindScore / 4`, line 473). Wiring this penalty into the Siren reveal path is design intent, not yet a single-transaction flow.
+4. Attack evidence is published on-chain via `publishEvidence`
 
 ### Phase 5 — Resource Recycling
 
@@ -75,8 +75,8 @@ This is where it gets interesting. Captured resources don't disappear. They're r
 
 - **50% of slashed stake** goes to the insurance pool (protects legitimate users)
 - **50% of slashed stake** goes to the treasury (funds protocol development)
-- **Shadow branch entropy** is fed to VibeRNG (improves randomness quality for the real chain)
-- **Captured fees** are distributed to honest stakers
+- **Shadow branch entropy** is harvested for VibeRNG (in the reference contract, `recycleResources` accumulates `harvestedEntropy` and records a `entropyConsumer` / VibeRNG target; the actual feed into VibeRNG is design intent, not yet a live call)
+- **Captured fees** are accounted for recycling (`recycledFees`); distribution to honest stakers is design intent
 
 > Network value after attack = Network value before + Recycled resources + Deterrence value
 
@@ -99,15 +99,15 @@ For attack to be rational, the expected payoff must exceed honest participation:
 
 > −Attack cost + P(success) × Network value > Honest rewards
 
-Under the Siren Protocol, P(success) = 0 because the shadow branch is worthless. The equation becomes:
+Under the Siren Protocol's model, P(success) → 0 *conditional on the attacker being successfully engaged and unable to detect the shadow branch*. Under that condition the equation becomes:
 
 > −Attack cost − Shadow cost + 0 < Honest rewards
 
-Since attack cost is always positive, shadow cost is always positive, and honest rewards are non-negative:
+Since attack cost is positive, shadow cost is positive, and honest rewards are non-negative:
 
-> **Payoff(attack) < Payoff(honest) for ALL parameter values**
+> **Payoff(attack) < Payoff(honest) whenever the attacker is trapped and cannot detect it**
 
-This isn't a Nash equilibrium (which depends on others' strategies). It's a **strictly dominant strategy** — optimal regardless of what anyone else does.
+This is the intended target: honest participation dominating attack. The strength of that conclusion rests on two assumptions that are design targets rather than proven properties — (1) detection reliably engages a real attacker, and (2) the shadow branch is genuinely indistinguishable. Where those hold, attack is dominated; where they don't, the model does not yet guarantee the result. This is a game-theoretic argument, not a completed proof.
 
 ### The Self-Referential Trap
 
@@ -132,17 +132,17 @@ Knowledge of the trap is the trap.
 - **Optimistic rollup fraud proofs** — Reactive defense. Attack costs bond. Post-attack: neutral.
 - **Siren Protocol** — Active defense. Attack costs everything. Post-attack: **network strengthened** (resources recycled, deterrence value increased).
 
-The Siren Protocol is the first defense mechanism that leaves the network provably stronger after an attack.
+The Siren Protocol is designed so that a trapped, revealed attack leaves the network stronger — captured resources recycle into insurance, treasury, and entropy rather than being merely denied. (This is the design goal; the recycling accounting is implemented in `HoneypotDefense.sol`, but the mechanism is not yet deployed on any public network.)
 
 ---
 
 ## 5. Implementation
 
-The Siren Protocol is implemented in production as `HoneypotDefense.sol`, part of the VSOS protocol stack:
+The Siren Protocol has a reference implementation as `HoneypotDefense.sol`, part of the VSOS protocol stack. Note: VibeSwap is not publicly deployed — no mainnet, no testnet, `deployments/` is empty by design. These are the mechanism spec and reference contracts used for audits and the CKB port, not live production code:
 
-- **HoneypotDefense.sol** — Core Siren logic, shadow state management, resource recycling
-- **ProofOfMind.sol** — PoM scoring that makes Sybil attacks temporally impossible
-- **TrinityGuardian.sol** — Immutable sentinel infrastructure (no admin, no pause, no upgrade path)
+- **HoneypotDefense.sol** — Core Siren logic, shadow state management, resource recycling accounting
+- **ProofOfMind.sol** — PoM scoring designed to make Sybil attacks asymptotically (not literally) impossible: mind-work must be accumulated over time, so the cost of a Sybil majority grows with the honest network
+- **TrinityGuardian.sol** — Sentinel infrastructure that is genuinely immutable in code: no owner, no pause function, no upgrade path
 - **OmniscientAdversaryDefense.sol** — Temporal anchoring against time-manipulation attacks
 
 Source: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
@@ -155,7 +155,7 @@ Every defense system in crypto today is a wall. Walls get breached. The Siren Pr
 
 This is adversarial judo: use the attacker's force against them. The stronger the attacker, the more the network gains from their attempt.
 
-By making attack literally indistinguishable from donation, the protocol achieves something no previous defense has: **provable antifragility.**
+By aiming to make attack indistinguishable from donation, the protocol reaches for something most defenses don't attempt: **antifragility by design** — the network built to gain from being attacked, not merely survive. Whether it achieves that in practice is what deployment and adversarial testing will decide.
 
 > *"He thought he was hacking the system. The system was hacking him."*
 

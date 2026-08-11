@@ -7,7 +7,7 @@
 
 ## TL;DR
 
-Nakamoto Consensus gave us permissionless BFT for the first time. But it left three structural vulnerabilities: the 51% attack, nothing-at-stake, and the scalability trilemma. These aren't implementation bugs — they're design limits. **Nakamoto Consensus ∞ (NCI)** resolves all three by adding a third consensus dimension: **Proof of Mind** — where cognitive contribution is 60% of vote weight, is non-transferable, and cannot be fast-forwarded. Combined with the **Siren Protocol** (a game-theoretic trap that makes attacking the network worse than not attacking), NCI creates a consensus mechanism where the only rational strategy is honest participation. CKB's architecture — already built on Nakamoto Consensus — is the natural substrate for this evolution.
+Nakamoto Consensus gave us permissionless BFT for the first time. But it left three structural vulnerabilities: the 51% attack, nothing-at-stake, and the scalability trilemma. These aren't implementation bugs — they're design limits. **Nakamoto Consensus ∞ (NCI)** is a design that aims to raise the cost of all three by adding a third consensus dimension: **Proof of Mind** — where cognitive contribution is 60% of vote weight, is non-transferable, and cannot be fast-forwarded. Combined with the **Siren Protocol** (a game-theoretic trap designed to make attacking the network worse than not attacking), NCI targets a consensus mechanism where honest participation is the rational strategy. This is early-stage mechanism-design work: there is a reference Solidity implementation (`contracts/consensus/NakamotoConsensusInfinity.sol`, `contracts/core/HoneypotDefense.sol`), but nothing is deployed to any public network — the security properties below are design intent, not measured results. CKB's architecture — already built on Nakamoto Consensus — is the substrate we think this evolution wants.
 
 ---
 
@@ -21,7 +21,7 @@ Satoshi solved the Byzantine Generals Problem in a permissionless setting. Revol
 | Nothing-at-Stake | PoS validators can vote on multiple forks costlessly | Slashing (reactive, not preventive) |
 | Scalability Trilemma | Can't have decentralization + security + scalability | Rollups, sidechains (complexity, not resolution) |
 
-Every blockchain since Bitcoin has inherited or worked around these problems. NCI solves them at the mechanism level.
+Every blockchain since Bitcoin has inherited or worked around these problems. NCI is an attempt to raise the attacker's cost on all three at the mechanism level rather than patch around them. Whether it holds under real adversarial pressure is an open question — this is a design plus a reference implementation, not a battle-tested result.
 
 ---
 
@@ -40,18 +40,18 @@ W(node) = 0.10 × PoW(node) + 0.30 × PoS(node) + 0.60 × PoM(node)
 **Proof of Mind (60%)** — The novel primitive. Measures *cumulative verified cognitive contribution*. Unlike PoW (instantaneous computation) or PoS (current capital), PoM measures accumulated genuine work over time.
 
 Properties of Mind Score:
-- **Non-transferable**: Cannot be bought, sold, or delegated
-- **Cumulative**: Grows only through verified genuine output
-- **Logarithmic**: Diminishing returns prevent plutocracy of expertise
-- **Persistent**: Survives node exit and rejoin
+- **Non-transferable**: designed so it can't be bought, sold, or delegated (enforced by the soulbound source contracts it aggregates)
+- **Cumulative**: intended to grow only through verified genuine output — note the reference code also *reduces* it on equivocation (75% mind-score slash) and re-aggregates from its sources, so "monotonic growth" is the aspiration, not an invariant of the current implementation
+- **Logarithmic**: diminishing returns to prevent plutocracy of expertise (`_log2` scaling in the reference contract)
+- **Persistent**: survives node exit and rejoin
 
-The key insight: an attacker cannot fast-forward Mind Score accumulation. Even with infinite capital and compute, they cannot manufacture years of verified cognitive contribution.
+The key insight: an attacker cannot fast-forward Mind Score accumulation. Even with large capital and compute, they cannot manufacture years of verified cognitive contribution — assuming the contribution-verification layer (the harder, still-open problem; see Open Questions) actually resists forgery. The strength of PoM is only as good as the strength of that verifier.
 
 ---
 
 ## The Siren Protocol: Trapping Attackers
 
-Traditional defense blocks attackers. NCI **traps** them.
+Traditional defense blocks attackers. The Siren Protocol is designed to **trap** them instead. (This is a reference contract, `HoneypotDefense.sol`, not a deployed or independently reviewed system — read the phases below as the intended design.)
 
 When anomaly detection identifies an attack:
 
@@ -71,7 +71,7 @@ The game theory is devastating:
 - Attack fails → you've spent resources → payoff < 0
 - Don't attack → payoff = 0
 
-The dominant strategy is *not attacking*, regardless of resources. This is a strictly dominant strategy equilibrium — stronger than Nash.
+If the payoff table above holds, *not attacking* weakly dominates attacking regardless of resources. The intent is a dominant-strategy equilibrium, stronger than a Nash equilibrium — but that claim is contingent on the model's assumptions (attackers can't distinguish shadow from real, detection fires reliably, the verifier can't be gamed). It has not been formally proven or adversarially tested; it's the design target, not an established result.
 
 The beautiful circularity: the only way to verify you're on the real branch is to have genuine Mind Score — which requires being a genuine contributor — which means you're not an attacker.
 
@@ -96,7 +96,7 @@ Cell {
 }
 ```
 
-The type script enforces that Mind Score can only increase through verified contribution — not through purchase, not through delegation, not through proxy. This is IIA Condition 1 (Extractive Strategy Elimination) applied to consensus itself.
+The intended design: a type script that only permits Mind Score to change through verified contribution — not through purchase, not through delegation, not through proxy. (In the current reference EVM code, `refreshMindScore` recomputes the score by aggregating soulbound-identity / contribution-DAG / VibeCode / agent-reputation sources; the non-transferability lives in those source contracts, and the CKB cell-script version above is a design target, not yet built.) This is IIA Condition 1 (Extractive Strategy Elimination) applied to consensus itself.
 
 ### CKB's `Since` for Temporal Security
 
@@ -110,7 +110,7 @@ No need for block.timestamp hacks or oracle-dependent time checks. The timelock 
 
 ### Cell Consumption as Equivocation Detection
 
-In NCI, voting on two forks simultaneously (equivocation) is slashed. On CKB, each vote consumes the voter's Mind Score cell and produces an updated one. Double-voting requires consuming the same cell twice — which CKB's UTXO-like model makes impossible by construction. You can't spend the same cell twice. Equivocation isn't punished; it's **undefined**.
+In NCI, voting on two forks simultaneously (equivocation) is slashed. The reference EVM implementation does this reactively: it detects the second conflicting vote and slashes 50% of stake plus 75% of mind score (`NakamotoConsensusInfinity.vote` / `_slashEquivocator`). The CKB design aims to go further: model each vote as consuming the voter's Mind Score cell and producing an updated one, so double-voting would require consuming the same cell twice — which CKB's UTXO-like model prevents. In that design, equivocation isn't punished; it's **undefined**. That cell-model version is designed, not yet built — it lives in the CKB port (`contracts-ckb/`), not in a deployed system.
 
 ### Meta-Node Architecture Mapped to CKB
 
@@ -128,13 +128,15 @@ NCI's scaling model maps cleanly:
 
 ## Attack Cost Comparison
 
+The numbers below are order-of-magnitude illustrations, not sourced benchmarks — the point is the *shape* of the third row, not the exact figures:
+
 | Consensus | Attack Cost | Time Required |
 |---|---|---|
-| Bitcoin PoW | ~$20B in hardware + electricity | Hours to days |
-| Ethereum PoS | ~$40B in staked ETH | Coordination time |
-| NCI on CKB | Capital + compute + **years of genuine work** | 500× network age |
+| Bitcoin PoW | tens of $B in hardware + electricity (rough order) | Hours to days |
+| Ethereum PoS | tens of $B in staked ETH (rough order) | Coordination time |
+| NCI on CKB (design target) | Capital + compute + **years of genuine work** | scales with network age |
 
-The third term — years of genuine work — is the killer. It transforms consensus security from a capital problem to a temporal impossibility.
+The third term — years of genuine work — is the intended killer. The design goal is to shift part of consensus security from a pure capital problem toward a temporal one an attacker can't buy their way past. Whether the PoM weighting actually delivers that depends entirely on the contribution verifier holding up (see Open Questions).
 
 ---
 
@@ -162,8 +164,8 @@ Every developer writing code, every researcher publishing analysis, every commun
 
 ## Further Reading
 
-- **Full paper**: [nakamoto-consensus-infinite.md](https://github.com/wglynn/vibeswap/blob/master/docs/papers/nakamoto-consensus-infinite.md)
-- **Related**: [Proof of Mind Consensus](https://github.com/wglynn/vibeswap/blob/master/docs/papers/proof-of-mind-consensus.md), [Siren Protocol](https://github.com/wglynn/vibeswap/blob/master/docs/papers/siren-protocol.md)
+- **Full paper**: [nakamoto-consensus-infinite.md](https://github.com/wglynn/vibeswap/blob/master/docs/research/papers/nakamoto-consensus-infinite.md)
+- **Related**: [Proof of Mind Consensus](https://github.com/wglynn/vibeswap/blob/master/docs/research/papers/proof-of-mind-consensus.md), [Siren Protocol](https://github.com/wglynn/vibeswap/blob/master/docs/research/papers/siren-protocol.md)
 - **Code**: [github.com/wglynn/vibeswap](https://github.com/wglynn/vibeswap)
 
 ---

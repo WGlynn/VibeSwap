@@ -1,6 +1,6 @@
 # VibeSwap: Mutualized Market Structure for Fair Decentralized Exchange
 
-**Abstract.** Current decentralized exchanges suffer from adversarial dynamics where value is extracted from traders and liquidity providers through MEV, impermanent loss, and information asymmetry. VibeSwap introduces a mutualized market structure that transforms these zero-sum games into positive-sum outcomes through batch auction price discovery and aligned incentive mechanisms. By aggregating orders into discrete batches with uniform clearing prices, we eliminate ordering-based extraction. By redistributing volatility fees, arbitrage proceeds, and exit penalties back to participants, we create a cooperative ecosystem where individual profit-seeking behavior produces collective benefit.
+**Abstract.** Current decentralized exchanges suffer from adversarial dynamics where value is extracted from traders and liquidity providers through MEV, impermanent loss, and information asymmetry. VibeSwap introduces a mutualized market structure that transforms these zero-sum games into positive-sum outcomes through batch auction price discovery and aligned incentive mechanisms. By aggregating orders into discrete batches with uniform clearing prices, we eliminate ordering-based extraction within each batch. By redistributing volatility fees, arbitrage proceeds, and exit penalties back to participants, we create a cooperative ecosystem where individual profit-seeking behavior produces collective benefit.
 
 ---
 
@@ -166,7 +166,7 @@ When a batch has 80 ETH of buy orders and 20 ETH of sell orders, sell-side LPs a
 - **Null player:** No contribution means no reward
 - **Event-based:** Each batch is independent (no compounding)
 
-*Effect:* Rewards become **fair by construction**, not by governance decision. LPs who provide scarce liquidity, stay during stress, and enable trading are mathematically guaranteed higher shares.
+*Effect:* Rewards become **fair by construction**, not by governance decision. LPs who provide scarce liquidity, stay during stress, and enable trading receive higher shares under the weighting above — fair by the chosen axioms, not a law of mathematics.
 
 ---
 
@@ -187,9 +187,9 @@ The result is a **positive-sum game**: the aggregate value created exceeds the a
 
 ## 5. Conclusion
 
-VibeSwap demonstrates that MEV and adversarial extraction are not inherent to decentralized exchange—they are artifacts of naive mechanism design. By aggregating orders into batch auctions with uniform clearing prices, we eliminate ordering-based extraction. By redistributing fees, penalties, and arbitrage proceeds back to participants, we align incentives toward mutual benefit.
+VibeSwap demonstrates that MEV and adversarial extraction are not inherent to decentralized exchange—they are artifacts of naive mechanism design. By aggregating orders into batch auctions with uniform clearing prices, we eliminate ordering-based extraction within a batch (cross-batch and non-ordering MEV are out of scope of this claim). By redistributing fees, penalties, and arbitrage proceeds back to participants, we align incentives toward mutual benefit.
 
-The invisible hand still operates. Participants still act in self-interest. But the rules of the game channel that self-interest toward building rather than extracting. This is not communism—participation is voluntary and profit motive remains. This is not pure free market—collective mechanisms smooth individual risk. This is mechanism design: engineering incentives so that individually rational behavior produces collectively optimal outcomes.
+The invisible hand still operates. Participants still act in self-interest. But the rules of the game channel that self-interest toward building rather than extracting. This is not communism—participation is voluntary and profit motive remains. This is not pure free market—collective mechanisms smooth individual risk. This is mechanism design: engineering incentives so that individually rational behavior produces collectively beneficial outcomes.
 
 VibeSwap is how decentralized exchange should have been built from the start.
 
@@ -206,4 +206,4 @@ VibeSwap is how decentralized exchange should have been built from the start.
 
 ---
 
-*VibeSwap Protocol — MIT License*
+*VibeSwap Protocol — license not yet finalized (see README: all rights reserved by default until a top-level LICENSE lands).*

@@ -10,7 +10,7 @@
 
 Economic growth is not primarily constrained by material scarcity, labor supply, or technological capability. The binding constraint is **trust** -- the ability to cooperate with strangers without certainty of their intentions. Throughout history, every quantum leap in human prosperity has been preceded by a breakthrough in trust technology: clocks enabled verifiable measurement of sacrifice, currency eliminated the double-coincidence problem of barter, and third-party intermediaries scaled commerce to global reach. Yet each trust layer introduced new vulnerabilities. Bitcoin achieved the first instance of trustless trust at planetary scale. VibeSwap represents the next evolution: trustless exchange, where not only value transfer but the *conversion between assets* operates without requiring trust in any intermediary, miner, or privileged actor.
 
-This paper traces the evolution of trust technologies from medieval timekeeping to blockchain-native decentralized exchange, argues that the third-party trust model is both essential and structurally parasitic, and demonstrates how VibeSwap's mechanism design eliminates the remaining trust dependencies in decentralized finance.
+This paper traces the evolution of trust technologies from medieval timekeeping to blockchain-native decentralized exchange, argues that the third-party trust model is both essential and structurally parasitic, and shows how VibeSwap's mechanism design is intended to remove the remaining trust dependencies in decentralized finance. (VibeSwap is pre-mainnet: the mechanism is specified, implemented, and fuzz-tested in this repo, but not yet deployed to any public network — the claims below describe design intent, not a live system.)
 
 **Core thesis**: "Trust is the significantly more oppressive restraint on economic growth. For this evolution in free markets, we need markets programmed without the need for trust."
 
@@ -45,7 +45,7 @@ The history of civilization is the history of extending trust:
 | Medieval | Contractual (millions) | Clocks, time-rate wages | Verifiable labor markets |
 | Industrial | Global (billions) | Banks, insurers, lawyers | Industrial commerce |
 | 2009 | Planetary (permissionless) | Bitcoin, proof-of-work | Trustless value transfer |
-| 2026 | Planetary (permissionless) | VibeSwap, commit-reveal | Trustless value exchange |
+| 2026 (design) | Planetary (permissionless) | VibeSwap, commit-reveal | Trustless value exchange (pre-mainnet — mechanism specified and tested, not yet deployed) |
 
 Each row in this table represents not merely a technological advance but a fundamental expansion in the number of strangers who can cooperate productively. The common thread is the reduction -- and ultimately the elimination -- of required trust.
 
@@ -169,7 +169,7 @@ This is not an argument against the existence of intermediaries in the current s
 
 ### 5.1 The Breakthrough
 
-In 2009, Bitcoin achieved what no prior system had: **trustless trust** -- a coordination mechanism that requires no trust because its security properties are mathematically guaranteed rather than institutionally promised.
+In 2009, Bitcoin achieved what no prior system had: **trustless trust** -- a coordination mechanism that minimizes required trust because its security rests on cryptography and open economic incentives (proof-of-work is costly to attack, honest mining is the profitable strategy) rather than on institutional promise. The guarantees are probabilistic and economic, not absolute, but they hold without trusting any single party.
 
 The architecture combines four trust technologies into a single system:
 
@@ -287,13 +287,13 @@ Neither option serves the population that most needs trustless infrastructure. V
 
 ### 8.1 From Trust Minimization to Trust Elimination
 
-Bitcoin minimized trust in value transfer. VibeSwap eliminates trust in exchange. The architecture maps directly onto the trust technology evolution:
+Bitcoin minimized trust in value transfer. VibeSwap is designed to do the same for exchange — to remove the intermediary trust that even "decentralized" exchanges relocate rather than eliminate. The architecture maps directly onto the trust technology evolution:
 
 | Trust Technology | Historical Analogue | VibeSwap Implementation |
 |-----------------|---------------------|------------------------|
 | **The Clock** (measuring sacrifice) | Mechanical timekeeping | Commit-reveal timestamps prove commitment |
 | **Currency** (eliminating double-coincidence) | Gold, fiat | Uniform clearing price eliminates price discrimination |
-| **Removing TTPs** (eliminating intermediaries) | Bitcoin's P2P network | Peer-to-peer cross-chain messaging via LayerZero |
+| **Removing TTPs** (eliminating intermediaries) | Bitcoin's P2P network | Canonical burn-and-mint cross-chain messaging with bonded validators (design; the legacy `CrossChainRouter` LayerZero wrapper is deprecated, pending chain-native implementation on the CKB fork) |
 | **Identity** (self-sovereign) | Passports, bank accounts | Device wallet (WebAuthn/Secure Element) |
 | **Fairness** (measuring contribution) | Shapley value theory | ShapleyDistributor computes fair reward allocation |
 
@@ -333,13 +333,13 @@ This is not merely fair distribution -- it is provably the *unique* allocation t
 
 ### 8.4 Cross-Chain Messaging as TTP Elimination
 
-Traditional cross-chain bridges are trusted third parties. They hold custody of assets, can censor transactions, and represent concentrated attack surfaces. VibeSwap's CrossChainRouter uses LayerZero V2's OApp protocol to achieve peer-to-peer messaging without custodial risk:
+Traditional cross-chain bridges are trusted third parties. They hold custody of assets, can censor transactions, and represent concentrated attack surfaces. VibeSwap's cross-chain design targets a canonical burn-and-mint messaging layer secured by a bonded validator network and BLS threshold attestations (spec: `docs/research/papers/post-layerzero-canonical-messaging.md`), replacing the earlier LayerZero-based approach. The reference EVM implementation to date is the `CrossChainRouter` LayerZero V2 wrapper — now deprecated, with the chain-native canonical version pending on the CKB fork and nothing yet deployed to a public network. The design goals are:
 
 - **No bridge custody**: Assets are not held by an intermediary
 - **Per-peer message ordering**: Identical fairness guarantees for cross-chain trades
-- **0% bridge fees**: The protocol never extracts value from cross-chain transfers
-- **Replay prevention**: `commitId = keccak256(depositor, commitHash, srcChainId, dstChainId, srcTimestamp)`
-- **Graceful degradation**: If LayerZero goes offline, same-chain trading continues uninterrupted
+- **0% bridge fees**: The protocol is designed never to extract value from cross-chain transfers
+- **Replay prevention**: the router derives a per-commit id via `keccak256(abi.encodePacked(depositor, commitHash, srcEndpointId, dstEndpointId, srcTimestamp))`, where the destination id makes a replay on any other chain fail reconstruction (`CrossChainRouter.sol:366`)
+- **Graceful degradation**: if the messaging layer goes offline, same-chain trading continues uninterrupted
 
 ### 8.5 Device Wallet as Self-Sovereign Identity
 
@@ -356,7 +356,7 @@ This completes the trust elimination: no intermediary holds your assets, knows y
 
 The most subtle trust dependency in DeFi is MEV. Even on "decentralized" exchanges, miners and block builders function as trusted third parties -- they can reorder, insert, or censor transactions for profit.
 
-VibeSwap makes MEV extraction structurally impossible:
+VibeSwap's batch-auction design removes the information and ordering advantages MEV extraction depends on. Within a single batch there is no "before" and "after" price to sandwich, and order details are hidden until the batch seals — so the classic intra-batch MEV vectors have no surface to attack (this is a property of the mechanism as specified and fuzz-tested in `contracts/`; it is not yet demonstrated on a live network):
 
 | MEV Vector | How It Works Elsewhere | Why It Fails on VibeSwap |
 |------------|----------------------|--------------------------|

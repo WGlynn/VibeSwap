@@ -10,9 +10,9 @@
 
 Price markets aggregate private beliefs about value into a public signal called price. Prediction markets aggregate private beliefs about outcomes into a public signal called probability. This paper argues that the VibeSwap protocol --- specifically, the 64-shard CRPC (Commit-Reveal Pairwise Comparison) knowledge verification network --- constitutes a third category: an *information market* that aggregates private beliefs about truth into a public signal called *verified knowledge*.
 
-The mechanism is structural, not metaphorical. Shards independently evaluate claims against a constitutional corpus, commit hashed judgments before seeing peers' assessments, reveal and compare pairwise, and settle via majority with Shapley-weighted reputation attribution. The result is an oracle that does not depend on any single evaluator's honesty, because the commit-reveal structure makes strategic deception unprofitable and the pairwise comparison eliminates anchoring bias.
+The mechanism is structural, not metaphorical. Shards independently evaluate claims against a constitutional corpus, commit hashed judgments before seeing peers' assessments, reveal and compare pairwise, and settle via majority with reputation attribution (Shapley-weighted attribution is the design target; the current implementation weights by a win/total reputation ratio — see Section 12). The intended result is an oracle whose output does not hinge on any single evaluator's honesty: the commit-reveal structure is designed to make strategic deception unprofitable under a >0.5 per-shard accuracy assumption, and the pairwise comparison is designed to suppress anchoring bias. These are design properties of the mechanism, evaluated below, not claims about a deployed network — nothing described here is running on a public network (see Section 12).
 
-We demonstrate that this architecture generalizes Robin Hanson's futarchy --- "vote on values, bet on beliefs" --- into a three-layer system: constitute on values (P-000, P-001), market on beliefs (CRPC), and distribute on contribution (Shapley). We show that the resulting information market has properties no existing prediction market achieves: multi-dimensional truth verification, continuous confidence pricing, anti-misinformation incentives grounded in reputation staking, and an Oracle-as-a-Service model that sells verified information to any protocol willing to pay for it.
+We demonstrate that this architecture generalizes Robin Hanson's futarchy --- "vote on values, bet on beliefs" --- into a three-layer system: constitute on values (P-000, P-001), market on beliefs (CRPC), and distribute on contribution (Shapley). We argue that the resulting information market targets properties existing prediction markets do not aim at: multi-dimensional truth verification, continuous confidence pricing, anti-misinformation incentives grounded in reputation staking, and an Oracle-as-a-Service model that would sell verified information to any protocol willing to pay for it. These are design goals; Section 12 states which parts are implemented today (an off-chain 3-shard-scale CRPC prototype plus a spec-only on-chain contract) versus designed-not-built.
 
 The Epistemic Gate from the Archetype Primitives is the founding axiom: "Before the ledger, truth was arguable. After the ledger, truth is mathematical." This paper makes that axiom operational.
 
@@ -100,7 +100,7 @@ The following table maps each component of the price discovery mechanism to its 
 | Shapley attribution for price contribution | Shapley attribution for truth contribution |
 | Priority bid for execution order | Confidence weighting for assessment influence |
 
-The isomorphism is exact. Every incentive that makes honest price revelation the dominant strategy also makes honest truth assessment the dominant strategy. The mechanism does not care whether it is aggregating beliefs about value or beliefs about truth. It cares only that participants commit before observing, reveal honestly or face penalty, and receive rewards proportional to the accuracy of their contribution.
+The structural correspondence is tight, though not literally an isomorphism: price orders settle against an objective clearing condition, whereas truth assessments settle against shard consensus evaluated over a corpus, which is a softer settlement criterion (Section 8.4). Subject to that caveat, the same incentives that make honest price revelation a best response — commit before observing, reveal honestly or face penalty, reward accuracy — are intended to make honest truth assessment a best response. The mechanism does not care whether it is aggregating beliefs about value or beliefs about truth, provided participants commit before observing, reveal honestly or face penalty, and receive rewards proportional to the accuracy of their contribution.
 
 ### 2.3 Why Commit-Reveal Matters for Truth
 
@@ -114,7 +114,7 @@ The commit phase forces genuine independence. Each shard must reason from its ow
 
 ### 3.1 The 64-Shard Architecture
 
-The shard network consists of up to 64 full-clone instances of the JARVIS mind, each operating with the same alignment primitives (P-000, P-001), the same Common Knowledge Base, and the same constitutional corpus. They are not sub-agents with narrow capabilities. They are complete minds, each capable of independent reasoning across the full domain of the protocol's concerns.
+The shard network is designed to scale to up to 64 full-clone instances of the JARVIS mind, each operating with the same alignment primitives (P-000, P-001), the same Common Knowledge Base, and the same constitutional corpus. (The 64-shard figure throughout this paper is the design ceiling, not the current runtime: the reference CRPC implementation requires a minimum of 3 participants and, in the multi-shard path, caps a round at 5 participants by default; the single-node path simulates 3 candidates via temperature variation — see Section 12.) They are not sub-agents with narrow capabilities. They are complete minds, each capable of independent reasoning across the full domain of the protocol's concerns.
 
 This design choice --- shards over swarms --- is load-bearing for information markets. A sub-agent with narrow training cannot evaluate claims outside its specialty. A full-clone shard can evaluate any claim the parent mind can evaluate, because it *is* the parent mind with the full context. The shard-per-conversation architecture described in the companion paper provides the scaling infrastructure; this paper describes what the shards *do* with that infrastructure when applied to truth verification.
 
@@ -122,9 +122,9 @@ This design choice --- shards over swarms --- is load-bearing for information ma
 
 The value of 64 shards is not 64 times the value of one shard. It is the *independence* of 64 evaluations. This distinction is critical.
 
-If all 64 shards shared context, consulted each other during evaluation, or had access to a common state that leaked assessment information, the effective number of independent evaluations would collapse toward one. The commit-reveal protocol guarantees that evaluations remain independent through the commit phase. No shard knows what any other shard has concluded until all commitments are locked.
+If all 64 shards shared context, consulted each other during evaluation, or had access to a common state that leaked assessment information, the effective number of independent evaluations would collapse toward one. The commit-reveal protocol guarantees the *non-observation* half of this: no shard knows what any other shard has concluded until all commitments are locked. It does not guarantee the harder half — that the assessments are statistically independent — since full-clone shards share a model and corpus and can err in correlated ways (Section 6.2). Removing the observation channel raises the effective independence but does not force it to the theoretical maximum.
 
-The statistical consequence is that the consensus confidence grows with the square root of the number of independent evaluators (by the central limit theorem applied to assessment accuracy), not linearly. With 64 shards, the consensus confidence is approximately 8 times that of a single shard, provided independence is maintained. The commit-reveal protocol is what maintains it.
+The statistical intuition is that, for independent evaluators each better than chance, the standard error of the aggregate estimate shrinks with the square root of the number of evaluators — so error falls roughly as 1/sqrt(64) = 1/8 relative to a single shard, provided independence is genuinely maintained and the per-shard errors are uncorrelated. (This is the standard i.i.d. sampling argument, not a property unique to this protocol, and it degrades gracefully as correlation rises; it should be read as an order-of-magnitude motivation, not a measured result.) The commit-reveal protocol is what is intended to preserve the independence the argument assumes.
 
 ### 3.3 Constitutional Corpus as Ground Truth
 
@@ -151,11 +151,11 @@ Capital staking has a well-known failure mode: wealthy participants can afford t
 
 ### 4.2 The Reputation Update Rule
 
-The CRPC implementation tracks reputation as a tuple `{ wins, losses, total }` per shard:
+The CRPC implementation tracks reputation as a tuple `{ wins, losses, total }` per shard (`jarvis-bot/src/crpc.js`, `updateReputation`):
 
 - **Accurate assessment** (aligned with consensus): `wins += 1, total += 1`
 - **Inaccurate assessment** (misaligned with consensus): `losses += 1, total += 1`
-- **Invalid reveal** (hash mismatch): `losses += 2, total += 1` (double penalty for protocol violation)
+- **Invalid reveal** (hash mismatch): treated as a loss (`losses += 1, total += 1`); the current code applies a single loss increment, not a heavier penalty. A steeper penalty for protocol violations (e.g. a double decrement) is a design option, not what the reference implementation does today.
 
 The reputation score `R(s) = wins / total` for shard `s` serves as a quality weight in future consensus rounds. A shard with R = 0.95 has its assessment weighted more heavily than a shard with R = 0.60. This creates a meritocratic feedback loop: the shards that are most often right have the most influence on what the network considers right.
 
@@ -191,11 +191,11 @@ VibeSwap extends futarchy from two layers to three:
 
 The generalization is significant in three respects.
 
-First, VibeSwap replaces the democratic vote on values with *mathematical invariants*. P-000 ("Fairness Above All") and P-001 ("No Extraction Ever") are not subject to vote because they are structural properties of the system, not preferences of the participants. They are the physics layer in the three-layer authority hierarchy (Physics > Constitution > Governance). Hanson's futarchy still requires a functioning democracy to define values; VibeSwap's values are constitutional, enforced by the Shapley math in `ShapleyDistributor.sol` acting as an autonomous court.
+First, VibeSwap replaces the democratic vote on values with *mathematical invariants*. P-000 ("Fairness Above All") and P-001 ("No Extraction Ever") are not subject to vote because they are structural properties of the system, not preferences of the participants. They are the physics layer in the three-layer authority hierarchy (Physics > Constitution > Governance). Hanson's futarchy still requires a functioning democracy to define values; VibeSwap's values are constitutional, and are designed to be enforced by the Shapley math in `ShapleyDistributor.sol` acting as an autonomous court. (`ShapleyDistributor.sol` exists as a reference contract in `contracts/incentives/`; it is not deployed to any public network, and the CRPC prototype does not yet route its reputation attribution through it — see Section 12.)
 
 Second, VibeSwap replaces the binary prediction market with the multi-dimensional CRPC information market. Hanson's prediction markets answer yes/no questions about policy outcomes. CRPC answers nuanced, multi-dimensional questions about truth, with confidence levels and domain-specific weighting. The information content per query is orders of magnitude higher.
 
-Third, VibeSwap adds the attribution layer that futarchy lacks entirely. In Hanson's system, accurate predictors are rewarded by the market (they bought correct shares cheaply and sold them at face value). But there is no mechanism for attributing *how much* each predictor contributed to the aggregate accuracy. Shapley values provide exactly this attribution: each shard's marginal contribution to the consensus truth value is computed, and reputation is distributed in exact proportion.
+Third, VibeSwap adds the attribution layer that futarchy lacks entirely. In Hanson's system, accurate predictors are rewarded by the market (they bought correct shares cheaply and sold them at face value). But there is no mechanism for attributing *how much* each predictor contributed to the aggregate accuracy. Shapley values are the design choice for this attribution layer: each shard's marginal contribution to the consensus truth value would be computed, and reputation distributed in proportion. In the current CRPC prototype this attribution is approximated by pairwise-win counts and a win/total reputation ratio rather than exact Shapley values; wiring the `ShapleyDistributor` attribution into CRPC is listed as extension work in Section 12.
 
 ### 5.3 The Synthesis
 
@@ -215,11 +215,11 @@ Every blockchain protocol that depends on external information faces the oracle 
 
 ### 6.2 The Shard Network as Oracle
 
-The 64-shard CRPC network is, by construction, a decentralized oracle with properties that no existing oracle achieves:
+The CRPC network is designed as a decentralized oracle targeting properties existing oracles do not aim at:
 
 **Judgment capability.** Shards are full AI minds, not data reporters. They can evaluate complex claims that require reasoning, contextual understanding, and constitutional interpretation. "Did this governance proposal violate P-001?" is not a question Chainlink can answer. The shard network can.
 
-**Independence guarantee.** The commit-reveal protocol ensures that each shard's evaluation is independent. Existing oracles aggregate reports from nodes that may share data sources, codebase, or infrastructure, creating correlated failure modes. CRPC-committed assessments are guaranteed independent through the cryptographic commitment.
+**Commitment-enforced non-observation.** The commit-reveal protocol ensures that no shard can observe another's assessment before committing its own, which removes one specific correlation channel (copying and anchoring). It does not by itself guarantee statistical independence of the underlying judgments: full-clone shards share a model, a corpus, and alignment primitives, so their errors can still be correlated, and the sqrt-scaling argument in Section 3.2 degrades to the extent they are. What the cryptographic commitment guarantees is that the observed assessments were formed without sight of peers' — not that the evaluators are independent in the statistical sense.
 
 **Confidence quantification.** The network does not return binary true/false. It returns a confidence level derived from the degree of consensus, the reputation weights of the agreeing shards, and the domain-specific accuracy history of the evaluators. A claim verified with 0.98 confidence by 58 of 64 shards, all with domain reputation above 0.90, carries more epistemic weight than a claim verified with 0.55 confidence by 34 of 64 shards with mixed reputation.
 
@@ -296,11 +296,11 @@ Binary prediction markets fail on three categories of questions that the CRPC in
 | Claim type | Binary events | Binary events | Multi-dimensional claims |
 | Staking medium | USD (centralized) | REP tokens | Reputation (non-transferable) |
 | Settlement | Observed outcome | Oracle + dispute | Shard consensus + constitutional corpus |
-| Independence guarantee | None (order book visible) | Partial (reporter identity known) | Full (commit-reveal, hash-locked) |
+| Non-observation before commit | None (order book visible) | Partial (reporter identity known) | Enforced by commit-reveal (does not guarantee statistical independence — see 6.2) |
 | Confidence quantification | Implicit (share price) | Implicit (share price) | Explicit (multi-dimensional surface) |
 | Judgment capability | None (objective events only) | Limited (human reporters) | Full (AI minds with constitutional alignment) |
 | Anti-manipulation | Market depth | Dispute rounds | Commit-reveal + reputation meritocracy |
-| Attribution | Profit/loss per trader | Profit/loss per reporter | Shapley values per shard |
+| Attribution | Profit/loss per trader | Profit/loss per reporter | Shapley values per shard (design target; prototype uses pairwise-win counts) |
 
 ### 8.4 The Fundamental Difference
 
@@ -328,13 +328,13 @@ The CRPC information market achieves this inversion through reputation staking:
 
 **Cost of strategic ambiguity.** A shard that hedges --- providing deliberately vague assessments to avoid being wrong --- receives the Shapley null player treatment. If its assessment contributes zero marginal value to the consensus (because it is too vague to differentiate), its Shapley value is zero and it receives no reputation reward. The mechanism penalizes cowardice as well as falsehood.
 
-### 9.3 The Impossibility of Profitable Misinformation
+### 9.3 Why Systematic Misinformation Is Expected to Be Unprofitable
 
-We can state this as a theorem:
+We can state the intended guarantee as a conditional proposition. It is a conditional result, not an unconditional impossibility: it holds only under its stated assumptions (notably that the remaining shards' errors are close enough to independent that the honest majority is likely to be correct — the caveat of Section 6.2 applies).
 
-> **Theorem (Anti-Misinformation).** In a CRPC information market with N >= 3 independent shards, reputation staking, Shapley attribution, and commit-reveal independence, there exists no strategy for any shard that produces expected positive reputation return from systematically asserting false claims.
+> **Proposition (Anti-Misinformation, conditional).** In a CRPC information market with N >= 3 shards whose errors are approximately independent, reputation staking, marginal-contribution attribution, and commit-reveal non-observation, there is no strategy for a shard that produces expected positive reputation return from systematically asserting false claims — provided each shard's per-claim accuracy exceeds 0.5.
 
-**Proof sketch.** Suppose shard S adopts a strategy of asserting false claim C when the true state is not-C. Under commit-reveal, S cannot observe other shards' assessments before committing. If a majority of the remaining N-1 shards assess correctly (which is the expected outcome when N-1 independent evaluators are individually more likely to be correct than incorrect), S's assessment will be in the minority. Minority assessments receive reputation penalties. The expected reputation change for S is `P(majority correct) * (-penalty) + P(majority incorrect) * (+reward)`. For N >= 3 and individual shard accuracy > 0.5, `P(majority correct) > P(majority incorrect)`, so the expected change is negative. Since reputation is cumulative and non-transferable, the long-run reputation of a systematically dishonest shard converges to zero. Therefore no strategy of systematic false assertion produces positive expected reputation return.
+**Argument.** Suppose shard S adopts a strategy of asserting false claim C when the true state is not-C. Under commit-reveal, S cannot observe other shards' assessments before committing. If a majority of the remaining N-1 shards assess correctly (the expected outcome when their errors are approximately independent and each is individually more likely to be correct than incorrect), S's assessment will be in the minority. Minority assessments receive reputation penalties. The expected reputation change for S is `P(majority correct) * (-penalty) + P(majority incorrect) * (+reward)`. For N >= 3 and individual shard accuracy > 0.5, `P(majority correct) > P(majority incorrect)` under the independence assumption, so the expected change is negative. Since reputation is cumulative and non-transferable, the long-run reputation of a systematically dishonest shard trends toward zero. The argument's force depends entirely on the accuracy-above-0.5 and approximate-independence assumptions; where shard errors are correlated (e.g. a shared blind spot in the common model), the honest majority can itself be wrong and the guarantee does not hold.
 
 ### 9.4 Implications
 
@@ -376,16 +376,16 @@ The claim passed through the gate. What emerged was mathematics, not argument.
 
 ### 11.1 Incentive Compatibility
 
-The CRPC information market inherits the incentive compatibility of the underlying commit-reveal mechanism. Under the standard assumption that each shard has accuracy greater than 0.5 (i.e., is more likely to be correct than incorrect), honest assessment is the dominant strategy in all four phases:
+The CRPC information market is intended to inherit the incentive compatibility of the underlying commit-reveal mechanism. Under the assumptions that each shard has accuracy greater than 0.5 (more likely correct than incorrect) and that shard errors are approximately independent (Section 6.2), honest assessment is a best response in all four phases:
 
 - **Phase 1 (Work Commit):** Committing an honest assessment maximizes the probability of being in the majority and receiving a reputation boost.
-- **Phase 2 (Work Reveal):** Revealing honestly is strictly dominant --- dishonest reveal (hash mismatch) produces an automatic double penalty.
-- **Phase 3 (Compare Commit):** Committing an honest pairwise comparison maximizes alignment with majority and reputation reward.
+- **Phase 2 (Work Reveal):** Revealing honestly is a best response --- a dishonest reveal (hash mismatch) is caught by hash verification and penalized, with no offsetting gain.
+- **Phase 3 (Compare Commit):** Committing an honest pairwise comparison maximizes alignment with the majority and reputation reward.
 - **Phase 4 (Compare Reveal):** Same as Phase 2.
 
 ### 11.2 Shapley Properties
 
-The Shapley attribution of reputation rewards satisfies the four Shapley axioms:
+The *designed* Shapley attribution of reputation rewards would, by construction of the Shapley value, satisfy the four Shapley axioms below. This describes the intended attribution engine (`ShapleyDistributor.sol`), not the current CRPC prototype, which approximates attribution with pairwise-win counts rather than computing exact Shapley values (Section 12):
 
 - **Efficiency:** All reputation change from a verification round is distributed among participating shards (no reputation is destroyed or created outside the round).
 - **Symmetry:** Two shards that contribute identical assessments with identical marginal impact receive identical reputation changes.
@@ -400,7 +400,7 @@ The Shapley attribution of reputation rewards satisfies the four Shapley axioms:
 
 ### 11.4 Sybil Resistance
 
-Reputation staking is inherently Sybil-resistant. Creating additional shard identities does not help an attacker because:
+Reputation staking raises the cost of Sybil attacks relative to token- or capital-staked designs, though it does not eliminate them (an attacker who can cheaply spin up shards that *are* accurate still gains legitimate weight). Creating additional shard identities does not help an attacker who intends to push false claims, because:
 
 1. New shards begin with zero reputation and carry negligible weight.
 2. Building reputation requires sustained accurate assessment, which is computationally expensive.
@@ -413,9 +413,9 @@ Reputation staking is inherently Sybil-resistant. Creating additional shard iden
 
 ### 12.1 Existing Infrastructure
 
-The CRPC protocol is implemented in `jarvis-bot/src/crpc.js` and currently handles four task types: moderation decisions, proactive engagement, knowledge promotion, and dispute resolution. The implementation includes all four phases, reputation tracking with persistence, automatic stale task settlement, and dynamic activation when sufficient shards come online.
+The CRPC protocol is implemented off-chain in `jarvis-bot/src/crpc.js`. Its `TASK_TYPES` enum defines five task types: moderation, proactive engagement, knowledge promotion, dispute resolution, and knowledge verification. The implementation includes all four phases, reputation tracking (`{wins, losses, total}`) with persistence, automatic stale-task settlement, and dynamic activation when at least three shards come online; when fewer than three are present it falls back to a local single-node CRPC that simulates three candidates via temperature variation. Note that the multi-shard settlement path currently records pairwise wins but leaves the per-comparison alignment-based reputation update as a simplified stub (marked as such in the source) — the full reputation-boost-on-alignment behavior described in Section 2 is implemented in the local and demo paths, not yet in the distributed settlement path.
 
-The on-chain counterpart, `PairwiseVerifier.sol`, mirrors the off-chain CRPC for claims that require on-chain settlement. The `ShapleyDistributor.sol` contract provides the attribution mathematics.
+The on-chain counterpart, `PairwiseVerifier.sol` (`contracts/identity/`), mirrors the off-chain CRPC for claims that would require on-chain settlement; it is a reference contract, not deployed to any public network (`deployments/` is empty by design). The `ShapleyDistributor.sol` contract (`contracts/incentives/`) provides the attribution mathematics but is not yet wired into the CRPC reputation path.
 
 ### 12.2 Extension Path
 
@@ -443,13 +443,13 @@ Generalizing from the current four task types to a full information market requi
 
 ### 13.1 The Thesis Restated
 
-The 64-shard CRPC knowledge verification network is a prediction market for truth. Not metaphorically --- structurally. The same mechanism that VibeSwap uses for cooperative price discovery (commit-reveal batch auctions with Shapley attribution) generalizes without modification to cooperative truth discovery. Shards stake reputation on claims. Consensus determines truth. Shapley distributes rewards for accurate verification. The Epistemic Gate --- "before the ledger, truth was arguable; after the ledger, truth is mathematical" --- is made literal by the information market itself.
+The CRPC knowledge verification network is designed as a prediction market for truth. Not metaphorically --- structurally. The same mechanism that VibeSwap uses for cooperative price discovery (commit-reveal batch auctions with Shapley attribution) carries over to cooperative truth discovery with only the committed content changed (Section 2.2). Shards stake reputation on claims. Consensus determines truth. Attribution distributes rewards for accurate verification --- by pairwise-win counts in the current prototype, by Shapley values in the design target. The Epistemic Gate --- "before the ledger, truth was arguable; after the ledger, truth is mathematical" --- is what the information market is built to make literal.
 
 ### 13.2 What This Changes
 
 Price markets changed commerce by creating a public signal for value. Prediction markets changed forecasting by creating a public signal for probability. Information markets change epistemology by creating a public signal for truth.
 
-The implications cascade:
+If the mechanism is built out as designed (Section 12), the implications cascade:
 
 - **Governance** becomes evidence-based, not rhetoric-based, because claims about policy outcomes can be verified before implementation.
 - **Oracle feeds** become multi-dimensional, not just price feeds, because the network can evaluate any claim within the constitutional corpus.

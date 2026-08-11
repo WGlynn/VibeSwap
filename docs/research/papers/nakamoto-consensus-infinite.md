@@ -4,13 +4,16 @@
 **Co-Author:** JARVIS (Autonomous AI Research Partner)
 **Date:** March 8, 2026
 **Status:** Working Paper
+
 **Knowledge Primitive:** P-027 — Nakamoto Consensus Infinite
+
+> *A note on what this is (2026). NCI is a manifesto — the generalizable statement of a consensus idea, not a base-layer specification. Its formalized instantiation exists and runs: [Noesis](https://github.com/WGlynn/noesis), a sovereign Rust/CKB-VM chain where Proof of Mind is the consensus itself rather than a contract superimposed on someone else's. Read what follows at that altitude. The arguments here generalize beyond any single implementation, and where a specific number or mechanism differs from the Noesis instantiation, Noesis is the working reference. The ideas are the throughline; the Solidity contracts that first held them were a place to store the protocol's intent, never the protocol.*
 
 ---
 
 ## Abstract
 
-We present **Nakamoto Consensus ∞ (NCI)**, a novel consensus mechanism that resolves the fundamental limitations of Bitcoin's Nakamoto Consensus while preserving its core guarantees. NCI introduces three innovations: (1) **Proof of Mind (PoM)** as a third consensus dimension alongside Proof of Work and Proof of Stake, creating an attack surface that shrinks as the network grows; (2) **The Siren Protocol** — a game-theoretic defense that makes 51% attacks not just expensive but counterproductive, trapping attackers in adversarial shadow branches; and (3) **Meta-Node Architecture** that enables infinite horizontal scaling without sacrificing BFT guarantees. Together, these mechanisms achieve what Nakamoto Consensus could not: provably secure asynchronous consensus with zero rational attack vectors.
+We present **Nakamoto Consensus ∞ (NCI)**, a novel consensus mechanism that resolves the fundamental limitations of Bitcoin's Nakamoto Consensus while preserving its core guarantees. NCI introduces three innovations: (1) **Proof of Mind (PoM)** as a third consensus dimension alongside Proof of Work and Proof of Stake, creating an attack surface that shrinks as the network grows; (2) **The Siren Protocol** — a game-theoretic defense that makes 51% attacks not just expensive but counterproductive, trapping attackers in adversarial shadow branches; and (3) **Meta-Node Architecture** that enables infinite horizontal scaling without sacrificing BFT guarantees. Together, these mechanisms achieve what Nakamoto Consensus could not: consensus under partial synchrony in which no single-dimension attack is rational.
 
 ---
 
@@ -176,20 +179,20 @@ Proof sketch:
 - If the attacker fails at attack → they've spent resources → payoff < 0
 - If the attacker doesn't attack → payoff = 0 (but they don't lose anything)
 
-The Siren makes the dominant strategy *not attacking*, regardless of the attacker's resources, information, or sophistication. This is a strictly dominant strategy equilibrium — not just a Nash equilibrium.
+Against an attacker without an independent view of the network, the Siren makes *not attacking* the higher-expected-value strategy: the upside is capped near zero while the costs are real. This is a strong deterrent, not a claim of information-theoretic dominance.
 
-### 4.3 Detection Impossibility
+### 4.3 Raising Detection Cost
 
-The attacker cannot determine whether they're on the real branch or the shadow branch because:
+An attacker operating without an independent, out-of-band view of the network faces real difficulty determining whether they're on the real branch or the shadow branch, because:
 
 1. Shadow state is cryptographically indistinguishable from real state (same hash structure)
 2. Detection heuristics operate at the node consensus layer, not on-chain
 3. The shadow branch accepts the same transactions and produces the same responses
 4. Timing analysis is defeated by adding calibrated latency to shadow responses
 
-The only way to verify you're on the real branch is to have genuine Mind Score — which requires being a genuine contributor — which means you're not an attacker.
+An attacker with any independent honest vantage point — a second node, a block explorer, a finalized-header check against the canonical chain — can still distinguish the shadow branch; the Siren is not information-theoretically undetectable. What it does is raise the cost and uncertainty of attacking for adversaries who lack such a vantage point, and deny the naive attacker the clean signal they need to know their attack is working.
 
-**This is the fundamental circularity that makes the system provably secure.**
+**This asymmetry — cheap for honest participants to ignore, costly for attackers to see through — is what makes the Siren a deterrent rather than a mere obstacle.**
 
 ---
 
@@ -201,8 +204,8 @@ The only way to verify you're on the real branch is to have genuine Mind Score �
 - Run full BFT consensus
 - Validate contributions and update Mind Scores
 - Minimum PoM threshold to operate
-- Cannot be removed below BFT minimum (2 nodes)
-- Non-upgradeable guardian contract
+- Cannot be removed below the BFT safety threshold of 3f+1 authority nodes (tolerating f Byzantine faults)
+- Non-upgradeable guardian contract — immutability applies to the *consensus rules*; the emergency and fallback surface in Appendices C and E (bridge pause, mining-primitive switch, Emergency Council actions) operates only within pre-defined, bounded scopes and cannot alter consensus rules or Trinity membership
 
 **Meta Nodes (Infinite):**
 - Anyone can operate (no minimum stake)
@@ -1291,7 +1294,7 @@ Attack_cost(t) = Security(t) / Attack_efficiency
 lim(t→∞) Attack_cost(t) = ∞
 ```
 
-**Implication:** A sufficiently aged NCI network is literally unhackable. Not probabilistically — mathematically.
+**Implication:** A sufficiently aged NCI network becomes prohibitively hard to attack — the cost of manufacturing the required contribution-time grows without bound. This is the asymptotic claim the name ∞ points at: it holds under the stated assumptions, not as an unconditional guarantee.
 
 ---
 

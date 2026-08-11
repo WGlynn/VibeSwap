@@ -9,18 +9,18 @@
 
 ## The Build
 
-**VibeSwap** — Omnichain DEX eliminating MEV through commit-reveal batch auctions with Shapley-fair reward distribution. Zero protocol fees. Deployed on Base, built on LayerZero V2.
+**VibeSwap** — Omnichain DEX designed to eliminate MEV through commit-reveal batch auctions with Shapley-fair reward distribution. Zero protocol fees. Not publicly deployed — mid-pivot to a sovereign Nervos-CKB-fork chain (canonical burn-and-mint messaging, replacing an earlier LayerZero V2 design).
 
-| What               | Number   |
-| ------------------ | -------- |
-| Solidity contracts | 351      |
-| Foundry tests      | 5,800+   |
-| CKB/Rust SDK tests | 15,155   |
-| React components   | 336      |
-| Commits            | 1,845+   |
-| Research papers    | 44       |
-| Time to build      | 3 months |
-| Funding raised     | $0       |
+| What                          | Number   |
+| ----------------------------- | -------- |
+| Solidity files in `contracts/`| 438      |
+| Foundry test files            | 591      |
+| CKB cell-type-scripts         | 26 building |
+| React components              | 349      |
+| Commits                       | 1,845+   |
+| Research papers               | 122      |
+| Time to build                 | 3 months |
+| Funding raised                | $0       |
 
 **The repo is the resume**: [github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)
 
@@ -28,15 +28,15 @@
 
 ## Original Contributions
 
-**Augmented Governance** — Shapley axioms as on-chain constitutional invariants. Governance capture becomes mathematically impossible. Proven in simulation.
+**Augmented Governance** — Shapley axioms as on-chain constitutional invariants, designed so governance capture violates a math-enforced bound rather than a social norm. Explored in simulation; not yet demonstrated on a live network.
 
-**P-001: No Extraction Ever** — Self-correcting fairness invariant. Same math that distributes rewards detects extraction. Autonomous correction without governance votes.
+**P-001: No Extraction Ever** — Self-correcting fairness invariant. The same Shapley math that distributes rewards is designed to detect extraction so the system self-corrects rather than depending on a governance referee. Design intent — not yet demonstrated on a live network.
 
-**Commit-Reveal Batch Auctions** — 8s commit → 2s reveal → Fisher-Yates shuffle via XORed secrets → uniform clearing price. MEV structurally eliminated.
+**Commit-Reveal Batch Auctions** — 8s commit → 2s reveal → Fisher-Yates shuffle via XORed secrets → uniform clearing price. A single clearing price per batch removes the "before/after" spread a sandwich attack needs, so the sandwich vector doesn't exist within a batch.
 
 **x402 + SIWX Session Auth** — Implemented CAIP-122 wallet sessions for HTTP 402 payments same day as protocol announcement. 4,000x latency reduction.
 
-**Three-Layer Oracle Stack** — On-chain TWAP + Kalman filter true price + regime detection. Circuit breakers on 50% price deviation, $10M volume spikes, 25% TVL surges.
+**Three-Layer Oracle Stack** — On-chain TWAP + off-chain Kalman filter true price + regime detection. Configurable circuit breakers for price-deviation, volume, and withdrawal anomalies (thresholds set per-pool at configure-time).
 
 ---
 
@@ -52,7 +52,7 @@ Solidity · Foundry · OpenZeppelin · UUPS Proxies · React · Vite · Tailwind
 
 *2025 – Present*
 
-Built a full-stack omnichain DEX from zero: 351 contracts, 336 frontend components, 73-module Rust SDK, multi-shard AI agent system, Python oracle, and 44 research papers. Designed commit-reveal batch auctions, Shapley reward distribution, augmented governance, and the cooperative capitalism economic model. Zero external funding.
+Built a full-stack omnichain DEX from zero: 438 Solidity files across 34 module directories, 349 frontend components, a sovereign CKB-fork chain (26 cell-type-scripts building, dev chain mining blocks), multi-shard AI agent system, Python oracle, and 122 research papers. Designed commit-reveal batch auctions, Shapley reward distribution, augmented governance, and the cooperative capitalism economic model. Zero external funding. Not yet publicly deployed — see repo status.
 
 ### Startup Consultant — Blockchain Projects
 
@@ -99,8 +99,8 @@ Ran social media campaign directly resulting in 5x ROI by market cap. Content cr
 
 ## What I'm Looking For
 
-Partners, grants, and capital to scale a protocol that's already built and deployed.
+Partners, grants, and capital to take a protocol that's already built — mechanism spec, reference contracts, and a mining CKB dev chain — the rest of the way to mainnet.
 
-Most founders raise money to build. I built first. The code is public. The tests pass. The math works.
+Most founders raise money to build. I built first. The code is public. Tests run per-module and pass. The mechanism design is done; deployment is the next chapter.
 
 **[github.com/WGlynn/VibeSwap](https://github.com/WGlynn/VibeSwap)** — 1,845+ commits. $0 funding. Built in a cave.

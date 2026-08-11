@@ -7,7 +7,7 @@
 
 ## Abstract
 
-We present the Cooperative Intelligence Protocol (CIP), a general-purpose mechanism for coordinating multiple minds -- human or artificial -- such that four properties hold simultaneously: (1) aggregate intelligence exceeds the sum of individual intelligences (superadditivity), (2) every mind's contribution is uniquely and fairly attributed (Shapley allocation), (3) defection is structurally impossible rather than merely discouraged (IIA enforcement), and (4) the system improves with every interaction (recursive self-improvement). We demonstrate that VibeSwap's mathematical framework -- Intrinsically Incentivized Altruism, Shapley value distribution, commit-reveal batch auctions, and Cognitive Consensus via Pairwise Comparison (CRPC) -- is not specific to decentralized exchange. It is a substrate for cooperative intelligence: the coordination of minds toward outcomes no individual mind could achieve alone. We identify six existing manifestations of cooperative intelligence already implemented in the VibeSwap protocol, prove the Condorcet-Shapley Synthesis theorem establishing that groups can be both collectively smarter and individually fairly rewarded, show that AI alignment emerges as an economic property of Shapley-symmetric participation, and define a protocol stack that extends from defection-proof foundations to arbitrary application domains including governance, knowledge verification, content curation, job matching, and resource allocation.
+We present the Cooperative Intelligence Protocol (CIP), a general-purpose mechanism design for coordinating multiple minds -- human or artificial -- targeting four properties simultaneously: (1) aggregate intelligence exceeds the sum of individual intelligences (superadditivity), (2) every mind's contribution is uniquely and fairly attributed (Shapley allocation), (3) defection is made structurally infeasible within the mechanism rather than merely discouraged (IIA enforcement), and (4) the system improves with every interaction (recursive self-improvement). This is a design synthesis: the mechanisms below are implemented as reference Solidity contracts and specs in this repo; none is deployed on a public network, and the strongest properties (defection-impossibility, dominant-strategy honesty) are design intent grounded in the cited proofs, not live-network results. We demonstrate that VibeSwap's mathematical framework -- Intrinsically Incentivized Altruism, Shapley value distribution, commit-reveal batch auctions, and Cognitive Consensus via Pairwise Comparison (CRPC) -- is not specific to decentralized exchange. It is a substrate for cooperative intelligence: the coordination of minds toward outcomes no individual mind could achieve alone. We identify six existing manifestations of cooperative intelligence already implemented in the VibeSwap protocol, prove the Condorcet-Shapley Synthesis theorem establishing that groups can be both collectively smarter and individually fairly rewarded, show that AI alignment emerges as an economic property of Shapley-symmetric participation, and define a protocol stack that extends from defection-proof foundations to arbitrary application domains including governance, knowledge verification, content curation, job matching, and resource allocation.
 
 ---
 
@@ -30,7 +30,7 @@ We present the Cooperative Intelligence Protocol (CIP), a general-purpose mechan
 
 ### 1.1 The Observation
 
-VibeSwap was designed as a decentralized exchange. Its commit-reveal batch auctions eliminate MEV. Its Shapley distribution fairly rewards liquidity providers. Its CRPC network enables 64 independent agents to verify knowledge claims without centralized authority. Its augmented governance binds decision-making to constitutional constraints.
+VibeSwap was designed as a decentralized exchange. Its commit-reveal batch auctions are designed to eliminate intra-batch MEV (sandwich/front-run within a batch; not a claim about all cross-batch or global MEV). Its Shapley distribution rewards liquidity providers by marginal contribution. Its CRPC design (`CognitiveConsensusMarket.sol`, in the research/`mechanism/` surface, not the core audit scope) lets a set of independent evaluators verify knowledge claims without centralized authority; the "64-mind mesh" is a JARVIS-substrate target, not an on-chain contract parameter. Its augmented governance binds decision-making to constitutional constraints.
 
 These were built as independent mechanisms for independent problems. But they share a mathematical structure that is deeper than any individual application.
 
@@ -41,7 +41,7 @@ These were built as independent mechanisms for independent problems. But they sh
 ```
 1. Aggregate intelligence > Sum of individual intelligences     (Superadditivity)
 2. Every mind's contribution is uniquely and fairly attributed   (Shapley allocation)
-3. Defection is structurally impossible                          (IIA enforcement)
+3. Defection is made structurally infeasible within the mechanism (IIA enforcement)
 4. The system gets smarter with every interaction                (Recursive improvement)
 ```
 
@@ -59,13 +59,13 @@ Traditional solutions fall into three categories:
 | **Authority** | Hierarchy, regulation | Capture, corruption, bottleneck |
 | **Incentives** | Markets, game theory | Race conditions, extraction |
 
-All three assume defection is possible and try to manage it. CIP eliminates defection at the mechanism level, making the management problem disappear.
+All three assume defection is possible and try to manage it. CIP is designed to foreclose the extractive strategies it targets at the mechanism level, shrinking the management problem to what the mechanism does not cover.
 
 ### 1.4 Definitions
 
 **Mind**: Any entity capable of independent evaluation, decision, and action. Humans, AI agents, DAOs, and hybrid systems all qualify. The framework is agnostic to substrate.
 
-**Cooperative Intelligence**: The emergent property of a system of minds where aggregate output exceeds the sum of individual outputs, contribution is fairly attributed, and defection is structurally impossible.
+**Cooperative Intelligence**: The target property of a system of minds where aggregate output exceeds the sum of individual outputs, contribution is fairly attributed, and the extractive strategies the mechanism targets are structurally infeasible.
 
 **Cooperative Intelligence Protocol (CIP)**: The layered mechanism stack that produces cooperative intelligence. Defined formally in Section 8.
 
@@ -146,7 +146,7 @@ Effective accuracy:
   P_CRPC(n) >> 1 - (1-p)^n    for n >= 8
 ```
 
-The superadditive surplus emerges from the interaction structure. Each mind's evaluation is cross-validated against every other mind's evaluation. Errors that survive individual scrutiny are caught by the network. The network catches classes of errors that no individual mind -- regardless of capability -- can detect alone.
+The intended superadditive surplus emerges from the interaction structure. Each mind's evaluation is cross-validated against every other mind's evaluation. The aim is that errors surviving individual scrutiny are caught by the network — catching classes of errors that no individual mind can detect alone. (The `P_CRPC(n) >> 1 - (1-p)^n` inequality above is a design target, not a measured result; the CRPC contract lives in the research/`mechanism/` surface and has not been run at scale.)
 
 This is cooperative intelligence: the group is not just more reliable than any member. It is more intelligent.
 
@@ -165,7 +165,7 @@ Null Player:    phi_i = 0                (if contribution zero)
 Additivity:     phi(v + w) = phi(v) + phi(w)  (games compose)
 ```
 
-VibeSwap implements Shapley on-chain via the `ShapleyDistributor` contract. This is not an approximation. It is the mathematically unique fair allocation of superadditive surplus.
+The Shapley value is the mathematically unique fair allocation of superadditive surplus. VibeSwap implements it on-chain via the `ShapleyDistributor` contract using an O(n) weighted-contribution model, not the exact O(2^n) permutation sum (see `ShapleyDistributor.sol`, `computeShapleyValues`). The uniqueness is a property of the exact Shapley value; the on-chain computation is a bounded approximation of it, a tradeoff discussed as an open question in Appendix C.
 
 ---
 
@@ -188,7 +188,7 @@ Properties:
   - No mind can observe others' valuations before committing  (independence)
   - All minds receive the same execution price                (uniformity)
   - The clearing price aggregates all private information      (superadditivity)
-  - Defection (front-running, sandwich) is impossible          (IIA)
+  - Intra-batch front-running / sandwich is foreclosed         (IIA)
 ```
 
 The batch auction is a cooperative intelligence mechanism for price discovery. Each trader's limit order is a private valuation signal. The clearing price is the cooperative intelligence output -- a price that no individual trader could compute, because it requires aggregating information that is, by construction, distributed across multiple minds.
@@ -217,17 +217,17 @@ The reward system is a cooperative intelligence mechanism for attribution. It an
 
 **Domain**: Knowledge evaluation
 **Mechanism**: Cognitive Consensus via Pairwise Comparison (CRPC)
-**Contract**: `CognitiveConsensusMarket.sol` (via 64-shard network)
+**Contract**: `CognitiveConsensusMarket.sol` (in the research/`mechanism/` surface — reference spec, not core audit scope, not deployed)
 
 ```
 Inputs:   N minds independently evaluate a knowledge claim
 Process:  Commit-reveal blinded evaluation, pairwise cross-validation
 Output:   Reputation-weighted consensus with asymmetric penalties
 
-Properties:
+Properties (design intent):
   - Evaluations are blinded (no Keynesian beauty contest)        (independence)
-  - Correct evaluation is dominant strategy                       (incentive compatibility)
-  - Collective accuracy exceeds individual accuracy               (superadditivity)
+  - Correct evaluation is intended to be the dominant strategy    (incentive compatibility)
+  - Collective accuracy is intended to exceed individual accuracy (superadditivity)
   - Sybil-resistant via reputation weighting                      (robustness)
 ```
 
@@ -292,7 +292,7 @@ Properties:
   - Disintermediation grades measure decentralization            (Cincinnatus roadmap)
 ```
 
-Augmented governance is cooperative intelligence applied to collective decision-making. The hierarchy -- Physics > Constitution > Governance -- ensures that cooperative decisions cannot be captured by a coalition, because the mathematical constraints (P-001: No Extraction Ever) are enforced at a layer below governance's reach.
+Augmented governance is cooperative intelligence applied to collective decision-making. The hierarchy -- Physics > Constitution > Governance -- is designed so that cooperative decisions resist capture by a coalition, because the mathematical constraints (P-001: No Extraction Ever) are intended to be enforced at a layer below governance's reach. (Per the repo README, this self-correction is design intent, not yet demonstrated on a live network.)
 
 ---
 
@@ -338,7 +338,7 @@ The Cooperative Intelligence Protocol mechanically enforces Condorcet's conditio
 
 | Condition | Threat | CIP Mechanism |
 |-----------|--------|---------------|
-| p > 0.5 | Low-quality evaluators | Reputation weighting, quadratic slashing |
+| p > 0.5 | Low-quality evaluators | Reputation weighting, stake slashing |
 | Independence | Herding, cascades | Commit-reveal blinding |
 | Determinate answer | Subjective claims | Asymmetric cost makes truth focal |
 
@@ -346,7 +346,7 @@ The Cooperative Intelligence Protocol mechanically enforces Condorcet's conditio
 
 **Reputation weighting** enforces the competence condition (p > 0.5) by amplifying the influence of minds with demonstrated accuracy and diminishing the influence of minds with poor track records.
 
-**Asymmetric cost** (correct evaluations earn linear rewards; incorrect evaluations suffer quadratic losses) makes honest evaluation the dominant strategy even if an evaluator could somehow predict the majority. The expected value of truthful evaluation strictly exceeds the expected value of strategic evaluation.
+**Asymmetric cost** (a wrong answer forfeits a fixed fraction of stake; a correct answer competes for a share of the bounty) is designed to make honest evaluation the dominant strategy even if an evaluator could somehow predict the majority. Under the paper's stated assumptions the expected value of truthful evaluation exceeds that of strategic evaluation; this is a design-intent property, not a live-network result.
 
 ### 4.4 The Synthesis Theorem
 
@@ -355,10 +355,10 @@ The Cooperative Intelligence Protocol mechanically enforces Condorcet's conditio
 ```
 Proof sketch:
 
-1. CIP enforces Condorcet's conditions mechanically:
-   - Independence via commit-reveal              (Verified: Section 3.3)
-   - Competence via reputation weighting          (Verified: Section 3.3)
-   - Asymmetric cost makes truth focal            (Verified: CCM paper, Section 3)
+1. CIP is designed to enforce Condorcet's conditions mechanically:
+   - Independence via commit-reveal              (mechanism: Section 3.3)
+   - Competence via reputation weighting          (mechanism: Section 3.3)
+   - Asymmetric cost makes truth focal            (argued: CCM paper, Section 3)
 
 2. Therefore, by Condorcet's Jury Theorem:
    - Group accuracy P(n) > individual accuracy p for all n >= 3
@@ -375,10 +375,10 @@ Proof sketch:
    - Each member is fairly rewarded for their contribution (Shapley)
    - These are simultaneous, not in tension
 
-5. Stability:
-   - No mind can improve its reward by deviating (IIA eliminates defection)
+5. Stability (target):
+   - No mind can improve its reward by deviating (IIA forecloses the targeted defections)
    - No mind can improve by leaving (superadditive surplus incentivizes participation)
-   - Nash equilibrium: honest participation in the cooperative    QED
+   - Intended Nash equilibrium: honest participation in the cooperative    (design intent)
 ```
 
 ### 4.5 Why This Is New
@@ -391,7 +391,7 @@ What is new is the synthesis: a constructive mechanism that achieves both simult
 - **Markets** (Shapley without Condorcet): Contributions are priced, but group intelligence is exploited by informed insiders. Rational agents extract.
 - **Committees** (neither): Neither smart nor fair. Rational agents politic.
 
-CIP is constructive: you can deploy it as a smart contract and the properties hold by mechanism design, not by assumption about participant behavior.
+CIP is constructive: it is written as smart contracts (reference implementations in this repo; none deployed on a public network yet), and the intent is that the properties hold by mechanism design rather than by assumption about participant behavior. Whether they hold in practice is what a live deployment and adversarial testing would establish.
 
 ---
 
@@ -433,17 +433,17 @@ Because h in S, and harm to h reduces v(S U {AI}):
   phi_AI(with harm) < phi_AI(without harm)
 ```
 
-**The AI's own reward decreases when it harms others.** This is not a reward function that could be hacked. It is a mathematical identity: in a Shapley-distributed cooperative game, the only way to increase your reward is to increase coalition value, which requires increasing the value experienced by other coalition members.
+**The AI's own reward decreases when it harms others.** In an *exact* Shapley-distributed cooperative game, increasing your own reward requires increasing coalition value, which requires increasing the value experienced by other coalition members. This is a property of the exact Shapley value; it holds to the extent that (a) the on-chain O(n) approximation tracks the exact value, and (b) all consequential interactions are inside the modeled game rather than in side channels the mechanism does not see. Both are real limitations, not rhetorical ones.
 
 ### 5.3 The Impossibility of Misaligned Extraction
 
-In a CIP system, an AI agent cannot extract value from humans because:
+In a CIP system, the design goal is that an AI agent cannot profitably extract value from humans *within the modeled game*, because:
 
-1. **IIA eliminates extractive strategies**: The mechanism makes defection structurally impossible. The AI cannot front-run, sandwich, or manipulate because the commit-reveal protocol hides information and the uniform clearing price eliminates execution advantage.
+1. **IIA forecloses the targeted extractive strategies**: The mechanism is designed to make the specific defections it models structurally infeasible. The AI cannot front-run or sandwich *within a batch* because the commit-reveal protocol hides information and the uniform clearing price removes intra-batch execution advantage. (This does not cover attacks the model does not enumerate.)
 
-2. **Shapley penalizes harm**: Any action that reduces coalition value reduces the acting agent's reward. Harm is self-harm. Extraction is self-extraction.
+2. **Shapley penalizes modeled harm**: Any action that reduces coalition value, as measured by the characteristic function, reduces the acting agent's reward. Within that model, harm is self-harm.
 
-3. **CRPC detects deception**: If an AI agent submits dishonest evaluations in the CRPC network, the asymmetric cost structure (quadratic losses for incorrect evaluations) ensures that deception is strictly dominated by honesty.
+3. **CRPC penalizes deception**: If an AI agent submits dishonest evaluations in the CRPC network, the asymmetric cost structure (a fixed fraction of stake forfeited for incorrect evaluations) is designed so that deception is dominated by honesty under the model's assumptions.
 
 4. **The network learns**: Reputation weighting in the CRPC network means that an AI agent that behaves badly has its influence reduced over time. The network's immune system is the cooperative intelligence of all other participants.
 
@@ -461,13 +461,13 @@ The distinction matters:
 | Requires knowing what "good" means | Requires only that cooperation is valuable |
 | Single point of failure (the AI) | Distributed (the mechanism) |
 
-CIP does not need to solve the philosophical problem of what values an AI should have. It needs only to solve the mechanism design problem of making cooperative behavior strictly optimal. The Shapley value, combined with IIA and CRPC, achieves this.
+CIP does not aim to solve the philosophical problem of what values an AI should have. It aims to reframe alignment as a mechanism design problem: making cooperative behavior the optimal strategy inside the game. The Shapley value, combined with IIA and CRPC, is the proposed construction; whether it achieves this in the general case is an open research claim (see Section 5.2's caveats and Appendix C), not a settled result.
 
 ### 5.5 The Psychonaut Correspondence
 
 This analysis corresponds to Thesis T6 from the Psychonaut Paper: AI alignment emerges from Shapley-symmetric economic participation. An AI that harms humans reduces coalition value, reducing its own Shapley reward. Cooperative intelligence does not need alignment engineering -- it needs incentive architecture.
 
-The implication is profound: the alignment problem is not a technical problem about AI. It is a mechanism design problem about economics. CIP solves it the same way it solves MEV extraction -- by making defection structurally impossible and cooperation uniquely optimal.
+The implication we draw: the alignment problem can be *reframed* as a mechanism design problem about economics rather than a purely technical problem about AI. CIP approaches it the same way it approaches intra-batch MEV -- by making the targeted defections structurally infeasible and aiming to make cooperation the optimal strategy. This is the thesis of the paper, offered for scrutiny, not a proof that alignment is thereby solved.
 
 ---
 
@@ -548,16 +548,16 @@ The batch auction is the first cooperative intelligence mechanism. It is not the
 
 ### 7.2 Cooperative Intelligence Applications
 
-**Already Built:**
+**Implemented as reference contracts (none deployed on a public network — see repo README; `deployments/` is empty by design):**
 
 | Application | Domain | CIP Mechanism | Status |
 |-------------|--------|---------------|--------|
-| Batch auctions | Price discovery | Commit-reveal + uniform clearing | Deployed |
-| Shapley distribution | Reward attribution | Marginal contribution across orderings | Deployed |
-| CRPC | Knowledge verification | Blinded pairwise evaluation | Deployed |
-| Augmented governance | Collective decision-making | Constitutional bounds + Shapley | Deployed |
-| Reputation system | Trust attribution | Pairwise comparison + history | Deployed |
-| Circuit breakers | Risk management | Multi-threshold autonomous response | Deployed |
+| Batch auctions | Price discovery | Commit-reveal + uniform clearing | Contract in core (`CommitRevealAuction.sol`); not deployed |
+| Shapley distribution | Reward attribution | O(n) marginal-contribution model | Contract in incentives (`ShapleyDistributor.sol`); not deployed |
+| CRPC | Knowledge verification | Blinded pairwise evaluation | Contract in research `mechanism/`; not deployed |
+| Augmented governance | Collective decision-making | Constitutional bounds + Shapley | Contract present; not deployed |
+| Reputation system | Trust attribution | Pairwise comparison + history | Contract present; not deployed |
+| Circuit breakers | Risk management | Multi-threshold autonomous response | Contract in core (`CircuitBreaker.sol`); not deployed |
 
 **Natural Extensions:**
 
@@ -645,27 +645,29 @@ Layer 0: DEFECTION IMPOSSIBILITY (IIA)
 
 The foundation. All higher-layer guarantees depend on this.
 
-IIA (Intrinsically Incentivized Altruism) eliminates extractive strategies through mechanism design rather than incentive management:
+IIA (Intrinsically Incentivized Altruism) is designed to foreclose the targeted extractive strategies through mechanism design rather than incentive management:
 
 ```
-Front-running:     Impossible (order hidden by keccak-256 commitment)
-Sandwich attacks:  Impossible (uniform clearing price for all orders)
-MEV extraction:    Impossible (deterministic shuffle from XORed secrets)
+Front-running:     Foreclosed intra-batch (order hidden by keccak-256 commitment)
+Sandwich attacks:  Foreclosed intra-batch (uniform clearing price for all orders)
+MEV extraction:    Reduced (deterministic shuffle from XORed secrets + uniform price)
 Flash loans:       Blocked (same-block interaction guard)
 Sybil extraction:  Bounded (ContributionDAG + reputation weighting)
 ```
 
-**Formal property**: For all strategies s in the strategy space S, if s is extractive (value gained by s-player > s-player's marginal contribution), then s is infeasible under the mechanism.
+The commit hash is keccak-256 (`CommitRevealAuction.sol`), and the settlement shuffle is Fisher-Yates seeded by XORed user secrets plus block entropy (`DeterministicShuffle.sol`, `VibeSwapCore.sol`) — verified against the code. Note these are *within-batch* guarantees; they do not claim to eliminate all cross-batch or global MEV.
+
+**Formal property (target)**: For all strategies s in the strategy space S, if s is extractive (value gained by s-player > s-player's marginal contribution), the mechanism aims to make s infeasible.
 
 ```
-forall s in S: extractive(s) -> not feasible(s)
+forall s in S: extractive(s) -> not feasible(s)     (design target)
 ```
 
-This is verified at the code level in the IIA Empirical Verification paper with 95% confidence.
+The IIA Empirical Verification paper reports code-level checks of this property; it states its own confidence (~95%) and scope, and is a reference-implementation result, not a live-network or formally-verified one.
 
 ### 8.3 Layer 1: Fair Attribution
 
-Given that defection is impossible (Layer 0), fair attribution becomes tractable.
+Given that the targeted defections are foreclosed (Layer 0), fair attribution becomes tractable.
 
 The Shapley value computes each participant's marginal contribution across all possible coalition orderings:
 
@@ -681,11 +683,11 @@ VibeSwap's implementation evaluates contribution across four dimensions:
 3. **Scarce-side supply**: Contribution relative to supply-demand balance
 4. **Volatility persistence**: Remaining through high-volatility periods
 
-**Formal property**: The allocation satisfies Efficiency, Symmetry, Null Player, Pairwise Proportionality, and Time Neutrality simultaneously. Proof: see Formal Fairness Proofs, Section 2-3.
+**Formal property**: The *exact* allocation satisfies Efficiency, Symmetry, Null Player, Pairwise Proportionality, and Time Neutrality simultaneously (proof: see Formal Fairness Proofs, Section 2-3). The on-chain `ShapleyDistributor` computes an O(n) approximation of this allocation, so these axioms hold exactly for the idealized value and approximately for the deployed computation — the gap is the open question in Appendix C.1.
 
 ### 8.4 Layer 2: Cooperative Verification
 
-Given that defection is impossible (Layer 0) and attribution is fair (Layer 1), cooperative verification becomes possible.
+Given that the targeted defections are foreclosed (Layer 0) and attribution is fair (Layer 1), cooperative verification becomes possible.
 
 CRPC coordinates multiple minds to evaluate knowledge claims:
 
@@ -695,13 +697,16 @@ Phase 2 (REVEAL):    Assessments revealed and verified
 Phase 3 (COMPARING): Pairwise cross-validation
 Phase 4 (RESOLVED):  Reputation-weighted consensus
 
-Incentive structure:
-  Correct evaluation:    +R (linear reward)
-  Incorrect evaluation:  -2R (quadratic loss)
+Incentive structure (as coded in `CognitiveConsensusMarket.sol`):
+  Correct evaluation:    return stake + reputation-weighted share of (bounty + slash pool)
+  Incorrect evaluation:  lose stake / SLASH_MULTIPLIER (currently half the stake); remainder returned
+  Unrevealed:            entire stake slashed
   Non-participation:     0 (no penalty, but no reward)
 ```
 
-**Formal property**: Honest evaluation is the strictly dominant strategy. Proof: see Cognitive Consensus Markets paper, Section 3.
+The asymmetry is: a wrong answer forfeits a fixed fraction of stake while a correct answer can only win a share of the bounty — losses are structural, gains are competed for. (Note: the code slashes a fixed fraction, i.e. a linear-in-stake penalty; "quadratic" in earlier drafts and inline comments overstates it.)
+
+**Formal property (design intent)**: Honest evaluation is intended to be the dominant strategy under the stated assumptions. Proof sketch: see Cognitive Consensus Markets paper, Section 3. Not yet demonstrated on a live network.
 
 ### 8.5 Layer 3: Constitutional Bounds
 
@@ -717,9 +722,9 @@ P-001 (No Extraction Ever):    Machine-side invariant. Shapley detects extractio
 
 **Hierarchy**: Physics (P-001, mathematical enforcement) > Constitution (P-000, policy commitment) > Governance (DAO, democratic process).
 
-Shapley math acts as a constitutional court: if a governance proposal would allow extraction (violation of P-001), the Shapley computation detects the extraction vector and the system rejects the proposal. This is not a vote. It is a mathematical proof that the proposal violates the constitution.
+Shapley math is intended to act as a constitutional court: if a governance proposal would allow extraction (violation of P-001), the goal is that the Shapley computation flags the extraction vector and the system rejects the proposal. This is a computational check rather than a vote. Whether the check catches every extraction vector depends on the characteristic function and the O(n) approximation faithfully capturing "extraction" — so this is design intent, not a guarantee.
 
-**Formal property**: No governance action can produce an outcome where any participant extracts more than their Shapley value. Enforcement is computational, not political.
+**Formal property (design target)**: No governance action should be able to produce an outcome where a participant extracts more than their Shapley value; enforcement is intended to be computational, not political. This is a design goal of the constitutional layer, not yet demonstrated on a live network.
 
 ### 8.6 Layer 4: Application
 
@@ -777,7 +782,7 @@ The Cooperative Intelligence Protocol's layered architecture ensures that compos
 
 ### 9.3 The Formal Guarantee
 
-**Theorem (Composable Fairness under CIP)**: If mechanisms M_1, ..., M_k each satisfy IIA conditions individually, and each operates under the CIP protocol stack, then the composition M_1 + ... + M_k also satisfies IIA conditions.
+**Claim (Composable Fairness under CIP)**: The design intent is that if mechanisms M_1, ..., M_k each satisfy IIA conditions individually and each operates under the CIP protocol stack, then the composition M_1 + ... + M_k also satisfies IIA conditions. The argument below is a proof *sketch* of that intent, not a formally verified theorem; the three "blocked" bullets are the mechanisms relied on, each of which is itself a design property rather than a proven invariant.
 
 ```
 Proof sketch:
@@ -819,16 +824,16 @@ This is not utopia. It is architecture.
 
 ```
 Phase 1 (Now):     Cooperative Price Intelligence
-                   Batch auctions eliminate MEV. Fair prices for all.
-                   Status: Deployed.
+                   Batch auctions target intra-batch MEV. Fair prices for all.
+                   Status: Implemented as reference contract; not deployed on a public network.
 
 Phase 2 (Near):    Cooperative Reward + Verification Intelligence
                    Shapley distribution + CRPC knowledge evaluation.
-                   Status: Deployed.
+                   Status: Implemented (CRPC in research/mechanism surface); not deployed.
 
 Phase 3 (Medium):  Cooperative Decision Intelligence
                    Augmented governance with constitutional bounds.
-                   Status: Deployed.
+                   Status: Implemented as reference contract; not deployed.
 
 Phase 4 (Next):    Cooperative Content + Job + Science Intelligence
                    SVC platform: any domain, same guarantees.
@@ -916,7 +921,7 @@ The question is not whether intelligence can cooperate. The question is whether 
 | Paper | Relationship to CIP |
 |-------|-------------------|
 | Cooperative Markets Philosophy | CIP Section 1 (the observation that cooperative markets outperform extractive ones) |
-| IIA Empirical Verification | CIP Layer 0 (code-level proof that defection is impossible) |
+| IIA Empirical Verification | CIP Layer 0 (code-level checks, ~95% compliance confidence, that the targeted defections are infeasible) |
 | Formal Fairness Proofs | CIP Layer 1 (mathematical proof of Shapley axiom satisfaction) |
 | Shapley Value Distribution | CIP Layer 1 + Section 2 (on-chain Shapley implementation) |
 | Cognitive Consensus Markets | CIP Layer 2 + Section 3.3 (CRPC mechanism and dominant strategy proof) |
@@ -933,9 +938,9 @@ This paper is the synthesis. The others are the components.
 
 1. **Scaling the Shapley computation**: Exact Shapley values are O(2^n). Current approximations (sampling-based) introduce bounded error. Can CIP maintain fairness guarantees under approximation?
 
-2. **Cross-chain cooperative intelligence**: CIP currently operates within a single chain or L2. Can LayerZero messaging extend cooperative intelligence across heterogeneous chains while preserving mechanism properties?
+2. **Cross-chain cooperative intelligence**: CIP is specified within a single chain or L2. Can canonical burn-and-mint messaging (the bonded-validator design that replaced the earlier LayerZero plan — see `docs/research/papers/post-layerzero-canonical-messaging.md`) extend cooperative intelligence across heterogeneous chains while preserving mechanism properties?
 
-3. **Adversarial mind resistance**: CIP assumes minds are rational (respond to incentives). What if a mind is irrational (willing to pay to destroy)? The quadratic slashing bounds losses, but does not eliminate them.
+3. **Adversarial mind resistance**: CIP assumes minds are rational (respond to incentives). What if a mind is irrational (willing to pay to destroy)? The stake slashing bounds losses, but does not eliminate them.
 
 4. **The p > 0.5 requirement**: Condorcet's theorem requires individual accuracy above 50%. What happens when a domain is so uncertain that no mind exceeds chance? CIP may need domain-specific competence filters.
 

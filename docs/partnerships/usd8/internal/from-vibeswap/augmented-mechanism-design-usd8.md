@@ -12,7 +12,7 @@ Imagine two approaches to an unfair coverage payout.
 
 **Approach A — Replacement**: "We'll prevent unfair payouts by appointing a claims committee that decides who deserves what. No one can be unfairly paid because the committee adjudicates."
 
-**Approach B — Augmentation**: "We'll prevent unfair payouts by computing each claimant's share from a published Cover Score formula that anyone can verify. Mathematically, no one can receive a different share than the formula assigns."
+**Approach B — Augmentation**: "We'll prevent unfair payouts by computing each claimant's share from a published Cover Score formula that anyone can verify. By construction, no one can receive a different share than the formula assigns."
 
 Approach A solves the problem but introduces a committee. The committee is now a trust-point, a potential attack surface, and a centralization risk. Compromise the committee, capture the protocol.
 
@@ -32,7 +32,7 @@ Don't replace markets or governance. Augment them with math-enforced invariants 
 - The invariants are mathematical constraints — they can't be circumvented by operator discretion.
 - Fairness emerges from the shape of the constraint, not from anyone being virtuous.
 
-For an insurance protocol, this is the load-bearing distinction between USD8 and the legacy insurance industry. Legacy insurance is replacement: the underwriter decides what to cover, the adjuster decides what to pay, the regulator decides who can sell policies. Each of these intermediaries is a trust-point and a capture surface. USD8 is augmentation, with role boundaries between three distinct actors: **governance** (Layer 3) decides what's covered (the partner-protocol whitelist) bounded by Layer 2 (Constitution) solvency invariants; the **formula** (Layer 1, Physics) decides what each affected holder is paid (by Cover Score); the **chain** decides who can participate (by the absence of any permissioning surface — holders are admitted automatically by holding USD8). The market still functions — capital still flows to whoever provides the most useful coverage; claims still settle to whoever is most provably entitled — but the unfair-rent extraction the legacy industry depends on is mathematically impossible.
+For an insurance protocol, this is the load-bearing distinction between USD8 and the legacy insurance industry. Legacy insurance is replacement: the underwriter decides what to cover, the adjuster decides what to pay, the regulator decides who can sell policies. Each of these intermediaries is a trust-point and a capture surface. USD8 is augmentation, with role boundaries between three distinct actors: **governance** (Layer 3) decides what's covered (the partner-protocol whitelist) bounded by Layer 2 (Constitution) solvency invariants; the **formula** (Layer 1, Physics) decides what each affected holder is paid (by Cover Score); the **chain** decides who can participate (by the absence of any permissioning surface — holders are admitted automatically by holding USD8). The market still functions — capital still flows to whoever provides the most useful coverage; claims still settle to whoever is most provably entitled — but the unfair-rent extraction the legacy industry depends on is designed out at the mechanism level rather than policed after the fact. (These are design properties of the specified mechanism; USD8 is not yet deployed on a public network, so they hold on paper and in tests, not yet under adversarial load in production.)
 
 ---
 
@@ -50,7 +50,7 @@ Rule-based: "If a holder claims a loss twice, the team detects it via off-chain 
 
 Invariant-based: "Each covered LP token can only be transferred to the Cover Pool once; after transfer, it is held by the protocol and cannot be re-tendered."
 
-The invariant-based version doesn't need monitoring. It doesn't need detection. Double-claiming is mathematically impossible because the mechanism's state doesn't allow it.
+The invariant-based version doesn't need monitoring. It doesn't need detection. Double-claiming is ruled out by construction because the mechanism's state doesn't allow it. (This is the intended design of the specified state machine; the cross-provider aggregate case is a separate, still-proposed layer — see the invariant-6 companion spec.)
 
 USD8's existing copy already gestures at this — the Cover Pool "accepts the specified LP token for claims at any time, permissionlessly." The reason that sentence is defensible is that the underlying state machine makes the permissionless acceptance safe. The invariant is doing the work; the prose just describes the consequence.
 
@@ -67,12 +67,12 @@ Different mechanism problems need different invariant types. The four below are 
 **USD8 example 1 — Uniform Cover Score formula across claimants**:
 - Every claimant's payout fraction is computed from the same Cover Score formula applied to the same Cover Pool composition.
 - Mathematical consequence: two claimants with identical usage histories receive identical payouts. There is no way for the protocol to favor one over the other; the formula does not include any field that distinguishes between them.
-- Front-running via claim ordering is structurally impossible — the formula doesn't read claim ordering.
+- Front-running via claim ordering is ruled out by construction — the formula doesn't read claim ordering, so there is no ordering for an attacker to exploit.
 
 **USD8 example 2 — Pro-rata payout from Cover Pool composition**:
 - Claimants receive a proportional mix of assets matching the Cover Pool's composition.
 - Mathematical consequence: there is no choice about which assets a claimant receives; the choice is removed from the protocol entirely.
-- Privileged access to the most desirable assets in the pool is structurally impossible — the protocol cannot favor anyone.
+- Privileged access to the most desirable assets in the pool is ruled out by construction — the mechanism exposes no field the protocol could use to favor anyone.
 
 ### Type 2 — Economic Invariants
 
@@ -109,7 +109,7 @@ Different mechanism problems need different invariant types. The four below are 
 
 **USD8 example 1 — EIP-712 signature on Cover Score attestations**:
 - The off-chain Cover Score computation is signed with EIP-712, domain-separated by chain ID.
-- Mathematical consequence: a signature valid on one chain is invalid on another. Cross-chain replay is structurally impossible.
+- Consequence (inherited from the EIP-712 standard, not a USD8 invention): with the chain ID in the domain separator, a signature valid on one chain does not verify on another, so cross-chain replay of an attestation is ruled out by the signing scheme.
 
 **USD8 example 2 — Merkle proof of holder history** (per companion compression spec):
 - Each holder's usage event is committed into an incremental Merkle tree on-chain. Brevis (or any third party) generates inclusion proofs against historical roots.
@@ -141,12 +141,12 @@ Combines:
 - **Economic**: capital-weighted contribution requires capital to participate.
 - **Temporal**: tenure-weighted contribution rewards capital that stays.
 
-Three invariant types underwriting a fair distribution. The math has the property that no LP can be discriminated against by the protocol; no LP can game the formula by short-term capital strategies; no LP can extract permanent rent from early arrival.
+Three invariant types underwriting a fair distribution. In each round, the math has the property that no LP can be discriminated against by the protocol and no LP can game the formula by short-term capital strategies. Whether early arrival converts into *permanent* rent over many rounds is the iterated-fairness question — the companion `fairness-fixed-point-cover-pool.md` treats the tenure premium asymptoting (rather than compounding) as conjectured-and-empirically-monitored, not proven; see that doc for the honest scope.
 
 ### Claim adjudication tribunal (proposed)
 
 Combines:
-- **Structural**: Bradley-Terry pairwise aggregation produces a unique ranking.
+- **Structural**: Bradley-Terry pairwise aggregation produces a unique ranking (given the standard connectivity condition on the comparison graph — the MLE is unique when the win/loss graph is strongly connected).
 - **Economic**: tribunal participation requires bonded capital that loses value if rulings are later overturned.
 - **Temporal**: contest window before final settlement.
 - **Verification**: cryptographic commitment to tribunal-vote ballots before reveal.
@@ -205,7 +205,7 @@ This contrasts with a common pattern in stablecoin design: when the market misbe
 - New governance captures where operators influence the protocol.
 - New regulatory surface where operators become licensable.
 
-USD8's existing architecture avoids these because the market continues to function. The added invariants are constraints, not substitutions. The Cover Pool operates as a market; the Cover Score operates as a published formula; coverage is permissionless and verifiable. Actors still exist — holders, pool capital, governance, operator — but each actor's discretion is **bounded by math-enforced invariants** at the layers above it (Layer 1 Physics, Layer 2 Constitution). No single actor can compromise the protocol because no actor's discretion can override the layers above it. The architecture is not "no discretion"; it is "discretion structurally bounded so capture cannot extract."
+USD8's existing architecture avoids these because the market continues to function. The added invariants are constraints, not substitutions. The Cover Pool operates as a market; the Cover Score operates as a published formula; coverage is permissionless and verifiable. Actors still exist — holders, pool capital, governance, operator — but each actor's discretion is **bounded by math-enforced invariants** at the layers above it (Layer 1 Physics, Layer 2 Constitution). The design goal is that no single actor can compromise the protocol, because no actor's discretion can override the layers above it — a property the architecture is built to hold, to be confirmed by audit and by testing under adversarial load once deployed. The architecture is not "no discretion"; it is "discretion structurally bounded so capture cannot extract."
 
 This is the philosophical foundation that makes USD8 distinguishable from every prior decentralized stablecoin attempt that ended up importing a centralized actor under a token wrapper. Augmented Mechanism Design is what keeps USD8 from drifting back into that mode as the protocol matures.
 

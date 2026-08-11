@@ -1,6 +1,8 @@
 # Consensus in VibeSwap: A Unified Theory
 
-> *"The protocol doesn't require participants to be good. It makes extraction mathematically impossible — so individual optimization naturally produces collective welfare."*
+> *"The protocol doesn't require participants to be good. It is designed so that extraction is unprofitable — so individual optimization naturally produces collective welfare."*
+>
+> *Status note: this document describes mechanism design intent. Nothing here is deployed on a public network (`deployments/` is empty by design). The EVM contracts are a reference implementation and audit/fuzz target; the canonical target is the CKB-fork port. Read every capability claim below as "designed to," not "proven in production."*
 
 ---
 
@@ -32,11 +34,11 @@ Traditional blockchains use consensus to agree on *one thing*: which transaction
 | Who is trustworthy? | Community voters | Pairwise comparison oracle |
 | Who deserves what reward? | Game theory (deterministic) | Shapley value distribution |
 | Should this clawback be approved? | Hybrid authority council | Federated consensus |
-| Does this person own this identity? | Multi-layer verifiers | AGI-resistant recovery |
+| Does this person own this identity? | Multi-layer verifiers | Multi-factor recovery (see 8.1 on the "AGI-resistant" framing) |
 
 Each question demands a different consensus model because each has different failure modes, adversary models, and finality requirements. A batch auction that takes 7 days would be useless. A wallet recovery that takes 10 seconds would be dangerous.
 
-The unifying principle: **every mechanism makes honest behavior the dominant strategy through economic incentives, not moral appeals.**
+The unifying principle: **every mechanism is designed to make honest behavior the economically rational strategy through incentives, not moral appeals.** The Nash-equilibrium arguments in Section 10 are analytic sketches, not machine-checked proofs; treat them as design rationale pending formal verification.
 
 ---
 
@@ -121,11 +123,13 @@ The foundational consensus mechanism. Every 10 seconds, all pending trades in a 
 
 **Non-Reveal Penalty**: If you commit but don't reveal, you lose 50% of your deposit. This makes griefing attacks (commit garbage to inflate batch size) expensive. Slashed funds route to `DAOTreasury`.
 
-**Flash Loan Protection**: Only EOAs can commit. Contract calls are rejected. This prevents single-transaction flash loan attacks that borrow → commit → reveal → settle → repay in one block.
+**Flash Loan Protection**: The auction contract enforces a same-block interaction guard (`lastInteractionBlock`) — a given caller cannot commit twice in one block, which prevents single-transaction flash loan attacks that borrow → commit → reveal → settle → repay in one block. An additional EOA-only rule (contract callers rejected) exists in `VibeSwapCore` but is a *configurable* flag (`requireEOA`) with a contract whitelist, not an absolute property of the auction — integrators can be allowlisted.
 
 ### 3.2 Cross-Chain Trading Consensus
 
 **Contract**: `contracts/messaging/CrossChainRouter.sol`
+
+> **Status / scope note**: `CrossChainRouter.sol` is a LayerZero V2 wrapper and is now **legacy**. The project moved off LayerZero (after the 2026-04 DVN-RPC compromise) to a canonical burn-and-mint messaging design with bonded validators and BLS threshold attestations; the canonical implementation is chain-native on the CKB-fork (see `IMessagingHub` and `docs/research/papers/post-layerzero-canonical-messaging.md`). The description below is accurate to the code that exists in this contract, but this is not the cross-chain path VibeSwap intends to ship.
 
 Extends the batch auction across chains via LayerZero V2. A trader on Arbitrum can commit to a batch settling on Ethereum.
 
@@ -322,15 +326,19 @@ Rate-limited (1 post per minute) to prevent spam. Requires SoulboundIdentity to 
 
 **Contract**: `contracts/incentives/ShapleyDistributor.sol`
 
-Consensus on "who deserves what" is the most contentious question in any economic system. VibeSwap answers it with **Shapley values** — the only allocation method in cooperative game theory that satisfies all fairness axioms simultaneously.
+Consensus on "who deserves what" is the most contentious question in any economic system. VibeSwap answers it with **Shapley values** — the allocation rule that cooperative game theory shows is *uniquely* determined by four classic axioms taken together: efficiency, symmetry, null-player, and additivity (the first three alone do not pin down a unique rule).
 
-**The Five Axioms**:
+**Classic Shapley axioms (what gives uniqueness):**
 
 1. **Efficiency**: `Σφᵢ = V` — All value is distributed. No treasury rake.
 2. **Symmetry**: Equal contributors receive equal rewards.
 3. **Null Player**: Zero contribution → zero reward. No free riders.
-4. **Pairwise Proportionality**: `φᵢ/φⱼ = wᵢ/wⱼ` — Reward ratios match contribution ratios.
-5. **Time Neutrality**: Same work in Era 1 and Era 5 produces the same fee reward.
+4. **Additivity**: Value from independent games adds linearly.
+
+**Project-specific properties VibeSwap layers on top (design goals, not classic Shapley axioms):**
+
+- **Pairwise Proportionality**: `φᵢ/φⱼ = wᵢ/wⱼ` — with the weighted-contribution formula below, reward ratios track contribution-weight ratios. Verified on-chain by `verifyPairwiseProportionality` (see 10.3).
+- **Time Neutrality**: same work in Era 1 and Era 5 produces the same *fee* reward (emissions still halve). This is a property of the two-track split below, not an axiom that follows from Shapley's characterization.
 
 **Weighted Contribution Formula**:
 
@@ -547,7 +555,7 @@ Votes in FederatedConsensus as ONCHAIN_REGULATOR when automated compliance rules
 
 **Contract**: `contracts/identity/AGIResistantRecovery.sol`
 
-The most paranoid consensus mechanism in the stack. Designed to resist attack by superhuman adversaries (AGI, nation-states, sophisticated social engineering).
+The most paranoid consensus mechanism in the stack. The "AGI-resistant" name is an aspiration, not a proven property: the design goal is to raise the cost of impersonation against strong adversaries (sophisticated social engineering, and as far as feasible AGI or nation-state-level attackers) by requiring several independent verification channels to converge. The multi-factor / social-recovery approach draws on well-established prior art (guardian-based and social recovery schemes); the contribution here is the specific weighting and the combination with time delays and economic bonds, not the category itself.
 
 **Seven Defense Layers**:
 
@@ -566,7 +574,7 @@ Layer 1: TIME DELAY               — 24h notification + 7-30 day window
 | Proof | Weight | Why |
 |-------|--------|-----|
 | Notarized document | 40 | Physical presence required |
-| Video verification | 35 | Hard to deepfake (today) |
+| Video verification | 35 | Harder to deepfake (today; this margin erodes as generative video improves) |
 | Hardware key attestation | 30 | YubiKey/Ledger proves possession |
 | Historical knowledge | 30 | Only real owner knows tx details |
 | Social vouching | 25 | 3+ humans confirm identity |
@@ -583,7 +591,7 @@ Layer 1: TIME DELAY               — 24h notification + 7-30 day window
 - Rapid retry attempts (max 3, 7-day cooldown)
 - Off-hours requests for claimed timezone
 
-**Consensus Property**: This is *multi-factor consensus* — the protocol agrees you are who you claim only when multiple independent verification channels converge. No single factor is sufficient. The combination of time delays, economic bonds, behavioral analysis, physical proofs, and social verification creates a consensus mechanism that is extremely expensive to defeat.
+**Consensus Property**: This is *multi-factor consensus* — the protocol agrees you are who you claim only when multiple independent verification channels converge. No single factor is sufficient. The combination of time delays, economic bonds, behavioral analysis, physical proofs, and social verification is designed to make a full defeat expensive across several independent channels at once. This is a defense-in-depth argument, not a proof of unbreakability — each individual channel has known failure modes.
 
 ---
 
@@ -649,7 +657,7 @@ Layer 1: TIME DELAY               — 24h notification + 7-30 day window
 
 ### 10.1 Incentive Compatibility
 
-Every consensus mechanism in the stack is **incentive-compatible**: honest behavior is the dominant strategy.
+Every consensus mechanism in the stack is **designed to be incentive-compatible**: the intent is that honest behavior is the rational (and where argued below, dominant) strategy. The arguments in 10.2 are analytic sketches, not machine-checked proofs — see the note in Section 1.
 
 | Mechanism | Honest Strategy | Deviation | Penalty |
 |-----------|----------------|-----------|---------|
@@ -661,15 +669,17 @@ Every consensus mechanism in the stack is **incentive-compatible**: honest behav
 
 ### 10.2 Nash Equilibria
 
-**Trading**: The unique Nash equilibrium is honest revelation. Proof: withholding reveals costs 50% deposit with zero information gain (you can't see others' orders).
+These are informal arguments, not formal equilibrium proofs (see the Section 1 note).
 
-**Reputation Voting**: The Nash equilibrium is voting your true belief. Proof: strategic voting (voting against belief to manipulate trust scores) requires predicting the majority outcome, which is hidden behind commit-reveal. The expected value of strategic voting is negative because you risk backing the minority with your deposit at stake.
+**Trading**: The intended Nash equilibrium is honest revelation. Argument: withholding reveals costs 50% deposit with zero information gain (you can't see others' orders).
 
-**Jury Duty**: The Nash equilibrium is voting by evidence. Proof: minority jurors lose their stake. Herding (voting with crowd regardless of evidence) is risky because you can't see other votes during deliberation. The dominant strategy is to vote what you believe, since that maximizes your probability of being in the majority.
+**Reputation Voting**: The intended Nash equilibrium is voting your true belief. Argument: strategic voting (voting against belief to manipulate trust scores) requires predicting the majority outcome, which is hidden behind commit-reveal. The expected value of strategic voting is negative because you risk backing the minority with your deposit at stake.
 
-### 10.3 Shapley Fairness Axioms (Verified On-Chain)
+**Jury Duty**: The intended Nash equilibrium is voting by evidence. Argument: minority jurors lose their stake. Herding (voting with crowd regardless of evidence) is risky because you can't see other votes during deliberation. The design goal is that voting what you believe maximizes your probability of being in the majority.
 
-All five axioms are verified by `PairwiseFairness.sol`:
+### 10.3 Shapley Fairness Checks (Verified On-Chain)
+
+`PairwiseFairness.sol` exposes five on-chain checks. Note (per Section 6.1) that only Efficiency and Null-Player are classic Shapley axioms; Pairwise Proportionality and Time Neutrality are project-specific properties layered on the weighted-contribution formula, and `verifyAllPairs` is the full-game aggregate of the proportionality check:
 
 ```solidity
 // Efficiency: total distributed == total value
@@ -704,9 +714,9 @@ verifyAllPairs(allocations, weights) → bool
 | Property | Mechanism | Guarantee |
 |----------|-----------|-----------|
 | No double execution | Commit-reveal | Nonce + hash uniqueness |
-| No MEV extraction | Uniform clearing price | All trades at same price |
+| No in-batch sandwich MEV | Uniform clearing price | All regular trades in a batch execute at the same price (priority orders still pay for ordering; scoped to within-batch, not cross-batch) |
 | No Sybil voting | SoulboundIdentity | One NFT per address, non-transferable |
-| No flash-loan attacks | EOA-only commits | Contract callers rejected |
+| No same-block flash-loan attacks | Same-block interaction guard (+ optional EOA-only flag) | One commit per caller per block; contract callers rejected when `requireEOA` is on |
 | No replay attacks | Cross-chain commitId | Includes both chain IDs |
 | No stale prices | Oracle staleness check | `MAX_STALENESS = 5 minutes` |
 

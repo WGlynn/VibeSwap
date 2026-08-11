@@ -8,20 +8,22 @@
 
 An omnichain DEX with original mechanism design across every layer. Not a fork. Not a wrapper. From scratch.
 
-- **Commit-reveal batch auctions** — MEV isn't mitigated. It's structurally dissolved. Uniform clearing prices make sandwich attacks mathematically impossible. Proved via formal analysis and adversarial simulation (430 scenarios, 7 agent types, 0 exploitable orderings).
-- **Fractalized Shapley rewards** — Contribution modeled as a DAG. Five Shapley axioms verified on-chain across 500 random games against exact-arithmetic reference. < 1 token deviation.
-- **Sovereign Intelligence Exchange** — On-chain AI agent infrastructure: identity, task routing, reputation, marketplace. A native protocol layer.
-- **Three-token economy** — Governance token (hard cap), elastic work token (PoW + PI rebase), state rent token. Each serves a distinct economic function.
-- **Cross-chain via LayerZero V2**, custom Kalman filter oracle, circuit breakers, flash loan protection, quantum-resistant modules.
+- **Commit-reveal batch auctions** — MEV isn't mitigated, it's structurally dissolved. Within a batch there is a single uniform clearing price, so the "before/after" price pair a sandwich attack needs doesn't exist inside the batch. Argued via mechanism analysis and adversarial simulation (~430 scenarios, 7 agent types); simulation harness and exact scenario/agent counts unverified against a single on-disk artifact.
+- **Fractalized Shapley rewards** — Contribution modeled as a DAG. Shapley allocation is checked against an exact-arithmetic reference across hundreds of random games; the four Shapley axioms (efficiency, symmetry, null-player, additivity) that uniquely determine the allocation are the design basis. Adversarial testing surfaces contribution-gaming deviations (see `test/vectors/adversarial_report.json`) rather than assuming none exist.
+- **Sovereign Intelligence Exchange** — A designed protocol layer for on-chain AI agent infrastructure: identity, task routing, reputation, marketplace. Spec + reference contracts in `contracts/agents/`; research surface, not on the launch critical path.
+- **Three-token economy** — Governance token (hard cap), elastic work token (PoW + rebase), state-rent token. Each serves a distinct economic function; designed, not yet live on any network.
+- **Cross-chain via a canonical burn-and-mint messaging design** (bonded validators, BLS12-381 threshold attestations; LayerZero V2 was the original path but was dropped after the 2026-04 DVN-RPC compromise — a legacy `CrossChainRouter` wrapper is still in-tree pending removal). Plus a custom Kalman filter oracle, circuit breakers, flash-loan protection, and exploratory post-quantum modules (`contracts/quantum/` — research surface, outside the core audit scope, not on the launch critical path).
 
 ```
-376 smart contracts  ·  110,728 lines of Solidity
-510 test files       ·  196,325 lines  ·  9,090 tests
-460 frontend files   ·  161,977 lines
- 74 oracle files     ·   13,856 lines (Python)
-─────────────────────────────────────────
-1,420 files          ·  482,886 lines of code
+438 smart contracts  ·  Solidity 0.8.20
+591 test files        (unit + fuzz + invariant, run per-module —
+                       the full suite OOMs a 16GB machine, so there is
+                       no single all-green run; modules are green individually)
+frontend             React 18 + Vite 5 (runs against a mock backend)
+oracle               Python Kalman filter
 ```
+
+> Line-count and full-file totals below are from an earlier snapshot and are narrative, not audited figures. The contract/test counts above are current against disk.
 
 10 ethresear.ch posts. 45 Nervos forum posts. 297 research documents. 139 published PDFs. A full economic model with formal proofs.
 
@@ -37,7 +39,7 @@ I deleted Call of Duty, Modern Warfare, Overwatch, Diablo III, and my entire Ste
 
 Forge takes 10 minutes to compile. I get six iteration cycles per hour. My test suite has 9,090 tests and I can't parallelize them. My AI copilot sessions crash when they hit context limits, and I built a write-ahead log and crash recovery protocol so I don't lose work when they do.
 
-384 tests fail right now. Not because of bugs. Because of compilation timeouts and memory pressure on a machine that is being asked to do what a cluster should be doing.
+Tests fail on the full-suite run right now — not because of logic bugs, but because of compilation timeouts and memory pressure on a machine being asked to do what a cluster should do. Modules pass individually when run scoped (`--match-path`); there is no single all-green full-suite number because the suite OOMs a 16GB machine.
 
 The week I hit 852 commits was also the week I had to clear my npm cache and delete Microsoft Playwright to free 4 GB. The dip to 195 the following week isn't fatigue. It's the machine saying no.
 
@@ -54,9 +56,9 @@ Every number is in `git log`. The repo is public.
 
 ## What I Figured Out Along the Way
 
-Building under these constraints forced patterns that don't exist yet in the literature:
+Building under these constraints forced patterns I haven't found written up for the AI-coding case (the underlying ideas — write-ahead logging, hash-linked state — are borrowed from databases and blockchains; the contribution is applying them to AI development continuity):
 
-**Anti-Amnesia Protocol** — Write-ahead logging for AI coding sessions. When the AI crashes mid-execution (context limit, OOM, power loss), it recovers exactly where it stopped. Not from scratch. From the last committed state, with full intent reconstruction.
+**Anti-Amnesia Protocol** — Write-ahead logging for AI coding sessions. When the AI crashes mid-execution (context limit, OOM, power loss), it resumes from the last committed state and the logged intent rather than from scratch. Reconstruction fidelity depends on how much intent got written to the WAL before the crash.
 
 **Session State Chains** — Each AI session writes a block header: parent hash, current HEAD, status, artifacts, next steps. Sessions form a hash-linked chain. Full state reconstruction without storing full state. Same idea as a blockchain, applied to development continuity.
 
@@ -78,7 +80,7 @@ My mechanism design needs peer review from people who study cooperative game the
 
 ## What I Have That You Don't
 
-A working system. Not a simulation. Not a model. 376 contracts, tested, integrated, deployed to a frontend.
+A working reference implementation. Not just a model on paper. 438 contracts, tested per-module and integrated, with a frontend running against a mock backend. To be clear about status: nothing is on a public network — no mainnet, no public testnet, `deployments/` is empty by design (the protocol is mid-pivot to a sovereign Nervos-CKB fork). A local CKB dev chain is up and mining blocks.
 
 Plus 10 ready-to-submit research contributions that intersect MIT's core interests:
 
@@ -101,7 +103,7 @@ And a case study that writes itself: what happens when you give one builder and 
 
 | I bring | You bring |
 |---|---|
-| 376 contracts, battle-tested | Compute to run them properly |
+| 438 contracts, tested per-module (not yet deployed to any public network) | Compute to run the full suite properly |
 | 10 papers ready for co-authorship | Peer review and publication channels |
 | AI co-development methodology | Academic context to formalize it |
 | 49 commits/day and accelerating | Infrastructure to remove the ceiling |

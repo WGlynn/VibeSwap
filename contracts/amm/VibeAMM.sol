@@ -25,6 +25,20 @@ import "../incentives/interfaces/IIncentiveController.sol";
 import "../incentives/interfaces/IVolatilityOracle.sol";
 import "./FeeController.sol";
 
+// ============ Passport (Stage 3.2) producer edges — non-blocking, additive ============
+interface IUtilizationSink {
+    function recordBatchSettlement(
+        bytes32 poolId, uint128 volumeIn, uint128 volumeOut,
+        uint64 buyVol, uint64 sellVol, uint8 volatilityTier
+    ) external;
+    function currentEpochId() external view returns (uint256);
+    function registerLP(bytes32 poolId, address lp) external;
+    function snapshotLP(bytes32 poolId, address lp, uint128 liquidity) external;
+}
+interface IExternalFlowSink {
+    function recordSwap(uint256 epochId, bytes32 poolId, address trader, uint256 volume) external;
+}
+
 /**
  * @title VibeAMM
  * @author Faraday1 & JARVIS -- vibeswap.org
@@ -266,8 +280,16 @@ contract VibeAMM is
     /// @notice Timestamp when lastTwapSnapshot was last recorded per pool
     mapping(bytes32 => uint256) public lastTwapSnapshotTime;
 
-    /// @dev Reserved storage gap for future upgrades (49 - 1 feeController - 2 TWAP drift = 46)
-    uint256[46] private __gap;
+    // ============ Passport (Stage 3.2) State ============
+    // NOTE: Appended before __gap (gap reduced 46->44) to maintain upgrade-safe storage layout,
+    //       matching the TWAP-drift precedent above. Each sink consumes one slot from the gap.
+    /// @notice Passport external-flow producers. address(0) => feature off.
+    ///         All calls are try/catch; a fault here never blocks core AMM operation.
+    IUtilizationSink public utilizationSink;
+    IExternalFlowSink public externalFlowSink;
+
+    /// @dev Reserved storage gap for future upgrades (49 - 1 feeController - 2 TWAP drift - 2 passport sinks = 44)
+    uint256[44] private __gap;
 
     // ============ Security Events ============
 
@@ -944,6 +966,10 @@ contract VibeAMM is
         trackedBalances[pool.token0] = IERC20(pool.token0).balanceOf(address(this));
         trackedBalances[pool.token1] = IERC20(pool.token1).balanceOf(address(this));
 
+        // Passport (Stage 3.2): non-blocking external-flow producers. Extracted to a private
+        // helper so its locals live in a separate stack frame (avoids stack-too-deep here).
+        _emitPassportFlow(poolId, result.totalTokenInSwapped, result.totalTokenOutSwapped, orders);
+
         emit BatchSwapExecuted(
             poolId,
             batchId,
@@ -951,6 +977,44 @@ contract VibeAMM is
             orders.length,
             result.protocolFees
         );
+    }
+
+    /// @notice Passport (Stage 3.2) external-flow producers, extracted from executeBatchSwap to keep
+    ///         its stack shallow. NON-BLOCKING: every sink call is try/catch, so a passport-layer
+    ///         fault can never revert settlement. epochId is read AFTER recordBatchSettlement so it
+    ///         reflects any auto-advance (spec FLAG 5d); buy/sell are in/out proxies (FLAG 5b).
+    function _emitPassportFlow(
+        bytes32 poolId,
+        uint256 totalIn,
+        uint256 totalOut,
+        SwapOrder[] calldata orders
+    ) private {
+        if (address(utilizationSink) == address(0)) return;
+        uint8 volTier = 0;
+        if (address(volatilityOracle) != address(0)) {
+            try volatilityOracle.getVolatilityTier(poolId) returns (IVolatilityOracle.VolatilityTier t) {
+                volTier = uint8(t);
+            } catch {}
+        }
+        uint256 epochForSwaps;
+        bool haveEpoch;
+        try utilizationSink.recordBatchSettlement(
+            poolId, uint128(totalIn), uint128(totalOut), uint64(totalIn), uint64(totalOut), volTier
+        ) {
+            try utilizationSink.currentEpochId() returns (uint256 eid) {
+                epochForSwaps = eid;
+                haveEpoch = true;
+            } catch {}
+        } catch {}
+
+        if (haveEpoch && address(externalFlowSink) != address(0)) {
+            for (uint256 j = 0; j < orders.length;) {
+                try externalFlowSink.recordSwap(
+                    epochForSwaps, poolId, orders[j].trader, orders[j].amountIn
+                ) {} catch {}
+                unchecked { ++j; }
+            }
+        }
     }
 
     /**
@@ -1390,6 +1454,22 @@ contract VibeAMM is
     function setIncentiveController(address _controller) external onlyOwner {
         incentiveController = IIncentiveController(_controller);
         emit IncentiveControllerUpdated(_controller);
+    }
+
+    // ============ Passport (Stage 3.2) sink setters ============
+    event UtilizationSinkUpdated(address indexed sink);
+    event ExternalFlowSinkUpdated(address indexed sink);
+
+    /// @notice Set the passport utilization/LP-set sink. address(0) disables. Owner-only.
+    function setUtilizationSink(address _sink) external onlyOwner {
+        utilizationSink = IUtilizationSink(_sink);
+        emit UtilizationSinkUpdated(_sink);
+    }
+
+    /// @notice Set the passport external-flow sink. address(0) disables. Owner-only.
+    function setExternalFlowSink(address _sink) external onlyOwner {
+        externalFlowSink = IExternalFlowSink(_sink);
+        emit ExternalFlowSinkUpdated(_sink);
     }
 
     /**

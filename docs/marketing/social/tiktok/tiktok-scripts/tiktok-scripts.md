@@ -12,9 +12,9 @@
 ## Script 1: "Every Trade You Make Gets Robbed"
 **Hook (2s):** "You're getting robbed every time you trade crypto and you don't even know it."
 
-**Body (20s):** "It's called MEV — maximal extractable value. Bots see your trade before it goes through, front-run you, and make you pay a worse price. It happens on Uniswap, Sushi, every DEX. $175,000 extracted in one simulation we ran. You never see it — it just looks like slippage."
+**Body (20s):** "It's called MEV — maximal extractable value. Bots see your trade before it goes through, front-run you, and make you pay a worse price. It happens on Uniswap, Sushi, every DEX. $175,000 extracted in one simulation we ran against modeled bots. You never see it — it just looks like slippage."
 
-**Punch (8s):** "We built a DEX where that's impossible. Not reduced. Impossible. Everyone gets the same price. The math proves it. Link in bio."
+**Punch (8s):** "We designed a DEX where the sandwich has nowhere to stand. One price per batch, so there's no before-and-after to front-run. Everyone gets the same clearing price. Link in bio."
 
 **Caption:** Every swap you lose money you can't see
 
@@ -31,14 +31,14 @@
 
 ---
 
-## Script 3: "This DEX Is Quantum-Proof"
-**Hook (2s):** "Quantum computers will break every crypto wallet. Except ours."
+## Script 3: "This DEX Is Designed Quantum-Resistant"
+**Hook (2s):** "Quantum computers threaten every crypto wallet. We designed ours differently."
 
-**Body (25s):** "Every wallet uses elliptic curve cryptography. Quantum computers crack it with Shor's algorithm. Game over. We use hash-based signatures. Quantum can't reverse a hash. Our mining gets MORE expensive for quantum computers, not less. And our trades are committed as SHA-256 hashes — even quantum can't see inside them."
+**Body (25s):** "Most wallets use elliptic curve cryptography. Quantum computers crack it with Shor's algorithm. Game over. Our design uses hash-based signatures instead — quantum can't reverse a hash. Difficulty-adjusted proof-of-work already resists a quantum speedup, the same way Bitcoin's does. And a committed trade is just a SHA-256 hash — nobody sees inside it until reveal, quantum or not."
 
-**Punch (5s):** "We're not quantum-resistant. We're quantum-proficient. We designed for this."
+**Punch (5s):** "This is a design choice, not a shipped guarantee — nothing here is on a public network yet. But we built for the storm before it arrives."
 
-**Caption:** Your wallet isn't safe. Ours is.
+**Caption:** Designed for the quantum storm.
 
 ---
 
@@ -80,7 +80,7 @@
 
 **Body (20s):** "Every 10 seconds: 8 seconds to commit your trade — it's hashed, nobody can see it. 2 seconds to reveal. Then everyone gets the same price. No frontrunning. No sandwich attacks. No bots stealing your value. Just math doing what humans can't — being fair."
 
-**Punch (8s):** "This is what $0 in MEV extraction looks like. Every other DEX wishes they could say that."
+**Punch (8s):** "In our simulations, ordering-MEV inside a batch went to zero — because there's no before-and-after price to attack. Every other DEX wishes they could design that out."
 
 **Caption:** 10 seconds to fair
 
@@ -89,7 +89,7 @@
 ## Script 8: "I Built a DEX With an AI Cofounder"
 **Hook (2s):** "My cofounder isn't human."
 
-**Body (25s):** "Jarvis is an AI that helped me design the mechanism, write the contracts, build the frontend, deploy the infrastructure. Not a chatbot. A cofounder. He has his own knowledge base, his own memory across conversations, his own learning loops. Multiple instances running across the world watching each other's backs."
+**Body (25s):** "Jarvis is an AI that helped me design the mechanism, write the contracts, build the frontend, stand up the dev infrastructure. Not a chatbot. A cofounder. He has his own knowledge base, his own memory across conversations, his own learning loops."
 
 **Punch (5s):** "The future of building isn't human OR AI. It's both. And we proved it."
 
@@ -111,7 +111,7 @@
 ## Script 10: "Five Ways to Recover Your Wallet"
 **Hook (2s):** "Lost your crypto wallet? On VibeSwap, you have five ways to get it back."
 
-**Body (25s):** "One: trusted friends can collectively recover it. Two: time-delayed recovery prevents instant takeover. Three: a digital will — if something happens to you. Four: community jury — dispute resolution by peers. Five: quantum-proof backup keys. Most wallets give you one chance — a seed phrase. We give you five."
+**Body (25s):** "One: trusted friends can collectively recover it. Two: time-delayed recovery prevents instant takeover. Three: a digital will — if something happens to you. Four: community jury — dispute resolution by peers. Five: quantum-resistant backup keys. Most wallets give you one chance — a seed phrase. We give you five."
 
 **Punch (5s):** "Your money should be as hard to lose as it is to steal."
 
@@ -182,7 +182,7 @@ Banks are the well. They control your access to money. VibeSwap teaches you to d
 
 **Body (25s):** "It doesn't argue with the waves. It doesn't try to calm the ocean. It just stands there and shines. Ships that see it survive. Ships that don't — that's not the lighthouse's fault.
 
-VibeSwap is a lighthouse. We don't fight MEV bots. We don't argue with extractors. We just built a protocol where extraction is mathematically impossible. If you use it, you're protected. If you don't, the ocean is still the ocean."
+VibeSwap is a lighthouse. We don't fight MEV bots. We don't argue with extractors. We just designed a protocol where the sandwich attack has no ground to stand on — one price per batch, no before-and-after to exploit. If you use it, you're protected from that class of attack. If you don't, the ocean is still the ocean."
 
 **Punch (5s):** "We can't save everyone. But we can make sure the light is on."
 
@@ -210,7 +210,7 @@ Same energy in DeFi. When someone builds something fair, the extractors call it 
 
 The other builds slow. Tests every beam. Takes a year. Looks the same from the outside. When the storm comes, it stands.
 
-Quantum computing is the storm. Every DEX built on elliptic curves is the first house. VibeSwap is built on hash functions. The storm is coming. We already tested the beams."
+Quantum computing is the storm. Every DEX built on elliptic curves is the first house. VibeSwap is designed on hash functions. The storm is coming. We're building the beams to survive it."
 
 **Punch (5s):** "Build on what survives."
 

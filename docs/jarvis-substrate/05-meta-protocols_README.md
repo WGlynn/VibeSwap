@@ -10,17 +10,17 @@ Meta-protocols are load-bearing principles that cite each other. Many have hook-
 
 > Augment markets and governance with math-enforced invariants; never replace.
 
-Shapley + batch auctions let the market still function while eliminating extraction. The mechanism stays a market — prices clear, traders trade — but extractive flows are mathematically impossible by construction. Augment the substrate, don't substitute it.
+Shapley + batch auctions let the market still function while narrowing the extraction surface toward zero. The mechanism stays a market — prices clear, traders trade — but within a sealed batch the extractive flows the design targets (sandwiching, reordering) have no vector to exploit. Augment the substrate, don't substitute it. (Design property of the EVM reference implementation; not yet on a public network — see the repo README status.)
 
-Worked example: VibeSwap commit-reveal batch auctions eliminate MEV without removing the auction. The auction is augmented with cryptographic commitment + uniform clearing price; extraction surface goes to zero; market function preserved.
+Worked example: VibeSwap commit-reveal batch auctions are designed to eliminate within-batch MEV without removing the auction. The auction is augmented with cryptographic commitment (hash-commit safety inherited from SHA-256) + a uniform clearing price; because a sandwich needs a distinct "before" and "after" price and a batch clears at one price, that attack vector doesn't exist inside a batch. Market function preserved.
 
 ### Augmented Governance (AGov)
 
 > Physics (math invariants) > Constitution (fairness floors) > Governance (DAO votes, free within Physics + Constitution).
 
-Math is the constitutional court. The DAO can vote on anything *within* the bounds set by mathematical invariants. It cannot vote to violate Shapley fairness, because Shapley fairness is enforced at the contract level, not at the governance level.
+Math is the constitutional court. The DAO can vote on anything *within* the bounds set by mathematical invariants. The design intent is that it cannot vote to violate Shapley fairness, because Shapley fairness is enforced at the contract level (`contracts/incentives/ShapleyDistributor.sol`), not at the governance level.
 
-This prevents governance capture. A captured DAO still cannot extract — extraction is a Physics-layer impossibility, not a Governance-layer rule.
+This is meant to blunt governance capture: a captured DAO still cannot rewrite an invariant that lives below the vote — extraction is pushed down to a Physics-layer constraint rather than a Governance-layer rule. (Property of the EVM reference implementation; the sovereign-chain port is where this ships as native cell scripts — not yet on a public network.)
 
 ### Substrate-Geometry Match (SGM)
 
@@ -51,7 +51,7 @@ Rule-generation completes when the rule is live in *my* execution stack, not at 
 
 > Code inspires docs; docs inspire code.
 
-Compounding-knowledge pattern. Every session: doc-future-work-item → ship → doc-result. The 60+ papers in `vibeswap/docs/papers/` are the backwards-direction (code → docs); the substance gate is the forwards-direction (a doc described it before the hook existed).
+Compounding-knowledge pattern. Every session: doc-future-work-item → ship → doc-result. The papers in `vibeswap/docs/research/papers/` are the backwards-direction (code → docs); the substance gate is the forwards-direction (a doc described it before the hook existed).
 
 ### Economic Theory of Mind (ETM)
 
@@ -86,4 +86,4 @@ The protocols are tested by violation. When a session produces a violation, the 
 
 - Primitive files implementing each protocol: `~/.claude/projects/.../memory/primitive_*.md`
 - Cross-referenced from MEMORY.md's load-bearing index
-- Public expansions: [`vibeswap/docs/papers/`](https://github.com/wglynn/vibeswap/tree/master/docs) — the augmented-mechanism-design paper, ETM essays, Substrate-Geometry exhibits
+- Public expansions: [`vibeswap/docs/research/papers/`](https://github.com/wglynn/vibeswap/tree/master/docs/research) — the augmented-mechanism-design paper, ETM essays, Substrate-Geometry exhibits

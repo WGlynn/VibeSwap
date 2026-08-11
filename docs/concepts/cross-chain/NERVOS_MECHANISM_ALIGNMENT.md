@@ -14,9 +14,9 @@ VibeSwap's mechanism design follows the same philosophy. We're not optimizing fo
 
 **Nervos principle**: State storage requires locking CKBytes. You pay for the space you occupy. This prevents state bloat and aligns incentives—if you're not using state, free it up for others.
 
-**VibeSwap alignment**: Our commit-reveal mechanism treats state the same way. Each commit creates a cell that occupies space. That cell exists only for the duration of the batch—typically 10 seconds. After settlement, commit cells are consumed. The state is transient by design.
+**VibeSwap alignment**: Our commit-reveal mechanism is designed to treat state the same way. On the CKB target, each commit creates a cell that occupies space. That cell exists only for the duration of the batch—typically 10 seconds. After settlement, commit cells are consumed. The state is transient by design.
 
-We don't accumulate historical order data on-chain. We don't maintain growing mappings of user balances. The only persistent state is the AMM pool parameters, and even those are minimal. Every other piece of state is created, used, and consumed within a single batch cycle.
+The aim is not to accumulate historical order data on-chain, and to keep persistent state minimal — ideally just the AMM pool parameters, with every other piece of state created, used, and consumed within a single batch cycle. (Honest caveat: the current EVM reference implementation still holds several persistent mappings — commitments, batches, refunds, slashed amounts — so the fully transient-state property is a target of the cell-model port, not a property of the Solidity reference today.)
 
 This isn't just gas optimization. It's philosophical alignment. State should have cost. Transient operations shouldn't leave permanent footprints.
 
@@ -24,11 +24,11 @@ This isn't just gas optimization. It's philosophical alignment. State should hav
 
 **Nervos principle**: Security comes from economic incentives, not trusted parties. The CKB token economics create natural alignment between miners, developers, users, and long-term holders. No foundation needs to "govern" the system into safety.
 
-**VibeSwap alignment**: Our fairness guarantees come from mechanism design, not operational promises. We don't say "trust us not to front-run." We designed a system where front-running is mathematically impossible.
+**VibeSwap alignment**: Our fairness guarantees are meant to come from mechanism design, not operational promises. We don't say "trust us not to front-run." We designed a system where the intra-batch front-running vector is closed by construction: a sandwich needs a distinct "before" and "after" price, and a uniform-clearing batch has only one price.
 
-The commit-reveal mechanism means order contents are hidden until the reveal phase. The batch auction means all orders execute at the same price. The deterministic shuffle means no party controls execution order. These aren't policies we enforce—they're properties that emerge from the mechanism itself.
+The commit-reveal mechanism means order contents are hidden until the reveal phase. The batch auction means all orders execute at the same price. The deterministic shuffle means no single party controls execution order. These aren't policies we enforce—they're properties that emerge from the mechanism itself. (Scope: these hold within a batch; batch-boundary and reveal-phase considerations are covered in the mechanism papers, and none of this is yet demonstrated on a live network.)
 
-Economic security over administrative security. Provable properties over promised behavior.
+Economic security over administrative security. Structural properties over promised behavior.
 
 ## Alignment 3: Long-Term Value Capture
 
@@ -54,21 +54,23 @@ This separation lets us upgrade auction parameters without touching base-layer s
 
 **Nervos principle**: Assets should be first-class citizens, not entries in someone else's contract. The cell model makes tokens as real as native CKB—you own them, control them, and transfer them without permission from any contract owner.
 
-**VibeSwap alignment**: User deposits in VibeSwap are their own cells. When you commit to a batch, your deposit doesn't go into a pool contract that could be upgraded, rugged, or frozen. It stays in a cell that you control, locked only by the commit-reveal mechanism.
+**VibeSwap alignment (design intent, on the CKB target)**: On the sovereign CKB-fork chain — the real deployment target — user deposits are meant to be their own cells. When you commit to a batch, your deposit wouldn't go into a pool contract that could be upgraded, rugged, or frozen; it would stay in a cell that you control, locked only by the commit-reveal type script. This is a property of the cell model we are porting to; it is designed, not yet deployed (the CKB cells are spec-only on the local dev chain today).
 
-This is fundamentally different from most DEXes where your deposit becomes a number in a mapping, subject to whatever the contract owner decides to do next. On VibeSwap, your assets remain first-class. The protocol constrains when you can move them, but it never takes ownership.
+Note the honest caveat about the current EVM reference implementation: there, a commit deposit is `msg.value` held by the auction contract and refunded on reveal/withdraw — the account model, not the cell model. The first-class-ownership property is exactly why we are moving off the EVM and onto CKB.
 
-We couldn't rug users even if we wanted to. The mechanism doesn't allow it.
+This is fundamentally different from most DEXes where your deposit becomes a number in a mapping, subject to whatever the contract owner decides to do next. The goal on CKB: your assets remain first-class. The protocol constrains when you can move them, aiming never to take ownership.
+
+The design intent is that we couldn't rug users even if we wanted to — because the cell-model mechanism wouldn't allow it. On the current EVM reference, that property is not yet in force.
 
 ## Alignment 6: Predictable Costs
 
 **Nervos principle**: Users should be able to predict costs. The state rent model makes costs proportional to resource usage. No gas auctions, no priority fee wars, no surprise costs during congestion.
 
-**VibeSwap alignment**: Batch auctions eliminate gas wars entirely. In a traditional DEX, users compete on gas price to get their transaction included first. During high volatility, this creates a secondary auction where users pay more for worse prices.
+**VibeSwap alignment**: Batch auctions are designed to remove the intra-batch gas war. In a traditional DEX, users compete on gas price to get their transaction included first. During high volatility, this creates a secondary auction where users pay more for worse prices.
 
-Our model flips this. All commits in a batch pay the same base cost. Execution order is determined by the protocol, not by gas bidding. Settlement cost is amortized across all participants in the batch.
+Our model flips this. All commits in a batch pay the same base cost. Execution order within the batch is determined by the protocol, not by gas bidding. Settlement cost is amortized across all participants in the batch.
 
-The result: predictable costs regardless of market conditions. No MEV extraction through gas manipulation. No user paying 10x fees because they happened to trade during a volatile minute.
+The intended result: predictable costs within a batch regardless of market conditions, and no MEV extraction through in-batch gas manipulation — no user paying 10x fees because they happened to trade during a volatile minute. This is a property of the mechanism as designed; it has not yet been measured on a live network.
 
 ## Alignment 7: Cooperative Economics
 

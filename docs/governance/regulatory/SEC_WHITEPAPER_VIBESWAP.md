@@ -26,7 +26,7 @@ February 2026
 
 ## 1. Executive Summary
 
-VibeSwap is an open-source trading protocol designed to eliminate Maximal Extractable Value (MEV) exploitation while providing cryptographically guaranteed fair execution for all market participants. The protocol achieves instant atomic settlement (T+0), complete transparency, and mathematical fairness proofs—addressing key challenges in digital asset markets that have been of concern to regulators.
+VibeSwap is an open-source trading protocol designed to eliminate Maximal Extractable Value (MEV) exploitation within a batch while providing cryptographically-enforced fair execution for market participants. The protocol is designed to deliver instant atomic settlement (T+0), on-chain transparency, and formal fairness arguments for its core mechanisms—addressing key challenges in digital asset markets that have been of concern to regulators. The protocol is pre-deployment: the reference implementation and its fairness proofs live in the repository (`contracts/`, `docs/research/proofs/`); there is no public mainnet or testnet, so the properties below describe the design as specified and tested, not a live production record.
 
 ### Key Innovations
 
@@ -78,9 +78,9 @@ Traditional market:  W = S - Deadweight_loss - Extraction
 VibeSwap:           W = S (full surplus to traders)
 ```
 
-Where S = total gains from trade. VibeSwap eliminates extraction by making it cryptographically impossible, not merely discouraged.
+Where S = total gains from trade. VibeSwap is designed to remove intra-batch extraction structurally—the commit-reveal batch has a single clearing price, so the front-run/sandwich attack vector does not exist within a batch—rather than merely discouraging it.
 
-See `COOPERATIVE_MARKETS_PHILOSOPHY.md` for mathematical proofs using multilevel selection theory.
+See `docs/concepts/ai-native/COOPERATIVE_MARKETS_PHILOSOPHY.md` for the welfare argument using multilevel selection theory.
 
 ### 2.2 Current Market Structure Deficiencies
 
@@ -93,7 +93,7 @@ See `COOPERATIVE_MARKETS_PHILOSOPHY.md` for mathematical proofs using multilevel
 
 ### 2.3 VibeSwap's Solution
 
-VibeSwap addresses these deficiencies through cryptographic mechanisms that make exploitation mathematically impossible, not merely prohibited.
+VibeSwap addresses these deficiencies through cryptographic and batch-auction mechanisms designed so that intra-batch order-flow exploitation is structurally unavailable, not merely prohibited.
 
 ---
 
@@ -147,7 +147,7 @@ VibeSwap addresses these deficiencies through cryptographic mechanisms that make
    - Uniform clearing price calculated
    - Atomic token transfers executed
 
-**Security Guarantee**: No observer can determine order parameters from the commitment hash due to the cryptographic properties of keccak256.
+**Security property**: An observer cannot recover order parameters from the commitment hash under the standard preimage-resistance assumption of keccak256 — an inherited property of the hash function, not a novel VibeSwap construction. This hides orders during the commit phase; it does not by itself prevent an actor from revealing early within the reveal window (see the same-block reveal tradeoff in `docs/research/proofs/FORMAL_FAIRNESS_PROOFS.md`).
 
 ### 3.3 Uniform Clearing Price
 
@@ -162,19 +162,19 @@ where:
 ```
 
 **Benefits**:
-- No price discrimination between participants
-- Eliminates execution quality variance
-- Achieves Pareto-efficient allocation
+- No price discrimination between participants within a batch
+- Removes intra-batch execution-quality variance (all fills at one price)
+- Argued to be Pareto-efficient at the clearing price under the model's assumptions (see `docs/research/proofs/FORMAL_FAIRNESS_PROOFS.md` §6); this is a property of the idealized mechanism, not a claim about every real-world market condition
 
 ### 3.4 Deterministic Random Ordering
 
 For orders that don't specify priority, execution order is determined by:
 
 1. Collecting secrets from all revealed orders
-2. Computing combined seed: `seed = hash(XOR(all_secrets) || count)`
-3. Applying Fisher-Yates shuffle algorithm
+2. Computing a combined seed from the XOR of all user secrets plus block entropy (`blockhash` of the reveal-end block), so no single party controls the seed (see `DeterministicShuffle.sol` and `CommitRevealAuction.sol`)
+3. Applying the Fisher-Yates shuffle algorithm
 
-**Mathematical Guarantee**: Each permutation has equal probability 1/n!
+**Design property**: Fisher-Yates driven by an unbiased seed yields each permutation with equal probability 1/n!. VibeSwap's seed is constructed to make unilateral manipulation of the ordering infeasible; the uniformity of the realized seed depends on the entropy sources and is argued, not proven, in `docs/research/proofs/FORMAL_FAIRNESS_PROOFS.md`.
 
 ---
 
@@ -194,16 +194,16 @@ VibeSwap is designed to support ATS registration under Rules 300-303:
 
 ### 4.2 Best Execution Framework
 
-The uniform clearing price mechanism inherently achieves best execution:
+The uniform clearing price mechanism is designed to support best-execution outcomes by giving every participant in a batch the same price:
 
 ```
-Theorem: All participants receive the market-clearing price,
-which is Pareto efficient.
-
-Proof: At clearing price p*, Supply(p*) = Demand(p*).
-No participant can improve their outcome without
-making another participant worse off. ∎
+Claim (formalized in FORMAL_FAIRNESS_PROOFS.md §6):
+All participants in a batch receive the same market-clearing
+price p*, where Supply(p*) = Demand(p*). Under the mechanism's
+modeling assumptions, this allocation is Pareto efficient at p*.
 ```
+
+This is a modeling result about the mechanism as specified, not an assertion that VibeSwap guarantees best execution under all market or cross-venue conditions; regulatory best-execution obligations remain the responsibility of the registered operator.
 
 ### 4.3 Form ATS Disclosures
 
@@ -224,33 +224,35 @@ The following information is available for Form ATS filing:
 
 ### 5.1 Manipulation Prevention
 
-| Manipulation Type | Prevention Mechanism | Guarantee Level |
-|-------------------|---------------------|-----------------|
-| Front-running | Commit-reveal hiding | Cryptographic |
-| Wash trading | Uniform price (no profit motive) | Economic |
+| Manipulation Type | Prevention Mechanism | Basis of Resistance |
+|-------------------|---------------------|---------------------|
+| Front-running | Commit-reveal hiding | Cryptographic (relies on keccak256 preimage resistance) |
+| Wash trading | Uniform price (no intra-batch profit motive) | Economic |
 | Spoofing | Forfeiture for non-reveal | Financial |
 | Layering | Single order per commit | Structural |
 | Quote stuffing | Gas costs + batch limits | Economic |
 | Sybil attacks | Uniform treatment + collateral | Economic |
 
-**Sybil Attack Resistance**: Coordinated multi-address attacks are economically irrational because:
+**Sybil Attack Resistance**: The mechanism is designed to make coordinated multi-address attacks economically unattractive rather than technically impossible, because:
 - Uniform clearing price: All addresses get the same execution price
 - Uniform collateral: Each address requires 5% locked capital (real, not borrowed)
 - Uniform slashing: 50% penalty applies to every address that fails to reveal
-- Flash loan immunity: Collateral locks prevent borrowed funds (must repay same transaction)
-- TWAP bounds: Price manipulation limited to 5% deviation from oracle
+- Flash-loan resistance: same-block interaction detection blocks committing with funds that must be repaid in the same transaction (`CommitRevealAuction.sol` reverts with `FlashLoanDetected`)
+- TWAP bounds: swaps are rejected when spot deviates more than 5% from the time-weighted average (`MAX_PRICE_DEVIATION_BPS = 500` in `VibeAMM.sol`)
 
 See `DESIGN_PHILOSOPHY_CONFIGURABILITY.md` Section 3.6 for detailed analysis.
 
 ### 5.2 Circuit Breakers
 
-Automated trading halts trigger when thresholds are exceeded:
+Automated trading halts trigger when configured thresholds are exceeded. `CircuitBreaker.sol` implements volume, price, and withdrawal breakers (plus loss and true-price breakers) whose thresholds and cooldowns are set per deployment via `configureBreaker`, not fixed as protocol constants. Illustrative default values:
 
-| Breaker | Threshold | Cooldown |
+| Breaker | Threshold (example config) | Cooldown (example config) |
 |---------|-----------|----------|
 | Volume | $10M / hour | 1 hour |
 | Price | 50% deviation | 30 minutes |
 | Withdrawal | 25% TVL / hour | 2 hours |
+
+These figures are example operator settings, not hardcoded on-chain values.
 
 ### 5.3 Price Manipulation Detection
 
@@ -270,11 +272,11 @@ if |spot_price - TWAP| > 5%:
 VibeSwap provides instant, atomic settlement:
 
 ```
-Settlement Properties:
-├── Finality: Immediate (same block)
-├── Reversibility: None (blockchain immutable)
-├── Counterparty risk: Zero (atomic swap)
-├── Failed trades: Impossible
+Settlement Properties (by design):
+├── Finality: Immediate at chain-finality (same block)
+├── Reversibility: Bounded by the underlying chain's reorg/finality guarantees
+├── Counterparty risk: Eliminated for the atomic-swap step (trade executes or reverts)
+├── Partial fills: A trade either settles atomically or reverts; no half-settled state
 └── Reconciliation: Not required
 ```
 
@@ -282,10 +284,10 @@ Settlement Properties:
 
 | Metric | T+1 (Traditional) | T+0 (VibeSwap) |
 |--------|-------------------|----------------|
-| Settlement time | 1 business day | ~10 seconds |
-| Counterparty exposure | 24+ hours | 0 |
-| Fail rate | ~2% industry avg | 0% |
-| Capital efficiency | Reduced | Maximized |
+| Settlement time | 1 business day | ~10 seconds (one batch) |
+| Counterparty exposure | 24+ hours | 0 (atomic execution) |
+| Settlement fail mode | ~2% industry avg | atomic — a trade settles fully or reverts |
+| Capital efficiency | Reduced | Improved (no multi-day pre-funding) |
 
 ### 6.2 Clearing Mechanism
 
@@ -316,7 +318,7 @@ User Assets → Smart Contract Escrow → Execution → User Wallets
 
 | Risk | Mitigation |
 |------|------------|
-| Smart contract bugs | Formal verification, audits |
+| Smart contract bugs | Written fairness proofs (`docs/research/proofs/`), Foundry fuzz + invariant tests, and dated internal audit reports (`docs/audits/`); no third-party audit or mechanized formal verification completed yet |
 | Oracle manipulation | Multiple price sources, TWAP |
 | Flash loan attacks | Same-block detection |
 | Economic attacks | Minimum liquidity, rate limits |
@@ -403,7 +405,7 @@ The protocol uses UUPS (Universal Upgradeable Proxy Standard):
 | Min deposit | 0.001 ETH | Baseline commitment |
 | Flash loan protection | Always on | No exceptions in commit-reveal |
 
-**Flash Loan Protection Explained**: Flash loans allow borrowing large amounts with zero collateral, provided funds are returned within the same blockchain transaction. Without protection, attackers could commit orders using borrowed funds they never actually owned, defeating the purpose of collateral requirements. VibeSwap blocks same-block repeat interactions, making flash loan attacks impossible. This protection cannot be disabled in the commit-reveal auction. The AMM has additional protections enabled by default with emergency admin toggles for incident response.
+**Flash Loan Protection Explained**: Flash loans allow borrowing large amounts with zero collateral, provided funds are returned within the same blockchain transaction. Without protection, attackers could commit orders using borrowed funds they never actually owned, defeating the purpose of collateral requirements. VibeSwap blocks same-block repeat interactions, which prevents the flash-loan collateral-bypass in the commit-reveal path. This protection cannot be disabled in the commit-reveal auction. The AMM has additional protections enabled by default with emergency admin toggles for incident response.
 
 **Pool Access Control (Can Vary)**:
 - Minimum user tier (open, retail, accredited, institutional)
@@ -480,20 +482,20 @@ We commit to:
 
 ### Appendix B: Security Audit Reports
 
-[Links to third-party audit reports]
+To date the audits are internal, dated reports in `docs/audits/` (through 2026-05-12), each cross-referencing contract + line and a closing commit. No third-party audit has been completed; third-party audit links will be added here when available.
 
 ### Appendix C: Mathematical Proofs
 
 See: `FORMAL_FAIRNESS_PROOFS.md`
 
-- Proof of shuffle uniformity
-- Proof of clearing price efficiency
-- Proof of MEV impossibility
+- Shuffle uniformity argument (conditioned on at least one honest entropy contributor)
+- Clearing-price Pareto-efficiency argument (under the model's assumptions)
+- Intra-batch no-frontrunning argument (note the documented same-block reveal tradeoff — this is batch-scoped MEV resistance, not global MEV impossibility)
 
 ### Appendix D: Source Code
 
 Repository: [GitHub link]
-License: MIT (Open Source)
+License: not yet finalized. Libraries and tooling are intended as MIT; core protocol contracts are reserved pending a formal license decision. Until a top-level `LICENSE` file lands, treat the repository as all rights reserved (see the repo README Status/License).
 
 ### Appendix E: Glossary
 

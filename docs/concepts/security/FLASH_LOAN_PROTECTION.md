@@ -12,9 +12,9 @@
 
 Flash loans enable any actor to borrow millions of dollars with zero collateral, execute arbitrary logic, and repay within a single transaction. While marketed as financial innovation, flash loans are the single most powerful tool for manipulating decentralized markets. They allow attackers to simulate infinite capital, distort prices, drain liquidity, and extract value from honest participants — all without ever having real funds at risk.
 
-This paper presents VibeSwap's multi-layered defense against flash loan attacks. The primary defense is a same-block interaction guard: any address that has interacted with the commit-reveal auction in the current block is rejected on subsequent interactions. The secondary defense is structural: collateral deposited during the commit phase is held by the contract until reveal or settlement, making it physically impossible to repay a flash loan within the same transaction. Together, these mechanisms make flash loan participation in VibeSwap's batch auctions mathematically impossible, not merely economically unprofitable.
+This paper presents VibeSwap's multi-layered defense against flash loan attacks, as implemented in the reference Solidity contracts. (Status: the protocol is pre-mainnet and not publicly deployed — see the repository README. These are the defenses the reference implementation enforces, analyzed as designed, not measured on a live network.) The primary defense is a same-block interaction guard: any non-settler address that has interacted with the commit-reveal auction in the current block is rejected on subsequent interactions. The secondary defense is structural: collateral deposited during the commit phase is held by the contract until reveal or settlement, so a flash loan cannot be fully repaid within the same transaction. Together, these mechanisms are designed to make flash loan participation in VibeSwap's batch auctions structurally infeasible rather than merely economically unprofitable.
 
-We further analyze the Sybil attack vector — distributing flash-loaned funds across multiple addresses — and show that collateral locking defeats this strategy as well. Finally, we address Sybil attacks conducted with real capital and demonstrate that VibeSwap's uniform treatment of all participants eliminates the advantage that multiple identities typically provide.
+We further analyze the Sybil attack vector — distributing flash-loaned funds across multiple addresses — and argue that collateral locking defeats this strategy as well. Finally, we address Sybil attacks conducted with real capital and show why VibeSwap's uniform treatment of all participants removes the advantage that multiple identities typically provide.
 
 ---
 
@@ -129,12 +129,16 @@ mapping(address => uint256) public lastInteractionBlock;
 On every commit, the contract checks whether the caller has already interacted in the current block:
 
 ```solidity
-// Flash loan protection - ALWAYS ON (protocol constant)
-if (lastInteractionBlock[msg.sender] == block.number) {
-    revert FlashLoanDetected();
+// Flash loan protection - skip for authorized settlers (they batch commits for multiple traders)
+if (!authorizedSettlers[msg.sender]) {
+    if (lastInteractionBlock[msg.sender] == block.number) {
+        revert FlashLoanDetected();
+    }
+    lastInteractionBlock[msg.sender] = block.number;
 }
-lastInteractionBlock[msg.sender] = block.number;
 ```
+
+Note the one carve-out: `authorizedSettlers` (e.g. the cross-chain router batching commits for multiple traders) are exempt from the per-address block guard, since a single settler legitimately submits many users' commits in one block. The guard therefore constrains ordinary callers; settlers are a trusted, registry-gated role.
 
 ### 3.2 Why This Defeats Flash Loans
 
@@ -151,22 +155,24 @@ The attacker must repay the flash loan in block N, but their collateral is locke
 
 ### 3.3 The VibeAMM Layer
 
-The same defense is implemented in `VibeAMM` with an additional per-pool granularity:
+The same class of defense is implemented in `VibeAMM` as a modifier on liquidity and swap entrypoints:
 
 ```solidity
 /// @notice Prevents flash loan attacks by blocking same-block interactions
 modifier noFlashLoan(bytes32 poolId) {
     if ((protectionFlags & FLAG_FLASH_LOAN) != 0) {
-        bytes32 interactionKey = keccak256(
-            abi.encodePacked(msg.sender, poolId, block.number)
-        );
-        // Check and record interaction
+        bytes32 interactionKey = keccak256(abi.encodePacked(msg.sender, block.number));
+        if (sameBlockInteraction[interactionKey]) {
+            emit FlashLoanAttemptBlocked(msg.sender, poolId);
+            revert SameBlockInteraction();
+        }
+        sameBlockInteraction[interactionKey] = true;
     }
     _;
 }
 ```
 
-This ensures that even if an attacker bypasses the auction layer, the AMM layer independently enforces same-block interaction guards.
+Two honest caveats versus the auction-layer guard. First, the interaction key is `(msg.sender, block.number)` — it is per-caller-per-block, **not** per-pool; a caller who touches any pool in a block is blocked from touching any other pool in that same block. Second, unlike the auction's hardcoded guard, the AMM guard is gated behind a `FLAG_FLASH_LOAN` protection flag that is set on initialization but is admin-toggleable. So the claim is: when the flag is on (its initialized default), the AMM layer independently enforces a same-block interaction guard, so an attacker who bypasses the auction layer still hits this check.
 
 ---
 
@@ -215,14 +221,14 @@ The flash loan provider's repayment check fails because 500 ETH is locked in the
 
 ### 4.3 Structural Impossibility vs. Economic Unprofitability
 
-Many protocols defend against flash loans by making attacks *economically unprofitable* — the cost exceeds the expected gain. VibeSwap's defense is stronger: it makes flash loan participation *structurally impossible*. The transaction cannot complete because the flash loan cannot be repaid. There is no profit calculation to analyze because the attack vector does not exist.
+Many protocols defend against flash loans by making attacks *economically unprofitable* — the cost exceeds the expected gain. VibeSwap's defense aims higher: it targets *structural infeasibility*. Under the mechanism as designed, the attack transaction cannot complete because the locked collateral leaves the borrower short of the repayment amount, so there is no profit calculation left to analyze. (This is an argument about the mechanism as specified, not a formal impossibility proof, and it assumes the collateral genuinely remains locked for the transaction's duration — which the commit/reveal separation enforces.)
 
 | Defense Type | Example | Strength |
 |-------------|---------|----------|
 | Economic deterrence | High fees during suspicious activity | Attacker can still succeed if profit > fees |
 | Time-based separation | Commit in block N, reveal in block N+k | Prevents single-tx attacks but complex |
-| Collateral lock | Funds held by contract until settlement | Structurally impossible — transaction reverts |
-| Same-block guard | Reject repeat interactions per block | Prevents all same-block attack patterns |
+| Collateral lock | Funds held by contract until settlement | Structural — repayment falls short, transaction reverts |
+| Same-block guard | Reject repeat interactions per block | Blocks same-block repeat-interaction patterns |
 | **VibeSwap (both)** | **Collateral lock + same-block guard** | **Belt and suspenders — both structural** |
 
 ---
@@ -253,7 +259,7 @@ Transaction REVERTS
 
 ### 5.2 Why Collateral Lock Defeats Sybil Flash Loans
 
-No matter how the attacker distributes the borrowed funds, the total collateral locked equals `total_trade_value * COLLATERAL_BPS / 10000`. This collateral is held by the contract and cannot be used for repayment. The math is inescapable:
+No matter how the attacker distributes the borrowed funds, the total collateral locked equals `total_trade_value * COLLATERAL_BPS / 10000`. This collateral is held by the contract and cannot be used for repayment. As long as the collateral is funded from the loan principal (the flash-loan-only case this section is about), the accounting is straightforward:
 
 ```
 Let:
@@ -284,12 +290,14 @@ But more importantly, commits with negligible collateral would need to trade neg
 
 ### 6.1 The Design Decision
 
-VibeSwap's flash loan protection is a protocol constant, not a per-pool configuration. The comment in the contract is explicit:
+In the commit-reveal auction, flash loan protection is a protocol constant, not a per-pool configuration. The comment in the contract is explicit:
 
 ```solidity
 /// @notice Last block each user interacted (flash loan protection - ALWAYS ON)
 mapping(address => uint256) public lastInteractionBlock;
 ```
+
+(The auction-layer guard is unconditional except for the authorized-settler carve-out described in 3.1. The AMM-layer guard in 3.3 is admin-toggleable via a protection flag that defaults on; "always on" describes the auction constant, which is the primary entrypoint.)
 
 ### 6.2 Justification
 
@@ -303,7 +311,7 @@ mapping(address => uint256) public lastInteractionBlock;
 
 ### 6.3 The Principle
 
-If a security mechanism has zero cost to honest users and complete effectiveness against attackers, there is no reason to make it optional. Optionality creates attack surface — an attacker would simply choose pools without protection. "Always on" eliminates this strategic choice entirely.
+If a security mechanism has near-zero cost to honest users (a single-block delay between interactions) and closes the same-block attack path against attackers, there is little reason to make it optional. Optionality creates attack surface — an attacker would simply choose pools without protection. Making the auction guard a hardcoded constant removes that strategic choice at the primary entrypoint. (The AMM-layer guard remains admin-toggleable, as noted in 3.3 and 6.1.)
 
 ---
 
@@ -351,7 +359,7 @@ Execution order within a batch is determined by a Fisher-Yates shuffle using XOR
 
 ### 8.4 Defense: TWAP Validation
 
-The VibeAMM enforces a maximum 5% deviation between the clearing price and the TWAP (Time-Weighted Average Price). Even if a Sybil attacker controls a significant fraction of orders in a batch, they cannot push the clearing price more than 5% from the TWAP. This bounds the potential profit from any price manipulation attempt.
+The VibeAMM enforces a maximum 5% deviation between the clearing price and the TWAP (Time-Weighted Average Price), via `MAX_PRICE_DEVIATION_BPS = 500`; in the batch path a clearing price beyond that bound is capped back toward the TWAP (`applyDeviationCap`) rather than executed as-is. A separate drift-rate check (`MAX_TWAP_DRIFT_BPS = 200`, 2%) guards against an attacker walking the TWAP across successive windows while staying under the single-batch limit. Even if a Sybil attacker controls a significant fraction of orders in a batch, they cannot realize a clearing price more than 5% from the TWAP. This bounds the potential profit from any price manipulation attempt.
 
 ### 8.5 Defense: Uniform Collateral and Slashing
 
@@ -401,11 +409,11 @@ VibeSwap's flash loan defense operates at two structural levels:
 
 2. **Collateral locks** ensure that funds deposited during the commit phase cannot be used to repay a flash loan, causing the transaction to revert regardless of attack strategy.
 
-These defenses are complementary and reinforcing. The same-block guard is a fast-fail check that rejects obvious flash loan patterns. The collateral lock is a deep structural defense that defeats sophisticated multi-address distribution strategies. Neither defense alone is sufficient; together, they make flash loan participation in VibeSwap's batch auctions mathematically impossible.
+These defenses are complementary and reinforcing. The same-block guard is a fast-fail check that rejects obvious flash loan patterns. The collateral lock is a deeper structural defense that targets sophisticated multi-address distribution strategies. Neither defense alone is sufficient; together, they are designed to make flash loan participation in VibeSwap's batch auctions structurally infeasible rather than merely unprofitable. (Argued from the mechanism as specified; the protocol is pre-mainnet and this has not been demonstrated on a live network.)
 
 For Sybil attacks with real capital, VibeSwap's uniform treatment of all participants — identical clearing prices, random ordering, uniform collateral, uniform slashing — eliminates the advantage that multiple identities typically provide. In a system where everyone is treated the same, being many people is the same as being one person.
 
-The cost to honest users is negligible: a single-block delay between interactions (imperceptible on any chain) and a 5% collateral requirement that is returned upon honest participation. The cost to attackers is total: structural impossibility.
+The cost to honest users is negligible: a single-block delay between interactions (imperceptible on any chain) and a 5% collateral requirement that is returned upon honest participation. The cost to a flash-loan attacker, under the mechanism as specified, is that the attack transaction cannot complete — a structural infeasibility argument, not a formal proof or a result measured on a live network.
 
 **P-000: Fairness Above All.** Flash loan protection is not a feature. It is a prerequisite for fairness. Borrowed capital with zero risk has no place in a market designed to reward genuine participation.
 

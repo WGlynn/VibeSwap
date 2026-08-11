@@ -6,7 +6,7 @@
 
 ## Abstract
 
-Social scalability is not constrained by material resources but by human behavior—specifically, the costly requirement of trust. Throughout history, civilizations have invented "social technologies" that extend trust beyond kinship: currency eliminated barter's double-coincidence problem, clocks enabled verifiable time-rate wages, and third-party intermediaries allowed strangers to transact globally. Yet each layer introduced new vulnerabilities. Bitcoin achieved the first breakthrough in trustless trust through proof-of-work and peer-to-peer consensus. VibeSwap represents the next evolution: applying these principles to decentralized exchange through **Intrinsically Incentivized Altruism (IIA)**—mechanism design that makes exploitation mathematically impossible rather than merely punishable.
+Social scalability is not constrained by material resources but by human behavior—specifically, the costly requirement of trust. Throughout history, civilizations have invented "social technologies" that extend trust beyond kinship: currency eliminated barter's double-coincidence problem, clocks enabled verifiable time-rate wages, and third-party intermediaries allowed strangers to transact globally. Yet each layer introduced new vulnerabilities. Bitcoin achieved the first breakthrough in trustless trust through proof-of-work and peer-to-peer consensus. VibeSwap aims to be the next evolution: applying these principles to decentralized exchange through **Intrinsically Incentivized Altruism (IIA)**—mechanism design that seeks to make a class of MEV exploits *structurally absent within a batch* rather than merely punishable. This is a design goal grounded in the commit-reveal batch mechanism, not a deployed-and-proven property: VibeSwap is pre-mainnet and not publicly deployed.
 
 ---
 
@@ -27,7 +27,7 @@ Every breakthrough in human prosperity has been accompanied by a breakthrough in
 | Medieval | Clocks/Time-rate wages | Verifiable labor contracts |
 | Industrial | Third-party intermediaries | Global commerce |
 | 2009 | Bitcoin/Blockchain | Trustless peer-to-peer value transfer |
-| 2025 | VibeSwap/IIA | Trustless peer-to-peer exchange |
+| 2025 | VibeSwap/IIA (proposed) | Deeper trust minimization for peer-to-peer exchange (design stage, pre-mainnet) |
 
 ### 1.2 The Evolution of Trust Technologies
 
@@ -63,7 +63,7 @@ Traditional DEXs inherit this problem. While they eliminate custodial risk, they
 
 ### 2.1 Trustless Trust
 
-Bitcoin achieved the first instance of **trustless trust**—a system that requires no trust because its security properties are mathematically guaranteed rather than institutionally promised.
+Bitcoin achieved the first instance of **trustless trust**—a system that minimizes trust because its security rests on cryptographic verification and the economic cost of proof-of-work rather than institutional promises. (These are properties of Bitcoin's own primitives, not of VibeSwap.)
 
 The architecture combines:
 
@@ -92,17 +92,17 @@ This is the gap VibeSwap addresses.
 
 ## Part III: VibeSwap's Evolution
 
-### 3.1 From Trust Minimization to Trust Elimination
+### 3.1 From Trust Minimization to Deeper Trust Minimization
 
-Bitcoin minimized trust in value transfer. VibeSwap eliminates trust in exchange through **Intrinsically Incentivized Altruism (IIA)**—mechanism design where exploitation is not merely punished but made impossible.
+Bitcoin minimized trust in value transfer. VibeSwap aims to minimize trust in exchange through **Intrinsically Incentivized Altruism (IIA)**—mechanism design that targets specific extractive strategies for structural removal rather than after-the-fact punishment.
 
-The Three IIA Conditions:
+The Three IIA Conditions (design targets):
 
 | Condition | Definition | VibeSwap Implementation |
 |-----------|------------|------------------------|
-| **Extractive Strategy Elimination** | No strategy extracts value from others | Cryptographic order hiding prevents front-running |
-| **Uniform Treatment** | All participants face identical rules | Uniform clearing price for all batch orders |
-| **Value Conservation** | Total value remains constant or increases | 100% LP fee distribution, no protocol extraction |
+| **Extractive Strategy Elimination** | Targeted extractive strategies (e.g. intra-batch front-running) have no information to act on | Cryptographic order hiding until batch seals (`CommitRevealAuction.sol`) |
+| **Uniform Treatment** | All participants face identical rules | Uniform clearing price for all batch orders (`VibeAMM.sol`) |
+| **Value Conservation** | No protocol-level extraction in the default configuration | LP fee distribution defaults to 100% to LPs (`VibeAMM.sol` fee share default `0`; a governance-set protocol share up to 25% is possible in code) |
 
 ### 3.2 The Commit-Reveal Mechanism
 
@@ -132,18 +132,18 @@ Phase 3: SETTLEMENT
 └── Collateral returned (or slashed if unrevealed)
 ```
 
-### 3.3 Why Exploitation Becomes Impossible
+### 3.3 Why Intra-Batch Exploitation Loses Its Foothold
 
 Traditional DEXs rely on **deterrence**: penalties for bad behavior. This creates an arms race between exploiters and defenders.
 
-VibeSwap achieves **impossibility**: the information required for exploitation does not exist.
+VibeSwap's design target is **information denial**: the information a given intra-batch attack needs does not exist while the batch is open. This removes the foothold for the attacks below *within a batch*; it does not claim to eliminate all MEV (e.g. cross-batch or oracle-timing strategies remain live research).
 
-| Attack Vector | Traditional DEX | VibeSwap |
+| Attack Vector | Traditional DEX | VibeSwap (within a batch) |
 |---------------|-----------------|----------|
-| Front-running | Profitable (see pending orders) | Impossible (orders encrypted until batch close) |
-| Sandwich attacks | Profitable (bracket victim trades) | Impossible (uniform price, no price impact per order) |
-| Just-in-time liquidity | Profitable (exploit price movement) | Impossible (all orders settled simultaneously) |
-| Information asymmetry | Sophisticated actors dominate | Information symmetry enforced by protocol |
+| Front-running | Profitable (see pending orders) | No pending-order signal (orders hidden until batch close) |
+| Sandwich attacks | Profitable (bracket victim trades) | No "before/after" price to bracket (single uniform clearing price) |
+| Just-in-time liquidity | Profitable (exploit price movement) | Orders in a batch settle at one price simultaneously |
+| Information asymmetry | Sophisticated actors dominate | Order contents symmetric until reveal, by protocol construction |
 
 ### 3.4 Proof-of-Work as Payment Alternative
 
@@ -160,9 +160,9 @@ function revealOrderWithPoW(
 ) external payable;
 ```
 
-This creates a **proof-of-sacrifice** alternative to monetary fees:
-- 16 difficulty bits ≈ 65K hashes ≈ ~100ms CPU time ≈ 0.0065 ETH equivalent
-- 24 difficulty bits ≈ 16M hashes ≈ ~30s CPU time ≈ 1.60 ETH equivalent
+This creates a **proof-of-sacrifice** alternative to monetary fees. The `revealOrderWithPoW` path is implemented in `CommitRevealAuction.sol` (`powAlgorithm` 0 = Keccak256, 1 = SHA256; difficulty bits verified via `ProofOfWorkLib`); the ETH-equivalent figures below are illustrative back-of-envelope estimates, not a calibrated fee schedule, and no value has been observed on a live network:
+- 16 difficulty bits ≈ 65K hashes ≈ ~100ms CPU time ≈ 0.0065 ETH equivalent (illustrative)
+- 24 difficulty bits ≈ 16M hashes ≈ ~30s CPU time ≈ 1.60 ETH equivalent (illustrative)
 
 The economic insight: both computation and money represent sacrifice. VibeSwap accepts either, democratizing access for those with compute resources but limited capital.
 
@@ -176,21 +176,21 @@ The original social scalability thesis noted:
 
 > *"Portrayal of the poor within a third world village is not one of culturally-based low trust. Rather, it is the painful lack of the various widely trusted intermediary institutions that catalyze commerce at a distance."*
 
-VibeSwap provides these trust guarantees without the intermediary institutions:
+VibeSwap is designed to offer these access properties without the intermediary institutions (target state once deployed; not yet live):
 
 - **No bank account required**: Only a wallet and internet connection
 - **No credit history required**: Collateral-based participation
 - **No institutional relationship required**: Protocol rules apply uniformly
-- **No jurisdictional restrictions**: Permissionless global access
+- **Permissionless by design**: no protocol-level allowlist (jurisdictional/regulatory constraints on any real deployment are out of the protocol's control)
 
 ### 4.2 The Service Economy Disruption
 
 If financial services represent 17% of global GDP and the broader service economy 60-65%, the potential disruption from trustless protocols is immense.
 
-VibeSwap targets the specific trust requirement of exchange:
-- Market makers extracting $500M+ annually in MEV → Protocol-enforced fairness
-- Centralized exchange fees (0.1-0.5%) → Competitive LP fees (~0.05%)
-- Custodial risk (billions lost to hacks) → Self-custody throughout
+VibeSwap targets the specific trust requirement of exchange (target properties of the design; VibeSwap is pre-mainnet):
+- Market makers extracting $500M+ annually in MEV → batch-auction fairness for intra-batch MEV
+- Centralized exchange fees (0.1-0.5%) → LP fee model (default 100% to LPs; the specific ~0.05% figure is an illustrative target, not a set on-chain parameter)
+- Custodial risk (billions lost to hacks) → non-custodial by design
 
 ### 4.3 From Selfish Behavior to Cooperative Outcomes
 
@@ -205,7 +205,7 @@ This is precisely IIA's insight. VibeSwap doesn't require altruism—it **produc
 3. **Protocol enforces fairness**: Uniform prices, cryptographic hiding, deterministic shuffles
 4. **Outcome is cooperative**: No one can extract value at others' expense
 
-The Nash equilibrium of VibeSwap is honest participation because no deviating strategy improves individual outcomes.
+The design intent is that honest participation is the rational strategy under the batch mechanism — that within a batch no deviating strategy improves individual outcomes. Establishing this as a proven Nash equilibrium under a realistic adversary model is ongoing work, not a closed result.
 
 ---
 
@@ -216,8 +216,8 @@ The Nash equilibrium of VibeSwap is honest participation because no deviating st
 Each trust technology builds on the previous:
 
 ```
-Layer 5: VibeSwap (2025)
-├── Trustless exchange
+Layer 5: VibeSwap (2025, proposed — pre-mainnet)
+├── Trust-minimized exchange (design target)
 ├── IIA mechanism design
 └── Builds on: Smart contracts, blockchain consensus
 
@@ -248,11 +248,11 @@ Nick Szabo observed:
 
 > *"The best 'TTP' of all is one that does not exist."*
 
-VibeSwap represents movement toward this ideal for exchange:
+VibeSwap is designed to move toward this ideal for exchange:
 - No central operator to trust
-- No privileged information holders
-- No extractive intermediaries
-- Mathematical guarantees replacing institutional promises
+- No privileged information holders within a batch
+- No extractive protocol intermediary
+- Mechanism-design guarantees, grounded in the batch construction, in place of institutional promises
 
 ---
 
@@ -262,14 +262,14 @@ The original social scalability thesis concluded:
 
 > *"We now have programmable money and the automation of sovereign trust would likely disrupt the largest portion of the Global Economy; which is the security plagued, service economy. The open and permissionless nature levels out the playing field and for the first time ever, gives the power of trust to the people."*
 
-VibeSwap extends this vision to exchange. By encoding fairness guarantees into protocol mechanics rather than institutional oversight, VibeSwap achieves:
+VibeSwap extends this vision to exchange. By encoding fairness into protocol mechanics rather than institutional oversight, VibeSwap is built to deliver:
 
-1. **Trust elimination**: Not minimization but mathematical impossibility of exploitation
-2. **Global access**: First-world exchange guarantees without first-world institutions
-3. **Cooperative capitalism**: Selfish actors producing cooperative outcomes through mechanism design
-4. **Social scalability**: Exchange that scales without trust constraints
+1. **Deeper trust minimization**: removing the *information* an intra-batch attacker needs, not just penalizing the attack (design target; the general MEV problem is not claimed solved)
+2. **Global access**: exchange access without first-world institutional relationships
+3. **Cooperative capitalism**: selfish actors producing cooperative outcomes through mechanism design
+4. **Social scalability**: exchange that scales with less trust overhead
 
-Bitcoin proved that value transfer could be trustless. VibeSwap proves that value exchange can be trustless. Together, they form the foundation of a truly peer-to-peer economy—one where trust is not required because fairness is guaranteed by mathematics.
+Bitcoin proved that value transfer could be trust-minimized. VibeSwap is the bet that value exchange can be too. The aim is a peer-to-peer economy where fairness is a property of the mechanism rather than a promise from an intermediary — a bet still to be proven on a live network, since VibeSwap is not yet deployed.
 
 ---
 

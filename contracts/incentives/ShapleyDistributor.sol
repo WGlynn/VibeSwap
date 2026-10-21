@@ -2070,10 +2070,13 @@ contract ShapleyDistributor is
      *      changing the string fed into keccak256, which produces a different
      *      hash. The _authorizeUpgrade gate refuses upgrades whose proposed
      *      implementation does not return the same axiomVersion as the current
-     *      one. This makes "Physics > Constitution > Governance" structurally
-     *      enforced at the upgrade boundary: a governance vote that elects an
-     *      implementation labelled as a different axiom set is rejected before
-     *      the proxy ever delegates to it.
+     *      one. A governance vote that elects an implementation labelled as a
+     *      different axiom set is rejected before the proxy ever delegates to it.
+     *      Limit: this compares a label the new implementation reports about
+     *      itself. It stops an honest or mislabelled change to the axiom set. It
+     *      does not stop a malicious implementation that returns the current hash
+     *      while enforcing different rules; only review of the new code, or
+     *      removing the upgrade path, closes that.
      *
      *      Five axioms enforced:
      *        - linearity

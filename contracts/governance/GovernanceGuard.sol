@@ -16,9 +16,13 @@ import "./IGovernanceProposalVerifier.sol";
  *      propose → veto (ShapleyDistributor)     (fairness check failed)
  *      proposeEmergency → [6h delay] → execute (guardian fast-track, still vetoable)
  *
- *      The Shapley veto is the key innovation: the vetoGuardian can cancel any
- *      proposal that fails a fairness check during the delay window. Governance
- *      captures are structurally impossible — P-001 enforced at the execution layer.
+ *      The Shapley veto: the vetoGuardian can cancel any proposal that fails a
+ *      fairness check during the delay window. This makes governance capture
+ *      slower and harder, not impossible. The guardian is a role the owner sets
+ *      (setVetoGuardian), and the autonomous check in execute() is only as strong
+ *      as the proposalVerifier it calls. It moves control from a single owner
+ *      (Grade C) to delayed, vetoable governance (Grade B); it does not remove
+ *      the upgrade path.
  *
  *      UUPS upgradeable. Once ownership is transferred here, changes to this
  *      contract require a proposal that survives the full veto window.
@@ -180,9 +184,11 @@ contract GovernanceGuard is
     ///      2. timelock elapsed
     ///      3. autonomous axiom check via proposalVerifier (fail-closed: reverts
     ///         if verifier is unset). This is the AA#2 closure of CRIT-3 from
-    ///         the 2026-05-12 audit — Physics > Constitution > Governance is now
-    ///         structurally enforced at the execution boundary rather than relying
-    ///         on a human vetoGuardian being honest and available.
+    ///         the 2026-05-12 audit. It moves the axiom check from a human
+    ///         vetoGuardian to code at the execution boundary. It is only as
+    ///         strong as the verifier: execute() reverts until one is set, and
+    ///         this repo has the interface (IGovernanceProposalVerifier) and a test
+    ///         mock, but no production implementation yet.
     function execute(
         address target, uint256 value, bytes calldata data, string calldata description
     ) external payable nonReentrant {

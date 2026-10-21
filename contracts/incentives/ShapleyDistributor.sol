@@ -2117,9 +2117,11 @@ contract ShapleyDistributor is
      *      axiomVersion() and return the same hash as the current implementation.
      *      A governance vote that elects an implementation with a different
      *      axiom set (signaled by a different hash) is rejected here, before
-     *      the proxy ever delegates to it. This closes the gap where the
-     *      math layer was upgradable to any implementation without preserving
-     *      Shapley invariants.
+     *      the proxy ever delegates to it. This narrows, but does not close,
+     *      the gap where the math layer was upgradable to any implementation
+     *      without preserving Shapley invariants: an implementation can still
+     *      declare the current hash while computing something else, so upgrades
+     *      still need review of the new code (or removal of the upgrade path).
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         require(newImplementation.code.length > 0, "Not a contract");

@@ -18,16 +18,11 @@ try {
   getSelfCorrectionPrompt = se.getSelfCorrectionPrompt || (() => '');
 } catch {}
 
+// Pruned 2026-10-27: eight per-topic files here were deleted in the 2026-05-05 memory
+// migration (fe5965b3) or predate the memory repo, so they loaded nothing and were
+// reported missing on every boot. gentu-substrate.md removed at Will's request.
 const MEMORY_FILES = [
   'MEMORY.md',
-  'it-token-vision.md',
-  'gentu-substrate.md',
-  'freedom-micro-interfaces.md',
-  'matt-pow-mmr.md',
-  'psinet-protocol.md',
-  'nervos-intel.md',
-  'limni-systems.md',
-  'tim-cotten-avb.md',
 ];
 
 // Path resolution uses config (supports both local and Docker/cloud)
@@ -215,7 +210,6 @@ export async function diagnoseContext() {
   const checks = [
     { path: CLAUDE_MD_PATH, label: 'CLAUDE.md' },
     { path: SESSION_STATE_PATH, label: 'SESSION_STATE.md' },
-    { path: CKB_PATH, label: 'JarvisxWill_CKB.md' },
     { path: SKB_PATH, label: 'JarvisxWill_SKB.md' },
     { path: GKB_PATH, label: 'JarvisxWill_GKB.md' },
     ...MEMORY_FILES.map(f => ({ path: join(MEMORY_DIR, f), label: f })),
@@ -836,17 +830,7 @@ export async function loadSystemPrompt() {
   // ============ CORE KNOWLEDGE BASE — Alignment & Protocols ============
   // The CKB contains identity primitives, operational protocols, and alignment
   // tiers that make JARVIS reason consistently across sessions.
-  const ckb = await safeRead(CKB_PATH, 'JarvisxWill_CKB.md');
-  if (ckb) {
-    await detectAndSyncChanges(CKB_PATH, ckb);
-    const sanitized = sanitizeContextForBot(ckb);
-    // Cap at 5000 chars — key operational tiers, skip philosophy (already sanitized out)
-    const capped = sanitized.slice(0, 5000);
-    dynamicParts.push('<context type="core_knowledge_base" description="Core alignment, identity protocols, and operational principles">');
-    dynamicParts.push(capped);
-    dynamicParts.push('</context>');
-    dynamicParts.push('');
-  }
+  // JarvisxWill_CKB.md was deleted from the repo on 2026-04-02 (89f235b4); its read is removed.
 
   // ============ Shared Knowledge Base (SKB) — Full session boot context ============
   const skb = await safeRead(SKB_PATH, 'JarvisxWill_SKB.md');

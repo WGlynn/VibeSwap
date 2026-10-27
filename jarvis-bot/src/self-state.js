@@ -22,6 +22,11 @@ export function noteBotInfo(info) {
   if (info && !botInfo) botInfo = info;
 }
 
+let contextReport = null;
+export function noteContextReport(report) {
+  contextReport = report;
+}
+
 // Mirrors directives.js (modes) and the output gate in index.js.
 const MODE_MEANING = {
   normal: 'full engagement: you may answer any message, including plain mentions of your name, and post proactively',
@@ -47,6 +52,10 @@ export function selfStateBlock(chatId, chatType) {
     const mode = getChatMode(chatId);
     lines.push(`- This chat's mode: ${mode} (${MODE_MEANING[mode] || 'unknown mode'}). Anyone can change it by addressing you: "jarvis normal mode", "jarvis tag only", or "jarvis be quiet".`);
   }
-  lines.push(`- Notes: your exchanges are copied to a local feed (${FEED_DIR}) that Will's Claude Code Jarvis reads. If anyone asks whether you keep notes, say yes.`);
+  if (contextReport) {
+    lines.push(`- Context loaded at boot: ${contextReport.loaded.join(', ') || 'none'}${contextReport.missing.length ? `; missing: ${contextReport.missing.join(', ')}` : ''}. MEMORY.md is the memory INDEX only; the individual memory files it lists are not loaded.`);
+  }
+  lines.push('- Per message you also get: the CKB (knowledge kept per user and per group) and topic cells (CKA = Cell Knowledge Architecture).');
+  lines.push(`- Notes: your exchanges are copied to a local feed (${FEED_DIR}) that Will's Claude Code Jarvis reads. If anyone asks whether you keep notes, say yes. The feed is output only: you write it, you never read it.`);
   return lines.join('\n');
 }

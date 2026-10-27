@@ -290,8 +290,8 @@ try {
 }
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
-import { recordExchange } from './feed.js';
-import { noteBotInfo } from './self-state.js';
+import { recordExchange, recordUncleanShutdown } from './feed.js';
+import { noteBotInfo, noteContextReport } from './self-state.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -906,6 +906,13 @@ async function writeHeartbeat(status) {
 }
 
 async function checkLastShutdown() {
+  // scripts/restart-local.ps1 leaves this marker before stopping the bot: a planned restart, not a crash.
+  const plannedFile = join(config.dataDir, 'planned-restart.json');
+  try {
+    const planned = JSON.parse(await readFile(plannedFile, 'utf-8'));
+    await unlink(plannedFile);
+    return { clean: true, planned: true, lastSeen: planned.at };
+  } catch {}
   try {
     const data = await readFile(HEARTBEAT_FILE, 'utf-8');
     const hb = JSON.parse(data);
@@ -5250,7 +5257,7 @@ bot.command('health', async (ctx) => {
   if (report.missing.length > 0) {
     lines.push(`Missing: ${report.missing.join(', ')}`);
   }
-  lines.push(`Model: ${config.anthropic.model}`);
+  lines.push(`Model: ${getProviderName()} / ${getModelName()}`);
   // Module health
   const mh = getModuleHealth();
   if (mh.failed.length > 0) {
@@ -5607,7 +5614,7 @@ bot.command('recover', async (ctx) => {
     if (report.missing.length > 0) {
       lines.push(`Still missing: ${report.missing.join(', ')}`);
     }
-    lines.push(`Model: ${config.anthropic.model}`);
+    lines.push(`Model: ${getProviderName()} / ${getModelName()}`);
     ctx.reply(lines.join('\n'));
   } catch (err) {
     ctx.reply(`Recovery failed: ${err.message}`);
@@ -8147,10 +8154,15 @@ async function main() {
     }
   }
 
+  noteContextReport(report);
+
   // Step 5: Check for unclean shutdown
   const lastShutdown = await checkLastShutdown();
   if (!lastShutdown.clean && !lastShutdown.firstBoot) {
     console.warn(`[jarvis] WARNING: Unclean shutdown detected. Last seen: ${lastShutdown.lastSeen}, downtime: ~${lastShutdown.downtime}min`);
+    recordUncleanShutdown(lastShutdown, config.dataDir);
+  } else if (lastShutdown.planned) {
+    console.log(`[jarvis] Planned restart (marker from ${lastShutdown.lastSeen})`);
   }
 
   // Step 6: Initialize group monitor (MTProto — reads public groups without joining)
@@ -8165,7 +8177,7 @@ async function main() {
     console.log('[jarvis] Step 6: Group monitor skipped (telegram package not installed).');
   }
 
-  console.log(`[jarvis] Model: ${config.anthropic.model}`);
+  console.log(`[jarvis] Model: ${getProviderName()} / ${getModelName()}`);
   console.log('[jarvis] Step 7: Starting Telegram bot...');
 
   // ============ Telegraf Error Handler — CRITICAL ============
@@ -9283,7 +9295,7 @@ async function main() {
     if (report.missing.length > 0) {
       lines.push(`Missing: ${report.missing.join(', ')}`);
     }
-    lines.push(`Model: ${config.anthropic.model}`);
+    lines.push(`Model: ${getProviderName()} / ${getModelName()}`);
     lines.push(`Shard: ${shardResult.id} (${isMultiShard() ? 'multi' : 'single'}-shard)`);
     await bot.telegram.sendMessage(config.ownerUserId, lines.join('\n'));
   } catch (err) {

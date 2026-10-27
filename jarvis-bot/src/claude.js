@@ -11,6 +11,7 @@ import { summarizeIfNeeded, getContextSummary } from './context-memory.js';
 import { checkBudget, recordUsage } from './compute-economics.js';
 import { getGroupContext } from './group-context.js';
 import { evaluateOwnResponse, appendScoreLog } from './intelligence.js';
+import { selfStateBlock } from './self-state.js';
 // Shard memory — compressed semantic memory for cross-shard context
 let observeMemory = () => {};
 try {
@@ -939,6 +940,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       cappedGroup,
       cappedKnowledge ? '\n\n' + cappedKnowledge : '',
       cellContext || '', // CKA: topic-relevant knowledge cells
+      selfStateBlock(chatId, chatType),
       systemPrompt.recency,
     ].filter(Boolean).join('\n');
 
@@ -959,7 +961,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       + (cappedSummary || '')
       + (cappedGroup || '')
       + (cappedKnowledge ? '\n\n' + cappedKnowledge : '')
-      + (cellContext ? '\n\n' + cellContext : '');
+      + (cellContext ? '\n\n' + cellContext : '')
+      + selfStateBlock(chatId, chatType);
   }
 
   // ============ Selective Tool Loading ============

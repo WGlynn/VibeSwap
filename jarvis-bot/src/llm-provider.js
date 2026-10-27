@@ -35,6 +35,7 @@
 import { config } from './config.js';
 import { randomUUID, createHash } from 'crypto';
 import { getActivePersonaId as _getPersonaId } from './persona.js';
+import { metered } from './llm-meter.js';
 
 // ============ Truncated Response Error ============
 // Thrown when a provider returns incomplete/truncated JSON.
@@ -132,7 +133,8 @@ function stripMediaBlocks(messages) {
 const providers = new Map();
 
 export function registerProvider(name, factory) {
-  providers.set(name, factory);
+  // Every provider instance is metered (one log line per physical request); see llm-meter.js.
+  providers.set(name, (providerConfig) => metered(factory(providerConfig)));
 }
 
 // ============ Circuit Breaker — Per-Provider Health Tracking ============

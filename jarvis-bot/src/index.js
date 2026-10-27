@@ -290,6 +290,8 @@ try {
 }
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
+import { recordExchange } from './feed.js';
+import { noteBotInfo } from './self-state.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -601,8 +603,9 @@ if (IS_WORKER) {
     console.error('============================================================');
     process.exit(1);
   }
-  if (!config.anthropic.apiKey) {
-    console.error('ANTHROPIC_API_KEY is required. Copy .env.example to .env and fill it in.');
+  // Free-tier rule: the Anthropic key is only required when Claude is the primary provider.
+  if (!config.anthropic.apiKey && (config.llm?.provider || 'claude') === 'claude') {
+    console.error('ANTHROPIC_API_KEY is required when LLM_PROVIDER is claude (the default). Set it, or set LLM_PROVIDER to a free provider.');
     process.exit(1);
   }
 }
@@ -6237,6 +6240,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
   const pacer = startReplyPacer(ctx);
 
   try {
+    noteBotInfo(ctx.botInfo);
     const response = await chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id });
     clearInterval(typingInterval);
     await saveConversations();
@@ -6252,6 +6256,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       pacer.cancel();
       return;
     }
+    recordExchange(ctx, text, reply);
     if (reply.length <= 4096) {
       await pacer.replyWith(reply, { parse_mode: undefined });
     } else {
@@ -7378,6 +7383,7 @@ bot.on('text', async (ctx) => {
     // This outer retry catches that case and waits for network recovery before
     // giving up entirely. Prevents "Something went wrong: fetch failed" on transient
     // network blips (which the logs showed happening around the 40hr uptime mark).
+    noteBotInfo(ctx.botInfo);
     let response;
     const MSG_MAX_RETRIES = 2;
     for (let msgAttempt = 0; msgAttempt <= MSG_MAX_RETRIES; msgAttempt++) {
@@ -7408,6 +7414,7 @@ bot.on('text', async (ctx) => {
       console.log(`[shard-dedup] Suppressed response in ${chatId} — sibling already covered it`);
       return;
     }
+    recordExchange(ctx, ctx.message.text, response.text);
 
     // Record compute usage (non-blocking)
     if (response.usage) {

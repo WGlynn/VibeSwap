@@ -15,7 +15,10 @@ import { getProviderName, getModelName } from './llm-provider.js';
 export const FEED_DIR = process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed');
 const MAX_CHARS = 2000;
 
-export function recordExchange(ctx, inbound, reply) {
+// meta (optional): { model, provider } to name what actually answered after a rotation,
+// or { noModel: true } for a turn answered without any model request (quick reply). The
+// default row is byte-identical to the old shape apart from the added noModel flag.
+export function recordExchange(ctx, inbound, reply, meta = {}) {
   try {
     mkdirSync(FEED_DIR, { recursive: true });
     const ts = new Date().toISOString();
@@ -27,10 +30,15 @@ export function recordExchange(ctx, inbound, reply) {
         username: ctx.from?.username ?? null,
         name: [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ') || null,
       },
+      // Message ids so Claude Code can thread a follow-up through POST /api/say (Will 2026-10-28)
+      messageId: ctx.message?.message_id ?? null,
+      replyTo: ctx.message?.reply_to_message?.message_id ?? null,
+      repliedToBot: !!(ctx.message?.reply_to_message?.from?.id && ctx.botInfo?.id && ctx.message.reply_to_message.from.id === ctx.botInfo.id),
       in: String(inbound ?? '').slice(0, MAX_CHARS),
       out: String(reply ?? '').slice(0, MAX_CHARS),
-      provider: getProviderName(),
-      model: getModelName(),
+      provider: meta.noModel ? 'quick-reply' : (meta.provider ?? getProviderName()),
+      model: meta.noModel ? null : (meta.model ?? getModelName()),
+      noModel: !!meta.noModel,
     };
     appendFileSync(join(FEED_DIR, `${ts.slice(0, 10)}.jsonl`), JSON.stringify(entry) + '\n');
   } catch (err) {

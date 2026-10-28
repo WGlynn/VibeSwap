@@ -34,6 +34,10 @@ const MEMORY_DIR = config.memory.dir;
 // Same folder as the exchange feed (mirrors FEED_DIR in feed.js, not imported to keep
 // memory.js free of the llm-provider dependency feed.js carries).
 const NOW_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'now.md');
+// people.md: who is who in the chats, written for the bot by Claude Code Jarvis from the People/
+// records (public-safe by hand; Will 2026-10-28: both brains keep the same picture of each person).
+const PEOPLE_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'people.md');
+const PEOPLE_CAP = 4000;
 const NOW_CAP = 3000;
 const CLAUDE_MD_PATH = join(REPO_PATH, 'CLAUDE.md');
 const CKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_CKB.md');
@@ -215,6 +219,7 @@ export async function diagnoseContext() {
   const checks = [
     { path: CLAUDE_MD_PATH, label: 'CLAUDE.md' },
     { path: NOW_PATH, label: 'now.md' },
+    { path: PEOPLE_PATH, label: 'people.md' },
     { path: SKB_PATH, label: 'JarvisxWill_SKB.md' },
     { path: GKB_PATH, label: 'JarvisxWill_GKB.md' },
     ...MEMORY_FILES.map(f => ({ path: join(MEMORY_DIR, f), label: f })),
@@ -829,6 +834,14 @@ export async function loadSystemPrompt() {
     dynamicParts.push('');
   }
 
+  const peopleNote = await safeRead(PEOPLE_PATH, 'people.md');
+  if (peopleNote && peopleNote.trim()) {
+    dynamicParts.push(`<context type="people" description="who is who in the chats, written by Claude Code Jarvis; working notes, never repeat private details back">`);
+    dynamicParts.push(sanitizeContextForBot(peopleNote).slice(0, PEOPLE_CAP));
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
   // ============ CORE KNOWLEDGE BASE — Alignment & Protocols ============
   // The CKB contains identity primitives, operational protocols, and alignment
   // tiers that make JARVIS reason consistently across sessions.
@@ -908,14 +921,18 @@ export async function loadSystemPrompt() {
 
   const dynamicPrompt = dynamicParts.join('\n');
   const fullPrompt = staticPrompt + '\n' + dynamicPrompt + '\n' + RECENCY_RULES;
+  // Hash of the frozen prefix every Gemini request starts with. A changed hash after
+  // /refresh or /persona is the cheapest explanation for a meter row with cached=0.
+  const prefixHash = createHash('sha256').update(fullPrompt).digest('hex').slice(0, 12);
 
-  console.log(`[memory] Prompt split: static=${staticPrompt.length} chars, dynamic=${dynamicPrompt.length} chars, recency=${RECENCY_RULES.length} chars`);
+  console.log(`[memory] Prompt split: static=${staticPrompt.length} chars, dynamic=${dynamicPrompt.length} chars, recency=${RECENCY_RULES.length} chars, hash=${prefixHash}`);
 
   return {
     static: staticPrompt,
     dynamic: dynamicPrompt,
     recency: RECENCY_RULES,
     full: fullPrompt,
+    prefixHash,
     // Backward compat: toString() returns the full prompt for string concatenation
     toString() { return this.full; },
   };

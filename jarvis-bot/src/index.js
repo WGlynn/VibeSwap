@@ -8978,6 +8978,30 @@ async function main() {
               res.end(JSON.stringify({ error: err.message }));
           }
 
+        // POST /api/say: Claude Code hands the bot text to post as itself in a chat it is in
+        // (Will 2026-10-28, feed-forward test). Body: { chatId, text, replyToMessageId? }.
+        // Same outgoing path as a reply: the dash filter on callApi applies, the group context
+        // window learns the bot said it, and recordOutgoing feeds collision detection.
+        } else if (path === '/api/say' && req.method === 'POST') {
+          try {
+            const payload = JSON.parse(await readBody(req));
+            const chatId = String(payload.chatId || '');
+            const text = String(payload.text || '').trim();
+            if (!/^-?\d+$/.test(chatId) || !text) throw new Error('chatId (numeric) and text are required');
+            if (text.length > 4000) throw new Error('text over 4000 characters');
+            const extra = { parse_mode: undefined };
+            if (payload.replyToMessageId) extra.reply_parameters = { message_id: Number(payload.replyToMessageId) };
+            const sent = await bot.telegram.sendMessage(chatId, text, extra);
+            recordOutgoing(chatId, text);
+            if (chatId.startsWith('-')) pushGroupMessage(chatId, 'JARVIS', text.slice(0, 500), null, true);
+            console.log(`[api] /api/say posted ${text.length} chars to chat ${chatId} (message ${sent.message_id})`);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, messageId: sent.message_id }));
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+
         // GET /api/outbox — Messages JARVIS has queued for Claude Code
         } else if (path === '/api/outbox' && req.method === 'GET') {
           const messages = getOutbox();
@@ -9031,6 +9055,7 @@ async function main() {
             'GET /api/status',
             'GET /api/intel?group=&count=',
             'POST /api/message',
+            'POST /api/say',
             'GET /api/outbox',
             'POST /api/outbox/ack',
             'GET /api/comms/log?count=',

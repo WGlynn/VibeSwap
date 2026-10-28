@@ -8414,10 +8414,9 @@ async function main() {
       } catch (restartErr) {
         console.error('[polling-monitor] Soft restart failed:', restartErr.message);
         persistCrashEntry('polling_restart_failed', restartErr);
+        // No DM here: a single failed attempt usually heals on the next one (a Telegram 502 did,
+        // 2026-10-28). Will is messaged only when attempts run out and the process hard-restarts.
         recordHealthEvent({ kind: 'polling_restart_failed', where: 'polling-monitor', error: String(restartErr.message).slice(0, 200) });
-        try {
-          await bot.telegram.sendMessage(config.ownerUserId, `[POLLING-MONITOR] Soft restart failed: ${String(restartErr.message).slice(0, 200)}`);
-        } catch {}
         // Don't reset timer — let it try again on next interval
       }
     }

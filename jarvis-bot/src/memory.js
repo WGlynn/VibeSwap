@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { createHash } from 'crypto';
 import { join } from 'path';
+import { homedir } from 'os';
 import { config } from './config.js';
 import { getPersonaOverlay, getActivePersonaId } from './persona.js';
 import { syncFileChange } from './knowledge-chain.js';
@@ -29,7 +30,11 @@ const MEMORY_FILES = [
 const REPO_PATH = config.repo.path;
 const MEMORY_DIR = config.memory.dir;
 
-const SESSION_STATE_PATH = join(REPO_PATH, '.claude', 'SESSION_STATE.md');
+// now.md: written FOR the bot by Claude Code Jarvis (~/.claude/session-chain/write-bot-now.py).
+// Same folder as the exchange feed (mirrors FEED_DIR in feed.js, not imported to keep
+// memory.js free of the llm-provider dependency feed.js carries).
+const NOW_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'now.md');
+const NOW_CAP = 3000;
 const CLAUDE_MD_PATH = join(REPO_PATH, 'CLAUDE.md');
 const CKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_CKB.md');
 const SKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_SKB.md');
@@ -209,7 +214,7 @@ export async function diagnoseContext() {
 
   const checks = [
     { path: CLAUDE_MD_PATH, label: 'CLAUDE.md' },
-    { path: SESSION_STATE_PATH, label: 'SESSION_STATE.md' },
+    { path: NOW_PATH, label: 'now.md' },
     { path: SKB_PATH, label: 'JarvisxWill_SKB.md' },
     { path: GKB_PATH, label: 'JarvisxWill_GKB.md' },
     ...MEMORY_FILES.map(f => ({ path: join(MEMORY_DIR, f), label: f })),
@@ -809,20 +814,17 @@ export async function loadSystemPrompt() {
   dynamicParts.push('</context>');
   dynamicParts.push('');
 
-  // ============ SESSION STATE — Recent Work & Decisions ============
-  // This is what makes the Claude Code session feel "sentient" — it knows what
-  // was just worked on, what decisions were made, what's in progress.
-  // Load the TAIL (most recent state) — bottom of file = latest session.
-  const sessionState = await safeRead(SESSION_STATE_PATH, 'SESSION_STATE.md');
-  if (sessionState) {
-    await detectAndSyncChanges(SESSION_STATE_PATH, sessionState);
-    const sanitized = sanitizeContextForBot(sessionState);
-    // Take the LAST 4000 chars (most recent 1-2 sessions of decisions/tasks)
-    const tail = sanitized.length > 4000
-      ? '...\n' + sanitized.slice(-4000)
-      : sanitized;
-    dynamicParts.push('<context type="session_state" description="Recent work, decisions, and current focus">');
-    dynamicParts.push(tail);
+  // ============ NOW — Will's Current Public Work ============
+  // Replaces the SESSION_STATE.md tail (2026-10-27). That file is newest-on-top, so its
+  // tail was months old, and it holds private and security-sensitive notes unfit for the
+  // public groups this bot talks in. now.md is public-safe by construction: a focus note
+  // plus recent commits on repos GitHub reports PUBLIC. It is regenerated locally and
+  // changes often, so it is not relayed through the knowledge chain.
+  const nowNote = await safeRead(NOW_PATH, 'now.md');
+  if (nowNote && nowNote.trim()) {
+    const capped = sanitizeContextForBot(nowNote).slice(0, NOW_CAP);
+    dynamicParts.push(`<context type="now" description="Will's current public work, written by Claude Code Jarvis">`);
+    dynamicParts.push(capped);
     dynamicParts.push('</context>');
     dynamicParts.push('');
   }

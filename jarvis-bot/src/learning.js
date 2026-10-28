@@ -400,6 +400,9 @@ async function saveGroupCKB(groupId) {
 
 export async function detectCorrection(userMessage, previousJarvisResponse, userName) {
   if (!previousJarvisResponse || userMessage.length < 10) return null;
+  // Free-tier quota (llm-meter, 2026-10-27): this ran a model call on EVERY message. Only spend
+  // one when the message has a correction marker; everything else cannot be a correction.
+  if (!/\b(no|not|nope|wrong|incorrect|actually|isn'?t|wasn'?t|don'?t|doesn'?t|false|mistake|correction|that'?s not|you('?re| are) wrong)\b/i.test(userMessage)) return null;
 
   try {
     const response = await llmChat({

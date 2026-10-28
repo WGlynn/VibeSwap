@@ -2406,10 +2406,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
     // Cross-chat context symmetry: extract user-specific context from conversation
     // and flow it into the CKB pipeline so knowledge persists across DM/group/shard
-    _extractConversationContext(effectiveUserId, userName, chatId, chatType, messageText, assistantMessage).catch(() => {});
+    // Free-tier quota (llm-meter, 2026-10-27): each follow-up is one more model request per message.
+    // Context extraction overlaps the CKB extraction below; on only with JARVIS_CONTEXT_EXTRACT=on.
+    if (process.env.JARVIS_CONTEXT_EXTRACT === 'on') {
+      _extractConversationContext(effectiveUserId, userName, chatId, chatType, messageText, assistantMessage).catch(() => {});
+    }
 
-    // Self-correcting feedback loop: score every response (fire-and-forget)
-    evaluateOwnResponse(assistantMessage, messageText, chatType)
+    // Self-correcting feedback loop: score every response (fire-and-forget). One extra request per
+    // message for a 3-token score; on only with JARVIS_SELF_EVAL=on.
+    if (process.env.JARVIS_SELF_EVAL === 'on') evaluateOwnResponse(assistantMessage, messageText, chatType)
       .then(scores => {
         if (scores) {
           // Feed composite score (0-10) into Shapley quality accumulator (expects 0-5)

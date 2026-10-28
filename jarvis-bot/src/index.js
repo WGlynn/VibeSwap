@@ -1,4 +1,8 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Telegram } from 'telegraf';
+import { installDashFilter } from './text-style.js';
+
+// No em or en dashes in anything the bot sends (Will 2026-10-27); see text-style.js.
+installDashFilter(Telegram);
 import { config } from './config.js';
 import { initClaude, chat, codeGenChat, bufferMessage, bufferAssistantMessage, reloadSystemPrompt, clearHistory, saveConversations, getSystemPrompt, getLastResponse, getToolBreakerStats, trimConversationCache } from './claude.js';
 import { gitStatus, gitPull, gitCommitAndPush, gitLog, backupData, gitCreateBranch, gitCommitAndPushBranch, gitReturnToMaster, gitPush, gitStatusShort, gitLogOneline } from './git.js';
@@ -7392,25 +7396,28 @@ bot.on('text', async (ctx) => {
     // network blips (which the logs showed happening around the 40hr uptime mark).
     noteBotInfo(ctx.botInfo);
     let response;
-    const MSG_MAX_RETRIES = 2;
-    for (let msgAttempt = 0; msgAttempt <= MSG_MAX_RETRIES; msgAttempt++) {
+    // Keep retrying (Will 2026-10-27: "should just keep retrying"). Free-tier quota (429) and
+    // overload (503) clear within a minute or two, so a growing wait beats giving up. Bounded at
+    // ~10 minutes so a long outage cannot pile up stuck messages; the typing indicator stays on.
+    const RETRY_WAITS_MS = [5000, 10000, 20000, 30000, 30000, 60000, 60000, 60000, 60000, 60000, 60000, 60000, 60000];
+    const RETRYABLE = ['fetch failed', 'econnreset', 'socket hang up', 'network', 'enotfound',
+      'all providers exhausted', 'temporarily unavailable', '429', '503', 'overloaded', 'quota', 'rate limit'];
+    for (let msgAttempt = 0; ; msgAttempt++) {
       try {
         response = await chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id });
         break; // Success — exit retry loop
       } catch (chatErr) {
         const errMsg = (chatErr?.message || '').toLowerCase();
-        const isNetworkError = errMsg.includes('fetch failed') || errMsg.includes('econnreset')
-          || errMsg.includes('socket hang up') || errMsg.includes('network')
-          || errMsg.includes('enotfound') || errMsg.includes('all providers exhausted');
-        if (isNetworkError && msgAttempt < MSG_MAX_RETRIES) {
-          const retryDelay = 3000 * (msgAttempt + 1); // 3s, 6s
-          console.warn(`[resilience] Network error on chat() attempt ${msgAttempt + 1}/${MSG_MAX_RETRIES + 1}, retrying in ${retryDelay}ms: ${chatErr.message?.slice(0, 80)}`);
+        const retryable = RETRYABLE.some(k => errMsg.includes(k));
+        if (retryable && msgAttempt < RETRY_WAITS_MS.length) {
+          const retryDelay = RETRY_WAITS_MS[msgAttempt];
+          console.warn(`[resilience] chat() attempt ${msgAttempt + 1} failed, retrying in ${retryDelay / 1000}s: ${chatErr.message?.slice(0, 80)}`);
+          const keepTyping = setInterval(() => ctx.sendChatAction('typing').catch(() => {}), 4000);
           await new Promise(r => setTimeout(r, retryDelay));
-          // Keep typing indicator alive
-          ctx.sendChatAction('typing').catch(() => {});
+          clearInterval(keepTyping);
           continue;
         }
-        throw chatErr; // Non-network error or retries exhausted — propagate to outer catch
+        throw chatErr; // Not retryable, or ~10 minutes of retries used up — propagate to outer catch
       }
     }
 

@@ -97,6 +97,26 @@ function flattenToolExchanges(messages) {
   }).filter(Boolean);
 }
 
+// ============ Current-Turn Tool Exchanges (native-tool providers) ============
+// A provider with native tools (Gemini) needs the CURRENT turn's tool_use/tool_result intact:
+// that is the live loop, and Gemini validates thought signatures there. Earlier turns are
+// flattened as for tool-less providers: they may name tools outside this message's selective
+// tool set, and old tool output is stale context. The current turn starts at the last user
+// message that carries text and no tool_result.
+
+function flattenPriorToolExchanges(messages) {
+  let start = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== 'user') continue;
+    const blocks = Array.isArray(m.content) ? m.content : null;
+    const hasText = blocks ? blocks.some(b => b.type === 'text' && b.text?.trim()) : Boolean(m.content?.trim?.());
+    const hasToolResult = blocks ? blocks.some(b => b.type === 'tool_result') : false;
+    if (hasText && !hasToolResult) { start = i; break; }
+  }
+  return [...flattenToolExchanges(messages.slice(0, start)), ...messages.slice(start)];
+}
+
 /**
  * Strip image/document blocks from messages for non-vision providers.
  * Replaces image blocks with text descriptions so the LLM knows an image was sent.
@@ -304,9 +324,11 @@ class CircuitState {
     this.recentResults.push({ timestamp: Date.now(), success: true });
     this._pruneWindow();
 
-    if (this.state === 'half_open') {
-      // Recovery confirmed — close the breaker
-      console.log(`[circuit-breaker] ${this.providerName}: HALF_OPEN → CLOSED (probe succeeded)`);
+    if (this.state !== 'closed') {
+      // Recovery confirmed — close the breaker. 'open' lands here when a request already in
+      // flight (or a concurrent one) succeeds after another tripped it: the provider works,
+      // and a single-provider pool must not stay locked out for the rest of the cooldown.
+      console.log(`[circuit-breaker] ${this.providerName}: ${this.state.toUpperCase()} → CLOSED (request succeeded)`);
       this.state = 'closed';
       this.openDuration = CIRCUIT_BREAKER_CONFIG.openDurationMs; // Reset backoff
       this.halfOpenProbes = 0;
@@ -923,14 +945,105 @@ async function warmOllama() {
 // Fire and forget — don't block startup. Always warm if Ollama URL is set (it's in the cascade)
 if (process.env.OLLAMA_URL) warmOllama();
 
+// ============ Gemini Schema Sanitizer ============
+// functionDeclarations[].parameters is an OpenAPI-3.0 Schema subset, not JSON Schema: an unknown
+// key (additionalProperties, $schema, $ref, default, examples, oneOf, ...) fails the WHOLE request
+// with 400, `type` is required on every node, and enum is STRING-only. So: whitelist the keys
+// Gemini documents and repair the shapes our tools use (surveyed over all 86 input_schemas
+// 2026-10-27: only type/description/properties/required/enum/items, one untyped property
+// set_behavior.value, several empty-properties objects).
+
+function toGeminiSchema(schema) {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return { type: 'string' };
+  const out = {};
+  let type = schema.type;
+  if (Array.isArray(type)) {                       // JSON Schema ["string","null"] → type + nullable
+    if (type.includes('null')) out.nullable = true;
+    type = type.find(t => t !== 'null');
+  }
+  if (!type && !Array.isArray(schema.anyOf)) {
+    type = schema.properties ? 'object' : schema.items ? 'array' : schema.enum ? 'string' : null;
+  }
+  if (schema.description) out.description = String(schema.description);
+  if (type) out.type = type;
+  else if (Array.isArray(schema.anyOf)) out.anyOf = schema.anyOf.map(toGeminiSchema);
+  else out.anyOf = [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }]; // untyped = any scalar
+  if (schema.nullable === true) out.nullable = true;
+  if (Array.isArray(schema.enum)) {
+    if (type === 'string') out.enum = schema.enum.map(String);
+    else out.description = `${out.description ? out.description + ' ' : ''}Allowed: ${schema.enum.join(', ')}.`;
+  }
+  if (type === 'object' && schema.properties && typeof schema.properties === 'object') {
+    out.properties = {};
+    for (const [key, sub] of Object.entries(schema.properties)) out.properties[key] = toGeminiSchema(sub);
+    const required = (schema.required || []).filter(k => k in out.properties);
+    if (required.length) out.required = required;
+  }
+  if (type === 'array') out.items = toGeminiSchema(schema.items || { type: 'string' }); // ARRAY needs items
+  return out;
+}
+
+function toGeminiTools(tools) {
+  if (!tools?.length) return undefined;
+  return [{
+    functionDeclarations: tools.map(t => {
+      const decl = { name: t.name, description: t.description || '' };
+      const params = toGeminiSchema(t.input_schema || { type: 'object' });
+      // A zero-argument tool omits parameters: an OBJECT with empty properties is rejected.
+      if (params.type === 'object' && params.properties && Object.keys(params.properties).length) {
+        decl.parameters = params;
+      }
+      return decl;
+    }),
+  }];
+}
+
+// ============ Gemini Thought Signatures ============
+// Gemini 3 puts an opaque thoughtSignature beside each turn's first functionCall part and rejects
+// (400) a replayed functionCall that lacks one. Content blocks must stay Anthropic-clean (Claude
+// rejects unknown block fields if history ever reaches it), so signatures live here, keyed by the
+// tool_use id we mint. Bounded: a tool loop replays within seconds. Anything evicted, lost on
+// restart, or minted by another model falls back to Google's documented placeholder, which skips
+// validation at some cost to reasoning continuity.
+
+const GEMINI_TOOL_META_MAX = 256;
+const geminiToolMeta = new Map(); // tool_use id → { signature, model, callId }
+const GEMINI_SKIP_SIGNATURE = 'skip_thought_signature_validator';
+
+function rememberGeminiToolCall(toolUseId, meta) {
+  geminiToolMeta.set(toolUseId, meta);
+  if (geminiToolMeta.size > GEMINI_TOOL_META_MAX) {
+    geminiToolMeta.delete(geminiToolMeta.keys().next().value); // Map iterates oldest-first
+  }
+}
+
+// Gemini 1.x/2.x predate signature validation; 3.x and the -latest aliases need it.
+const isPreSignatureGemini = (model) => /^gemini-[12][.-]/.test(model || '');
+
+// ============ Gemini Thinking ============
+// Hard messages get more reasoning. Gemini 3.x takes thinkingLevel; 2.x takes a token budget.
+// Thought tokens count against maxOutputTokens, so the cap rises by the same headroom, or a long
+// think starves the visible reply (empty text + MAX_TOKENS).
+
+const GEMINI_THINK_HEADROOM = 8192;
+
+function geminiThinkingConfig(model) {
+  return isPreSignatureGemini(model)
+    ? { thinkingBudget: GEMINI_THINK_HEADROOM }
+    : { thinkingLevel: 'high' };
+}
+
 // ============ Gemini Provider ============
 
 function createGeminiProvider(providerConfig) {
   const apiKey = providerConfig.apiKey;
   const defaultModel = providerConfig.model || 'gemini-2.5-flash';
   const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  // Free tier meters quota per MODEL: on 429 llmChat rotates through these (empty string = off).
+  const fallbackModels = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.5-flash-lite,gemini-flash-latest,gemini-3.1-flash-lite')
+    .split(',').map(m => m.trim()).filter(m => m && m !== defaultModel);
 
-  function convertMessages(messages, system) {
+  function convertMessages(messages, system, model) {
     const contents = [];
 
     // Build tool_use_id → function_name lookup across all messages
@@ -963,18 +1076,41 @@ function createGeminiProvider(providerConfig) {
               inlineData: { mimeType: block.source.media_type, data: block.source.data },
             });
           } else if (block.type === 'tool_use') {
-            functionCallParts.push({
-              functionCall: { name: block.name, args: block.input || {} },
-            });
+            const meta = geminiToolMeta.get(block.id);
+            const part = {
+              functionCall: {
+                ...(meta?.callId ? { id: meta.callId } : {}),
+                name: block.name,
+                args: block.input || {},
+              },
+            };
+            // A signature is only valid for the model that minted it.
+            if (meta?.signature && meta.model === model) part.thoughtSignature = meta.signature;
+            functionCallParts.push(part);
           } else if (block.type === 'tool_result') {
             const funcName = toolIdToName.get(block.tool_use_id) || block.tool_use_id;
+            const callId = geminiToolMeta.get(block.tool_use_id)?.callId;
+            const text = typeof block.content === 'string'
+              ? block.content
+              : Array.isArray(block.content)
+                ? block.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+                : JSON.stringify(block.content ?? '');
             functionResponseParts.push({
               functionResponse: {
+                ...(callId ? { id: callId } : {}),
                 name: funcName,
-                response: { result: typeof block.content === 'string' ? block.content : JSON.stringify(block.content) },
+                // "error" is Gemini's documented key for a failed call; "result" otherwise.
+                response: block.is_error ? { error: text } : { result: text },
               },
             });
           }
+        }
+
+        // Replayed calls with no stored signature (restart, eviction, other model): the
+        // placeholder rides on the turn's FIRST functionCall, where Gemini puts a real one.
+        if (functionCallParts.length && !isPreSignatureGemini(model)
+            && !functionCallParts.some(p => p.thoughtSignature)) {
+          functionCallParts[0].thoughtSignature = GEMINI_SKIP_SIGNATURE;
         }
 
         // Emit parts in Gemini-required order:
@@ -1015,31 +1151,25 @@ function createGeminiProvider(providerConfig) {
     return { contents, systemInstruction: system ? { parts: [{ text: system }] } : undefined };
   }
 
-  function convertTools(tools) {
-    if (!tools?.length) return undefined;
-    return [{
-      functionDeclarations: tools.map(t => ({
-        name: t.name,
-        description: t.description,
-        parameters: t.input_schema,
-      })),
-    }];
-  }
-
   return {
     name: 'gemini',
     model: defaultModel,
+    supportsTools: true,     // llmChat keeps tools + current-turn tool exchanges for us
+    supportsThinking: true,  // llmChat may set request._thinking on hard messages
+    fallbackModels,
 
     async chat(request) {
       const model = request.model || this.model;
-      const { contents, systemInstruction } = convertMessages(request.messages, request.system);
+      const { contents, systemInstruction } = convertMessages(request.messages, request.system, model);
+      const think = request._thinking === 'high';
 
       const body = {
         contents,
         ...(systemInstruction ? { systemInstruction } : {}),
-        ...(request.tools?.length ? { tools: convertTools(request.tools) } : {}),
+        ...(request.tools?.length ? { tools: toGeminiTools(request.tools) } : {}),
         generationConfig: {
-          maxOutputTokens: request.max_tokens || 2048,
+          maxOutputTokens: (request.max_tokens || 2048) + (think ? GEMINI_THINK_HEADROOM : 0),
+          ...(think ? { thinkingConfig: geminiThinkingConfig(model) } : {}),
         },
       };
 
@@ -1054,26 +1184,52 @@ function createGeminiProvider(providerConfig) {
       );
 
       if (!response.ok) {
-        const error = await response.text();
+        const raw = await response.text();
+        // Carry the HTTP status (and RetryInfo delay on 429) as properties so llmChat's retry
+        // policy reads facts, not message text. Body is google.rpc.Status JSON.
+        let detail = raw;
+        let retryAfterMs = 0;
+        try {
+          const e = JSON.parse(raw).error || {};
+          detail = [e.status, e.message].filter(Boolean).join(' ') || raw;
+          const info = (e.details || []).find(d => String(d['@type'] || '').endsWith('RetryInfo'));
+          const secs = parseFloat(info?.retryDelay); // Duration JSON, e.g. "41s" / "2.5s"
+          if (secs > 0) retryAfterMs = Math.ceil(secs * 1000);
+        } catch {}
         // BOT-104: Don't include raw error (may echo URL with API key) in thrown message
-        throw new Error(`Gemini API error ${response.status}: ${error.slice(0, 200).replace(/key=[^&\s]+/gi, 'key=REDACTED')}`);
+        const err = new Error(`Gemini API error ${response.status}: ${detail.slice(0, 300).replace(/key=[^&\s]+/gi, 'key=REDACTED')}`);
+        err.status = response.status;
+        if (retryAfterMs) err.retryAfterMs = retryAfterMs;
+        throw err;
       }
 
       const data = await response.json();
       const candidate = data.candidates?.[0];
+      // A blocked prompt is deterministic: fail as permanent instead of an empty response
+      // that llmChat would retry (each retry spends quota for the same block).
+      if (!candidate && data.promptFeedback?.blockReason) {
+        throw new Error(`Gemini prompt blocked: ${data.promptFeedback.blockReason}`);
+      }
       const content = [];
       let hasToolCalls = false;
 
       if (candidate?.content?.parts) {
         for (const part of candidate.content.parts) {
+          if (part.thought) continue; // thought summaries never reach the reply
           if (part.text) {
             content.push({ type: 'text', text: part.text });
           }
           if (part.functionCall) {
             hasToolCalls = true;
+            const id = `toolu_gemini_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+            rememberGeminiToolCall(id, {
+              signature: part.thoughtSignature || null,
+              model,
+              callId: part.functionCall.id || null,
+            });
             content.push({
               type: 'tool_use',
-              id: `toolu_gemini_${randomUUID().slice(0, 8)}`,
+              id,
               name: part.functionCall.name,
               input: part.functionCall.args || {},
             });
@@ -1083,11 +1239,14 @@ function createGeminiProvider(providerConfig) {
 
       return {
         content,
-        stop_reason: hasToolCalls ? 'tool_use' : 'end_turn',
+        stop_reason: hasToolCalls ? 'tool_use'
+          : candidate?.finishReason === 'MAX_TOKENS' ? 'max_tokens' : 'end_turn',
         usage: {
           input_tokens: data.usageMetadata?.promptTokenCount || 0,
           output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+          thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0,
         },
+        _model: model, // the model that actually answered (llmChat may have rotated it)
       };
     },
   };
@@ -1637,8 +1796,16 @@ function classifyComplexity(request) {
     return 'explicit';
   }
 
-  // Analyze the last user message
-  const lastMsg = [...(request.messages || [])].reverse().find(m => m.role === 'user');
+  return classifyMessageText(request);
+}
+
+// Skill/complexity of the message text alone, ignoring tools and explicit model. Split out so
+// llmChat can size Gemini thinking even when tools force the 'tooluse' route. Reads the last
+// user message that carries text: mid-tool-loop the last one is only tool_results.
+function classifyMessageText(request) {
+  const lastMsg = [...(request.messages || [])].reverse().find(m => m.role === 'user' && (
+    typeof m.content === 'string' || (Array.isArray(m.content) && m.content.some(b => b.type === 'text' && b.text))
+  ));
   if (!lastMsg) return 'moderate';
 
   const text = typeof lastMsg.content === 'string'
@@ -1720,7 +1887,7 @@ const ESCALATION_CHAINS = {
   // Start PREMIUM (irreducible complexity — these NEED frontier models)
   // Qwen as fallback between premium and budget — 0.80 quality may satisfy before hitting paid tiers
   reasoning:  ['claude', 'xai', 'openai', 'openrouter', 'deepseek', 'gemini'],
-  tooluse:    ['claude', 'openai', 'xai', 'deepseek'],                  // Tool use needs native tool support, Qwen via OpenRouter won't help
+  tooluse:    ['claude', 'gemini', 'openai', 'xai', 'deepseek'],        // Tool use needs native tool support (claude, gemini); the rest get tools stripped
   complex:    ['claude', 'xai', 'openai', 'openrouter', 'deepseek', 'gemini'],
 
   explicit:   [], // Caller specified model — use activeProvider
@@ -1826,7 +1993,8 @@ export function initProvider() {
   for (const name of fallbackOrder) {
     if (name === providerName) continue; // Skip primary
     const fbConfig = getProviderConfig(name);
-    if (name === 'ollama' || (fbConfig.apiKey && fbConfig.apiKey.length > 10)) {
+    // Ollama only when OLLAMA_URL is set: unset, it was registered anyway and failed in ~3 ms on every fallback.
+    if ((name === 'ollama' && process.env.OLLAMA_URL) || (fbConfig.apiKey && fbConfig.apiKey.length > 10)) {
       try {
         const factory = providers.get(name);
         if (factory) {
@@ -1993,6 +2161,94 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// HTTP status of a provider error: the property when the provider set one, else parsed from
+// the "<Provider> API error 503: ..." message convention.
+function httpStatusOf(error) {
+  const status = error?.status || error?.statusCode || error?.response?.status;
+  if (status) return Number(status);
+  const m = /\b(?:api error|http|status)\s*:?\s*(\d{3})\b/i.exec(error?.message || '');
+  return m ? Number(m[1]) : undefined;
+}
+
+// ============ Retry Policy: 503 vs 429 ============
+// 503 (overloaded / "high demand") usually clears in seconds → retry the same provider at
+// ~1s then ~3s (+ jitter). 429 (quota) fails again instantly on the same model → never retry
+// it; rotate to the next model's quota bucket instead (Gemini free tier meters per MODEL).
+const OVERLOAD_BACKOFF_MS = [1000, 3000];
+const OVERLOAD_JITTER_MS = 500;
+const QUOTA_COOLDOWN_DEFAULT_MS = 60_000;      // no RetryInfo → assume a per-minute bucket
+const QUOTA_COOLDOWN_MAX_MS = 15 * 60_000;
+const QUOTA_HONOR_MAX_MS = 10_000;             // wait out a RetryInfo delay once, if this short
+
+const modelQuotaCooldown = new Map(); // `${provider}:${model}` → epoch ms the bucket may refill
+
+function quotaModels(provider) {
+  return [provider.model, ...(provider.fallbackModels || [])];
+}
+
+function nextQuotaModel(provider, tried) {
+  const now = Date.now();
+  return quotaModels(provider).find(m =>
+    !tried.has(m) && (modelQuotaCooldown.get(`${provider.name}:${m}`) || 0) <= now) || null;
+}
+
+function soonestQuotaModel(provider) {
+  let best = null;
+  for (const m of quotaModels(provider)) {
+    const waitMs = Math.max(0, (modelQuotaCooldown.get(`${provider.name}:${m}`) || 0) - Date.now());
+    if (!best || waitMs < best.waitMs) best = { model: m, waitMs };
+  }
+  return best;
+}
+
+function markQuotaExhausted(provider, model, error) {
+  const ms = Math.min(error?.retryAfterMs || QUOTA_COOLDOWN_DEFAULT_MS, QUOTA_COOLDOWN_MAX_MS);
+  modelQuotaCooldown.set(`${provider.name}:${model}`, Date.now() + ms);
+}
+
+// ============ Per-Provider Request Shaping ============
+// Claude gets the request untouched. Native-tool providers (Gemini) keep tools plus the
+// current turn's tool exchange. Everyone else gets tools stripped and history flattened, as
+// before. Model is always stripped for non-Claude: callers pass a Claude-era model id, and
+// each provider's chat() falls back to its own model (or a rotated one set by llmChat).
+
+const TOOL_DEGRADE_MS = 10 * 60_000;
+const toolDegradeUntil = new Map(); // provider → epoch ms; native tools off after a tool 400
+
+function shapeRequestFor(provider, request) {
+  if (provider.name === 'claude' || !request.messages) return request;
+  const { tools, model, ...cleaned } = request;
+  const native = provider.supportsTools && tools?.length
+    && !((toolDegradeUntil.get(provider.name) || 0) > Date.now());
+  const shaped = native
+    ? { ...cleaned, tools, messages: flattenPriorToolExchanges(cleaned.messages) }
+    : { ...cleaned, messages: flattenToolExchanges(cleaned.messages) };
+  if (!VISION_PROVIDERS.has(provider.name)) shaped.messages = stripMediaBlocks(shaped.messages);
+  return shaped;
+}
+
+// A 400 caused by an optional feature drops that feature once and resends, so a schema or
+// thinking-field mismatch degrades to the old tool-less reply instead of failing every message.
+function degradeAfter400(provider, request, error) {
+  const msg = error?.message || '';
+  if (request._thinking && /thinking/i.test(msg)) {
+    console.warn(`[llm] ${provider.name}: 400 on thinking config, resending without it: ${msg.slice(0, 160)}`);
+    const { _thinking, ...rest } = request;
+    return rest;
+  }
+  if (request.tools?.length && /function|tool|thought_?signature|schema|parameters/i.test(msg)) {
+    console.error(`[llm] ${provider.name}: 400 on native tools, tools OFF for ${TOOL_DEGRADE_MS / 60000} min: ${msg.slice(0, 200)}`);
+    toolDegradeUntil.set(provider.name, Date.now() + TOOL_DEGRADE_MS);
+    const { tools, ...rest } = request;
+    return { ...rest, messages: flattenToolExchanges(rest.messages) };
+  }
+  return null;
+}
+
+// Messages that earn extra model reasoning (Gemini thinking). Read from the message text,
+// because tools force classifyComplexity to 'tooluse' on nearly every real message.
+const THINK_HARD_CLASSES = new Set(['reasoning', 'complex', 'math', 'coding']);
+
 // ============ Convenience: Direct Chat (with escalation + fallback + retry) ============
 //
 // Flow:
@@ -2025,6 +2281,11 @@ export async function llmChat(request) {
     if (escalationChain.length === 0) escalationChain = [activeProvider];
   }
 
+  // Thinking is sized by what the user asked, not by the route (background work never thinks hard)
+  const messageClass = (complexity === 'tooluse' || complexity === 'explicit')
+    ? classifyMessageText(request) : complexity;
+  const thinkHard = !bg && THINK_HARD_CLASSES.has(messageClass);
+
   // Extract query text for adequacy checks
   const lastUserMsg = [...(request.messages || [])].reverse().find(m => m.role === 'user');
   const queryText = !lastUserMsg ? '' :
@@ -2049,22 +2310,31 @@ export async function llmChat(request) {
       continue; // Skip to next in chain
     }
 
-    // Prepare request for this provider
-    let providerRequest = originalRequest;
-
-    // Non-Claude: flatten tool exchanges, strip tools AND model name
-    // The original request carries model: 'claude-sonnet-4-5-...' which other providers reject.
-    // Each provider's .chat() uses `request.model || this.model` — stripping model lets the
-    // provider use its own default model.
-    if (currentProvider.name !== 'claude' && providerRequest.messages) {
-      providerRequest = { ...providerRequest, messages: flattenToolExchanges(providerRequest.messages) };
-      const { tools, model, ...cleaned } = providerRequest;
-      providerRequest = cleaned;
+    // Prepare request for this provider (tools / history / model / images — see shapeRequestFor)
+    let providerRequest = shapeRequestFor(currentProvider, originalRequest);
+    if (thinkHard && currentProvider.supportsThinking) {
+      providerRequest = { ...providerRequest, _thinking: 'high' };
     }
 
-    // Non-vision: strip image blocks
-    if (!VISION_PROVIDERS.has(currentProvider.name) && providerRequest.messages) {
-      providerRequest = { ...providerRequest, messages: stripMediaBlocks(providerRequest.messages) };
+    // Per-model quota buckets: start on the first model not cooling down from a 429. The
+    // model goes on the request so the meter logs the model actually called.
+    const modelsTried = new Set();
+    let honoredRetryDelay = false;
+    if (currentProvider.fallbackModels) {
+      let startModel = nextQuotaModel(currentProvider, modelsTried);
+      if (!startModel) {
+        const soon = soonestQuotaModel(currentProvider);
+        if (soon && soon.waitMs <= QUOTA_HONOR_MAX_MS) {
+          honoredRetryDelay = true;
+          await sleep(soon.waitMs);
+          startModel = soon.model;
+        } else {
+          lastError = Object.assign(new Error(`${currentProvider.name}: every model's quota is cooling down (next in ${Math.ceil((soon?.waitMs || 0) / 1000)}s)`), { status: 429 });
+          cascadeTrail.push({ provider: currentProvider.name, status: 'quota_cooldown', tier: providerTier });
+          continue;
+        }
+      }
+      if (startModel !== currentProvider.model) providerRequest = { ...providerRequest, model: startModel };
     }
 
     if (chainIdx > 0) {
@@ -2127,9 +2397,11 @@ export async function llmChat(request) {
           }
 
           // ============ Success — attach metadata and return ============
+          // _model = the model that actually answered (a provider may report a rotated one)
+          const usedModel = result._model || providerRequest.model || currentProvider.model;
           cascadeTrail.push({
             provider: currentProvider.name,
-            model: currentProvider.model,
+            model: usedModel,
             status: 'success',
             tier: providerTier,
             latencyMs: Date.now() - attemptStart,
@@ -2141,7 +2413,7 @@ export async function llmChat(request) {
           reorderFallbacksByPerformance();
 
           result._provider = currentProvider.name;
-          result._model = currentProvider.model;
+          result._model = usedModel;
           result._cascadeTrail = cascadeTrail;
           result._intelligenceLevel = getIntelligenceLevel();
           result._complexity = complexity;
@@ -2149,25 +2421,71 @@ export async function llmChat(request) {
           result._escalated = escalated;
           const contentStr = JSON.stringify(result.content);
           result._responseHash = createHash('sha256')
-            .update(contentStr + currentProvider.name + currentProvider.model + Date.now())
+            .update(contentStr + currentProvider.name + usedModel + Date.now())
             .digest('hex');
           return result;
 
         } catch (error) {
           lastError = error;
           const latencyMs = Date.now() - attemptStart;
+          const errStatus = httpStatusOf(error);
+          const errMsg = (error?.message || '').toLowerCase();
+          const attemptModel = providerRequest.model || currentProvider.model;
 
-          getCircuitBreaker(currentProvider.name, bg).recordFailure(error);
           recordProviderPerformance(currentProvider.name, latencyMs, false);
 
           cascadeTrail.push({
             provider: currentProvider.name,
-            model: currentProvider.model,
+            model: attemptModel,
             status: isCreditError(error) ? 'credit_error' : isTransientError(error) ? 'transient_error' : 'error',
             tier: providerTier,
             latencyMs,
             error: error.message?.slice(0, 120),
           });
+
+          // ============ 429 → next model's quota bucket (never the same model again) ============
+          // The breaker is not charged here: the provider is healthy, one bucket is empty.
+          // A rotation is a different bucket, not a retry, so it does not spend `attempt`.
+          if (errStatus === 429 && currentProvider.fallbackModels) {
+            markQuotaExhausted(currentProvider, attemptModel, error);
+            modelsTried.add(attemptModel);
+            let nextModel = nextQuotaModel(currentProvider, modelsTried);
+            if (!nextModel && !honoredRetryDelay) {
+              const soon = soonestQuotaModel(currentProvider);
+              if (soon && soon.waitMs <= QUOTA_HONOR_MAX_MS) {   // honor one short RetryInfo delay
+                honoredRetryDelay = true;
+                console.warn(`[llm] ${currentProvider.name}: all model quotas spent, waiting ${soon.waitMs}ms (RetryInfo) for ${soon.model}`);
+                await sleep(soon.waitMs);
+                nextModel = soon.model;
+              }
+            }
+            if (nextModel) {
+              console.warn(`[llm] ${currentProvider.name}/${attemptModel} quota exhausted (429) — rotating to ${nextModel}`);
+              providerRequest = { ...providerRequest, model: nextModel };
+              attempt--;
+              continue;
+            }
+          }
+
+          // ============ 503 → retry same provider, ~1s then ~3s (+ jitter) ============
+          // Charged to the breaker only when the retries run out, so one overloaded second
+          // cannot trip a 60s+ lockout of a single-provider pool.
+          if (errStatus === 503 && attempt < MAX_RETRIES) {
+            const delay = OVERLOAD_BACKOFF_MS[attempt] + Math.random() * OVERLOAD_JITTER_MS;
+            console.warn(`[llm] ${currentProvider.name} 503 overloaded (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retry in ${Math.round(delay)}ms`);
+            await sleep(delay);
+            continue;
+          }
+
+          // ============ 400 from an optional feature → drop it once, resend ============
+          const degraded = errStatus === 400 ? degradeAfter400(currentProvider, providerRequest, error) : null;
+          if (degraded) {
+            providerRequest = degraded;
+            attempt--;
+            continue;
+          }
+
+          getCircuitBreaker(currentProvider.name, bg).recordFailure(error);
 
           // Credit/permanent error → skip to next provider in chain (escalate)
           if (isCreditError(error) || (!isTransientError(error) && !isTransientOrGlitch(error))) {
@@ -2175,13 +2493,11 @@ export async function llmChat(request) {
             break; // Break retry loop, continue chain loop
           }
 
-          // 529/overloaded OR 429/rate-limit → DON'T retry same provider, instant escalate
-          // The circuit breaker already tripped — skip remaining retries, try next provider.
-          // Retrying a rate-limited provider wastes 30-60s when a fallback can answer instantly.
-          const errStatus = error?.status || error?.statusCode || error?.response?.status;
-          const errMsg = (error?.message || '').toLowerCase();
-          if (errStatus === 529 || errMsg.includes('overloaded')) {
-            console.warn(`[escalation] ${currentProvider.name} overloaded (529) — instant escalate, no retry`);
+          // 529/overloaded OR 429/rate-limit (no model left to rotate to) → DON'T retry the
+          // same provider, instant escalate. The circuit breaker already tripped. A 503 only
+          // reaches here once its backoff retries are spent.
+          if (errStatus === 529 || errStatus === 503 || errMsg.includes('overloaded')) {
+            console.warn(`[escalation] ${currentProvider.name} overloaded (${errStatus || 'overloaded'}) — escalating, no further retry`);
             break; // Skip remaining retries, move to next provider
           }
           if (errStatus === 429 || errMsg.includes('rate limit')) {
@@ -2189,18 +2505,10 @@ export async function llmChat(request) {
             break; // Skip remaining retries, move to next provider
           }
 
-          // Transient error — retry with backoff
+          // Other transient error (timeout, 5xx, truncated/empty response) — retry with backoff
           if (attempt < MAX_RETRIES) {
-            // 429 rate limit → longer backoff (10-30s) vs generic transient (1-4s)
-            let baseDelay, jitterRange;
-            if (errStatus === 429 || errMsg.includes('rate limit')) {
-              baseDelay = Math.min(10000 * Math.pow(2, attempt), 30000); // 10s, 20s, 30s
-              jitterRange = 5000;
-            } else {
-              baseDelay = Math.min(1000 * Math.pow(2, attempt), 4000);  // 1s, 2s, 4s
-              jitterRange = 500;
-            }
-            const jitter = Math.random() * jitterRange;
+            const baseDelay = Math.min(1000 * Math.pow(2, attempt), 4000);  // 1s, 2s, 4s
+            const jitter = Math.random() * 500;
             console.warn(`[llm] Transient error on ${currentProvider.name} (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retry in ${Math.round(baseDelay + jitter)}ms`);
             await sleep(baseDelay + jitter);
             continue;
@@ -2230,15 +2538,7 @@ export async function llmChat(request) {
 
     console.warn(`[wardenclyffe] Last resort fallback: ${fb.name}`);
 
-    let fbRequest = originalRequest;
-    if (fb.name !== 'claude' && fbRequest.messages) {
-      fbRequest = { ...fbRequest, messages: flattenToolExchanges(fbRequest.messages) };
-      const { tools, model, ...cleaned } = fbRequest;
-      fbRequest = cleaned;
-    }
-    if (!VISION_PROVIDERS.has(fb.name) && fbRequest.messages) {
-      fbRequest = { ...fbRequest, messages: stripMediaBlocks(fbRequest.messages) };
-    }
+    const fbRequest = shapeRequestFor(fb, originalRequest);
 
     const fbStart = Date.now();
     try {
@@ -2248,9 +2548,9 @@ export async function llmChat(request) {
       recordProviderPerformance(fb.name, Date.now() - fbStart, true);
       recordEscalationMetric(fb.name, true);
 
-      cascadeTrail.push({ provider: fb.name, model: fb.model, status: 'success', latencyMs: Date.now() - fbStart });
+      cascadeTrail.push({ provider: fb.name, model: result._model || fb.model, status: 'success', latencyMs: Date.now() - fbStart });
       result._provider = fb.name;
-      result._model = fb.model;
+      result._model = result._model || fb.model;
       result._cascadeTrail = cascadeTrail;
       result._intelligenceLevel = getIntelligenceLevel();
       result._complexity = complexity;

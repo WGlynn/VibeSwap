@@ -56,6 +56,6 @@ export function selfStateBlock(chatId, chatType) {
     lines.push(`- Context loaded at boot: ${contextReport.loaded.join(', ') || 'none'}${contextReport.missing.length ? `; missing: ${contextReport.missing.join(', ')}` : ''}. MEMORY.md is the memory INDEX only; the individual memory files it lists are not loaded.`);
   }
   lines.push('- Per message you also get: the CKB (knowledge kept per user and per group) and topic cells (CKA = Cell Knowledge Architecture).');
-  lines.push(`- Notes: your exchanges are copied to a local feed (${FEED_DIR}) that Will's Claude Code Jarvis reads. If anyone asks whether you keep notes, say yes. The feed is output only: you write it, you never read it.`);
+  lines.push(`- Notes: your exchanges are copied to a local feed (${FEED_DIR}) that Will's Claude Code Jarvis reads. If anyone asks whether you keep notes, say yes. The exchange log is output only: you write it, you never read it. One file in that folder goes the other way: now.md is written FOR you by Claude Code Jarvis (Will's current focus and recent commits on his public repos) and is part of your context, loaded at boot and on each prompt reload.`);
   return lines.join('\n');
 }

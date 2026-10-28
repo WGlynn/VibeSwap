@@ -296,6 +296,8 @@ import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAu
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
 import { quickReply, isBareAck } from './quick-reply.js';
+import { gateFakeActions } from './action-claims.js';
+import { recordNoModelTurn, withTurn } from './llm-meter.js';
 import { noteBotInfo, noteContextReport } from './self-state.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
@@ -6254,7 +6256,8 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
 
   try {
     noteBotInfo(ctx.botInfo);
-    const response = await chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id });
+    const response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
+      chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id }));
     clearInterval(typingInterval);
     await saveConversations();
 
@@ -6269,7 +6272,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       pacer.cancel();
       return;
     }
-    recordExchange(ctx, text, reply);
+    recordExchange(ctx, text, reply, { model: response.model, provider: response.provider });
     if (reply.length <= 4096) {
       await pacer.replyWith(reply, { parse_mode: undefined });
     } else {
@@ -7402,8 +7405,9 @@ bot.on('text', async (ctx) => {
           bufferAssistantMessage(chatId, quick);
           await ctx.reply(quick, { parse_mode: undefined });
           recordOutgoing(String(chatId), quick);
-          recordExchange(ctx, ctx.message.text, quick);
+          recordExchange(ctx, ctx.message.text, quick, { noModel: true });
         }
+        recordNoModelTurn(quick ? 'quick_reply' : 'bare_ack', { chatType: ctx.chat?.type });
         console.log(`[quick-reply] ${quick ? 'answered' : 'bare ack, no reply'} without a model call`);
         return;
       }
@@ -7425,7 +7429,10 @@ bot.on('text', async (ctx) => {
       'all providers exhausted', 'temporarily unavailable', '429', '503', 'overloaded', 'quota', 'rate limit'];
     for (let msgAttempt = 0; ; msgAttempt++) {
       try {
-        response = await chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id });
+        // withTurn tags every meter row this call produces (tool rounds, 429/503 rotations,
+        // and the background work chat() spawns) with one id, so calls per message is countable.
+        response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
+          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id }));
         break; // Success — exit retry loop
       } catch (chatErr) {
         const errMsg = (chatErr?.message || '').toLowerCase();
@@ -7449,7 +7456,14 @@ bot.on('text', async (ctx) => {
       console.log(`[shard-dedup] Suppressed response in ${chatId} — sibling already covered it`);
       return;
     }
-    recordExchange(ctx, ctx.message.text, response.text);
+    // Fake-action gate (Will 2026-10-28): no promised or claimed action without a tool receipt this turn.
+    const gated = gateFakeActions(response.text, { toolsRan: response.toolsRan || 0 });
+    if (gated.changed) {
+      console.warn(`[action-gate] removed ${gated.removed.length} action claim(s) with no tool receipt`);
+      recordHealthEvent({ kind: 'fake_action_blocked', where: 'message-handler', chatType: ctx.chat?.type, removed: gated.removed.map(x => x.slice(0, 160)) });
+      response.text = gated.text;
+    }
+    recordExchange(ctx, ctx.message.text, response.text, { model: response.model, provider: response.provider });
 
     // Record compute usage (non-blocking)
     if (response.usage) {

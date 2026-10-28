@@ -776,6 +776,14 @@ function createOpenAIProvider(providerConfig) {
       usage: {
         input_tokens: response.usage?.prompt_tokens || 0,
         output_tokens: response.usage?.completion_tokens || 0,
+        // OpenAI-compatible cache hit count (Groq, OpenRouter, Mistral report it under
+        // prompt_tokens_details; DeepSeek reports prompt_cache_hit_tokens at the top level).
+        // Providers that report neither (Cerebras, xAI, Together, SambaNova, Fireworks,
+        // Novita) must reach the meter as null, meaning unmeasured, not as a fake 0 that
+        // the report would count as "caching never hits".
+        cached_tokens: response.usage?.prompt_tokens_details?.cached_tokens
+          ?? response.usage?.prompt_cache_hit_tokens
+          ?? null,
       },
     };
   }
@@ -1208,17 +1216,24 @@ function createGeminiProvider(providerConfig) {
         // policy reads facts, not message text. Body is google.rpc.Status JSON.
         let detail = raw;
         let retryAfterMs = 0;
+        let quotaId = null;
         try {
           const e = JSON.parse(raw).error || {};
           detail = [e.status, e.message].filter(Boolean).join(' ') || raw;
           const info = (e.details || []).find(d => String(d['@type'] || '').endsWith('RetryInfo'));
           const secs = parseFloat(info?.retryDelay); // Duration JSON, e.g. "41s" / "2.5s"
           if (secs > 0) retryAfterMs = Math.ceil(secs * 1000);
+          // QuotaFailure names the bucket that ran dry (per-minute vs per-day). Measurement
+          // only: it reaches the meter row as `quota`; no cooldown logic reads it yet.
+          const qf = (e.details || []).find(d => String(d['@type'] || '').endsWith('QuotaFailure'));
+          const ids = (qf?.violations || []).map(v => v.quotaId).filter(Boolean);
+          if (ids.length) quotaId = ids.join(',');
         } catch {}
         // BOT-104: Don't include raw error (may echo URL with API key) in thrown message
         const err = new Error(`Gemini API error ${response.status}: ${detail.slice(0, 300).replace(/key=[^&\s]+/gi, 'key=REDACTED')}`);
         err.status = response.status;
         if (retryAfterMs) err.retryAfterMs = retryAfterMs;
+        if (quotaId) err.quotaId = quotaId;
         throw err;
       }
 
@@ -1264,6 +1279,9 @@ function createGeminiProvider(providerConfig) {
           input_tokens: data.usageMetadata?.promptTokenCount || 0,
           output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
           thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0,
+          // Implicit-cache hits (prefix reuse). Zero on every row means caching never
+          // hits on this tier and prompt prefix work would buy nothing.
+          cached_tokens: data.usageMetadata?.cachedContentTokenCount || 0,
         },
         _model: model, // the model that actually answered (llmChat may have rotated it)
       };
@@ -1670,18 +1688,21 @@ function getProviderConfig(providerName) {
       switch (providerName) {
         case 'claude': return config.llm?.model || config.anthropic?.model;
         case 'openai': return process.env.OPENAI_MODEL || 'gpt-5.4';
-        case 'gemini': return process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        // Defaults follow Desktop/jarvis-free-models-2026-10-27.md (free-table ids as of that
+        // date). Every provider takes a <NAME>_MODEL override so a new key never needs a
+        // code edit. Inert while .env sets the model explicitly.
+        case 'gemini': return process.env.GEMINI_MODEL || 'gemini-3.6-flash';
         case 'deepseek': return process.env.DEEPSEEK_MODEL || 'deepseek-chat';
         case 'ollama': return process.env.OLLAMA_MODEL || config.llm?.model || 'llama3.1';
-        case 'cerebras': return process.env.CEREBRAS_MODEL || 'llama-3.3-70b';
-        case 'groq': return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-        case 'openrouter': return process.env.OPENROUTER_MODEL || 'qwen/qwen3.6-plus:free';
+        case 'cerebras': return process.env.CEREBRAS_MODEL || 'gpt-oss-120b';
+        case 'groq': return process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+        case 'openrouter': return process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free';
         case 'mistral': return process.env.MISTRAL_MODEL || 'mistral-small-latest';
-        case 'together': return 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
-        case 'sambanova': return 'Meta-Llama-3.3-70B-Instruct';
-        case 'fireworks': return 'accounts/fireworks/models/llama-v3p3-70b-instruct';
-        case 'novita': return 'meta-llama/llama-3.3-70b-instruct';
-        case 'xai': return 'grok-3';
+        case 'together': return process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+        case 'sambanova': return process.env.SAMBANOVA_MODEL || 'Meta-Llama-3.3-70B-Instruct';
+        case 'fireworks': return process.env.FIREWORKS_MODEL || 'accounts/fireworks/models/llama-v3p3-70b-instruct';
+        case 'novita': return process.env.NOVITA_MODEL || 'meta-llama/llama-3.3-70b-instruct';
+        case 'xai': return process.env.XAI_MODEL || 'grok-3';
         default: return config.llm?.model;
       }
     })(),

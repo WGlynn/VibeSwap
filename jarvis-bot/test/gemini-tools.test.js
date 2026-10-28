@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { readFileSync } from 'fs';
 
 process.env.LLM_CALL_LOG = join(tmpdir(), `jarvis-gemini-test-${process.pid}.jsonl`);
 process.env.GEMINI_FALLBACK_MODELS = 'gemini-test-lite,gemini-test-latest';
@@ -31,6 +32,8 @@ const textReply = (text) => json({ candidates: [{ content: { role: 'model', part
 const reset = (...rs) => { calls.length = 0; responders = rs; };
 
 const llm = await import('../src/llm-provider.js');
+const { withTurn } = await import('../src/llm-meter.js');
+const meterLines = () => { try { return readFileSync(process.env.LLM_CALL_LOG, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch { return []; } };
 const newGemini = (model = 'gemini-3.5-flash') => llm.createProvider('gemini', { apiKey: 'test-key-not-real', model });
 
 const TOOLS = [
@@ -199,10 +202,14 @@ const quota429 = (delay) => json({ error: { code: 429, status: 'RESOURCE_EXHAUST
 test('429: rotates to the next model bucket, never retries the same model; _model is truthful', async () => {
   newGemini('gemini-test-primary');
   reset(quota429('41s'), textReply('Answer from the lite model, complete.'));
-  const r = await llm.llmChat({ max_tokens: 100, messages: [{ role: 'user', content: 'tell me something about bridges please' }] });
+  const logLinesBefore = meterLines().length;
+  const r = await withTurn('t1', () => llm.llmChat({ max_tokens: 100, messages: [{ role: 'user', content: 'tell me something about bridges please' }] }));
   assert.deepEqual(calls.map(c => c.model), ['gemini-test-primary', 'gemini-test-lite']);
   assert.equal(r._model, 'gemini-test-lite');
   assert.deepEqual(r._cascadeTrail.map(t => `${t.model}:${t.status}`), ['gemini-test-primary:credit_error', 'gemini-test-lite:success']);
+  // Both physical rows (the 429 and the fallback success) are countable as one turn.
+  const turnRows = meterLines().slice(logLinesBefore);
+  assert.deepEqual(turnRows.map(x => [x.model, x.ok, x.turn]), [['gemini-test-primary', false, 't1'], ['gemini-test-lite', true, 't1']]);
 
   // Primary is cooling (41s RetryInfo) → the next message starts on the lite bucket directly.
   reset(textReply('Second answer from the lite model, complete.'));
@@ -259,4 +266,79 @@ test('429 again after the one honored wait: give up (no second wait)', async () 
   reset(quota429('0.2s'), quota429('0.2s'));
   await assert.rejects(llm.llmChat({ max_tokens: 100, messages: [{ role: 'user', content: 'tell me something about bridges please' }] }), /429/);
   assert.equal(calls.length, 2);
+});
+
+// ============ Meter: cached tokens and quota ids ============
+
+test('usage: cachedContentTokenCount reaches usage.cached_tokens and the meter row', async () => {
+  // Direct provider.chat (still metered): earlier tests leave the provider breaker tripped,
+  // and this test is about the parse path, not routing.
+  const p = newGemini('gemini-3.6-flash');
+  reset(json({ candidates: [{ content: { role: 'model', parts: [{ text: 'cached answer, complete enough' }] }, finishReason: 'STOP' }],
+    usageMetadata: { promptTokenCount: 6000, candidatesTokenCount: 5, cachedContentTokenCount: 4096 } }));
+  const r = await p.chat({ max_tokens: 100, messages: [{ role: 'user', content: 'tell me something about bridges please' }] });
+  assert.equal(r.usage.cached_tokens, 4096);
+  assert.equal(r.usage.input_tokens, 6000);
+  const last = meterLines().at(-1);
+  assert.equal(last.model, 'gemini-3.6-flash');
+  assert.equal(last.cached, 4096);
+  assert.equal(last.in, 6000);
+});
+
+test('429 with QuotaFailure: quotaId parsed onto the error and the meter error row', async () => {
+  const p = newGemini('gemini-quota-test');
+  reset(json({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'You exceeded your current quota',
+    details: [
+      { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaMetric: 'generativelanguage.googleapis.com/generate_content_free_tier_requests', quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }] },
+      { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '5s' },
+    ] } }, 429));
+  try {
+    await p.chat({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 });
+    assert.fail('expected 429');
+  } catch (e) {
+    assert.equal(e.status, 429);
+    assert.equal(e.retryAfterMs, 5000);
+    assert.equal(e.quotaId, 'GenerateRequestsPerDayPerProjectPerModel-FreeTier');
+  }
+  const last = meterLines().at(-1);
+  assert.equal(last.ok, false);
+  assert.equal(last.quota, 'GenerateRequestsPerDayPerProjectPerModel-FreeTier');
+});
+
+// ============ OpenAI-compatible cache field: unreported means null, not 0 ============
+// Same mocked-fetch harness, pointed at the openai-compatible path. The meter report
+// must be able to tell "this provider never told us" (null, unmeasured) apart from
+// "this provider told us zero cache hits" (0, measured).
+
+const withOpenAIFetch = async (usage, fn) => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+    usage,
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  try { return await fn(); } finally { globalThis.fetch = real; }
+};
+
+test('openai-compat usage without any cache field reaches the meter as cached: null', async () => {
+  const p = llm.createProvider('cerebras', { apiKey: 'test-key-not-real', model: 'test-model' });
+  await withOpenAIFetch({ prompt_tokens: 12, completion_tokens: 3 }, () =>
+    p.chat({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 }));
+  const last = meterLines().at(-1);
+  assert.equal(last.ok, true);
+  assert.equal(last.in, 12);
+  assert.equal(last.cached, null, 'unreported cache count must be null (unmeasured), not 0');
+});
+
+test('openai-compat usage with prompt_tokens_details.cached_tokens is read as-is, including 0', async () => {
+  const p = llm.createProvider('groq', { apiKey: 'test-key-not-real', model: 'test-model' });
+  await withOpenAIFetch({ prompt_tokens: 12, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 0 } }, () =>
+    p.chat({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 }));
+  assert.equal(meterLines().at(-1).cached, 0, 'a reported 0 is a real measurement');
+});
+
+test('deepseek top-level prompt_cache_hit_tokens is read when prompt_tokens_details is absent', async () => {
+  const p = llm.createProvider('deepseek', { apiKey: 'test-key-not-real', model: 'test-model' });
+  await withOpenAIFetch({ prompt_tokens: 40, completion_tokens: 3, prompt_cache_hit_tokens: 32, prompt_cache_miss_tokens: 8 }, () =>
+    p.chat({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 }));
+  assert.equal(meterLines().at(-1).cached, 32);
 });

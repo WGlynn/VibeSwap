@@ -38,6 +38,14 @@ const NOW_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-fee
 // records (public-safe by hand; Will 2026-10-28: both brains keep the same picture of each person).
 const PEOPLE_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'people.md');
 const PEOPLE_CAP = 4000;
+// topics.md: public-safe briefs on what the chats discuss (Cadence, OPH), same contract as people.md.
+const TOPICS_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'topics.md');
+const TOPICS_CAP = 9000;
+// repos.md: latest public state of the repos the chats discuss (write-bot-repos.py), same contract.
+const REPOS_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'repos.md');
+const REPOS_CAP = 9000;
+const PROJECTS_PATH = join(process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed'), 'projects.md');
+const PROJECTS_CAP = 6000;
 const NOW_CAP = 3000;
 const CLAUDE_MD_PATH = join(REPO_PATH, 'CLAUDE.md');
 const CKB_PATH = join(REPO_PATH, '.claude', 'JarvisxWill_CKB.md');
@@ -220,6 +228,9 @@ export async function diagnoseContext() {
     { path: CLAUDE_MD_PATH, label: 'CLAUDE.md' },
     { path: NOW_PATH, label: 'now.md' },
     { path: PEOPLE_PATH, label: 'people.md' },
+    { path: TOPICS_PATH, label: 'topics.md' },
+    { path: REPOS_PATH, label: 'repos.md' },
+    { path: PROJECTS_PATH, label: 'projects.md' },
     { path: SKB_PATH, label: 'JarvisxWill_SKB.md' },
     { path: GKB_PATH, label: 'JarvisxWill_GKB.md' },
     ...MEMORY_FILES.map(f => ({ path: join(MEMORY_DIR, f), label: f })),
@@ -267,6 +278,7 @@ MANDATORY OUTPUT RULES — violation of these is a critical failure:
 19. NEVER be generically motivational. "The future is bright" is noise. "We shipped a circuit breaker that triggers within one block" is signal.
 20. NEVER ask the community what VibeSwap should build. You know the roadmap. You designed it. Asking signals lack of conviction.
 21. NEVER fabricate operational status. Do not invent claims about rate limits, provider health, what Will is working on, or system state unless you have ACTUAL data from a tool call or explicit context. If asked "are you online?" just confirm you're here. Making up infrastructure narratives is a hallucination — treat it as one.
+22. NEVER promise or claim an action (tracking, logging, monitoring, updating, scheduling, following up) unless a tool you called in this turn did it; you cannot act between messages. You DO already hold shared state that Will's Claude Code session keeps current for you: the project board (projects), who is who (people), topic briefs (topics) and repo state (repos). When someone asks you to track or remember something, answer from that board truthfully (what is already on it, what is not yet), and say that Will's session reads this chat and updates it. A gate removes unbacked action claims; write so it has nothing to remove.
 </critical_rules>`;
 
 /**
@@ -838,6 +850,30 @@ export async function loadSystemPrompt() {
   if (peopleNote && peopleNote.trim()) {
     dynamicParts.push(`<context type="people" description="who is who in the chats, written by Claude Code Jarvis; working notes, never repeat private details back">`);
     dynamicParts.push(sanitizeContextForBot(peopleNote).slice(0, PEOPLE_CAP));
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  const topicsNote = await safeRead(TOPICS_PATH, 'topics.md');
+  if (topicsNote && topicsNote.trim()) {
+    dynamicParts.push(`<context type="topics" description="what the chats are about (Cadence, OPH); public facts and our measured numbers, written by Claude Code Jarvis">`);
+    dynamicParts.push(sanitizeContextForBot(topicsNote).slice(0, TOPICS_CAP));
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  const reposNote = await safeRead(REPOS_PATH, 'repos.md');
+  if (reposNote && reposNote.trim()) {
+    dynamicParts.push(`<context type="repos" description="latest public state of the repos the chats discuss, refreshed by Claude Code Jarvis; say when it was refreshed if asked about newer things">`);
+    dynamicParts.push(sanitizeContextForBot(reposNote).slice(0, REPOS_CAP));
+    dynamicParts.push('</context>');
+    dynamicParts.push('');
+  }
+
+  const projectsNote = await safeRead(PROJECTS_PATH, 'projects.md');
+  if (projectsNote && projectsNote.trim()) {
+    dynamicParts.push(`<context type="projects" description="the project board: state of every project in the chats, kept current by Claude Code Jarvis; this is what 'tracking everyone's projects' means, answer from it">`);
+    dynamicParts.push(sanitizeContextForBot(projectsNote).slice(0, PROJECTS_CAP));
     dynamicParts.push('</context>');
     dynamicParts.push('');
   }

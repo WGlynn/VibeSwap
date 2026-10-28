@@ -957,6 +957,14 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     ];
   } else {
     // ============ FULL TIER — Non-Claude providers ============
+    // Prefix discipline (verified 2026-10-28): systemPrompt.full is static + boot-frozen
+    // dynamic + RECENCY_RULES, built once per load and byte-identical across chats and
+    // messages, and it is emitted first. Every per-chat or per-message block (summary,
+    // group window, knowledge, topic cells, self-state with its uptime) comes after it.
+    // That already satisfies Gemini implicit caching's identical-prefix rule, so do not
+    // reorder RECENCY_RULES or move the per-chat blocks without Will's call. The prefix
+    // hash is logged by loadSystemPrompt ('[memory] Prompt split ... hash=') and the
+    // meter's `cached` column shows whether the cache ever hits on this tier.
     fullSystemPrompt = systemPrompt.full
       + (cappedSummary || '')
       + (cappedGroup || '')
@@ -1713,6 +1721,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     let rounds = 0;
     const historyLenBeforeTools = history.length;
     const filesWrittenInLoop = []; // Track write_file calls for auto-commit
+    let toolsRan = 0; // receipt for the fake-action gate (action-claims.js)
     while (response.stop_reason === 'tool_use' && rounds < 5) {
       rounds++;
       const toolBlocks = response.content.filter(b => b.type === 'tool_use');
@@ -1720,6 +1729,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
       const toolResults = [];
       for (const tb of toolBlocks) {
+        toolsRan++;
         // Circuit breaker check — skip disabled tools
         if (isToolDisabled(tb.name)) {
           toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: `Tool "${tb.name}" temporarily disabled (circuit breaker tripped after ${TOOL_CB_THRESHOLD} consecutive failures). Will auto-resume in ${TOOL_CB_COOLDOWN_MS / 1000}s.` });
@@ -2438,6 +2448,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         input: response.usage.input_tokens,
         output: response.usage.output_tokens,
       },
+      // The model that actually answered after any 429/503 rotation (llmChat sets _model),
+      // so the feed can name it instead of the configured primary.
+      model: response._model || null,
+      provider: response._provider || null,
+      toolsRan,
     };
   } catch (error) {
     console.error('[claude] API error:', error.message);

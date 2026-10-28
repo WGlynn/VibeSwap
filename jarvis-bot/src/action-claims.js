@@ -14,6 +14,7 @@ const CLAIM = new RegExp(String.raw`\b${SUBJECT}\s+(?:\w+\s+){0,3}(?:${VERBS.joi
 const STOCK = /\b(consider it (?:done|handled|logged|noted)|on it|done and done|noted and (?:saved|logged|stored)|will do|tracking (?:this|that|it) now|logged|noted)\b/i;
 // True statements about the shared notes pass: the board, people, topics and repos notes are real
 // files written by Will's session and loaded into this prompt, so "already on the project board" is honest.
+const SUBJECTLESS = /^\s*(?:saved|logged|tracked|added|stored|recorded|updated|scheduled|filed|queued|bookmarked|pinned|remembered)\b(?!\s+by\b)/i;
 const SHARED_STATE = /\b(project board|projects? note|my notes|the board|people note|topics note|repos note|shared notes|already (?:on|in) (?:the|my) (?:board|notes))\b/i;
 const FALLBACK = "I can't take actions from this chat on my own. Will's Claude Code session reads it and acts.";
 
@@ -30,7 +31,7 @@ export function gateFakeActions(text, { toolsRan = 0 } = {}) {
   for (const s of splitSentences(original)) {
     // A reference to the shared board passes only as a statement of state, never as 'I added/will add'.
     const stateRef = SHARED_STATE.test(s) && !/\bI(?:'ve| have| had| just| am now|'m now| will|'ll| am going to)\b/i.test(s);
-    const claims = (CLAIM.test(s) || STOCK.test(s)) && !stateRef;
+    const claims = (CLAIM.test(s) || STOCK.test(s) || SUBJECTLESS.test(s)) && !stateRef;
     (claims ? removed : kept).push(s);
   }
   if (!removed.length) return { text: original, changed: false, removed: [] };

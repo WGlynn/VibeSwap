@@ -135,11 +135,14 @@ export function getDirective(chatId) {
 export function setDirective(chatId, mode, setBy, reason) {
   if (!MODES.includes(mode)) return false;
 
-  if (mode === 'normal') {
-    // Remove directive — return to default
+  const envTagOnly = !!(config.tagOnlyChatIds && config.tagOnlyChatIds.includes(Number(chatId)));
+  if (mode === 'normal' && !envTagOnly) {
+    // Remove directive: the default for this chat is already normal
     delete directives[String(chatId)];
     console.log(`[directives] Cleared directive for chat ${chatId} (set by ${setBy.username || setBy.first_name || setBy.id})`);
   } else {
+    // Stored explicitly, including 'normal' for a chat in TAG_ONLY_CHAT_IDS: deleting the entry there
+    // fell back to the env list, so "normal mode" acknowledged and stayed tag-only (fixed 2026-10-28).
     directives[String(chatId)] = {
       mode,
       setBy: {

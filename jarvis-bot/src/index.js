@@ -298,7 +298,7 @@ import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed
 import { quickReply, isBareAck } from './quick-reply.js';
 import { gateFakeActions } from './action-claims.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
-import { noteBotInfo, noteContextReport } from './self-state.js';
+import { noteBotInfo, noteChatTitle, noteContextReport } from './self-state.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
 // Group monitor — graceful fallback if 'telegram' package not installed
@@ -7420,6 +7420,7 @@ bot.on('text', async (ctx) => {
     // giving up entirely. Prevents "Something went wrong: fetch failed" on transient
     // network blips (which the logs showed happening around the 40hr uptime mark).
     noteBotInfo(ctx.botInfo);
+    noteChatTitle(ctx.chat?.id, ctx.chat?.title);
     let response;
     // Keep retrying (Will 2026-10-27: "should just keep retrying"). Free-tier quota (429) and
     // overload (503) clear within a minute or two, so a growing wait beats giving up. Bounded at

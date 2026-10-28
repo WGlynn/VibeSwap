@@ -34,6 +34,11 @@ const MODE_MEANING = {
   quiet: 'complete silence; only mode changes are processed',
 };
 
+const chatTitles = new Map(); // chatId -> title, noted per message (2026-10-28: the bot could not name its own chat)
+export function noteChatTitle(chatId, title) {
+  if (chatId != null && title) chatTitles.set(String(chatId), String(title));
+}
+
 export function selfStateBlock(chatId, chatType) {
   const lines = [
     '\n\n## SELF-STATE (live facts about your own setup; when asked about yourself, state these instead of guessing)',
@@ -49,6 +54,8 @@ export function selfStateBlock(chatId, chatType) {
   if (chatType === 'private') {
     lines.push('- This chat: a private DM.');
   } else {
+    const title = chatTitles.get(String(chatId));
+    lines.push(`- This chat: ${title ? `"${title}"` : 'a group (title not seen yet)'}, a ${chatType}. If asked its name, give exactly this title.`);
     const mode = getChatMode(chatId);
     lines.push(`- This chat's mode: ${mode} (${MODE_MEANING[mode] || 'unknown mode'}). Anyone can change it by addressing you: "jarvis normal mode", "jarvis tag only", or "jarvis be quiet".`);
   }

@@ -42,7 +42,7 @@ const wizardState = new Map();
 const PROVIDERS = {
   '1': { id: 'claude', name: 'Claude (Anthropic)', model: 'claude-sonnet-4-5-20250929', keyEnv: 'ANTHROPIC_API_KEY', keyPrefix: 'sk-ant-' },
   '2': { id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat', keyEnv: 'DEEPSEEK_API_KEY', keyPrefix: 'sk-' },
-  '3': { id: 'gemini', name: 'Gemini (Google)', model: 'gemini-2.0-flash', keyEnv: 'GEMINI_API_KEY', keyPrefix: 'AIza' },
+  '3': { id: 'gemini', name: 'Gemini (Google)', model: 'gemini-3.6-flash', keyEnv: 'GEMINI_API_KEY', keyPrefix: 'AIza' },
   '4': { id: 'openai', name: 'OpenAI', model: 'gpt-5.4', keyEnv: 'OPENAI_API_KEY', keyPrefix: 'sk-' },
 };
 
@@ -398,7 +398,7 @@ export async function validateApiKey(provider, apiKey) {
         break;
 
       case 'gemini':
-        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || 'gemini-3.6-flash'}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -783,8 +783,9 @@ function friendlyError(error) {
   if (/content.?filter|safety|blocked|refused/i.test(msg)) {
     return 'That request was filtered by the AI provider\'s safety system. Try rephrasing.';
   }
-  // Generic — still truncate but frame better
-  return `Something went wrong: ${msg.slice(0, 150) || 'Unknown error'}`;
+  // Generic. Never forward raw provider text to a chat (Will 2026-10-28: a group saw
+  // "Ollama error 404: model not found"); the raw error is already in the log.
+  return 'I couldn\'t get a reply from any model just now. Try again in a minute.';
 }
 
 // ============ Ephemeral Error Reply ============

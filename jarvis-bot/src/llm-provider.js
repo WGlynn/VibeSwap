@@ -871,15 +871,30 @@ function createOllamaProvider(providerConfig) {
     model: defaultModel,
 
     async chat(request) {
-      const messages = convertMessages(request.messages, request.system);
+      // Backup mode (Will 2026-10-27): a small local model on CPU cannot read the full ~20k-token
+      // Jarvis prompt. Keep the head of the system prompt (identity and rules come first), add a
+      // backup-mode note, and send only the last few messages.
+      const sysCap = parseInt(process.env.OLLAMA_SYSTEM_CHARS, 10) || 4000;
+      const sysText = Array.isArray(request.system)
+        ? request.system.map(b => b.text || '').join('\n')
+        : String(request.system || '');
+      const system = sysText.slice(0, sysCap)
+        + '\n\nBACKUP MODE: you are a small local model standing in because the main models are rate-limited. '
+        + 'Keep replies short. For anything complex, say the main model is temporarily unavailable and to ask again in a few minutes.';
+      const messages = convertMessages((request.messages || []).slice(-6), system);
 
-      // Try OpenAI-compatible endpoint first (Ollama 0.2+)
       const body = {
-        model: request.model || this.model,
+        // Always the local model. As a fallback this adapter can receive the primary provider's
+        // model name (live 2026-10-28: Ollama 404 "model 'gemini-3.5-flash' not found").
+        model: this.model,
         messages,
         stream: false,
+        think: false,
         options: {
-          num_predict: request.max_tokens || 2048,
+          num_predict: Math.min(request.max_tokens || 300, 300),
+          num_ctx: parseInt(process.env.OLLAMA_NUM_CTX, 10) || 4096,
+          // OLLAMA_NUM_GPU=0 forces CPU: the GTX 1050 Ti needs NVIDIA driver 570+ for Ollama's CUDA build.
+          ...(process.env.OLLAMA_NUM_GPU !== undefined ? { num_gpu: parseInt(process.env.OLLAMA_NUM_GPU, 10) } : {}),
         },
       };
 
@@ -911,7 +926,9 @@ function createOllamaProvider(providerConfig) {
 
       return {
         content,
-        stop_reason: toolCalls.length > 0 ? 'tool_use' : 'end_turn',
+        // No tool calls are parsed from local output (BOT-106), so a reply always ends the turn.
+        // The old `toolCalls.length` here referenced a removed variable and threw on every reply.
+        stop_reason: 'end_turn',
         usage: {
           input_tokens: data.prompt_eval_count || 0,
           output_tokens: data.eval_count || 0,
@@ -1901,12 +1918,9 @@ const PROVIDER_TIER = {
 };
 
 function getProviderForComplexity(complexity) {
-  // Tier -1: If Ollama is available and configured, try it first for ALL complexity levels.
-  // Local inference = zero cost, zero rate limit, zero dependency.
-  // The escape hatch from every API toll booth.
-  if (process.env.OLLAMA_URL && providerPool.has('ollama')) {
-    return providerPool.get('ollama');
-  }
+  // Ollama is the LAST resort (Will 2026-10-27): the local model on this PC is a small CPU
+  // backup, far weaker than the cloud models, so it must never answer first. It sits at the
+  // end of fallbackOrder and is reached only when every cloud provider has failed.
 
   // Return first available provider from the escalation chain
   const chain = ESCALATION_CHAINS[complexity] || ESCALATION_CHAINS.moderate;
@@ -1987,7 +2001,7 @@ export function initProvider() {
   // Init ALL available providers into the pool + fallback chain
   // Cascade: quality-first, Ollama as floor (never runs out of credits)
   // "When people top off credits, the network Nash-equilibriums at positive-sum" — Will
-  const fallbackOrder = ['claude', 'deepseek', 'openai', 'xai', 'gemini', 'ollama', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita'];
+  const fallbackOrder = ['claude', 'deepseek', 'openai', 'xai', 'gemini', 'cerebras', 'groq', 'openrouter', 'mistral', 'together', 'sambanova', 'fireworks', 'novita', 'ollama'];
   fallbackProviders = [];
 
   for (const name of fallbackOrder) {
@@ -2475,6 +2489,20 @@ export async function llmChat(request) {
             console.warn(`[llm] ${currentProvider.name} 503 overloaded (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retry in ${Math.round(delay)}ms`);
             await sleep(delay);
             continue;
+          }
+
+          // ============ 503 retries spent → next model (overload is per model) ============
+          // Live 2026-10-28: gemini-3.6-flash stayed overloaded through both retries and the bot
+          // fell to the CPU backup model while the other Gemini models were never tried.
+          if (errStatus === 503 && currentProvider.fallbackModels) {
+            modelsTried.add(attemptModel);
+            const nextModel = nextQuotaModel(currentProvider, modelsTried);
+            if (nextModel) {
+              console.warn(`[llm] ${currentProvider.name}/${attemptModel} still overloaded (503), rotating to ${nextModel}`);
+              providerRequest = { ...providerRequest, model: nextModel };
+              attempt = -1; // the next model gets its own short retry budget
+              continue;
+            }
           }
 
           // ============ 400 from an optional feature → drop it once, resend ============

@@ -366,6 +366,7 @@ export async function flushInnerDialogue() {
 // ============
 
 let lastGenerationTime = 0;
+let lastInputKey = null; // outside inputs at the last generation (see the skip below)
 const GENERATION_INTERVAL_MS = 60 * 60 * 1000; // 1 hour between generations
 const MAX_INSIGHTS_PER_GENERATION = 3;
 
@@ -403,6 +404,15 @@ export async function generateInnerDialogue(learningStats, skills, recentCorrect
   if (recentCorrections.length > 0) {
     const corrSummary = recentCorrections.slice(-5).map(c => c.correction || c.content || JSON.stringify(c)).join('; ');
     reflectionContext.push(`Recent corrections: ${corrSummary}`);
+  }
+
+  // Nothing new to reflect on: skip the model call (Will 2026-10-28, free-tier quota). Measured on
+  // the live bot: 25 of 27 hourly generations fired with no conversation since the previous one.
+  // Only outside inputs count; the bot's own earlier thoughts below change every generation.
+  const inputKey = reflectionContext.join('\n');
+  if (inputKey === lastInputKey) {
+    lastGenerationTime = now;
+    return [];
   }
 
   // Include existing inner dialogue for continuity
@@ -446,6 +456,7 @@ Respond ONLY with the JSON array, no other text.`;
     });
 
     lastGenerationTime = now;
+    lastInputKey = inputKey;
 
     // Parse response — extract JSON array
     const text = response?.content?.[0]?.text || '';

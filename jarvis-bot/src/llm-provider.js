@@ -1911,24 +1911,21 @@ const providerPool = new Map();
 // Each classification maps to an ordered chain: try cheapest first, escalate on quality failure.
 // Within each tier, providers are ordered by skill fit (best specialist first).
 const ESCALATION_CHAINS = {
-  // Start FREE → Budget → Premium
-  // All 8 Tier 0 providers in chains. Ordered by quality within tier.
-  // openrouter = Qwen 3.6 Plus (0.80), groq/cerebras/sambanova/together (0.60),
-  // fireworks (0.58), novita (0.55), mistral (0.50)
-  simple:     ['openrouter', 'groq', 'cerebras', 'sambanova', 'together', 'fireworks', 'novita', 'mistral', 'deepseek', 'gemini', 'ollama'],
-  moderate:   ['openrouter', 'groq', 'cerebras', 'sambanova', 'together', 'novita', 'deepseek', 'gemini', 'xai', 'claude'],
-
-  // Start FREE (Qwen 0.80 quality) → Budget → Premium
-  // Wardenclyffe v3.1: Qwen leads coding/math — 32/40 on DeFi mechanism design, $0.
-  coding:     ['openrouter', 'deepseek', 'gemini', 'openai', 'xai', 'claude'],
-  math:       ['openrouter', 'deepseek', 'gemini', 'openai', 'xai', 'claude'],
+  // Voice first, overflow after (Will 2026-10-28: tokens are never saved at UX cost). Gemini is the
+  // bot's voice (quality 0.75, native tools, thinking on hard turns); Groq (gpt-oss-120b) and the
+  // OpenRouter :free model absorb Gemini's 429/503s instead of the user waiting a minute. The old
+  // order led with 'openrouter' when it meant Qwen 3.6 Plus (0.80); that model is retired and the
+  // name now points at a different free model, so it no longer leads. Ollama stays last.
+  simple:     ['gemini', 'groq', 'openrouter', 'cerebras', 'sambanova', 'together', 'fireworks', 'novita', 'mistral', 'deepseek', 'ollama'],
+  moderate:   ['gemini', 'groq', 'openrouter', 'cerebras', 'sambanova', 'together', 'novita', 'deepseek', 'xai', 'claude'],
+  coding:     ['gemini', 'groq', 'openrouter', 'deepseek', 'openai', 'xai', 'claude'],
+  math:       ['gemini', 'groq', 'openrouter', 'deepseek', 'openai', 'xai', 'claude'],
   multimodal: ['gemini', 'xai', 'claude', 'openai'],                    // Gemini cheap + vision (text-only models can't help here)
 
-  // Start PREMIUM (irreducible complexity — these NEED frontier models)
-  // Qwen as fallback between premium and budget — 0.80 quality may satisfy before hitting paid tiers
-  reasoning:  ['claude', 'xai', 'openai', 'openrouter', 'deepseek', 'gemini'],
-  tooluse:    ['claude', 'gemini', 'openai', 'xai', 'deepseek'],        // Tool use needs native tool support (claude, gemini); the rest get tools stripped
-  complex:    ['claude', 'xai', 'openai', 'openrouter', 'deepseek', 'gemini'],
+  // Premium first when a paid key exists (none today), then the voice, then free overflow.
+  reasoning:  ['claude', 'xai', 'openai', 'gemini', 'groq', 'openrouter', 'deepseek'],
+  tooluse:    ['claude', 'gemini', 'openai', 'xai', 'deepseek'],        // Tool use needs native tool support (claude, gemini)
+  complex:    ['claude', 'xai', 'openai', 'gemini', 'groq', 'openrouter', 'deepseek'],
 
   explicit:   [], // Caller specified model — use activeProvider
 };

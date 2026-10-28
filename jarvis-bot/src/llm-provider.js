@@ -950,7 +950,9 @@ async function warmOllama() {
     const res = await fetch(`${url}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt: 'hi', stream: false, options: { num_predict: 1 } }),
+      body: JSON.stringify({ model, prompt: 'hi', stream: false, options: { num_predict: 1,
+        // same CPU pin as chat(); without it the warm-up tried the GPU and got HTTP 500 (2026-10-28)
+        ...(process.env.OLLAMA_NUM_GPU !== undefined ? { num_gpu: parseInt(process.env.OLLAMA_NUM_GPU, 10) } : {}) } }),
       signal: AbortSignal.timeout(60_000),
     });
     if (res.ok) console.log(`[ollama] Model ${model} warm — ready for inference`);

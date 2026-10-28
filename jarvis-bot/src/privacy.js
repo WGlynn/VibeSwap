@@ -162,7 +162,9 @@ export function decrypt(encryptedB64, key) {
     // BOT-206: Only fall back to plaintext for data that is clearly NOT encrypted.
     // If data looks encrypted (long enough to have IV+tag) but fails to decrypt,
     // it's either tampered or wrong key — don't silently return garbage.
-    if (typeof encryptedB64 === 'string' && buf.length >= IV_LENGTH + TAG_LENGTH) {
+    // `buf` lives in the try block; recompute the length here (it was a ReferenceError, so a
+    // failed decrypt threw instead of returning plaintext or the marker).
+    if (typeof encryptedB64 === 'string' && Buffer.from(encryptedB64, 'base64').length >= IV_LENGTH + TAG_LENGTH) {
       console.warn('[privacy] Decryption failed on data that appears encrypted — possible tampering or wrong key');
       return '[DECRYPTION_FAILED]';
     }
@@ -242,8 +244,13 @@ export function getKeyFingerprint(key) {
 // ============ Key Rotation ============
 
 export async function rotateMasterKey(oldKeyHex, newKeyHex) {
-  const oldKey = pbkdf2Sync(oldKeyHex, SALT, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
-  const newKey = pbkdf2Sync(newKeyHex, SALT, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
+  // Same derivation as initPrivacy (BOT-208): raw 64-char hex used directly, else PBKDF2 with the
+  // legacy salt. This referenced an undefined SALT before.
+  const derive = (k) => /^[0-9a-f]{64}$/i.test(k)
+    ? Buffer.from(k, 'hex')
+    : pbkdf2Sync(k, LEGACY_PRIVACY_SALT, PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
+  const oldKey = derive(oldKeyHex);
+  const newKey = derive(newKeyHex);
 
   // This is a placeholder — actual rotation requires:
   // 1. Load every encrypted CKB with old key

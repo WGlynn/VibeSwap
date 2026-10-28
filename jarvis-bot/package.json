@@ -10,7 +10,8 @@
     "dev": "node --expose-gc --watch src/index.js",
     "chatterbox": "node src/chatterbox/index.js",
     "chatterbox:dev": "node --watch src/chatterbox/index.js",
-    "test": "node --test test/mi-bandit.test.js test/shard-learnings.test.js test/mi-manifest.test.js test/mi-host.test.js test/mi-lifecycle.test.js test/rosetta.test.js test/gemini-tools.test.js"
+    "test": "node --test test/mi-bandit.test.js test/shard-learnings.test.js test/mi-manifest.test.js test/mi-host.test.js test/mi-lifecycle.test.js test/rosetta.test.js test/gemini-tools.test.js",
+    "lint:undef": "eslint --no-eslintrc --env es2022,node,browser --parser-options=ecmaVersion:latest,sourceType:module --rule \"{\\\"no-undef\\\":\\\"error\\\"}\" src/"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -22,5 +23,8 @@
     "telegraf": "^4.16.3",
     "telegram": "^2.26.16",
     "youtube-transcript": "^1.2.1"
+  },
+  "devDependencies": {
+    "eslint": "8.57.1"
   }
 }

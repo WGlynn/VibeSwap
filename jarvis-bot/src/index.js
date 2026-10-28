@@ -294,7 +294,8 @@ try {
 }
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
-import { recordExchange, recordUncleanShutdown } from './feed.js';
+import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
+import { quickReply, isBareAck } from './quick-reply.js';
 import { noteBotInfo, noteContextReport } from './self-state.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
 import { runSecurityChecks } from './security-checks.js';
@@ -7389,6 +7390,25 @@ bot.on('text', async (ctx) => {
       }
     }
 
+    // ============ Quick reply: trivial turns never reach a model (Will 2026-10-28) ============
+    if (!process.env.JARVIS_QUICK_REPLY_OFF) {
+      const quick = quickReply(messageForLLM, { name: ctx.from?.first_name, botUsername: ctx.botInfo?.username,
+        uptimeSec: process.uptime(), model: process.env.GEMINI_MODEL || process.env.LLM_MODEL });
+      const bareAck = !quick && !isGroupMsg && isBareAck(messageForLLM, ctx.botInfo?.username);
+      if (quick || bareAck) {
+        clearInterval(typingInterval);
+        bufferMessage(chatId, userName, messageForLLM); // keep the model's history whole
+        if (quick) {
+          bufferAssistantMessage(chatId, quick);
+          await ctx.reply(quick, { parse_mode: undefined });
+          recordOutgoing(String(chatId), quick);
+          recordExchange(ctx, ctx.message.text, quick);
+        }
+        console.log(`[quick-reply] ${quick ? 'answered' : 'bare ack, no reply'} without a model call`);
+        return;
+      }
+    }
+
     // ============ Resilient LLM Call — Retry on Network Failure ============
     // The Wardenclyffe cascade handles provider-level retries, but if the entire
     // network is down (all providers unreachable), the cascade exhausts and throws.
@@ -7556,6 +7576,9 @@ bot.on('text', async (ctx) => {
   } catch (error) {
     clearInterval(typingInterval);
     console.error('[bot] Error:', error.message);
+    // Error feed for the Claude Code side (Will 2026-10-28: auto-debug while AFK). No message text.
+    recordHealthEvent({ kind: 'reply_error', where: 'message-handler', chatType: ctx.chat?.type,
+      error: String(error.message || error).slice(0, 300), stack: String(error.stack || '').split('\n').slice(1, 4).join(' | ') });
     try {
       await ephemeralReply(ctx, friendlyError(error), { parse_mode: undefined });
     } catch {

@@ -8,8 +8,21 @@
 #
 # Usage (PowerShell):  powershell -File scripts\restart-local.ps1
 
+param([switch]$Force)
 $ErrorActionPreference = 'Stop'
 $bot = Split-Path -Parent $PSScriptRoot
+# Gate (2026-10-28): every live bug that day sat on a path no test or check covered (a removed
+# variable that threw on every Ollama reply, among others). Refuse to restart onto code that fails
+# the suite or the undefined-variable lint; -Force overrides in an emergency.
+if (-not $Force) {
+  Push-Location $bot
+  try {
+    & npm run -s lint:undef
+    if ($LASTEXITCODE -ne 0) { throw 'lint:undef failed (undefined variable in src/). Fix it, or rerun with -Force.' }
+    & npm test --silent | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'npm test failed. Fix it, or rerun with -Force.' }
+  } finally { Pop-Location }
+}
 $logs = Join-Path $HOME 'jarvis-bot-logs'
 $pidFile = Join-Path $logs 'pid.txt'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null

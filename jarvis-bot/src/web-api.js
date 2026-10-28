@@ -793,7 +793,7 @@ export async function handleWebRequest(req, res, pathname) {
       const result = submitProof(authenticatedUserId, nonce, hash, challenge);
       const status = result.accepted ? 200 : 400;
       if (!result.accepted) {
-        console.log(`[mining] Proof REJECTED: user=${authenticatedUserId} reason=${result.reason || 'unknown'} details=${JSON.stringify(result.details || {})} challenge_match=${challenge === state?.challenge} IP=${ip}`);
+        console.log(`[mining] Proof REJECTED: user=${authenticatedUserId} reason=${result.reason || 'unknown'} details=${JSON.stringify(result.details || {})} IP=${ip}`);
       }
       jsonResponse(res, status, result);
     } catch (err) {

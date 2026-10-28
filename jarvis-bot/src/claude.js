@@ -803,6 +803,18 @@ function sanitizeInput(text) {
 
 // ============ LLM Call + Tool Loop (shared by text and multimodal paths) ============
 
+// ============ Register switch (Will + Jarvis 2026-10-28) ============
+// "the transition between banter and technical depth ... drop the conversational padding instantly and
+// land on first principles. no preamble, just the constraint or the math." A technical turn gets a
+// per-turn line telling the model so; banter turns get nothing (no change to how jokes land).
+export const TECH_TURN = /\b(mechanism|architecture|consensus|finality|attribution|shapley|v\(s\)|proof of (?:work|stake|mind)|tokenomics|incentive|equilibri\w*|invariant|protocol|algorithm|complexity|latency|throughput|cadence|recall|apical|gradient|settle|noesis|oph|patch|cohomolog\w*|sybil|wash|calibration|regression|bug|stack trace|error|exception|commit|repo|deploy|contract|solidity|rust|python|node|api|schema|database|benchmark|experiment|seed|p-value|variance|sem|spearman|why does|how does|prove|derive|what breaks)\b/i;
+export function registerLine(text, complexity) {
+  const t = String(text || '');
+  const technical = complexity === 'complex' || complexity === 'deep' || TECH_TURN.test(t);
+  if (!technical || t.trim().length < 12) return '';
+  return '\n\n## REGISTER THIS TURN: technical\n- Drop the banter for this reply. First sentence is the answer: the constraint, the number, the mechanism, or the failure. No preamble, no restating the question, no "great question".\n- Then only what the reader needs to check it: one reason, one source (file, commit, experiment id) if you have it, and what would change the answer. If you do not know, say so in one line.\n- Wit is fine after the substance, never instead of it.';
+}
+
 async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId) {
   // In DMs, chatId IS the userId. In groups, userId must be passed explicitly.
   const effectiveUserId = userId || chatId;
@@ -970,7 +982,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       + (cappedGroup || '')
       + (cappedKnowledge ? '\n\n' + cappedKnowledge : '')
       + (cellContext ? '\n\n' + cellContext : '')
-      + selfStateBlock(chatId, chatType);
+      + selfStateBlock(chatId, chatType)
+      + registerLine(messageText, complexity);
   }
 
   // ============ Selective Tool Loading ============

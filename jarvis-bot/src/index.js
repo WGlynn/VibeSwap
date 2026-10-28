@@ -960,6 +960,10 @@ async function checkLastShutdown() {
 
 // Messages queued while the bot was down are answered on boot if younger than this.
 const BACKLOG_MAX_AGE_S = 15 * 60;
+// Boot notice + polling liveness, kept for the on-demand status reply instead of being pushed to
+// Will's DM (Will 2026-10-28: "i only want to see them if i ask for jarvis status").
+let bootReportLines = null;
+let lastPollReturnAt = 0;
 
 if (!IS_WORKER) {
   // ============ Archive Middleware ============
@@ -5276,12 +5280,14 @@ bot.command('broadcast', async (ctx) => {
   ctx.reply(lines.join('\n'));
 });
 
-bot.command('health', async (ctx) => {
-  if (!isAuthorized(ctx)) return unauthorized(ctx);
+async function buildStatusReport() {
   const report = await diagnoseContext();
+  const pollAgo = lastPollReturnAt ? Math.round((Date.now() - lastPollReturnAt) / 1000) : null;
   const lines = [
     'JARVIS Health Check',
     '',
+    `Online: up ${Math.round(process.uptime() / 60)}m | Telegram long-poll last returned ${pollAgo === null ? 'not yet' : pollAgo + 's ago'}`,
+    ...(bootReportLines ? [`Last boot: ${bootReportLines[0]}`] : []),
     `Context loaded: ${report.loaded.length}/${report.loaded.length + report.missing.length} files (${report.totalChars} chars)`,
   ];
   if (report.missing.length > 0) {
@@ -5300,7 +5306,18 @@ bot.command('health', async (ctx) => {
   const mem = process.memoryUsage();
   lines.push(`Memory: ${Math.round(mem.rss / 1048576)}MB RSS, ${Math.round(mem.heapUsed / 1048576)}MB heap`);
   lines.push(`Uptime: ${Math.round(process.uptime() / 60)}m`);
-  ctx.reply(lines.join('\n'));
+  return lines.join('\n');
+}
+
+bot.command('health', async (ctx) => {
+  if (!isAuthorized(ctx)) return unauthorized(ctx);
+  ctx.reply(await buildStatusReport());
+});
+
+// Will asks in plain words: "jarvis status", "status", "online status", "connection".
+bot.hears(/^\s*(jarvis\s+)?(status|online status|online|connection|connection status)\s*\??\s*$/i, async (ctx, next) => {
+  if (ctx.chat?.type !== 'private' || ctx.from?.id !== config.ownerUserId) return next();
+  ctx.reply(await buildStatusReport());
 });
 
 // ============ Continuous Context ============
@@ -8296,6 +8313,19 @@ async function main() {
     return next();
   });
 
+  // A quiet chat is not dead polling: Telegram's long-poll returns about every 50s even with no
+  // messages, so a returned getUpdates counts as alive too (Will 2026-10-28: the monitor
+  // soft-restarted every 6 min during lulls). Only a long-poll that stops returning trips it.
+  const rawCallApi = bot.telegram.callApi.bind(bot.telegram);
+  bot.telegram.callApi = async (method, payload, opts) => {
+    const res = await rawCallApi(method, payload, opts);
+    if (method === 'getUpdates') lastUpdateReceived = lastPollReturnAt = Date.now();
+    return res;
+  };
+  // Silent by default: soft restarts go to bot.log + health.jsonl; Will is messaged only when a
+  // soft restart fails or the process hard-restarts. POLLING_MONITOR_NOTIFY=all restores every ping.
+  const pollingNotifyAll = process.env.POLLING_MONITOR_NOTIFY === 'all';
+
   // Fire-and-forget launch — must NOT block startup or the HTTP health server won't start.
   // If Telegram is unreachable, the polling liveness monitor (below) handles recovery.
   bot.launch({ dropPendingUpdates: false }).catch(launchErr => {
@@ -8346,11 +8376,14 @@ async function main() {
         process.exit(1);
       }
 
-      try {
-        await bot.telegram.sendMessage(config.ownerUserId,
-          `[POLLING-MONITOR] No updates for ${Math.round(silentMs / 60000)}min. Soft restart attempt ${pollingRestartAttempts}...`
-        );
-      } catch {}
+      recordHealthEvent({ kind: 'polling_restart', where: 'polling-monitor', silentMin: Math.round(silentMs / 60000), attempt: pollingRestartAttempts });
+      if (pollingNotifyAll) {
+        try {
+          await bot.telegram.sendMessage(config.ownerUserId,
+            `[POLLING-MONITOR] No updates for ${Math.round(silentMs / 60000)}min. Soft restart attempt ${pollingRestartAttempts}...`
+          );
+        } catch {}
+      }
 
       try {
         // Step 1: Stop existing polling
@@ -8370,15 +8403,21 @@ async function main() {
           lastUpdateReceived = Date.now(); // Reset timer
           pollingRestartAttempts = 0; // Reset counter on success
           console.log(`[polling-monitor] Polling restarted successfully (bot: @${me.username})`);
-          try {
-            await bot.telegram.sendMessage(config.ownerUserId, `[POLLING-MONITOR] Polling restarted ✓ (@${me.username})`);
-          } catch {}
+          if (pollingNotifyAll) {
+            try {
+              await bot.telegram.sendMessage(config.ownerUserId, `[POLLING-MONITOR] Polling restarted ✓ (@${me.username})`);
+            } catch {}
+          }
         } else {
           throw new Error('getMe() returned no data after restart');
         }
       } catch (restartErr) {
         console.error('[polling-monitor] Soft restart failed:', restartErr.message);
         persistCrashEntry('polling_restart_failed', restartErr);
+        recordHealthEvent({ kind: 'polling_restart_failed', where: 'polling-monitor', error: String(restartErr.message).slice(0, 200) });
+        try {
+          await bot.telegram.sendMessage(config.ownerUserId, `[POLLING-MONITOR] Soft restart failed: ${String(restartErr.message).slice(0, 200)}`);
+        } catch {}
         // Don't reset timer — let it try again on next interval
       }
     }
@@ -9397,7 +9436,11 @@ async function main() {
     }
     lines.push(`Model: ${getProviderName()} / ${getModelName()}`);
     lines.push(`Shard: ${shardResult.id} (${isMultiShard() ? 'multi' : 'single'}-shard)`);
-    await bot.telegram.sendMessage(config.ownerUserId, lines.join('\n'));
+    bootReportLines = lines;
+    // Only an unclean shutdown is pushed; a normal boot is shown on request (jarvis status).
+    if (!lastShutdown.clean && !lastShutdown.firstBoot) {
+      await bot.telegram.sendMessage(config.ownerUserId, lines.join('\n'));
+    }
   } catch (err) {
     console.warn(`[jarvis] Could not notify owner: ${err.message}`);
   }
@@ -9579,6 +9622,7 @@ async function main() {
   // BUT: immediately notify on state changes (degradation, memory warnings, recovery).
   const STATUS_PULSE_INTERVAL = 30 * 60 * 1000; // 30 min (was 3 min)
   let lastPulseState = { degraded: false, memWarning: false, pollingOk: true };
+  let prevAlert = { degraded: false, memWarning: false };
   setInterval(async () => {
     try {
       const uptime = process.uptime();
@@ -9623,7 +9667,13 @@ async function main() {
       if (stateChanged) {
         parts.unshift('[STATE CHANGE]');
       }
-      await bot.telegram.sendMessage(config.ownerUserId, parts.join('\n'));
+      // Silent pulse: pushed only when degradation or memory pressure starts or clears. Polling
+      // has its own failure alert, so it does not trigger this. STATUS_PULSE=all restores the 30-min ping.
+      const alertChanged = currentState.degraded !== prevAlert.degraded || currentState.memWarning !== prevAlert.memWarning;
+      prevAlert = { degraded: currentState.degraded, memWarning: currentState.memWarning };
+      if (alertChanged || process.env.STATUS_PULSE === 'all') {
+        await bot.telegram.sendMessage(config.ownerUserId, parts.join('\n'));
+      }
     } catch {}
   }, STATUS_PULSE_INTERVAL);
 

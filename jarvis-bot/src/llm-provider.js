@@ -2238,8 +2238,15 @@ function soonestQuotaModel(provider) {
   return best;
 }
 
+// A per-day bucket (quotaId contains "PerDay") stays dead until the provider's RetryInfo says
+// otherwise, capped at 24 h; the 15 min clamp is for per-minute buckets. Measured 2026-10-28:
+// gemini-3.6-flash returned retryAfterMs ~14 h and the bot re-probed it every 15 min all day.
+const QUOTA_COOLDOWN_DAY_MAX_MS = 24 * 60 * 60_000;
 function markQuotaExhausted(provider, model, error) {
-  const ms = Math.min(error?.retryAfterMs || QUOTA_COOLDOWN_DEFAULT_MS, QUOTA_COOLDOWN_MAX_MS);
+  const perDay = /perday/i.test(String(error?.quotaId || ''));
+  const cap = perDay ? QUOTA_COOLDOWN_DAY_MAX_MS : QUOTA_COOLDOWN_MAX_MS;
+  const ms = Math.min(error?.retryAfterMs || QUOTA_COOLDOWN_DEFAULT_MS, cap);
+  if (perDay) console.warn(`[llm] ${provider.name}/${model}: daily quota spent, parked for ${Math.round(ms / 60_000)} min`);
   modelQuotaCooldown.set(`${provider.name}:${model}`, Date.now() + ms);
 }
 

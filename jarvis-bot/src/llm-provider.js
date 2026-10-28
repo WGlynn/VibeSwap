@@ -74,6 +74,9 @@ class TruncatedResponseError extends Error {
 
 // Providers that support vision (image input)
 const VISION_PROVIDERS = new Set(['claude', 'openai', 'gemini', 'xai']);
+// OpenRouter's vision depends on the model .env picks, so it is opt-in: OPENROUTER_VISION=true
+// only when OPENROUTER_MODEL reads images (nemotron-3.5-super-vl:free verified 2026-10-28).
+const isVisionProvider = name => VISION_PROVIDERS.has(name) || (name === 'openrouter' && process.env.OPENROUTER_VISION === 'true');
 
 function flattenToolExchanges(messages) {
   // Strip tool_use/tool_result blocks entirely — fallback models don't need them
@@ -1936,7 +1939,7 @@ const ESCALATION_CHAINS = {
   moderate:   ['gemini', 'groq', 'openrouter', 'cerebras', 'sambanova', 'together', 'novita', 'deepseek', 'xai', 'claude'],
   coding:     ['gemini', 'groq', 'openrouter', 'deepseek', 'openai', 'xai', 'claude'],
   math:       ['gemini', 'groq', 'openrouter', 'deepseek', 'openai', 'xai', 'claude'],
-  multimodal: ['gemini', 'xai', 'claude', 'openai'],                    // Gemini cheap + vision (text-only models can't help here)
+  multimodal: ['gemini', 'openrouter', 'xai', 'claude', 'openai'],      // vision only; openrouter stays text-stripped unless OPENROUTER_VISION=true
 
   // Premium first when a paid key exists (none today), then the voice, then free overflow.
   reasoning:  ['claude', 'xai', 'openai', 'gemini', 'groq', 'openrouter', 'deepseek'],
@@ -2308,7 +2311,7 @@ function shapeRequestFor(provider, request) {
   const shaped = native
     ? { ...cleaned, tools, messages: flattenPriorToolExchanges(cleaned.messages) }
     : { ...cleaned, messages: flattenToolExchanges(cleaned.messages) };
-  if (!VISION_PROVIDERS.has(provider.name)) shaped.messages = stripMediaBlocks(shaped.messages);
+  if (!isVisionProvider(provider.name)) shaped.messages = stripMediaBlocks(shaped.messages);
   return shaped;
 }
 

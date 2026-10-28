@@ -149,8 +149,10 @@ export async function evaluateResponse(botResponse, userMessage, recentContext, 
 }
 
 // ============ Fast Check (Pattern Matching) ============
+// Exported for chat-learning.js: a reply that trips a concession or hype pattern earns no
+// positive credit there, so the loop can never learn caving or flattery as "what lands".
 
-function fastCheck(botResponse, userMessage, meta) {
+export function fastCheck(botResponse, userMessage, meta = {}) {
   const lower = botResponse.toLowerCase();
   const found = [];
 

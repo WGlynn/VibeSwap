@@ -9,9 +9,12 @@ import { searchDeepStorageFull } from './deep-storage.js';
 import { llmChat, getProvider, getProviderName, getModelName, getIntelligenceLevel } from './llm-provider.js';
 import { summarizeIfNeeded, getContextSummary } from './context-memory.js';
 import { checkBudget, recordUsage } from './compute-economics.js';
-import { getGroupContext } from './group-context.js';
+import { getGroupContext, getHumanTexts } from './group-context.js';
+import { roomLine } from './text-style.js';
 import { evaluateOwnResponse, appendScoreLog } from './intelligence.js';
 import { selfStateBlock } from './self-state.js';
+import { TECH_TURN } from './chat-intent.js';
+import { chatGuidance } from './chat-learning.js';
 // Shard memory — compressed semantic memory for cross-shard context
 let observeMemory = () => {};
 try {
@@ -807,7 +810,8 @@ function sanitizeInput(text) {
 // "the transition between banter and technical depth ... drop the conversational padding instantly and
 // land on first principles. no preamble, just the constraint or the math." A technical turn gets a
 // per-turn line telling the model so; banter turns get nothing (no change to how jokes land).
-export const TECH_TURN = /\b(mechanism|architecture|consensus|finality|attribution|shapley|v\(s\)|proof of (?:work|stake|mind)|tokenomics|incentive|equilibri\w*|invariant|protocol|algorithm|complexity|latency|throughput|cadence|recall|apical|gradient|settle|noesis|oph|patch|cohomolog\w*|sybil|wash|calibration|regression|bug|stack trace|error|exception|commit|repo|deploy|contract|solidity|rust|python|node|api|schema|database|benchmark|experiment|seed|p-value|variance|sem|spearman|why does|how does|prove|derive|what breaks)\b/i;
+// TECH_TURN lives in chat-intent.js (pure, shared with the chat-learning tagger); re-exported here.
+export { TECH_TURN };
 export function registerLine(text, complexity) {
   const t = String(text || '');
   const technical = complexity === 'complex' || complexity === 'deep' || TECH_TURN.test(t);
@@ -953,6 +957,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       cappedKnowledge ? '\n\n' + cappedKnowledge : '',
       cellContext || '', // CKA: topic-relevant knowledge cells
       selfStateBlock(chatId, chatType),
+      chatGuidance(chatId),
       systemPrompt.recency,
     ].filter(Boolean).join('\n');
 
@@ -983,7 +988,13 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       + (cappedKnowledge ? '\n\n' + cappedKnowledge : '')
       + (cellContext ? '\n\n' + cellContext : '')
       + selfStateBlock(chatId, chatType)
-      + registerLine(messageText, complexity);
+      + chatGuidance(chatId) // per-chat, after the frozen prefix (see chat-learning.js)
+      // casual turns: size to the room (text-style.js roomLine); technical turns: registerLine
+      + (registerLine(messageText, complexity) || roomLine({
+        isGroup: chatType !== 'private',
+        humanTexts: chatType !== 'private' ? getHumanTexts(chatId) : [],
+        recentReplies: history.filter(m => m.role === 'assistant' && typeof m.content === 'string').map(m => m.content),
+      }));
   }
 
   // ============ Selective Tool Loading ============

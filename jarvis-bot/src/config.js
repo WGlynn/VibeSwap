@@ -15,6 +15,11 @@ function resolvePath(envVar, localDefault) {
   return localDefault;
 }
 
+// Comma lists of keys (GEMINI_API_KEY, GEMINI_API_KEYS) → one ordered, de-duplicated array.
+export function splitKeys(...vals) {
+  return [...new Set(vals.flatMap(v => String(v || '').split(',')).map(k => k.trim()).filter(Boolean))];
+}
+
 export const config = {
   telegram: {
     token: process.env.TELEGRAM_BOT_TOKEN,
@@ -93,7 +98,11 @@ export const config = {
     model: process.env.LLM_MODEL || process.env.CLAUDE_MODEL || 'claude-sonnet-4-5-20250929',
     baseUrl: process.env.LLM_BASE_URL || null, // Custom endpoint (e.g., self-hosted Ollama)
     openaiApiKey: process.env.OPENAI_API_KEY || null,
-    geminiApiKey: process.env.GEMINI_API_KEY || null,
+    // Gemini free tier meters quota per PROJECT per MODEL (quotaId ...PerProjectPerModel). Extra keys
+    // add capacity only if each comes from a different Google Cloud / AI Studio project; two keys
+    // from one project share one bucket. GEMINI_API_KEY (if set) is key 0, so one key = today.
+    geminiApiKeys: splitKeys(process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEYS),
+    geminiApiKey: process.env.GEMINI_API_KEY || splitKeys(process.env.GEMINI_API_KEYS)[0] || null,
     deepseekApiKey: process.env.DEEPSEEK_API_KEY || null,
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     whisperModel: process.env.WHISPER_MODEL || 'whisper-1',

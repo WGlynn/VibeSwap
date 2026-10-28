@@ -8,7 +8,8 @@
 // request: ts, provider, model, ms, ok, input/output tokens when the provider reports
 // them, cached (provider-side cache hits) and think (thinking tokens) when reported,
 // turn (the Telegram message this request belongs to, see withTurn), caller (first stack
-// frame outside the provider layer), error and quota (on failure).
+// frame outside the provider layer), error and quota (on failure), and key (an index into
+// GEMINI_API_KEYS, never the value) when several Gemini keys are configured.
 //
 // A second row kind, { kind: 'no_model' }, records a turn answered without any model
 // request (quick reply, bare ack). Those rows do not count toward `total`, which stays
@@ -83,6 +84,7 @@ export function metered(provider) {
       ts: new Date().toISOString(),
       provider: provider.name,
       model: request?.model || provider.model,
+      ...(request?._keyIdx !== undefined ? { key: request._keyIdx } : {}),
       caller,
       turn: currentTurn(),
     };

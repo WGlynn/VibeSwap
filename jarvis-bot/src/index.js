@@ -181,7 +181,7 @@ import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, g
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
 import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, flagNoise, getAirspaceStats } from './airspace-monitor.js';
-import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval } from './self-eval.js';
+import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval, fastCheck } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // Nervos Talks — autonomous forum presence (silent guardian)
 let initNervosTalks, nervosStatus, nervosPostNext, nervosPostSpecific, nervosCheckReplies, nervosStartSchedule, nervosStopSchedule, nervosScanPipeline;
@@ -361,6 +361,14 @@ try {
   extractSignal = rs.extractSignal;
   initRewardSignals = rs.initRewardSignals;
 } catch (e) { console.warn(`[jarvis] reward-signal import failed: ${e.message}`); }
+// Chat learning: outcome per chat x intent x humor (src/chat-learning.js)
+let noteInbound = () => {}, noteExchange = () => {}, initChatLearning = async () => {};
+try {
+  const cl = await import('./chat-learning.js');
+  noteInbound = cl.noteInbound;
+  noteExchange = cl.noteExchange;
+  initChatLearning = cl.initChatLearning;
+} catch (e) { console.warn(`[jarvis] chat-learning import failed: ${e.message}`); }
 try {
   const si = await import('./self-improve.js');
   recordRollout = si.recordRollout;
@@ -950,6 +958,9 @@ async function checkLastShutdown() {
 //   2. Directive change messages (so users can always change the mode)
 //   3. Normal mode → no restrictions
 
+// Messages queued while the bot was down are answered on boot if younger than this.
+const BACKLOG_MAX_AGE_S = 15 * 60;
+
 if (!IS_WORKER) {
   // ============ Archive Middleware ============
   // Canonical chat archive. Every incoming update is appended to
@@ -963,6 +974,17 @@ if (!IS_WORKER) {
     } catch (err) {
       console.warn(`[archive] middleware error: ${err.message}`);
     }
+    return next();
+  });
+
+  // ============ Backlog Guard ============
+  // Launch keeps the updates Telegram queued while the bot was down (Will 2026-10-28: a DM sent
+  // during a restart was silently dropped by dropPendingUpdates). Only messages older than
+  // BACKLOG_MAX_AGE_S are skipped, so a long outage does not flood chats with stale replies.
+  // They are still archived above.
+  bot.use((ctx, next) => {
+    const sent = ctx.message?.date || ctx.editedMessage?.date || ctx.channelPost?.date;
+    if (sent && Date.now() / 1000 - sent > BACKLOG_MAX_AGE_S) return;
     return next();
   });
 
@@ -6282,6 +6304,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
         await ctx.reply(reply.slice(i, i + 4096), { parse_mode: undefined });
       }
     }
+    try { noteExchange(ctx, text, reply, { flags: fastCheck(reply, text || '', { isGroup: chatType !== 'private' }).map(f => f.type) }); } catch {}
 
     // Self-eval: post-response alignment check (background, non-blocking)
     // "The true mind can weather all lies and illusions without being lost."
@@ -6725,6 +6748,8 @@ bot.on('text', async (ctx) => {
 
   // Track ALL messages silently (before auth check for chat responses)
   await trackMessage(ctx);
+  // Chat learning: this message may be the outcome of an earlier reply (before any early return)
+  try { noteInbound(ctx); } catch {}
 
   // Airspace monitor — record every message for dominance tracking
   if (ctx.chat?.type !== 'private') {
@@ -7583,6 +7608,8 @@ bot.on('text', async (ctx) => {
 
     // Record outgoing message for collision detection
     recordOutgoing(String(chatId), text);
+    // Chat learning: open a pending exchange on the FINAL sent text (self-eval patterns taint it)
+    try { noteExchange(ctx, ctx.message.text, text, { flags: fastCheck(text, ctx.message.text, { isGroup }).map(f => f.type) }); } catch {}
 
     // Track Jarvis's response in group context window (prevents phantom interactions)
     if (isGroup && text) {
@@ -8040,6 +8067,7 @@ async function main() {
     loadWorkflowStats(),
     initShardMemory().catch(err => console.warn(`[jarvis] Shard memory init failed: ${err.message}`)),
     initRewardSignals().catch(err => console.warn(`[jarvis] Reward signals init failed: ${err.message}`)),
+    initChatLearning(config.dataDir).catch(err => console.warn(`[jarvis] Chat learning init failed: ${err.message}`)),
     initSelfImprove().catch(err => console.warn(`[jarvis] Self-improve init failed: ${err.message}`)),
     initCrossContext().catch(err => console.warn(`[jarvis] Cross-context init failed: ${err.message}`)),
     initCollisionDetector().catch(err => console.warn(`[jarvis] Collision detector init failed: ${err.message}`)),
@@ -8270,7 +8298,7 @@ async function main() {
 
   // Fire-and-forget launch — must NOT block startup or the HTTP health server won't start.
   // If Telegram is unreachable, the polling liveness monitor (below) handles recovery.
-  bot.launch({ dropPendingUpdates: true }).catch(launchErr => {
+  bot.launch({ dropPendingUpdates: false }).catch(launchErr => {
     console.error(`[jarvis] bot.launch() failed: ${launchErr.message}`);
     persistCrashEntry('launch_failed', launchErr);
     // Polling monitor will detect silence and attempt restart
@@ -8330,11 +8358,12 @@ async function main() {
         // Step 2: Wait for Telegram to release the getUpdates session
         await new Promise(r => setTimeout(r, 5000));
         // Step 3: Clear any stuck webhook/session — this is the key fix
-        // deleteWebhook with drop_pending_updates clears Telegram's server-side session lock
-        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        // deleteWebhook clears Telegram's server-side session lock; pending updates are kept and
+        // the Backlog Guard skips any older than BACKLOG_MAX_AGE_S
+        await bot.telegram.deleteWebhook({ drop_pending_updates: false });
         await new Promise(r => setTimeout(r, 2000));
         // Step 4: Re-launch polling
-        bot.launch({ dropPendingUpdates: true });
+        bot.launch({ dropPendingUpdates: false });
         // Step 5: Verify API connectivity
         const me = await bot.telegram.getMe();
         if (me?.id) {

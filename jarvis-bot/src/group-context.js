@@ -135,6 +135,11 @@ export function getGroupContext(chatId) {
   return contextWindows.get(chatId)?.format() || '';
 }
 
+// Last (up to 30) human message texts in this chat; JARVIS and DIABLO excluded via isJarvis.
+export function getHumanTexts(chatId) {
+  return (contextWindows.get(chatId)?.messages || []).filter(m => !m.isJarvis).map(m => m.text);
+}
+
 /**
  * Get plain-text recent context for proactive intelligence.
  * Replaces the empty '' that was passed to analyzeMessage.

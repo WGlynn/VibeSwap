@@ -1063,14 +1063,15 @@ function geminiThinkingConfig(model) {
 // ============ Gemini Provider ============
 
 function createGeminiProvider(providerConfig) {
-  const apiKey = providerConfig.apiKey;
+  // Several keys (GEMINI_API_KEYS) are only ever named by index outside this closure.
+  const apiKeys = providerConfig.apiKeys?.length ? providerConfig.apiKeys : [providerConfig.apiKey];
   const defaultModel = providerConfig.model || 'gemini-2.5-flash';
   const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   // Free tier meters quota per MODEL: on 429 llmChat rotates through these (empty string = off).
   const fallbackModels = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-3.5-flash-lite,gemini-flash-latest,gemini-3.1-flash-lite')
     .split(',').map(m => m.trim()).filter(m => m && m !== defaultModel);
 
-  function convertMessages(messages, system, model) {
+  function convertMessages(messages, system, model, keyIdx = 0) {
     const contents = [];
 
     // Build tool_use_id → function_name lookup across all messages
@@ -1111,8 +1112,11 @@ function createGeminiProvider(providerConfig) {
                 args: block.input || {},
               },
             };
-            // A signature is only valid for the model that minted it.
-            if (meta?.signature && meta.model === model) part.thoughtSignature = meta.signature;
+            // A signature is only valid for the model that minted it. Same key too: whether a
+            // signature crosses projects is unverified, and a 400 there would turn tools off.
+            if (meta?.signature && meta.model === model && (meta.keyIdx || 0) === keyIdx) {
+              part.thoughtSignature = meta.signature;
+            }
             functionCallParts.push(part);
           } else if (block.type === 'tool_result') {
             const funcName = toolIdToName.get(block.tool_use_id) || block.tool_use_id;
@@ -1184,10 +1188,12 @@ function createGeminiProvider(providerConfig) {
     supportsTools: true,     // llmChat keeps tools + current-turn tool exchanges for us
     supportsThinking: true,  // llmChat may set request._thinking on hard messages
     fallbackModels,
+    keyCount: apiKeys.length, // llmChat rotates (key, model) buckets; the keys stay in here
 
     async chat(request) {
       const model = request.model || this.model;
-      const { contents, systemInstruction } = convertMessages(request.messages, request.system, model);
+      const keyIdx = request._keyIdx || 0;
+      const { contents, systemInstruction } = convertMessages(request.messages, request.system, model, keyIdx);
       const think = request._thinking === 'high';
 
       const body = {
@@ -1201,7 +1207,7 @@ function createGeminiProvider(providerConfig) {
       };
 
       const response = await fetch(
-        `${baseUrl}/models/${model}:generateContent?key=${apiKey}`,
+        `${baseUrl}/models/${model}:generateContent?key=${apiKeys[keyIdx]}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1217,6 +1223,7 @@ function createGeminiProvider(providerConfig) {
         let detail = raw;
         let retryAfterMs = 0;
         let quotaId = null;
+        let keyInvalid = false;
         try {
           const e = JSON.parse(raw).error || {};
           detail = [e.status, e.message].filter(Boolean).join(' ') || raw;
@@ -1228,12 +1235,18 @@ function createGeminiProvider(providerConfig) {
           const qf = (e.details || []).find(d => String(d['@type'] || '').endsWith('QuotaFailure'));
           const ids = (qf?.violations || []).map(v => v.quotaId).filter(Boolean);
           if (ids.length) quotaId = ids.join(',');
+          // A rejected key (ErrorInfo reason API_KEY_INVALID / _EXPIRED, or a leaked-key 403)
+          // lets llmChat park that key and try the next one instead of failing the message.
+          const ei = (e.details || []).find(d => String(d['@type'] || '').endsWith('ErrorInfo'));
+          keyInvalid = [400, 401, 403].includes(response.status)
+            && (/^API_KEY_/.test(ei?.reason || '') || /api key (not valid|expired|.*leaked)/i.test(e.message || ''));
         } catch {}
         // BOT-104: Don't include raw error (may echo URL with API key) in thrown message
         const err = new Error(`Gemini API error ${response.status}: ${detail.slice(0, 300).replace(/key=[^&\s]+/gi, 'key=REDACTED')}`);
         err.status = response.status;
         if (retryAfterMs) err.retryAfterMs = retryAfterMs;
         if (quotaId) err.quotaId = quotaId;
+        if (keyInvalid) err.keyInvalid = true;
         throw err;
       }
 
@@ -1259,6 +1272,7 @@ function createGeminiProvider(providerConfig) {
             rememberGeminiToolCall(id, {
               signature: part.thoughtSignature || null,
               model,
+              keyIdx,
               callId: part.functionCall.id || null,
             });
             content.push({
@@ -1436,7 +1450,7 @@ export function createProvider(providerName, providerConfig) {
     throw new Error(`Unknown LLM provider: "${providerName}". Available: ${[...providers.keys()].join(', ')}`);
   }
   activeProvider = factory(providerConfig);
-  console.log(`[llm] Provider initialized: ${providerName} (model: ${activeProvider.model})`);
+  console.log(`[llm] Provider initialized: ${providerName} (model: ${activeProvider.model}${activeProvider.keyCount > 1 ? `, ${activeProvider.keyCount} keys` : ''})`);
   return activeProvider;
 }
 
@@ -1725,6 +1739,8 @@ function getProviderConfig(providerName) {
         default: return config.anthropic?.apiKey;
       }
     })(),
+    // Gemini only: every configured key (GEMINI_API_KEY first), rotated per quota bucket.
+    apiKeys: providerName === 'gemini' ? config.llm?.geminiApiKeys : undefined,
     baseUrl: (() => {
       switch (providerName) {
         case 'deepseek': return 'https://api.deepseek.com/v1';
@@ -2035,7 +2051,7 @@ export function initProvider() {
           const fb = factory(fbConfig);
           fallbackProviders.push(fb);
           providerPool.set(name, fb); // Also add to router pool
-          console.log(`[llm] Provider registered: ${name} (${fb.model})`);
+          console.log(`[llm] Provider registered: ${name} (${fb.model}${fb.keyCount > 1 ? `, ${fb.keyCount} keys` : ''})`);
         }
       } catch (err) { console.warn(`[llm] Failed to init ${name}: ${err.message}`); }
     }
@@ -2214,37 +2230,65 @@ const QUOTA_COOLDOWN_DEFAULT_MS = 60_000;      // no RetryInfo → assume a per-
 const QUOTA_COOLDOWN_MAX_MS = 15 * 60_000;
 const QUOTA_HONOR_MAX_MS = 10_000;             // wait out a RetryInfo delay once, if this short
 
-const modelQuotaCooldown = new Map(); // `${provider}:${model}` → epoch ms the bucket may refill
+// A bucket is (key, model): the free tier meters per PROJECT per MODEL, so a key from another
+// project is a fresh bucket of the same model. Key 0 keeps the old `${provider}:${model}` id,
+// so with one key the state is exactly what it was. Keys are named by index only, never value.
+const modelQuotaCooldown = new Map(); // bucket id → epoch ms the bucket may refill
+const deadKeys = new Map();           // provider → Set of key indexes rejected this session
 
-function quotaModels(provider) {
-  return [provider.model, ...(provider.fallbackModels || [])];
+function bucketId(provider, k, model) {
+  return k ? `${provider.name}#${k}:${model}` : `${provider.name}:${model}`;
 }
 
-function nextQuotaModel(provider, tried) {
+function keyLabel(provider, k) {
+  return (provider.keyCount || 1) > 1 ? `${provider.name}[k${k}]` : provider.name;
+}
+
+// Model outer, key inner: the next key keeps the best model before quality drops a model.
+function quotaBuckets(provider) {
+  const dead = deadKeys.get(provider.name);
+  const out = [];
+  for (const model of [provider.model, ...(provider.fallbackModels || [])]) {
+    for (let k = 0; k < (provider.keyCount || 1); k++) {
+      if (!dead?.has(k)) out.push({ model, k });
+    }
+  }
+  return out;
+}
+
+function nextQuotaBucket(provider, tried) {
   const now = Date.now();
-  return quotaModels(provider).find(m =>
-    !tried.has(m) && (modelQuotaCooldown.get(`${provider.name}:${m}`) || 0) <= now) || null;
+  return quotaBuckets(provider).find(b => {
+    const id = bucketId(provider, b.k, b.model);
+    return !tried.has(id) && (modelQuotaCooldown.get(id) || 0) <= now;
+  }) || null;
 }
 
-function soonestQuotaModel(provider) {
+function soonestQuotaBucket(provider) {
   let best = null;
-  for (const m of quotaModels(provider)) {
-    const waitMs = Math.max(0, (modelQuotaCooldown.get(`${provider.name}:${m}`) || 0) - Date.now());
-    if (!best || waitMs < best.waitMs) best = { model: m, waitMs };
+  for (const b of quotaBuckets(provider)) {
+    const waitMs = Math.max(0, (modelQuotaCooldown.get(bucketId(provider, b.k, b.model)) || 0) - Date.now());
+    if (!best || waitMs < best.waitMs) best = { ...b, waitMs };
   }
   return best;
+}
+
+// Point a request at a bucket. _keyIdx only rides when several keys exist (one key = old request).
+function onBucket(provider, request, b) {
+  const r = b.model !== (request.model || provider.model) ? { ...request, model: b.model } : request;
+  return (provider.keyCount || 1) > 1 ? { ...r, _keyIdx: b.k } : r;
 }
 
 // A per-day bucket (quotaId contains "PerDay") stays dead until the provider's RetryInfo says
 // otherwise, capped at 24 h; the 15 min clamp is for per-minute buckets. Measured 2026-10-28:
 // gemini-3.6-flash returned retryAfterMs ~14 h and the bot re-probed it every 15 min all day.
 const QUOTA_COOLDOWN_DAY_MAX_MS = 24 * 60 * 60_000;
-function markQuotaExhausted(provider, model, error) {
+function markQuotaExhausted(provider, model, k, error) {
   const perDay = /perday/i.test(String(error?.quotaId || ''));
   const cap = perDay ? QUOTA_COOLDOWN_DAY_MAX_MS : QUOTA_COOLDOWN_MAX_MS;
   const ms = Math.min(error?.retryAfterMs || QUOTA_COOLDOWN_DEFAULT_MS, cap);
-  if (perDay) console.warn(`[llm] ${provider.name}/${model}: daily quota spent, parked for ${Math.round(ms / 60_000)} min`);
-  modelQuotaCooldown.set(`${provider.name}:${model}`, Date.now() + ms);
+  if (perDay) console.warn(`[llm] ${keyLabel(provider, k)}/${model}: daily quota spent, parked for ${Math.round(ms / 60_000)} min`);
+  modelQuotaCooldown.set(bucketId(provider, k, model), Date.now() + ms);
 }
 
 // ============ Per-Provider Request Shaping ============
@@ -2357,25 +2401,28 @@ export async function llmChat(request) {
       providerRequest = { ...providerRequest, _thinking: 'high' };
     }
 
-    // Per-model quota buckets: start on the first model not cooling down from a 429. The
-    // model goes on the request so the meter logs the model actually called.
-    const modelsTried = new Set();
+    // Per-(key, model) quota buckets: start on the first bucket not cooling down from a 429.
+    // The model (and key index) go on the request so the meter logs the bucket actually called.
+    const bucketsTried = new Set();
     let honoredRetryDelay = false;
     if (currentProvider.fallbackModels) {
-      let startModel = nextQuotaModel(currentProvider, modelsTried);
-      if (!startModel) {
-        const soon = soonestQuotaModel(currentProvider);
+      let start = nextQuotaBucket(currentProvider, bucketsTried);
+      if (!start) {
+        const soon = soonestQuotaBucket(currentProvider);
         if (soon && soon.waitMs <= QUOTA_HONOR_MAX_MS) {
           honoredRetryDelay = true;
           await sleep(soon.waitMs);
-          startModel = soon.model;
+          start = soon;
         } else {
-          lastError = Object.assign(new Error(`${currentProvider.name}: every model's quota is cooling down (next in ${Math.ceil((soon?.waitMs || 0) / 1000)}s)`), { status: 429 });
-          cascadeTrail.push({ provider: currentProvider.name, status: 'quota_cooldown', tier: providerTier });
+          const status = soon ? 'quota_cooldown' : 'keys_invalid'; // no bucket at all = every key rejected
+          lastError = Object.assign(new Error(soon
+            ? `${currentProvider.name}: every model's quota is cooling down (next in ${Math.ceil(soon.waitMs / 1000)}s)`
+            : `${currentProvider.name}: every API key was rejected this session`), { status: soon ? 429 : 401 });
+          cascadeTrail.push({ provider: currentProvider.name, status, tier: providerTier });
           continue;
         }
       }
-      if (startModel !== currentProvider.model) providerRequest = { ...providerRequest, model: startModel };
+      providerRequest = onBucket(currentProvider, providerRequest, start);
     }
 
     if (chainIdx > 0) {
@@ -2443,6 +2490,7 @@ export async function llmChat(request) {
           cascadeTrail.push({
             provider: currentProvider.name,
             model: usedModel,
+            ...((currentProvider.keyCount || 1) > 1 ? { key: providerRequest._keyIdx || 0 } : {}),
             status: 'success',
             tier: providerTier,
             latencyMs: Date.now() - attemptStart,
@@ -2472,37 +2520,55 @@ export async function llmChat(request) {
           const errStatus = httpStatusOf(error);
           const errMsg = (error?.message || '').toLowerCase();
           const attemptModel = providerRequest.model || currentProvider.model;
+          const attemptKey = providerRequest._keyIdx || 0;
+          const multiKey = (currentProvider.keyCount || 1) > 1;
 
           recordProviderPerformance(currentProvider.name, latencyMs, false);
 
           cascadeTrail.push({
             provider: currentProvider.name,
             model: attemptModel,
+            ...(multiKey ? { key: attemptKey } : {}),
             status: isCreditError(error) ? 'credit_error' : isTransientError(error) ? 'transient_error' : 'error',
             tier: providerTier,
             latencyMs,
             error: error.message?.slice(0, 120),
           });
 
-          // ============ 429 → next model's quota bucket (never the same model again) ============
+          // ============ Bad key → park it for the session, next key, same model ============
+          // Only with several keys; with one, a rejected key keeps today's permanent-error path.
+          // No breaker charge while another key is left: the provider is fine, one key is not.
+          if (error.keyInvalid && multiKey) {
+            if (!deadKeys.has(currentProvider.name)) deadKeys.set(currentProvider.name, new Set());
+            deadKeys.get(currentProvider.name).add(attemptKey);
+            console.error(`[llm] ${keyLabel(currentProvider, attemptKey)}: API key rejected (${errStatus}), parked for this session`);
+            const next = nextQuotaBucket(currentProvider, bucketsTried);
+            if (next) {
+              providerRequest = onBucket(currentProvider, providerRequest, next);
+              attempt--;
+              continue;
+            }
+          }
+
+          // ============ 429 → next (key, model) bucket (never the same bucket again) ============
           // The breaker is not charged here: the provider is healthy, one bucket is empty.
           // A rotation is a different bucket, not a retry, so it does not spend `attempt`.
           if (errStatus === 429 && currentProvider.fallbackModels) {
-            markQuotaExhausted(currentProvider, attemptModel, error);
-            modelsTried.add(attemptModel);
-            let nextModel = nextQuotaModel(currentProvider, modelsTried);
-            if (!nextModel && !honoredRetryDelay) {
-              const soon = soonestQuotaModel(currentProvider);
+            markQuotaExhausted(currentProvider, attemptModel, attemptKey, error);
+            bucketsTried.add(bucketId(currentProvider, attemptKey, attemptModel));
+            let next = nextQuotaBucket(currentProvider, bucketsTried);
+            if (!next && !honoredRetryDelay) {
+              const soon = soonestQuotaBucket(currentProvider);
               if (soon && soon.waitMs <= QUOTA_HONOR_MAX_MS) {   // honor one short RetryInfo delay
                 honoredRetryDelay = true;
                 console.warn(`[llm] ${currentProvider.name}: all model quotas spent, waiting ${soon.waitMs}ms (RetryInfo) for ${soon.model}`);
                 await sleep(soon.waitMs);
-                nextModel = soon.model;
+                next = soon;
               }
             }
-            if (nextModel) {
-              console.warn(`[llm] ${currentProvider.name}/${attemptModel} quota exhausted (429) — rotating to ${nextModel}`);
-              providerRequest = { ...providerRequest, model: nextModel };
+            if (next) {
+              console.warn(`[llm] ${keyLabel(currentProvider, attemptKey)}/${attemptModel} quota exhausted (429) — rotating to ${multiKey ? `${keyLabel(currentProvider, next.k)}/` : ''}${next.model}`);
+              providerRequest = onBucket(currentProvider, providerRequest, next);
               attempt--;
               continue;
             }
@@ -2521,12 +2587,14 @@ export async function llmChat(request) {
           // ============ 503 retries spent → next model (overload is per model) ============
           // Live 2026-10-28: gemini-3.6-flash stayed overloaded through both retries and the bot
           // fell to the CPU backup model while the other Gemini models were never tried.
+          // Overload is Google's capacity for the model, not a per-project quota, so another key
+          // cannot help: every key of this model is marked tried and the next MODEL is used.
           if (errStatus === 503 && currentProvider.fallbackModels) {
-            modelsTried.add(attemptModel);
-            const nextModel = nextQuotaModel(currentProvider, modelsTried);
-            if (nextModel) {
-              console.warn(`[llm] ${currentProvider.name}/${attemptModel} still overloaded (503), rotating to ${nextModel}`);
-              providerRequest = { ...providerRequest, model: nextModel };
+            for (let k = 0; k < (currentProvider.keyCount || 1); k++) bucketsTried.add(bucketId(currentProvider, k, attemptModel));
+            const next = nextQuotaBucket(currentProvider, bucketsTried);
+            if (next) {
+              console.warn(`[llm] ${currentProvider.name}/${attemptModel} still overloaded (503), rotating to ${multiKey ? `${keyLabel(currentProvider, next.k)}/` : ''}${next.model}`);
+              providerRequest = onBucket(currentProvider, providerRequest, next);
               attempt = -1; // the next model gets its own short retry budget
               continue;
             }

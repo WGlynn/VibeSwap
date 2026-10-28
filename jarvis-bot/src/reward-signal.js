@@ -42,6 +42,7 @@ export const SignalType = {
   EMOJI:        'emoji',        // Positive reaction → emotional positive
   ADOPTION:     'adoption',     // User uses info bot provided → practical success
   SHARE:        'share',        // User shares bot's response → high value
+  LAUGH:        'laugh',        // "lmao", "haha", 😂 → the joke landed
 
   // Self-detected (from quality gates)
   INTELLECTUAL_LAZINESS: 'intellectual_laziness', // Bot's own output was generic/lazy → strong negative
@@ -64,6 +65,7 @@ const SIGNAL_WEIGHTS = {
   [SignalType.EMOJI]:        0.5,
   [SignalType.ADOPTION]:     0.9,
   [SignalType.SHARE]:        1.0,
+  [SignalType.LAUGH]:        0.5,  // below CORRECTION, so "lol no, that's wrong" scores as the correction
   [SignalType.INTELLECTUAL_LAZINESS]: -0.7, // Caught being generic/lazy
   [SignalType.ACKNOWLEDGE]:  0.1,
   [SignalType.CONTINUE]:     0.0,
@@ -108,6 +110,9 @@ export async function initRewardSignals() {
 
 // ============ Detection Patterns ============
 
+// Word-bounded on purpose (2026-10-28 audit of signals.json: 91% 'continue' and the rest
+// mostly substring noise, e.g. 'based on' scored as thanks).
+// Not read anywhere: re-ask fires only through isSemanticallySimlar.
 const REASK_PATTERNS = [
   /again/i, /already asked/i, /i said/i, /repeat/i,
   /you didn't/i, /still not/i, /that's not what/i,
@@ -117,29 +122,34 @@ const REASK_PATTERNS = [
 const CORRECTION_PATTERNS = [
   /^no[,.\s!]/i, /not that/i, /instead/i, /wrong/i,
   /don't do that/i, /that's incorrect/i, /actually/i,
-  /let's not/i, /stop/i, /you should have/i,
+  /let's not/i, /\bstop\b/i, /you should have/i, /\byou already said\b/i,
   /the problem is/i, /fix this/i, /try again/i,
 ];
 
+// Slang that reads as frustration alone, but not beside a laugh ("lmao bruh") or after banter
+const SLANG_FRUSTRATION = [/bruv/i, /bruh/i, /smh/i];
+
 const FRUSTRATION_PATTERNS = [
-  /bruv/i, /bruh/i, /wtf/i, /ffs/i, /smh/i,
-  /annoying/i, /useless/i, /terrible/i,
+  /wtf/i, /ffs/i,
+  /annoying/i, /useless/i, /terrible/i, /\bslop\b/i,
   /^[A-Z\s!]{10,}$/, // ALL CAPS
 ];
 
 const THANKS_PATTERNS = [
-  /thanks/i, /thank you/i, /perfect/i, /great/i,
-  /awesome/i, /nice/i, /love it/i, /exactly/i,
+  /thanks/i, /thank you/i, /\bperfect\b/i, /\bgreat\b/i,
+  /awesome/i, /\bnice\b/i, /\blove (?:it|this|that|how|him|you|jarvis)\b/i, /exactly/i,
   /that's it/i, /nailed it/i, /good job/i,
   /beautiful/i, /chef's kiss/i, /lfg/i,
-  /let's go/i, /fire/i, /based/i,
+  /let's go/i, /\bfire\b/i, /\bbased\b(?!\s+on)/i,
 ];
+
+const LAUGH_PATTERN = /\b(l+o+l+|l+m+f?a+o+\w*|ha(?:ha)+h?|he(?:he)+|rofl|kek|i'?m (?:dead|crying)|hilarious|(?<!\bnot )funny)\b|[\u{1F602}\u{1F923}\u{1F480}\u{1F62D}]/iu;
 
 const EMOJI_POSITIVE = /[\u{1F44D}\u{1F44F}\u{2764}\u{1F525}\u{1F680}\u{2705}\u{1F389}\u{1F60D}\u{1F929}\u{1F4AF}]/u;
 
 const FOLLOWUP_PATTERNS = [
   /can you also/i, /what about/i, /and then/i,
-  /now do/i, /next/i, /keep going/i, /more/i,
+  /now do/i, /\bwhat'?s next\b|\bnext (?:step|one)\b/i, /keep going/i, /\b(?:tell me )?more\b(?: (?:on|about)|\s*$)/i,
   /tell me about/i, /how does.*work/i,
 ];
 
@@ -159,18 +169,10 @@ export function extractSignal(userMessage, previousBotResponse, previousUserMess
   if (!initialized || !userMessage) return null;
 
   const msg = userMessage.trim();
-  const signals = [];
+  const c = classifySignal(msg, previousUserMessage);
 
-  // Check for re-ask (semantic similarity to previous question)
-  if (previousUserMessage && isSemanticallySimlar(msg, previousUserMessage)) {
-    signals.push(SignalType.REASK);
-  }
-
-  // Check correction patterns
-  if (CORRECTION_PATTERNS.some(p => p.test(msg))) {
-    signals.push(SignalType.CORRECTION);
-
-    // Extract the correction direction (token-level supervision)
+  // Correction: extract the direction (token-level supervision)
+  if (c.allTypes.includes(SignalType.CORRECTION)) {
     const direction = extractCorrectionDirection(msg, previousBotResponse);
     if (direction) {
       aggregateScores.corrections.push({
@@ -185,8 +187,52 @@ export function extractSignal(userMessage, previousBotResponse, previousUserMess
     }
   }
 
-  // Check frustration
-  if (FRUSTRATION_PATTERNS.some(p => p.test(msg))) {
+  const signal = {
+    id: `sig-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: Date.now(),
+    type: c.type,
+    allTypes: c.allTypes,
+    weight: c.weight,
+    userId: meta.userId || null,
+    chatId: meta.chatId || null,
+    messageLength: msg.length,
+    previousResponseLength: previousBotResponse?.length || 0,
+  };
+
+  recordSignal(signal);
+  return signal;
+}
+
+/**
+ * Pure classifier behind extractSignal: no state, records nothing.
+ * Also used by chat-learning.js to score the next human message after a reply.
+ *
+ * @param {string} userMessage - The message being scored
+ * @param {string} previousUserMessage - The user message before it (re-ask check)
+ * @param {Object} opts - { banter }: the scored exchange was banter, so bare slang is not frustration
+ * @returns {{type: string, allTypes: string[], weight: number}}
+ */
+export function classifySignal(userMessage, previousUserMessage, { banter = false } = {}) {
+  const msg = String(userMessage || '').trim();
+  const signals = [];
+
+  // Check for re-ask (semantic similarity to previous question)
+  if (previousUserMessage && isSemanticallySimlar(msg, previousUserMessage)) {
+    signals.push(SignalType.REASK);
+  }
+
+  // Check correction patterns
+  if (CORRECTION_PATTERNS.some(p => p.test(msg))) {
+    signals.push(SignalType.CORRECTION);
+  }
+
+  // Laughter: checked before frustration so "lmao bruh" is a laugh, not frustration
+  const laughed = LAUGH_PATTERN.test(msg);
+  if (laughed) signals.push(SignalType.LAUGH);
+
+  // Check frustration ("lmao this is useless slop" still counts)
+  if (FRUSTRATION_PATTERNS.some(p => p.test(msg)) ||
+      (!laughed && !banter && SLANG_FRUSTRATION.some(p => p.test(msg)))) {
     signals.push(SignalType.FRUSTRATION);
   }
 
@@ -220,20 +266,7 @@ export function extractSignal(userMessage, previousBotResponse, previousUserMess
     Math.abs(SIGNAL_WEIGHTS[s]) > Math.abs(SIGNAL_WEIGHTS[best]) ? s : best
   , signals[0]);
 
-  const signal = {
-    id: `sig-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    timestamp: Date.now(),
-    type: primary,
-    allTypes: signals,
-    weight: SIGNAL_WEIGHTS[primary],
-    userId: meta.userId || null,
-    chatId: meta.chatId || null,
-    messageLength: msg.length,
-    previousResponseLength: previousBotResponse?.length || 0,
-  };
-
-  recordSignal(signal);
-  return signal;
+  return { type: primary, allTypes: signals, weight: SIGNAL_WEIGHTS[primary] };
 }
 
 // ============ Similarity Detection ============

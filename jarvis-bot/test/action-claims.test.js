@@ -22,3 +22,15 @@ test('nouns and past observations pass', () => {
 test('a tool that ran lets the claim through', () => {
   assert.equal(gateFakeActions("we'll benchmark that.", { toolsRan: 1 }).changed, false);
 });
+
+test('a far-off verb after a future subject is still a promise (Pragma msg 790 reply)', () => {
+  const r = gateFakeActions("that moves EXP-14b from a null to a clean baseline receipt. we'll rerun the exact 6x6 and 12x12 hidden layer setup on 0.91 with apical enabled and update the atlas with the new numbers.");
+  assert.equal(r.changed, true);
+  assert.deepEqual(r.removed, ["we'll rerun the exact 6x6 and 12x12 hidden layer setup on 0.91 with apical enabled and update the atlas with the new numbers."]);
+});
+
+test('future talk without an action verb passes', () => {
+  for (const s of ["we'll see how it goes.", "I'll be honest, that surprised me.", "we will need more seeds for that."]) {
+    assert.equal(gateFakeActions(s).changed, false, s);
+  }
+});

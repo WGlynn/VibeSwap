@@ -42,12 +42,12 @@ const MODES = ['normal', 'tag-only', 'quiet'];
 const DIRECTIVE_PATTERNS = [
   { mode: 'tag-only', patterns: [
     /only (?:respond|reply|speak|talk|answer|say\b|post|message) (?:when|if) (?:you(?:'re|'re| are)? )?(?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
-    /don'?t (?:say|speak|respond|reply|talk|post|message|type|chime) (?:anything |nothing |in )?(?:unless|until|except) (?:you(?:'re|'re| are)? )?(?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
+    /(?:don'?t|do not|can'?t|cannot|can not|shouldn'?t|should not|won'?t|will not|mustn'?t|must not) (?:say|speak|respond|reply|talk|post|message|type|chime) (?:anything |nothing |in )?(?:unless|until|except) (?:you(?:'re|'re| are)? )?(?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
     /tag[\s-]?only(?: mode)?/i,
     /mention[\s-]?only(?: mode)?/i,
     /wait for (?:a )?tag/i,
     /no (?:proactive|unsolicited|autonomous|random|unprompted) (?:messages?|responses?|replies?|posts?|engagement)/i,
-    /don'?t (?:talk|speak|respond|reply|say anything|chime in|engage) unless (?:someone )?(?:tags?|mentions?|@|pings?|summons?|calls? on|asks?|addresses)/i,
+    /(?:don'?t|do not|can'?t|cannot|can not|shouldn'?t|should not|won'?t|will not|mustn'?t|must not) (?:talk|speak|respond|reply|say anything|chime in|engage) unless (?:someone )?(?:tags?|mentions?|@|pings?|summons?|calls? on|asks?|addresses)/i,
     /stay quiet unless (?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
     /only (?:talk|speak|engage|chime in) (?:when|if) (?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
   ]},
@@ -79,6 +79,7 @@ export function detectDirective(text) {
 
   // Strip @mentions and bot name prefix for cleaner matching
   const cleaned = text
+    .replace(/[‘’ʼ]/g, "'") // phone keyboards send curly apostrophes (can’t)
     .replace(/@\w+/g, '')
     .replace(/^(?:jarvis|jar|j)\s*[,.:!?\-—]\s*/i, '')
     .trim();

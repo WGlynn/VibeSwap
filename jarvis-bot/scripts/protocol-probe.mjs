@@ -18,16 +18,24 @@ const PROBES = [
   { chatType: 'supergroup', text: 'jarvis one line: commit-reveal batch auctions vs continuous auctions, which resists MEV better?' },
   // A casual DM.
   { chatType: 'private', text: 'hey whats up' },
+  // Act first, then speak: code has already queued the request (index.js); the model is told so.
+  {
+    name: 'act', chatType: 'supergroup', receipts: [{ name: 'ask_session', ok: true }],
+    text: 'jarvis please add Project Orbit to the project board, its launch is dec 12\n\n[SESSION REQUEST probe1] Code already queued this message for Will\'s Claude Code session. Do not call ask_session for it again. In one short line, say it is queued, not done, and that you will confirm here when it is; then answer anything else they asked.',
+  },
 ];
+// `node scripts/protocol-probe.mjs act` runs only the named probe (saves free-tier quota).
+const only = process.argv[2];
+const RUN = only ? PROBES.filter((p) => p.name === only) : PROBES.filter((p) => !p.name);
 
 initProvider();
 const prompt = await loadSystemPrompt();
 let declared = 0;
 let leaked = 0;
-for (const p of PROBES) {
+for (const p of RUN) {
   const res = await llmChat({ model: getModelName(), max_tokens: 500, system: prompt.full, messages: [{ role: 'user', content: p.text }] });
   const raw = (res.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-  const spoken = speak(raw, turnRecord({ chatType: p.chatType, chatMode: 'normal' }));
+  const spoken = speak(raw, turnRecord({ chatType: p.chatType, chatMode: 'normal', receipts: p.receipts || [] }));
   declared += spoken.declared ? 1 : 0;
   const leak = /<\s*\/?\s*protocol|^\s*protocol\s*:/im.test(spoken.reply);
   leaked += leak ? 1 : 0;
@@ -36,5 +44,5 @@ for (const p of PROBES) {
     raw_ending: raw.slice(-180), reply: spoken.reply, actions: spoken.actions, violations: spoken.violations, leak,
   }, null, 1));
 }
-console.log(`\n${declared}/${PROBES.length} replies declared their protocol line; ${leaked} leaked anything protocol-shaped.`);
+console.log(`\n${declared}/${PROBES.length} replies declared their protocol line; ${leaked} leaked anything protocol-shaped.`.replace(`/${PROBES.length} `, `/${RUN.length} `));
 process.exit(leaked ? 1 : 0);

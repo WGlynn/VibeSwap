@@ -734,7 +734,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       sanitizeHistory(history);
 
       try {
-        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId);
+        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts);
       } finally {
         // Restore text-only content for persistence (no base64 stored)
         historyEntry.content = savedContent;
@@ -760,7 +760,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
     }
     sanitizeHistory(history);
 
-    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId);
+    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts);
   });
 }
 
@@ -838,7 +838,7 @@ export function registerLine(text, complexity) {
   return '\n\n## REGISTER THIS TURN: technical\n- Drop the banter for this reply. First sentence is the answer: the constraint, the number, the mechanism, or the failure. No preamble, no restating the question, no "great question".\n- Then only what the reader needs to check it: one reason, one source (file, commit, experiment id) if you have it, and what would change the answer. If you do not know, say so in one line.\n- Wit is fine after the substance, never instead of it.';
 }
 
-async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId) {
+async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts = []) {
   // In DMs, chatId IS the userId. In groups, userId must be passed explicitly.
   const effectiveUserId = userId || chatId;
 

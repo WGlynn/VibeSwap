@@ -6305,13 +6305,20 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       try { recordComputeUsage(String(chatId), response.usage); } catch {}
     }
 
+    // Article 1.2 holds on every reply path: media replies pass the same action gate (2026-11-01).
+    const gatedMedia = gateFakeActions(response.text, { toolsRan: response.toolsRan || 0, chatMode: getChatMode(ctx.chat.id) });
+    if (gatedMedia.changed) {
+      console.warn(`[action-gate] media path: removed ${gatedMedia.removed.length} action claim(s) with no tool receipt`);
+      recordHealthEvent({ kind: 'fake_action_blocked', where: 'media-handler', chatType: ctx.chat?.type, removed: gatedMedia.removed.map(x => x.slice(0, 160)) });
+      response.text = gatedMedia.text;
+    }
     const reply = response.text?.trim();
     if (!reply) {
       console.warn('[bot] Empty response from LLM — skipping send');
       pacer.cancel();
       return;
     }
-    recordExchange(ctx, text, reply, { model: response.model, provider: response.provider });
+    recordExchange(ctx, text, reply, { model: response.model, provider: response.provider, toolsRan: response.toolsRan || 0 });
     if (reply.length <= 4096) {
       await pacer.replyWith(reply, { parse_mode: undefined });
     } else {
@@ -7500,13 +7507,13 @@ bot.on('text', async (ctx) => {
       return;
     }
     // Fake-action gate (Will 2026-10-28): no promised or claimed action without a tool receipt this turn.
-    const gated = gateFakeActions(response.text, { toolsRan: response.toolsRan || 0 });
+    const gated = gateFakeActions(response.text, { toolsRan: response.toolsRan || 0, chatMode: getChatMode(ctx.chat.id) });
     if (gated.changed) {
       console.warn(`[action-gate] removed ${gated.removed.length} action claim(s) with no tool receipt`);
       recordHealthEvent({ kind: 'fake_action_blocked', where: 'message-handler', chatType: ctx.chat?.type, removed: gated.removed.map(x => x.slice(0, 160)) });
       response.text = gated.text;
     }
-    recordExchange(ctx, ctx.message.text, response.text, { model: response.model, provider: response.provider });
+    recordExchange(ctx, ctx.message.text, response.text, { model: response.model, provider: response.provider, toolsRan: response.toolsRan || 0 });
 
     // Record compute usage (non-blocking)
     if (response.usage) {

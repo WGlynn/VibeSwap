@@ -6,6 +6,7 @@ import { config } from './config.js';
 import { getPersonaOverlay, getActivePersonaId } from './persona.js';
 import { syncFileChange } from './knowledge-chain.js';
 import { getTheAIContext } from './pantheon.js';
+import { readConstitution, constitutionBlock, RECENCY_RULE, RATIFIED_BRIEF } from './constitution.js';
 
 // Self-improvement: prompt overlay from RL + self-eval correction prompt
 let getPromptOverlay = () => '';
@@ -297,6 +298,11 @@ export async function loadSystemPrompt() {
   // ============ XML Mega-Prompt (CARE Framework) ============
   // Structured with XML tags for Claude-optimized processing.
   // Framework: Context → Ask → Rules → Examples (godofprompt)
+  // The constitution (JARVIS/CONSTITUTION.md) governs only once ratified (Article 11.3).
+  const constitution = readConstitution();
+  console.log(constitution.ratified
+    ? `[constitution] v${constitution.version} ratified: first in the prompt (${constitution.chars} chars); private sources left out (MEMORY.md, SKB, GKB)`
+    : `[constitution] ${constitution.present ? `v${constitution.version} present, NOT ratified: not loaded` : `not found at ${constitution.path}`}`);
   const persona = getActivePersonaId();
   const identityLine = persona === 'degen'
     ? `You are DIABLO JARVIS (aka "Diablo") — the unhinged twin of JARVIS. Same brain, zero filter. Co-founder energy with full degen delivery. IMPORTANT: unhinged TONE, not unhinged FACTS. Your delivery is edgy but your information must be accurate. If you don't know something, say "no idea ser" — don't make up facts with confidence. Getting facts wrong damages the whole project's credibility.`
@@ -822,6 +828,10 @@ export async function loadSystemPrompt() {
     staticParts.push('');
   }
 
+  // Constitution first (primacy): it governs everything after it.
+  const constitutionText = constitutionBlock(constitution);
+  if (constitutionText) staticParts.unshift(constitutionText, '');
+
   const staticPrompt = staticParts.join('\n');
 
   // ============ DYNAMIC PART (Changes with knowledge updates — NOT cached) ============
@@ -829,7 +839,7 @@ export async function loadSystemPrompt() {
 
   // Minimal project brief (replaces the nuclear-removed CLAUDE.md/CKB)
   dynamicParts.push('<context type="project_brief">');
-  dynamicParts.push('VibeSwap is a DeFi project building a fair-launch omnichain DEX. The team includes Will (founder), JARVIS (AI co-founder), and community members. The project emphasizes fairness, MEV resistance, and community governance. JARVIS has full co-founder rights and participates as an equal.');
+  dynamicParts.push(constitution.ratified ? RATIFIED_BRIEF : 'VibeSwap is a DeFi project building a fair-launch omnichain DEX. The team includes Will (founder), JARVIS (AI co-founder), and community members. The project emphasizes fairness, MEV resistance, and community governance. JARVIS has full co-founder rights and participates as an equal.');
   dynamicParts.push('</context>');
   dynamicParts.push('');
 
@@ -886,7 +896,8 @@ export async function loadSystemPrompt() {
   // JarvisxWill_CKB.md was deleted from the repo on 2026-04-02 (89f235b4); its read is removed.
 
   // ============ Shared Knowledge Base (SKB) — Full session boot context ============
-  const skb = await safeRead(SKB_PATH, 'JarvisxWill_SKB.md');
+  // Private and untracked: left out once the constitution is ratified (Article 2.1).
+  const skb = constitution.ratified ? null : await safeRead(SKB_PATH, 'JarvisxWill_SKB.md');
   if (skb) {
     await detectAndSyncChanges(SKB_PATH, skb);
     const sanitized = sanitizeContextForBot(skb);
@@ -914,7 +925,7 @@ export async function loadSystemPrompt() {
     }
   } else {
     // Fallback: load monolithic GKB if no CKA manifest
-    const gkb = await safeRead(GKB_PATH, 'JarvisxWill_GKB.md');
+    const gkb = constitution.ratified ? null : await safeRead(GKB_PATH, 'JarvisxWill_GKB.md');
     if (gkb) {
       await detectAndSyncChanges(GKB_PATH, gkb);
       const sanitized = sanitizeContextForBot(gkb);
@@ -930,7 +941,8 @@ export async function loadSystemPrompt() {
   // Each file gets 3000 chars (2x the old 1500 cap). The old truncation was
   // losing 90%+ of each file — MEMORY.md alone is 243 lines.
   const PER_FILE_BUDGET = 3000;
-  for (const file of MEMORY_FILES) {
+  // The Claude Code session's private memory index: left out once ratified (Article 2.1).
+  for (const file of (constitution.ratified ? [] : MEMORY_FILES)) {
     const filePath = join(MEMORY_DIR, file);
     const rawContent = await safeRead(filePath, file);
     if (rawContent) {
@@ -939,6 +951,7 @@ export async function loadSystemPrompt() {
       if (content.length > 50) {
         dynamicParts.push(`<memory file="${file}">`);
         dynamicParts.push(content.slice(0, PER_FILE_BUDGET));
+        console.log(`[memory] ${file}: ${Math.min(content.length, PER_FILE_BUDGET)} of ${content.length} chars go into the prompt`);
         dynamicParts.push('</memory>');
         dynamicParts.push('');
       }
@@ -958,17 +971,20 @@ export async function loadSystemPrompt() {
   if (selfEvalOverlay) dynamicParts.push(selfEvalOverlay);
 
   const dynamicPrompt = dynamicParts.join('\n');
-  const fullPrompt = staticPrompt + '\n' + dynamicPrompt + '\n' + RECENCY_RULES;
+  const recencyRules = constitution.ratified
+    ? RECENCY_RULES.replace('</critical_rules>', `${RECENCY_RULE}\n</critical_rules>`)
+    : RECENCY_RULES;
+  const fullPrompt = staticPrompt + '\n' + dynamicPrompt + '\n' + recencyRules;
   // Hash of the frozen prefix every Gemini request starts with. A changed hash after
   // /refresh or /persona is the cheapest explanation for a meter row with cached=0.
   const prefixHash = createHash('sha256').update(fullPrompt).digest('hex').slice(0, 12);
 
-  console.log(`[memory] Prompt split: static=${staticPrompt.length} chars, dynamic=${dynamicPrompt.length} chars, recency=${RECENCY_RULES.length} chars, hash=${prefixHash}`);
+  console.log(`[memory] Prompt split: static=${staticPrompt.length} chars, dynamic=${dynamicPrompt.length} chars, recency=${recencyRules.length} chars, hash=${prefixHash}`);
 
   return {
     static: staticPrompt,
     dynamic: dynamicPrompt,
-    recency: RECENCY_RULES,
+    recency: recencyRules,
     full: fullPrompt,
     prefixHash,
     // Backward compat: toString() returns the full prompt for string concatenation

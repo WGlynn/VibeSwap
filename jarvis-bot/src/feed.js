@@ -39,6 +39,9 @@ export function recordExchange(ctx, inbound, reply, meta = {}) {
       provider: meta.noModel ? 'quick-reply' : (meta.provider ?? getProviderName()),
       model: meta.noModel ? null : (meta.model ?? getModelName()),
       noModel: !!meta.noModel,
+      // Tools that ran this turn: the receipt the action gate checks (Article 1.2). Lets the
+      // constitution replay tell a backed "saved" from a fake one (2026-11-01).
+      toolsRan: meta.noModel ? 0 : (Number.isFinite(meta.toolsRan) ? meta.toolsRan : null),
     };
     appendFileSync(join(FEED_DIR, `${ts.slice(0, 10)}.jsonl`), JSON.stringify(entry) + '\n');
   } catch (err) {

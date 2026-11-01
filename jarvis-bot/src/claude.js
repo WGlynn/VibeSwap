@@ -3,6 +3,7 @@ import { existsSync } from 'fs';
 import { join, resolve, relative } from 'path';
 import { config } from './config.js';
 import { loadSystemPrompt, getCellContext, getCellStats } from './memory.js';
+import { constitutionChanged } from './constitution.js';
 import { setFlag, getBehavior } from './behavior.js';
 import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
@@ -663,6 +664,11 @@ export function bufferAssistantMessage(chatId, message) {
 }
 
 export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId } = {}) {
+  // A ratified amendment to the constitution takes effect on the next message (Article 11.3).
+  if (constitutionChanged()) {
+    console.log('[constitution] file changed: reloading the system prompt');
+    await reloadSystemPrompt();
+  }
   return withChatLock(chatId, async () => {
     if (!conversations.has(chatId)) {
       conversations.set(chatId, []);

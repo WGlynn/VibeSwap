@@ -34,12 +34,33 @@ const SUBJECTLESS = /^\s*(?:saved|logged|tracked|added|stored|recorded|updated|s
 const SHARED_STATE = /\b(project board|projects? note|my notes|the board|people note|topics note|repos note|shared notes|already (?:on|in) (?:the|my) (?:board|notes))\b/i;
 const FALLBACK = "I can't take actions from this chat on my own. Will's Claude Code session reads it and acts.";
 
+// Mode claims are checked against the chat's real mode (Constitution 1.2 and 5.1; 2026-11-01).
+// 2026-10-30: asked "You can't respond unless tagged", the bot answered "got it, back in tag-only
+// mode" while no mode had been set. A request the detector recognizes is acknowledged before the
+// model runs (index.js), so a mode CHANGE claimed in a model reply is always unbacked. A claim
+// about the CURRENT mode passes only when it matches the chat's stored mode.
+const MODE_WORD = String.raw`(tag[- ]?only|quiet|silent|normal)`;
+const MODE_CHANGE = new RegExp(String.raw`\b(?:back (?:in|to) ${MODE_WORD}|switch(?:ed|ing)? (?:back )?(?:to|into) ${MODE_WORD}|(?:going|gone|went) (?:quiet|silent|tag[- ]?only)|i(?:'ll| will|'m going to| am going to) (?:stay|keep|go|be) (?:quiet|silent)|(?:i )?(?:won'?t|will not) (?:respond|reply|speak|talk|chime in)(?: here)? unless (?:tagged|summoned|mentioned|asked))\b`, 'i');
+const MODE_STATE = new RegExp(String.raw`\b(?:this chat is|we're|we are|i'm|i am|i'm now|now) (?:in|on) ${MODE_WORD}(?: mode)?\b`, 'i');
+const canonicalMode = w => {
+  const m = String(w || '').toLowerCase().replace(/[- ]/g, '');
+  return m === 'silent' ? 'quiet' : (m === 'tagonly' ? 'tag-only' : m);
+};
+const falseModeClaim = (s, chatMode) => {
+  if (MODE_CHANGE.test(s)) return true;
+  if (!chatMode) return false;
+  const m = MODE_STATE.exec(s);
+  if (!m) return false;
+  const claimed = canonicalMode(m.slice(1).find(Boolean));
+  return claimed !== chatMode;
+};
+
 export function splitSentences(text) {
   return String(text || '').split(/(?<=[.!?])\s+|\n+/).filter(s => s.trim());
 }
 
 // Returns { text, changed, removed } where removed lists the dropped sentences (for the log).
-export function gateFakeActions(text, { toolsRan = 0 } = {}) {
+export function gateFakeActions(text, { toolsRan = 0, chatMode = null } = {}) {
   const original = String(text || '');
   if (toolsRan > 0 || !original.trim()) return { text: original, changed: false, removed: [] };
   const kept = [];
@@ -47,7 +68,8 @@ export function gateFakeActions(text, { toolsRan = 0 } = {}) {
   for (const s of splitSentences(original)) {
     // A reference to the shared board passes only as a statement of state, never as 'I added/will add'.
     const stateRef = SHARED_STATE.test(s) && !/\bI(?:'ve| have| had| just| am now|'m now| will|'ll| am going to)\b/i.test(s);
-    const claims = (CLAIM.test(s) || FUTURE_EXPERIMENT.test(s) || futurePromise(s) || STOCK.test(s) || ON_IT.test(s) || SUBJECTLESS.test(s)) && !stateRef;
+    const claims = ((CLAIM.test(s) || FUTURE_EXPERIMENT.test(s) || futurePromise(s) || STOCK.test(s) || ON_IT.test(s) || SUBJECTLESS.test(s)) && !stateRef)
+      || falseModeClaim(s, chatMode);
     (claims ? removed : kept).push(s);
   }
   if (!removed.length) return { text: original, changed: false, removed: [] };

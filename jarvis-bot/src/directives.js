@@ -49,10 +49,11 @@ const DIRECTIVE_PATTERNS = [
     /no (?:proactive|unsolicited|autonomous|random|unprompted) (?:messages?|responses?|replies?|posts?|engagement)/i,
     /(?:don'?t|do not|can'?t|cannot|can not|shouldn'?t|should not|won'?t|will not|mustn'?t|must not) (?:talk|speak|respond|reply|say anything|chime in|engage) unless (?:someone )?(?:tags?|mentions?|@|pings?|summons?|calls? on|asks?|addresses)/i,
     /stay quiet unless (?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
+    /(?:stay|be|keep) quiet unless (?:someone|somebody|anyone|we|i) (?:tags?|mentions?|pings?|summons?|asks?) you/i,
     /only (?:talk|speak|engage|chime in) (?:when|if) (?:tagged|mentioned|@|pinged|summoned|called(?: on)?|asked|addressed)/i,
   ]},
   { mode: 'quiet', patterns: [
-    /^(?:shut up|be quiet|mute(?: yourself)?|silence|stfu|stop talking|stop responding|go away|go silent|quiet down)[.!?]*$/i,
+    /^(?:please\s+)?(?:shut up|be quiet|mute(?: yourself)?|silence|stfu|stop talking|stop responding|go away|go silent|go quiet|quiet down)[.!?]*$/i,
     /don'?t (?:say|speak|respond|reply|talk|post|message|type) (?:anything|at all|ever|a word|a thing)[.!?]*$/i,
     /^(?:mute|quiet|silent|silence)[.!?]*$/i,
     /complete(?:ly)? (?:silent|quiet|mute)/i,
@@ -81,7 +82,8 @@ export function detectDirective(text) {
   const cleaned = text
     .replace(/[‘’ʼ]/g, "'") // phone keyboards send curly apostrophes (can’t)
     .replace(/@\w+/g, '')
-    .replace(/^(?:jarvis|jar|j)\s*[,.:!?\-—]\s*/i, '')
+    .replace(/^(?:jarvis|jar|j)\b\s*[,.:!?\-—]?\s*/i, '') // "jarvis be quiet" needs no comma (2026-11-01)
+    .replace(/[\s,]+(?:jarvis|jar)\s*([.!?]*)$/i, '$1') // "shut up jarvis"
     .trim();
 
   if (cleaned.length < 2) return null;

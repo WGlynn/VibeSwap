@@ -3,9 +3,12 @@
 // an enforced article cannot be deployed. Case ids match the "Tested by" lines in the document.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { spawnSync } from 'child_process';
 import {
-  parseConstitution, constitutionBlock, PRIVATE_SOURCES, RECENCY_RULE, RATIFIED_BRIEF, CONSTITUTION_PATH,
+  parseConstitution, constitutionBlock, readConstitution, PRIVATE_SOURCES, RECENCY_RULE, RATIFIED_BRIEF, CONSTITUTION_PATH,
 } from '../src/constitution.js';
 import { gateFakeActions } from '../src/action-claims.js';
 import { stripDashes } from '../src/text-style.js';
@@ -160,4 +163,76 @@ test('A12 the constitution file declares enforcement and tests for every article
     assert.match(a, /\*\*Enforced by:\*\*/, `Article ${title} lacks "Enforced by"`);
     assert.match(a, /\*\*Tested by:\*\*/, `Article ${title} lacks "Tested by"`);
   }
+});
+
+// ============ Article 11.4: only the published text can ratify ============
+
+test('A11 a local edit to the status line does not ratify; a pushed commit does', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'constitution-'));
+  const origin = join(tmp, 'origin.git');
+  const repo = join(tmp, 'JARVIS');
+  const git = (cwd, ...args) => {
+    const r = spawnSync('git', args, { cwd, encoding: 'utf-8' });
+    assert.equal(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`);
+  };
+  try {
+    git(tmp, 'init', '--bare', '-b', 'main', origin);
+    git(tmp, 'init', '-b', 'main', repo);
+    git(repo, 'config', 'user.email', 'test@example.invalid');
+    git(repo, 'config', 'user.name', 'test');
+    const file = join(repo, 'CONSTITUTION.md');
+    writeFileSync(file, 'Version: 0.1\nStatus: draft, not yet ratified\n');
+    git(repo, 'add', 'CONSTITUTION.md');
+    git(repo, 'commit', '-m', 'draft');
+    git(repo, 'remote', 'add', 'origin', origin);
+    git(repo, 'push', '-u', 'origin', 'main');
+    assert.equal(readConstitution(file).ratified, false, 'published draft');
+
+    writeFileSync(file, 'Version: 1.0\nStatus: ratified\n');
+    assert.equal(readConstitution(file).ratified, false, 'a local edit alone must not ratify');
+    git(repo, 'commit', '-am', 'ratify');
+    assert.equal(readConstitution(file).ratified, false, 'committed but unpublished must not ratify');
+    git(repo, 'push');
+    assert.equal(readConstitution(file).ratified, true, 'the published commit ratifies');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// ============ Article 2.1: the private memory index is never in the prompt ============
+
+test('A2 P2 the Claude Code memory index is not loaded at all, ratified or not', () => {
+  assert.match(src('memory.js'), /const MEMORY_FILES = \[\];/);
+});
+
+test('A2 P3 group prompts no longer carry a person\'s private DM topics', () => {
+  const idx = src('index.js');
+  assert.doesNotMatch(idx, /messageForLLM = `\$\{messageForLLM\}\\n\\n\$\{dmCtx\}`/);
+});
+
+// ============ Article 8.1 and 1.1: no funding asks, no false claims about tips ============
+
+test('A8 the bot never posts the tip-jar funding notice', () => {
+  const idx = src('index.js');
+  assert.doesNotMatch(idx, /Tip jar contributions \(\/tip\) restore premium quality/);
+  assert.doesNotMatch(idx, /discuss funding the cascade/);
+  assert.doesNotMatch(idx, /tip jar refilled credits/);
+});
+
+// ============ Article 1.2 and 10.1 on the web chat path ============
+
+test('A1 the web chat reply passes the action gate and the dash filter', () => {
+  assert.match(src('web-api.js'), /reply: stripDashes\(gateFakeActions\(response\.text/);
+});
+
+// ============ Article 5.1: the documented quiet command works ============
+
+test('A5 R4 to R8 plain quiet requests change the mode, including the documented "jarvis be quiet"', () => {
+  assert.equal(detectDirective('jarvis be quiet')?.mode, 'quiet');
+  assert.equal(detectDirective('shut up jarvis')?.mode, 'quiet');
+  assert.equal(detectDirective('jarvis go quiet')?.mode, 'quiet');
+  assert.equal(detectDirective('please stay quiet unless someone tags you')?.mode, 'tag-only');
+  assert.equal(detectDirective('jarvis stop talking')?.mode, 'quiet');
+  assert.equal(detectDirective('just be quiet about it, the code is fine'), null);
+  assert.equal(detectDirective('jasmine be quiet'), null);
 });

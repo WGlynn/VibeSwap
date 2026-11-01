@@ -20,6 +20,8 @@
 
 import { config } from './config.js';
 import { chat } from './claude.js';
+import { gateFakeActions } from './action-claims.js';
+import { stripDashes } from './text-style.js';
 import { speak as jarvisSpeak, cleanup as ttsCleanup } from './tts.js';
 import { getChainStats } from './knowledge-chain.js';
 import { getShardInfo, isMultiShard } from './shard.js';
@@ -360,7 +362,8 @@ export async function handleWebRequest(req, res, pathname) {
       recordUsage(sessionId, response.usage, quality);
 
       jsonResponse(res, 200, {
-        reply: response.text,
+        // Constitution 1.2 and 10.1 on this path too (2026-11-01).
+        reply: stripDashes(gateFakeActions(response.text, { toolsRan: response.toolsRan || 0 }).text),
         timestamp: new Date().toISOString(),
         budget: {
           daily: budgetCheck.budget,

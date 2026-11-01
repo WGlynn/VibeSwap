@@ -23,9 +23,9 @@ try {
 // Pruned 2026-10-27: eight per-topic files here were deleted in the 2026-05-05 memory
 // migration (fe5965b3) or predate the memory repo, so they loaded nothing and were
 // reported missing on every boot. gentu-substrate.md removed at Will's request.
-const MEMORY_FILES = [
-  'MEMORY.md',
-];
+// 2026-11-01: the Claude Code session's memory index (MEMORY.md) is private working detail and no
+// longer goes into this bot's prompt, ratified or not (Constitution 2.1; privacy does not wait).
+const MEMORY_FILES = [];
 
 // Path resolution uses config (supports both local and Docker/cloud)
 const REPO_PATH = config.repo.path;

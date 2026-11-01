@@ -1,6 +1,6 @@
 // ============ Cross-Context Memory — DM ↔ Group Awareness ============
 //
-// Problem: Fate talks to Jarvis in DMs about "quantum vibing".
+// Problem: someone talks to Jarvis in DMs about a topic.
 // Then in the group: "u know what we talked about."
 // Jarvis: *generic joke because it has no cross-context awareness*
 //

@@ -10,8 +10,9 @@
 // takes effect on the next message without a restart.
 
 import { readFileSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, dirname, basename } from 'path';
 import { homedir } from 'os';
+import { spawnSync } from 'child_process';
 
 export const CONSTITUTION_PATH = process.env.JARVIS_CONSTITUTION || join(homedir(), 'JARVIS', 'CONSTITUTION.md');
 export const CONSTITUTION_URL = 'https://github.com/WGlynn/JARVIS/blob/main/CONSTITUTION.md';
@@ -33,26 +34,45 @@ export function parseConstitution(text) {
   };
 }
 
-let lastSeenMtimeMs;
+let lastSeenKey;
 
 function mtimeOf(path) {
   try { return statSync(path).mtimeMs; } catch { return null; }
 }
 
-// Never throws: a missing or unreadable file reads as "not ratified" (the old prompt stays).
-export function readConstitution(path = CONSTITUTION_PATH) {
-  lastSeenMtimeMs = mtimeOf(path);
-  try {
-    return { ...parseConstitution(readFileSync(path, 'utf-8')), path, present: true };
-  } catch (err) {
-    return { ratified: false, version: null, text: '', chars: 0, path, present: false, error: err.message };
+// Article 11.4 (2026-11-01): what governs is the PUBLISHED text, origin/main of the JARVIS repo,
+// never a local edit. Changing the status line in the working tree does nothing until it is
+// committed and pushed, so a ratification cannot happen silently: it exists only as a public
+// commit. JARVIS_CONSTITUTION_SOURCE=file reads the working file instead (development only).
+function readPublished(path) {
+  if (process.env.JARVIS_CONSTITUTION_SOURCE === 'file') {
+    try { return readFileSync(path, 'utf-8'); } catch { return null; }
   }
+  const r = spawnSync('git', ['-C', dirname(path), 'show', `origin/main:${basename(path)}`], { encoding: 'utf-8', timeout: 5000 });
+  return r.status === 0 ? r.stdout : null;
 }
 
-// True when the file changed, appeared or disappeared since the last read.
+// The working file and the remote-tracking ref: either changing means the published text may have.
+function changeKey(path) {
+  const git = join(dirname(path), '.git');
+  const ref = mtimeOf(join(git, 'refs', 'remotes', 'origin', 'main')) ?? mtimeOf(join(git, 'packed-refs'));
+  return `${mtimeOf(path)}:${ref}`;
+}
+
+// Never throws: unpublished, unreadable or missing reads as "not ratified" (the old prompt stays).
+export function readConstitution(path = CONSTITUTION_PATH) {
+  lastSeenKey = changeKey(path);
+  const text = readPublished(path);
+  if (text == null) {
+    return { ratified: false, version: null, text: '', chars: 0, path, present: false, error: 'no published text (origin/main)' };
+  }
+  return { ...parseConstitution(text), path, present: true };
+}
+
+// True when the published text may have changed since the last read.
 export function constitutionChanged(path = CONSTITUTION_PATH) {
-  if (lastSeenMtimeMs === undefined) return false; // never read yet: the startup load reads it
-  return mtimeOf(path) !== lastSeenMtimeMs;
+  if (lastSeenKey === undefined) return false; // never read yet: the startup load reads it
+  return changeKey(path) !== lastSeenKey;
 }
 
 export function constitutionBlock(c) {

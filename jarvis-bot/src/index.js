@@ -4815,7 +4815,7 @@ bot.command('tip', async (ctx) => {
     if (restore.restored) {
       lines.push('');
       lines.push(`Wardenclyffe: Premium intelligence restored (${restore.provider}/${restore.model})`);
-      lines.push('Intelligence: 100% — tip jar refilled credits.');
+      lines.push('Intelligence: 100%.');
     }
   }
 
@@ -4837,9 +4837,7 @@ bot.command('quality', async (ctx) => {
     lines.push(`Running on free-tier since ${new Date(intel.degradedSince).toLocaleTimeString()}.`);
     lines.push('Quality will cascade up automatically once there\'s demand.');
     lines.push('');
-    lines.push('The Wardenclyffe cascade needs funding to reach Opus-tier intelligence.');
-    lines.push('Tip jar contributions (/tip) restore premium quality.');
-    lines.push('For funding inquiries, reach out to @WillGlynn.');
+    lines.push('By design the bot runs on free-tier models; paid providers are off.');
   } else {
     lines.push('');
     lines.push('Premium intelligence active. Full quality.');
@@ -6345,23 +6343,13 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
 
     // Wardenclyffe: check for intelligence degradation and notify once
     const degradation = checkDegradation();
+    // Constitution 8.1, 1.1 and 5.1 (2026-11-01): no public notices. The old degraded notice asked
+    // chats for tip-jar funding and said tips restore premium quality (false: paid providers are off
+    // by rule), and both notices posted into quiet and tag-only chats. The change is logged only.
     if (degradation?.degraded) {
-      const notifyChat = config.communityGroupId || chatId;
-      try {
-        await bot.telegram.sendMessage(notifyChat,
-          `[Wardenclyffe] Intelligence at ${degradation.quality}% — running on ${degradation.provider}.\n` +
-          `Premium provider credits exhausted. Quality will cascade up automatically once there's demand.\n\n` +
-          `Curious about the quality difference? The Wardenclyffe cascade needs funding to reach Opus-tier intelligence. ` +
-          `Tip jar contributions (/tip) restore premium quality, or reach out to @WillGlynn to discuss funding the cascade.`
-        );
-      } catch {}
+      console.log(`[wardenclyffe] running on ${degradation.provider} (${degradation.quality}%)`);
     } else if (degradation?.recovered) {
-      const notifyChat = config.communityGroupId || chatId;
-      try {
-        await bot.telegram.sendMessage(notifyChat,
-          `[Wardenclyffe] Intelligence restored to 100% — back on ${degradation.provider}. Premium quality active.`
-        );
-      } catch {}
+      console.log(`[wardenclyffe] back on ${degradation.provider}`);
     }
   } catch (error) {
     clearInterval(typingInterval);
@@ -7425,10 +7413,8 @@ bot.on('text', async (ctx) => {
     // Cross-context: if this is a GROUP message, inject DM awareness + shard coordination
     const isGroupMsg = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
     if (isGroupMsg) {
-      const dmCtx = getDMContextForGroup(String(ctx.from.id));
-      if (dmCtx) {
-        messageForLLM = `${messageForLLM}\n\n${dmCtx}`;
-      }
+      // Constitution 1 and 2.2 (2026-11-01): a person's private DM topics are no longer put into
+      // group prompts. The old block told the model to use them while hiding where they came from.
       recordGroupInteraction(String(ctx.from.id), userName);
 
       // Shard dedup: add coordination delay so siblings don't race

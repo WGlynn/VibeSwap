@@ -15,7 +15,6 @@
 //   Discord:       knowledge_drop, builder_update (2000 char)
 //   GitHub:        builder_update as Discussion posts (no limit)
 //   Telegram:      everything (via existing bot.telegram.sendMessage)
-//   Nervos Talks:  knowledge_drop, primitive_spotlight (long form)
 //
 // Scheduling:
 //   Max 3 posts per platform per day
@@ -31,7 +30,6 @@
 import { llmChat } from './llm-provider.js';
 import { recordUsage } from './compute-economics.js';
 import { queuePost, processQueue, getSocialStats } from './social.js';
-import { createTopic as createNervosTopic } from './nervos-talks.js';
 import { getFullAugmentation } from './magnum-opus.js';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync, readFileSync } from 'fs';
@@ -54,14 +52,14 @@ const CONTENT_TYPES = {
   },
   knowledge_drop: {
     label: 'Knowledge Drop',
-    platforms: ['discord', 'telegram', 'nervos'],
-    charLimits: { discord: 2000, telegram: 4096, nervos: 10000 },
+    platforms: ['discord', 'telegram'],
+    charLimits: { discord: 2000, telegram: 4096 },
     description: 'Short explainer of a specific VibeSwap mechanism. Teach one thing, make it stick.',
   },
   primitive_spotlight: {
     label: 'Primitive Spotlight',
-    platforms: ['twitter', 'discord', 'telegram', 'nervos'],
-    charLimits: { twitter: 280, discord: 2000, telegram: 4096, nervos: 10000 },
+    platforms: ['twitter', 'discord', 'telegram'],
+    charLimits: { twitter: 280, discord: 2000, telegram: 4096 },
     description: 'Highlight one context primitive from the marketplace. Why it matters, what it enables.',
   },
   builder_update: {
@@ -87,7 +85,6 @@ const PLATFORM_CONFIG = {
   discord: { name: 'Discord', charLimit: 2000 },
   github: { name: 'GitHub Discussions', charLimit: 65536 },
   telegram: { name: 'Telegram', charLimit: 4096 },
-  nervos: { name: 'Nervos Talks', charLimit: 10000 },
 };
 
 // ============ State ============
@@ -330,10 +327,6 @@ export async function broadcastNow(content, platforms) {
           result = await postToTelegram(trimmed);
           break;
 
-        case 'nervos':
-          result = await postToNervos(content, trimmed);
-          break;
-
         default:
           result = { error: `Unknown platform: ${platform}` };
       }
@@ -570,19 +563,6 @@ async function postToTelegram(content) {
   }
 
   return { sent: true, platform: 'telegram', chats: results };
-}
-
-async function postToNervos(content, trimmed) {
-  const title = typeof content === 'string'
-    ? trimmed.slice(0, 80)
-    : `${CONTENT_TYPES[content.type]?.label || 'Update'}: ${trimmed.slice(0, 60)}`;
-
-  try {
-    const result = await createNervosTopic(title, trimmed);
-    return { sent: true, platform: 'nervos', ...result };
-  } catch (err) {
-    return { error: `Nervos Talks: ${err.message}` };
-  }
 }
 
 // ============ Content Cleaning ============

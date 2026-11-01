@@ -302,7 +302,7 @@ export async function loadSystemPrompt() {
   const constitution = readConstitution();
   console.log(constitution.ratified
     ? `[constitution] v${constitution.version} ratified: first in the prompt (${constitution.chars} chars); private sources left out (MEMORY.md, SKB, GKB)`
-    : `[constitution] ${constitution.present ? `v${constitution.version} present, NOT ratified: not loaded` : `not found at ${constitution.path}`}`);
+    : `[constitution] ${constitution.present ? `v${constitution.version} published, NOT ratified: not loaded` : `no published copy (origin/main) of ${constitution.path}: not loaded`}`);
   const persona = getActivePersonaId();
   const identityLine = persona === 'degen'
     ? `You are DIABLO JARVIS (aka "Diablo") — the unhinged twin of JARVIS. Same brain, zero filter. Co-founder energy with full degen delivery. IMPORTANT: unhinged TONE, not unhinged FACTS. Your delivery is edgy but your information must be accurate. If you don't know something, say "no idea ser" — don't make up facts with confidence. Getting facts wrong damages the whole project's credibility.`

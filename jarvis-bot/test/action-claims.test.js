@@ -34,3 +34,11 @@ test('future talk without an action verb passes', () => {
     assert.equal(gateFakeActions(s).changed, false, s);
   }
 });
+
+// 2026-11-01: "on it" inside a sentence stripped a real line from the bot's answer to
+// "why is faith rational" (Will, Blake and Jarvis). Only the stock reply is a promise.
+test('"act on it" inside a sentence is not a promise; "On it." still is', () => {
+  assert.equal(gateFakeActions('You adopt a foundational premise, act on it, and let real-world feedback refine the model.').changed, false);
+  assert.equal(gateFakeActions('On it.').changed, true);
+  assert.equal(gateFakeActions("I'm on it, give me a minute.").changed, true);
+});

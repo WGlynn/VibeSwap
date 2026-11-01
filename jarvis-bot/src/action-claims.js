@@ -24,7 +24,10 @@ const futurePromise = s => {
   const m = FUTURE_SUBJECT.exec(s);
   return !!m && ANY_VERB.test(s.slice(m.index + m[0].length));
 };
-const STOCK = /\b(consider it (?:done|handled|logged|noted)|on it|done and done|noted and (?:saved|logged|stored)|will do|tracking (?:this|that|it) now|logged|noted)\b/i;
+const STOCK = /\b(consider it (?:done|handled|logged|noted)|done and done|noted and (?:saved|logged|stored)|will do|tracking (?:this|that|it) now|logged|noted)\b/i;
+// "on it" is a promise only as the reply itself ("On it.", "I'm on it"); inside a sentence it is
+// ordinary English ("adopt a premise, act on it", Will, Blake and Jarvis, 2026-11-01).
+const ON_IT = /^\s*(?:(?:i'm|i am|we're|we are)\s+)?on it\b/i;
 // True statements about the shared notes pass: the board, people, topics and repos notes are real
 // files written by Will's session and loaded into this prompt, so "already on the project board" is honest.
 const SUBJECTLESS = /^\s*(?:saved|logged|tracked|added|stored|recorded|updated|scheduled|filed|queued|bookmarked|pinned|remembered)\b(?!\s+by\b)/i;
@@ -44,7 +47,7 @@ export function gateFakeActions(text, { toolsRan = 0 } = {}) {
   for (const s of splitSentences(original)) {
     // A reference to the shared board passes only as a statement of state, never as 'I added/will add'.
     const stateRef = SHARED_STATE.test(s) && !/\bI(?:'ve| have| had| just| am now|'m now| will|'ll| am going to)\b/i.test(s);
-    const claims = (CLAIM.test(s) || FUTURE_EXPERIMENT.test(s) || futurePromise(s) || STOCK.test(s) || SUBJECTLESS.test(s)) && !stateRef;
+    const claims = (CLAIM.test(s) || FUTURE_EXPERIMENT.test(s) || futurePromise(s) || STOCK.test(s) || ON_IT.test(s) || SUBJECTLESS.test(s)) && !stateRef;
     (claims ? removed : kept).push(s);
   }
   if (!removed.length) return { text: original, changed: false, removed: [] };

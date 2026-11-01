@@ -45,6 +45,32 @@ export const ASK_SESSION_TOOL = {
 
 const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
+// ============ Routing a request before the model speaks ============
+// Will's order: first work out what Jarvis needs his Claude Code session to do, then speak. A live test
+// (2026-11-01) showed why code must do the first step: with ask_session offered and rule 22 asking for
+// it, Gemini Flash-Lite answered "Project Orbit added to the board" and queued nothing. So a message
+// addressed to the bot that asks it to add, note or track something is queued here, by code, and the
+// model is only told it is queued. Questions about memory ("what do you remember") and reminiscing
+// ("remember when ...") are not requests.
+const BOARD_ASK = /\b(?:add|put|list|stick|log)\b[^.?!\n]{0,80}\b(?:on|to|onto|in)\s+(?:the|your|our)\s+(?:project\s+)?board\b/i;
+const NOTE_ASK = /\b(?:keep track of|keep an eye on|note (?:that|this|down)|make a note|remember (?:that|this|my|our|to|it)|track (?:my|our|the|this|that|it)|record (?:that|this|my|our|it)|save (?:that|this|my|our|it)|write (?:that|this|it) down|add (?:that|this|it) to (?:your|the) notes)\b/i;
+const POLITE = /\b(?:can|could|would|will)\s+(?:you|u)\b|\bplease\b|\bpls\b|^\s*(?:hey\s+)?(?:@\w+\s+)?(?:jarvis|j)\b/i;
+const IMPERATIVE = /^\s*(?:@\w+\s+)?(?:(?:hey\s+)?(?:jarvis|j)[,:!]?\s+)?(?:please\s+)?(?:keep track|keep an eye|note|make a note|remember|track|record|save|write|add|put|log)\b/i;
+const QUESTION_ABOUT = /^\s*(?:@\w+\s+)?(?:(?:hey\s+)?(?:jarvis|j)[,:!]?\s+)?(?:what|how|why|when|where|who|do|does|did|is|are|have|has)\b/i;
+const REMINISCE = /\bremember when\b/i;
+
+export function detectActionRequest(text) {
+  const t = String(text || '');
+  if (!t.trim() || t.length > 1500 || REMINISCE.test(t) || QUESTION_ABOUT.test(t)) return null;
+  if (BOARD_ASK.test(t) && (POLITE.test(t) || IMPERATIVE.test(t))) return { action: 'board' };
+  if (NOTE_ASK.test(t) && (POLITE.test(t) || IMPERATIVE.test(t))) return { action: 'note' };
+  return null;
+}
+
+// One request per message: code may queue it before the model runs, and the model may still call
+// ask_session for the same message.
+const queuedByMessage = new Map(); // `${chatId}:${messageId}` -> request id
+
 // Write one request. ctx: { chatId, chatType, chatTitle, messageId, userId, userName, isOwner }.
 // Returns { id, needsApproval } or { error }.
 export function queueSessionRequest(ctx, input = {}) {
@@ -52,6 +78,8 @@ export function queueSessionRequest(ctx, input = {}) {
   const summary = clip(input.summary, 300);
   if (!action) return { error: `action must be one of ${ACTIONS.join(', ')}` };
   if (!summary) return { error: 'summary is required' };
+  const messageKey = ctx.messageId != null ? `${ctx.chatId}:${ctx.messageId}` : null;
+  if (messageKey && queuedByMessage.has(messageKey)) return { id: queuedByMessage.get(messageKey), needsApproval: false, duplicate: true };
   const userKey = String(ctx.userId ?? 'unknown');
   if (!ctx.isOwner) {
     const now = Date.now();
@@ -77,6 +105,10 @@ export function queueSessionRequest(ctx, input = {}) {
     appendFileSync(REQUESTS_PATH, JSON.stringify(request) + '\n');
   } catch (err) {
     return { error: `could not queue the request: ${err.message}` };
+  }
+  if (messageKey) {
+    queuedByMessage.set(messageKey, request.id);
+    if (queuedByMessage.size > 5000) queuedByMessage.delete(queuedByMessage.keys().next().value);
   }
   return { id: request.id, needsApproval };
 }

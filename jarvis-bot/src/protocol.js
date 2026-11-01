@@ -21,7 +21,7 @@
 // per model (the measure Lever 3 needs). Sources are logged and checked against the record, but a
 // false source does not change the reply yet: there is no sentence to pin it to.
 
-import { splitSentences, claimsAction, claimsPromise, claimsFalseMode, FALLBACK } from './action-claims.js';
+import { splitSentences, claimsAction, claimsPromise, claimsFalseMode, mentionsActionVerb, FALLBACK } from './action-claims.js';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -39,6 +39,15 @@ Why: code reads this line, removes it before anyone sees your reply, and checks 
 // queue) and ask_session (Will's Claude Code session does it; session-requests.js). Constitution 1.2:
 // a promise is made only when a tool records it and a mind will actually carry it out.
 const FUTURE_TOOLS = new Set(['defertask', 'asksession']);
+
+// A queue is not a completion. A tool that only records future work backs a promise or a "queued"
+// claim, never "added" or "saved": in a live test (2026-11-01) a queued request would otherwise have
+// backed "Project Orbit added to the board", which was false.
+const QUEUED = /\b(?:queu\w*|ask(?:ed|ing)?\b|pass(?:ed|ing)?\b[^.?!]{0,20}\b(?:on|along|to)\b|request(?:ed)?\b|forward(?:ed|ing)?\b|hand(?:ed|ing)?\b[^.?!]{0,12}\b(?:off|over)\b)/i;
+const FUTURE_WORDS = /\b(?:will|'ll|going to|follow(?:ing)? up|confirm)\b/i;
+
+// Said instead of FALLBACK when the turn did queue a request for Will's session.
+export const QUEUED_NOTE = "I've passed this to Will's Claude Code session; I'll confirm here once it's done.";
 
 // Violations that mean an action claim was taken out (or could not be), so the reply must say so.
 const ACTION_VIOLATIONS = new Set(['unbacked_action', 'unbacked_promise', 'unbacked_declared', 'unlocated_declared']);
@@ -130,7 +139,7 @@ function locate(actionText, sentences) {
   let bestScore = 0;
   let tie = false;
   sentences.forEach((s, i) => {
-    if (!(FIRST_PERSON.test(s) || SUBJECTLESS_START.test(s))) return;
+    if (!(FIRST_PERSON.test(s) || SUBJECTLESS_START.test(s) || mentionsActionVerb(s))) return;
     const have = new Set(contentWords(s));
     let hit = 0;
     for (const w of want) if (have.has(w)) hit++;
@@ -157,20 +166,28 @@ export function speak(raw, record = turnRecord()) {
   const sentences = splitSentences(body);
   const okTools = record.tools.filter((t) => t.ok);
   const futureBacked = okTools.some((t) => FUTURE_TOOLS.has(norm(t.name)));
+  // Tools that did something now. One that only queued work backs no claim that the work is done.
+  const okNow = okTools.filter((t) => !FUTURE_TOOLS.has(norm(t.name)));
   const remove = new Set();
   const violations = [];
 
   // 1. Claims the fixed phrasings catch, on every reply, declared or not.
   sentences.forEach((s, i) => {
     if (claimsFalseMode(s, record.chatMode)) { remove.add(i); violations.push('mode_claim'); }
-    else if (!okTools.length && claimsAction(s)) { remove.add(i); violations.push('unbacked_action'); }
-    else if (okTools.length && !futureBacked && claimsPromise(s)) { remove.add(i); violations.push('unbacked_promise'); }
+    else if (claimsPromise(s)) {
+      if (!futureBacked) { remove.add(i); violations.push('unbacked_promise'); }
+    } else if (claimsAction(s) && !okNow.length && !(futureBacked && QUEUED.test(s))) {
+      remove.add(i);
+      violations.push('unbacked_action');
+    }
   });
 
-  // 2. Actions the model declared, each checked against the tools that worked this turn.
+  // 2. Actions the model declared, each checked against the tools that worked this turn. A tool that
+  // only queues work backs the declaration only if it reads as queued or still to come.
   const actions = (declared?.actions || []).filter((a) => !SPEECH.test(a.text) && !OTHER_ACTOR.test(a.text));
   for (const a of actions) {
-    a.backed = !!a.tool && okTools.some((t) => norm(t.name) === norm(a.tool));
+    const tool = a.tool && okTools.find((t) => norm(t.name) === norm(a.tool));
+    a.backed = !!tool && (!FUTURE_TOOLS.has(norm(tool.name)) || QUEUED.test(a.text) || FUTURE_WORDS.test(a.text));
     if (a.backed) continue;
     const i = locate(a.text, sentences);
     if (i >= 0) { remove.add(i); violations.push('unbacked_declared'); } else { a.unlocated = true; violations.push('unlocated_declared'); }
@@ -191,7 +208,9 @@ export function speak(raw, record = turnRecord()) {
   // actually happened: nothing was done, or the mode did not change and how to change it.
   let reply = remove.size ? removeSentences(body, sentences, remove) : body;
   const notes = [];
-  if (violations.some((v) => ACTION_VIOLATIONS.has(v))) notes.push(FALLBACK);
+  // If this turn queued a request for Will's session, say that; it is true and more useful.
+  const queuedForSession = okTools.some((t) => norm(t.name) === 'asksession');
+  if (violations.some((v) => ACTION_VIOLATIONS.has(v))) notes.push(queuedForSession ? QUEUED_NOTE : FALLBACK);
   if (violations.includes('mode_claim')) notes.push(MODE_NOTE);
   if (notes.length) reply = [reply, ...notes.filter((n) => !reply.includes(n))].filter(Boolean).join('\n\n');
 

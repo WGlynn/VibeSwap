@@ -3,7 +3,7 @@
 // CONSTITUTION.md ("Tested by", Articles 1 and 5).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { speak, parseDeclaration, turnRecord, protocolLine, protocolSummary, REPLY_PROTOCOL, MODE_NOTE } from '../src/protocol.js';
+import { speak, parseDeclaration, turnRecord, protocolLine, protocolSummary, REPLY_PROTOCOL, MODE_NOTE, QUEUED_NOTE } from '../src/protocol.js';
 import { FALLBACK } from '../src/action-claims.js';
 import { detectDirective } from '../src/directives.js';
 
@@ -169,11 +169,30 @@ test('P18 the history line is the true declaration of what was sent', () => {
 
 test('P19 the log summary carries counts and kinds, not the reply text', () => {
   const s = protocolSummary(speak("I'll keep track of that.", rec([failed('learn_fact')])));
-  assert.deepEqual(s, { v: 1, declared: false, actions: 0, backed: 0, removed: 1, violations: ['unbacked_action'], tools: ['learn_fact:failed'] });
+  assert.deepEqual(s, { v: 1, declared: false, actions: 0, backed: 0, removed: 1, violations: ['unbacked_promise'], tools: ['learn_fact:failed'] });
 });
 
 test('P20 the prompt block asks for the line and gives the reason, in plain words', () => {
   assert.match(REPLY_PROTOCOL, /<protocol>actions: ACTIONS \| sources: SOURCES<\/protocol>/);
   assert.match(REPLY_PROTOCOL, /Constitution 1\.2/);
   assert.doesNotMatch(REPLY_PROTOCOL, /[—–]/);
+});
+
+// ============ A queue is not a completion (live test, 2026-11-01) ============
+
+test('P23 the live failure: a third-person "added" claim is pinned and replaced by what is true', () => {
+  const raw = 'Project Orbit added to the board with a launch date of December 12, 2026.\n<protocol>actions: added Project Orbit to the board (none) | sources: conversation</protocol>';
+  assert.equal(speak(raw, rec([ok('ask_session')])).reply, QUEUED_NOTE, 'a request was queued this turn');
+  assert.equal(speak(raw, rec()).reply, FALLBACK, 'nothing was queued');
+});
+
+test('P24 a tool that only queues work backs "queued" and promises, never "done"', () => {
+  const queued = rec([ok('ask_session')]);
+  assert.equal(speak("I've queued it for Will's session.", queued).reply, "I've queued it for Will's session.");
+  assert.equal(speak("I'll confirm here when it's done.", queued).reply, "I'll confirm here when it's done.");
+  assert.equal(speak('Saved.', queued).reply, QUEUED_NOTE);
+  const declaredDone = speak('Done, it is on the board now.\n<protocol>actions: added it to the board (ask_session) | sources: conversation</protocol>', queued);
+  assert.equal(declaredDone.actions[0].backed, false);
+  const declaredQueued = speak('Queued for Will.\n<protocol>actions: queued the board update for Will (ask_session) | sources: conversation</protocol>', queued);
+  assert.equal(declaredQueued.actions[0].backed, true);
 });

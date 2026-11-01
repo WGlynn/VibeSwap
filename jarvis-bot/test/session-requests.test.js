@@ -18,10 +18,12 @@ before(async () => {
   protocol = await import('../src/protocol.js');
 });
 
-const person = (over = {}) => ({ chatId: -100123, chatType: 'supergroup', chatTitle: 'Test Room', messageId: 42, userId: 777, userName: 'Ana', isOwner: false, ...over });
+// Each call is a different message, as in a real chat; one message makes one request (S11).
+let nextMessage = 1000;
+const person = (over = {}) => ({ chatId: -100123, chatType: 'supergroup', chatTitle: 'Test Room', messageId: nextMessage++, userId: 777, userName: 'Ana', isOwner: false, ...over });
 
 test('S1 a safe request from anyone is queued without approval, as structured data', () => {
-  const q = mod.queueSessionRequest(person(), { action: 'note', summary: 'Project X: launch date is 2026-12-12 (from Ana)' });
+  const q = mod.queueSessionRequest(person({ messageId: 42 }), { action: 'note', summary: 'Project X: launch date is 2026-12-12 (from Ana)' });
   assert.ok(q.id && !q.error);
   assert.equal(q.needsApproval, false);
   const rows = readFileSync(mod.REQUESTS_PATH, 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
@@ -93,4 +95,31 @@ test('S9 the tool is always offered and wired, and receipts are confirmed only w
   assert.match(i, /shouldSuppress\(target, 'reply'\)/);
   assert.match(i, /receipts: \[\{ name: 'ask_session', ok: true \}/);
   assert.match(src('memory.js'), /call ask_session so Will's session does it, and say it is queued, not done/);
+});
+
+test('S10 code routes real requests before the model speaks, and only real requests', () => {
+  const yes = {
+    'jarvis please add Project Orbit to the project board, its launch is dec 12': 'board',
+    'can you keep track of my project launch date for me? its dec 12': 'note',
+    'remember that my birthday is may 3': 'note',
+    'j, note that the deadline moved to friday': 'note',
+    '@JarvisBot please put the Cadence demo on the board': 'board',
+  };
+  for (const [text, action] of Object.entries(yes)) assert.equal(mod.detectActionRequest(text)?.action, action, text);
+  for (const text of [
+    'I need to track my expenses better this year',
+    'what do you remember about me?',
+    'remember when we shipped v1? good times',
+    'the board meeting is tomorrow',
+    'track record matters more than hype',
+    'do you keep track of the projects?',
+  ]) assert.equal(mod.detectActionRequest(text), null, text);
+});
+
+test('S11 one message makes one request, even if the model also calls ask_session', () => {
+  const ctx = person({ userId: 950, messageId: 7777 });
+  const first = mod.queueSessionRequest(ctx, { action: 'note', summary: 'from code' });
+  const second = mod.queueSessionRequest(ctx, { action: 'note', summary: 'from the model' });
+  assert.equal(second.id, first.id);
+  assert.equal(second.duplicate, true);
 });

@@ -107,6 +107,12 @@ export function claimsPromise(s) {
   return claimsAction(s) && (FUTURE_MARK.test(s) || ON_IT.test(s));
 }
 
+// One sentence: does it contain an action verb in any form, whoever the subject is? Used to pin a
+// declared claim written in the third person ("Project Orbit added to the board", live test 2026-11-01).
+export function mentionsActionVerb(s) {
+  return ANY_VERB.test(s);
+}
+
 // One sentence: does it claim a mode change, or a mode that is not the chat's? No tool changes a
 // chat's mode (directives.js does, before the model runs), so this holds with or without receipts.
 export function claimsFalseMode(s, chatMode = null) {

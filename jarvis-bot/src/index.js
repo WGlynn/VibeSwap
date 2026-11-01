@@ -270,7 +270,7 @@ try {
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
-import { pendingReceipts, markDelivered, confirmationPrompt } from './session-requests.js';
+import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest } from './session-requests.js';
 import { quickReply, isBareAck } from './quick-reply.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
 import { noteBotInfo, noteChatTitle, noteContextReport } from './self-state.js';
@@ -7378,6 +7378,23 @@ bot.on('text', async (ctx) => {
         recordNoModelTurn(quick ? 'quick_reply' : 'bare_ack', { chatType: ctx.chat?.type });
         console.log(`[quick-reply] ${quick ? 'answered' : 'bare ack, no reply'} without a model call`);
         return;
+      }
+    }
+
+    // ============ Act first, then speak: route an action request before the model runs ============
+    // Will 2026-11-01: first work out what Jarvis needs his Claude Code session to do. Code does it, so
+    // the honest path does not depend on the model choosing the tool (session-requests.js).
+    const addressedToBot = ctx.chat.type === 'private' || isMentioned || isReplyToBot || isCalledByName;
+    const actionAsk = addressedToBot ? detectActionRequest(ctx.message.text) : null;
+    if (actionAsk) {
+      const queued = queueSessionRequest({
+        chatId: ctx.chat.id, chatType: ctx.chat.type, chatTitle: ctx.chat.title, messageId: ctx.message.message_id,
+        userId: ctx.from.id, userName, isOwner: String(ctx.from.id) === String(config.ownerUserId),
+      }, { action: actionAsk.action, summary: `${userName}: ${ctx.message.text}` });
+      if (queued.id) {
+        turnReceipts.push({ name: 'ask_session', ok: true });
+        messageForLLM += `\n\n[SESSION REQUEST ${queued.id}] Code already queued this message for Will's Claude Code session${queued.needsApproval ? ', where it waits for his approval' : ''}. Do not call ask_session for it again. In one short line, say it is queued, not done, and that you will confirm here when it is; then answer anything else they asked.`;
+        console.log(`[session] queued request ${queued.id} (${actionAsk.action}) from ${userName}`);
       }
     }
 

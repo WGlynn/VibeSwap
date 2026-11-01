@@ -270,6 +270,7 @@ try {
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
+import { pendingReceipts, markDelivered, confirmationPrompt } from './session-requests.js';
 import { quickReply, isBareAck } from './quick-reply.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
 import { noteBotInfo, noteChatTitle, noteContextReport } from './self-state.js';
@@ -6226,7 +6227,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
   try {
     noteBotInfo(ctx.botInfo);
     const response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
-      chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id }));
+      chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id, messageId: ctx.message?.message_id, chatTitle: ctx.chat?.title }));
     clearInterval(typingInterval);
     await saveConversations();
 
@@ -7400,7 +7401,7 @@ bot.on('text', async (ctx) => {
         // withTurn tags every meter row this call produces (tool rounds, 429/503 rotations,
         // and the background work chat() spawns) with one id, so calls per message is countable.
         response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
-          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id, receipts: turnReceipts }));
+          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id, receipts: turnReceipts, messageId: ctx.message?.message_id, chatTitle: ctx.chat?.title }));
         break; // Success — exit retry loop
       } catch (chatErr) {
         const errMsg = (chatErr?.message || '').toLowerCase();
@@ -8111,6 +8112,45 @@ async function main() {
     } catch {}
   });
   // Initialize broadcast engine (autonomous content distribution)
+  // ============ Session receipts: confirm what Will's session did (session-requests.js) ============
+  // Act first, then speak (Will 2026-11-01). A request the voice queued with ask_session is confirmed
+  // in its chat only once the session writes a receipt: one model call per receipt, through chat(), so
+  // the confirmation is a checked protocol object backed by that receipt. Quiet chats are skipped
+  // (Article 5.2); a receipt that keeps failing is dropped after three tries so it cannot burn quota.
+  const receiptAttempts = new Map();
+  const deliverSessionReceipts = async () => {
+    for (const { receipt, request } of pendingReceipts()) {
+      const target = request.chat?.id;
+      if (!target || String(target).startsWith('web-') || shouldSuppress(target, 'reply')) {
+        markDelivered(receipt.id);
+        recordHealthEvent({ kind: 'session_receipt_not_sent', requestId: receipt.id, reason: !target ? 'no chat' : String(target).startsWith('web-') ? 'web chat' : 'chat mode' });
+        continue;
+      }
+      try {
+        if (receipt.status === 'done') await reloadSystemPrompt(); // the notes it changed reach the prompt
+        const res = await chat(target, 'jarvis-session', confirmationPrompt({ receipt, request }), request.chat?.type || 'private', [], {
+          receipts: [{ name: 'ask_session', ok: true }, { name: 'session_receipt', ok: receipt.status === 'done' }],
+        });
+        const text = res?.text?.trim();
+        if (text) {
+          await bot.telegram.sendMessage(target, text, request.messageId ? { reply_to_message_id: request.messageId, allow_sending_without_reply: true } : {});
+          recordOutgoing(String(target), text);
+        }
+        markDelivered(receipt.id);
+        recordHealthEvent({ kind: 'session_receipt_confirmed', requestId: receipt.id, status: receipt.status });
+      } catch (err) {
+        const n = (receiptAttempts.get(receipt.id) || 0) + 1;
+        receiptAttempts.set(receipt.id, n);
+        console.warn(`[session] receipt ${receipt.id} not confirmed (try ${n}/3): ${err.message}`);
+        if (n >= 3) {
+          markDelivered(receipt.id);
+          recordHealthEvent({ kind: 'session_receipt_failed', requestId: receipt.id, error: String(err.message).slice(0, 200) });
+        }
+      }
+    }
+  };
+  setInterval(() => { deliverSessionReceipts().catch((e) => console.warn(`[session] ${e.message}`)); }, 30_000);
+
   await initBroadcast({
     telegramSend: (chatId, text) => bot.telegram.sendMessage(chatId, text),
     chatIds: config.authorizedGroups || [],

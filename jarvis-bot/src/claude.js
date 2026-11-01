@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { loadSystemPrompt, getCellContext, getCellStats } from './memory.js';
 import { constitutionChanged } from './constitution.js';
 import { speak, turnRecord, protocolLine, stripProtocolLine } from './protocol.js';
+import { ASK_SESSION_TOOL, queueSessionRequest, askSessionResult } from './session-requests.js';
 import { getChatMode } from './directives.js';
 import { recordHealthEvent } from './feed.js';
 import { setFlag, getBehavior } from './behavior.js';
@@ -671,7 +672,7 @@ export function bufferAssistantMessage(chatId, message) {
 
 // receipts: work code did for this turn before the model ran, as { name, ok } (a fetched link is
 // { name: 'web', ok: true }), so the protocol can back a claim like "read the article" (protocol.js).
-export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId, receipts = [] } = {}) {
+export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId, receipts = [], messageId = null, chatTitle = null } = {}) {
   // Six positional arguments invite swaps: the collision regeneration passed (prompt, chatId,
   // userName, ctx) and answered a user's name with no history. Fail loud instead (2026-11-01).
   if ((message != null && typeof message !== 'string') || (chatType != null && typeof chatType !== 'string') || !Array.isArray(media)) {
@@ -734,7 +735,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       sanitizeHistory(history);
 
       try {
-        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts);
+        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts, { messageId, chatTitle });
       } finally {
         // Restore text-only content for persistence (no base64 stored)
         historyEntry.content = savedContent;
@@ -760,7 +761,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
     }
     sanitizeHistory(history);
 
-    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts);
+    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts, { messageId, chatTitle });
   });
 }
 
@@ -838,7 +839,7 @@ export function registerLine(text, complexity) {
   return '\n\n## REGISTER THIS TURN: technical\n- Drop the banter for this reply. First sentence is the answer: the constraint, the number, the mechanism, or the failure. No preamble, no restating the question, no "great question".\n- Then only what the reader needs to check it: one reason, one source (file, commit, experiment id) if you have it, and what would change the answer. If you do not know, say so in one line.\n- Wit is fine after the substance, never instead of it.';
 }
 
-async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts = []) {
+async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts = [], turn = {}) {
   // In DMs, chatId IS the userId. In groups, userId must be passed explicitly.
   const effectiveUserId = userId || chatId;
 
@@ -1040,7 +1041,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           'ens_info', 'npm_lookup', 'crate_lookup', 'contract_abi', 'checksum_address'],
     education: ['explain_concept', 'crypto_glossary', 'vibeswap_explainer',
                 'crypto_tutorial', 'crypto_calendar', 'crypto_quiz'],
-    tasks: TASK_TOOL_NAMES,
+    tasks: [...TASK_TOOL_NAMES, 'ask_session'],
     wallet: WALLET_TOOL_NAMES,
     social_outbound: SOCIAL_TOOL_NAMES,
     proactive: PROACTIVE_TOOL_NAMES,
@@ -1722,6 +1723,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     },
     // ============ Task Queue — Deferred Execution ============
     DEFER_TASK_TOOL,
+    // ============ Ask Will's session: act first, then speak (session-requests.js) ============
+    ASK_SESSION_TOOL,
     // ============ Sovereign Wallet — On-Chain Agency ============
     ...WALLET_TOOLS,
     // ============ Trading — Autonomous DEX Trading ============
@@ -2346,6 +2349,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = `Task queued: ${taskResult.taskId} — will execute ${taskResult.executeAfter > Date.now() + 5000 ? `in ${Math.ceil((taskResult.executeAfter - Date.now()) / 1000)}s` : 'on next cycle (~30s)'}. Results will be reported back to this chat.`;
           }
           console.log(`[claude] Tool: defer_task("${tb.input.description?.slice(0, 50)}...") → ${taskResult.taskId || taskResult.error}`);
+        } else if (tb.name === 'ask_session') {
+          // Act first, then speak (session-requests.js): the request is written for Will's session;
+          // the confirmation comes later, from its receipt. The write itself is this turn's receipt.
+          const queued = queueSessionRequest({
+            chatId, chatType, chatTitle: turn.chatTitle, messageId: turn.messageId, userId: effectiveUserId, userName,
+            isOwner: String(effectiveUserId) === String(config.ownerUserId),
+          }, tb.input);
+          result = askSessionResult(queued);
+          console.log(`[claude] Tool: ask_session(${tb.input.action}: "${String(tb.input.summary || '').slice(0, 50)}") → ${queued.id || queued.error}`);
         } else {
           result = 'Unknown tool.';
         }

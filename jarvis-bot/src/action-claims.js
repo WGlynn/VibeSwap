@@ -8,7 +8,8 @@
 // or promised) is removed. If nothing is left, one honest line goes out instead. The bot's own
 // opinions, answers and questions pass untouched; only action claims are gated.
 
-const VERBS = ['track', 'keep track', 'monitor', 'watch', 'log', 'note', 'record', 'save', 'store', 'remember', 'update', 'add', 'create', 'build', 'set up', 'schedule', 'remind', 'follow up', 'check back', 'get back', 'look into', 'dig into', 'investigate', 'ping', 'notify', 'alert', 'flag', 'report back', 'run', 'deploy', 'index', 'scan', 'sync', 'coordinate', 'maintain', 'start', 'begin', 'handle', 'take care', 'queue', 'file', 'open', 'close', 'send', 'post', 'forward', 'relay', 'pull', 'fetch', 'compile', 'summarize', 'document', 'write up', 'draft', 'rerun', 'retest', 'redo', 'rebuild', 'rewrite', 'recheck'];
+// 'confirm' (2026-11-01): with ask_session, "I'll confirm here when it's done" is the common promise.
+const VERBS = ['confirm', 'track', 'keep track', 'monitor', 'watch', 'log', 'note','record', 'save', 'store', 'remember', 'update', 'add', 'create', 'build', 'set up', 'schedule', 'remind', 'follow up', 'check back', 'get back', 'look into', 'dig into', 'investigate', 'ping', 'notify', 'alert', 'flag', 'report back', 'run', 'deploy', 'index', 'scan', 'sync', 'coordinate', 'maintain', 'start', 'begin', 'handle', 'take care', 'queue', 'file', 'open', 'close', 'send', 'post', 'forward', 'relay', 'pull', 'fetch', 'compile', 'summarize', 'document', 'write up', 'draft', 'rerun', 'retest', 'redo', 'rebuild', 'rewrite', 'recheck'];
 // "we" counts too, future forms only: "we'll benchmark that" is the same unbacked promise
 // (a partner group chat, 2026-10-28). Past "we've ..." is left alone (too many false positives).
 // No "I'd": in chat it is "I would" ("I'd note the tradeoff", "I'd track it if I could"), an offer

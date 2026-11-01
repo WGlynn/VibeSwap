@@ -35,8 +35,10 @@ SOURCES: where what you said comes from, separated by ",": conversation, notes, 
 Why: code reads this line, removes it before anyone sees your reply, and checks it against what actually ran this turn. A claimed action with no tool behind it is taken out of the reply. This is how people can trust what you say you did (Constitution 1.2), whichever model you are running on.
 </reply_protocol>`;
 
-// Tools that record future work. A promise is backed only by one of these.
-const FUTURE_TOOLS = new Set(['defertask']);
+// Tools that record future work. A promise is backed only by one of these: defer_task (the bot's own
+// queue) and ask_session (Will's Claude Code session does it; session-requests.js). Constitution 1.2:
+// a promise is made only when a tool records it and a mind will actually carry it out.
+const FUTURE_TOOLS = new Set(['defertask', 'asksession']);
 
 // Violations that mean an action claim was taken out (or could not be), so the reply must say so.
 const ACTION_VIOLATIONS = new Set(['unbacked_action', 'unbacked_promise', 'unbacked_declared', 'unlocated_declared']);

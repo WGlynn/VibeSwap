@@ -7,6 +7,7 @@ import { getPersonaOverlay, getActivePersonaId } from './persona.js';
 import { syncFileChange } from './knowledge-chain.js';
 import { getTheAIContext } from './pantheon.js';
 import { readConstitution, constitutionBlock, RECENCY_RULE, RATIFIED_BRIEF } from './constitution.js';
+import { REPLY_PROTOCOL } from './protocol.js';
 
 // Self-improvement: prompt overlay from RL + self-eval correction prompt
 let getPromptOverlay = () => '';
@@ -971,9 +972,11 @@ export async function loadSystemPrompt() {
   if (selfEvalOverlay) dynamicParts.push(selfEvalOverlay);
 
   const dynamicPrompt = dynamicParts.join('\n');
-  const recencyRules = constitution.ratified
+  // The reply protocol closes the cached prefix: every reply is asked for its <protocol> line,
+  // which chat() parses, checks and removes (protocol.js). Added after the rules, none reordered.
+  const recencyRules = (constitution.ratified
     ? RECENCY_RULES.replace('</critical_rules>', `${RECENCY_RULE}\n</critical_rules>`)
-    : RECENCY_RULES;
+    : RECENCY_RULES) + REPLY_PROTOCOL;
   const fullPrompt = staticPrompt + '\n' + dynamicPrompt + '\n' + recencyRules;
   // Hash of the frozen prefix every Gemini request starts with. A changed hash after
   // /refresh or /persona is the cheapest explanation for a meter row with cached=0.

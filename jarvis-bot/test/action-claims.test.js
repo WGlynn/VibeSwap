@@ -42,3 +42,11 @@ test('"act on it" inside a sentence is not a promise; "On it." still is', () => 
   assert.equal(gateFakeActions('On it.').changed, true);
   assert.equal(gateFakeActions("I'm on it, give me a minute.").changed, true);
 });
+
+test('a bare "logged" or "noted" is a claim only as the opening word (feed replay, 2026-11-01)', () => {
+  assert.equal(gateFakeActions('Conversation history logged locally, and local session logs.').changed, false);
+  assert.equal(gateFakeActions('every exchange is logged to a local folder.').changed, false);
+  assert.equal(gateFakeActions('Logged.').changed, true);
+  assert.equal(gateFakeActions('Noted, thanks.').changed, true);
+  assert.equal(gateFakeActions("I've noted that.").changed, true);
+});

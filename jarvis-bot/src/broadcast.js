@@ -36,6 +36,8 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
+import { speak, turnRecord } from './protocol.js';
+import { shouldSuppress, getChatMode } from './directives.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
@@ -258,7 +260,9 @@ export async function generateContent(type) {
       .map(b => b.text)
       .join('');
 
-    const cleaned = cleanContent(raw);
+    // Model text that will be posted goes through the protocol like every reply (protocol.js):
+    // no tools run here, so any claimed action is removed.
+    const cleaned = cleanContent(speak(raw, turnRecord({ chatType: 'group' })).reply);
     if (!cleaned) return null;
 
     // Dedup check
@@ -554,6 +558,11 @@ async function postToTelegram(content) {
 
   const results = [];
   for (const chatId of telegramChatIds) {
+    // Article 5.2: quiet and tag-only chats get no unprompted posts, broadcasts included (2026-11-01).
+    if (shouldSuppress(chatId, 'broadcast')) {
+      results.push({ chatId, skipped: getChatMode(chatId) });
+      continue;
+    }
     try {
       await telegramSendFn(chatId, content);
       results.push({ chatId, sent: true });

@@ -4,6 +4,9 @@ import { join, resolve, relative } from 'path';
 import { config } from './config.js';
 import { loadSystemPrompt, getCellContext, getCellStats } from './memory.js';
 import { constitutionChanged } from './constitution.js';
+import { speak, turnRecord, protocolLine, stripProtocolLine } from './protocol.js';
+import { getChatMode } from './directives.js';
+import { recordHealthEvent } from './feed.js';
 import { setFlag, getBehavior } from './behavior.js';
 import { learnFact, buildKnowledgeContext, compressCKB } from './learning.js';
 import { searchDeepStorageFull } from './deep-storage.js';
@@ -556,6 +559,7 @@ Use the tools to read existing files for reference and write new files.`;
   }];
 
   const filesWritten = [];
+  const codeGenTools = []; // receipts for the protocol object, as in chat()
   let rounds = 0;
 
   try {
@@ -575,6 +579,7 @@ Use the tools to read existing files for reference and write new files.`;
       const toolResults = [];
       for (const tb of toolBlocks) {
         const result = await handleCodeGenTool(tb.name, tb.input);
+        codeGenTools.push({ name: tb.name, ok: !/^(?:error|failed)/i.test(String(result)) });
         if (tb.name === 'write_file') {
           filesWritten.push(tb.input.path);
         }
@@ -592,12 +597,13 @@ Use the tools to read existing files for reference and write new files.`;
       });
     }
 
-    const text = response.content
+    // This text is posted to the chat (/idea), so it goes through the protocol like chat()'s replies.
+    const spoken = speak(response.content
       .filter(b => b.type === 'text')
       .map(b => b.text)
-      .join('\n');
+      .join('\n'), turnRecord({ chatType: 'private', tools: codeGenTools }));
 
-    return { text, filesWritten };
+    return { text: spoken.reply, filesWritten, protocol: spoken };
   } catch (error) {
     console.error('[codegen] Error:', error.message);
     return { text: `Code generation failed: ${error.message}`, filesWritten };
@@ -663,7 +669,14 @@ export function bufferAssistantMessage(chatId, message) {
   conversationsDirty = true;
 }
 
-export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId } = {}) {
+// receipts: work code did for this turn before the model ran, as { name, ok } (a fetched link is
+// { name: 'web', ok: true }), so the protocol can back a claim like "read the article" (protocol.js).
+export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId, receipts = [] } = {}) {
+  // Six positional arguments invite swaps: the collision regeneration passed (prompt, chatId,
+  // userName, ctx) and answered a user's name with no history. Fail loud instead (2026-11-01).
+  if ((message != null && typeof message !== 'string') || (chatType != null && typeof chatType !== 'string') || !Array.isArray(media)) {
+    throw new TypeError(`chat(): arguments out of order (message: ${typeof message}, chatType: ${typeof chatType}, media: ${Array.isArray(media) ? 'array' : typeof media})`);
+  }
   // A ratified amendment to the constitution takes effect on the next message (Article 11.3).
   if (constitutionChanged()) {
     console.log('[constitution] file changed: reloading the system prompt');
@@ -999,7 +1012,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       + (registerLine(messageText, complexity) || roomLine({
         isGroup: chatType !== 'private',
         humanTexts: chatType !== 'private' ? getHumanTexts(chatId) : [],
-        recentReplies: history.filter(m => m.role === 'assistant' && typeof m.content === 'string').map(m => m.content),
+        recentReplies: history.filter(m => m.role === 'assistant' && typeof m.content === 'string').map(m => stripProtocolLine(m.content)),
       }));
   }
 
@@ -1751,7 +1764,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     let rounds = 0;
     const historyLenBeforeTools = history.length;
     const filesWrittenInLoop = []; // Track write_file calls for auto-commit
-    let toolsRan = 0; // receipt for the fake-action gate (action-claims.js)
+    // The turn's tool receipts for the protocol object (protocol.js): every call, by name, and
+    // whether it worked. A failed save backs no "Saved." (2026-11-01).
+    const toolEvents = [];
     while (response.stop_reason === 'tool_use' && rounds < 5) {
       rounds++;
       const toolBlocks = response.content.filter(b => b.type === 'tool_use');
@@ -1759,9 +1774,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
       const toolResults = [];
       for (const tb of toolBlocks) {
-        toolsRan++;
         // Circuit breaker check — skip disabled tools
         if (isToolDisabled(tb.name)) {
+          toolEvents.push({ name: tb.name, ok: false });
           toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: `Tool "${tb.name}" temporarily disabled (circuit breaker tripped after ${TOOL_CB_THRESHOLD} consecutive failures). Will auto-resume in ${TOOL_CB_COOLDOWN_MS / 1000}s.` });
           continue;
         }
@@ -2351,6 +2366,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         } else {
           recordToolSuccess(tb.name);
         }
+        toolEvents.push({ name: tb.name, ok: !isFailure && !/^(?:Unknown tool|Unknown flag|Failed to)/i.test(String(result)) });
         toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: result });
       }
       history.push({ role: 'user', content: toolResults });
@@ -2393,11 +2409,18 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       throw new Error('LLM returned empty response');
     }
 
-    let assistantMessage = response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('\n')
-      || '...';
+    // ============ The protocol object (proposal 0003, 2026-11-01) ============
+    // The model's words become a reply only through speak(): its closing <protocol> line is parsed
+    // and removed, and every claimed action is checked against this turn's record. chat() returns
+    // nothing else, so every caller gets the checked reply. Runs before the group length gate so
+    // the line is never cut in half.
+    const record = turnRecord({ chatId, chatType, chatMode: getChatMode(chatId), fromId: effectiveUserId ?? null, tools: toolEvents, receipts });
+    const spoken = speak(response.content.filter(block => block.type === 'text').map(block => block.text).join('\n'), record);
+    if (spoken.removed.length || spoken.violations.includes('unlocated_declared')) {
+      console.warn(`[protocol] ${spoken.violations.join(', ')}: removed ${spoken.removed.length} sentence(s)`);
+      recordHealthEvent({ kind: 'fake_action_blocked', where: 'protocol', chatType, violations: spoken.violations, removed: spoken.removed.map(x => x.slice(0, 160)) });
+    }
+    let assistantMessage = spoken.reply || '...';
 
     // ============ Group Chat Length Gate ============
     // LLMs ignore "be concise" rules. Code doesn't.
@@ -2429,8 +2452,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       }
     } catch {}
 
-    // Add assistant response to history
-    history.push({ role: 'assistant', content: assistantMessage });
+    // Add assistant response to history with its true protocol line, so every past turn the model
+    // sees is an example of the format (protocol.js protocolLine). People never see history.
+    history.push({ role: 'assistant', content: `${assistantMessage}\n${protocolLine(spoken)}` });
 
     // Track last response with rich metadata — enables learning from own history
     lastResponses.set(chatId, {
@@ -2469,7 +2493,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
     // CKB Generator — extract knowledge from conversation and append to per-user markdown
     // Runs in background (non-blocking) — writes to data/ckb/{userId}.md
-    processCKBConversation(chatId, effectiveUserId, userName, history)
+    // Without the protocol lines: they describe the reply, not the person, and must not become "facts".
+    const ckbHistory = history.map(m => (m.role === 'assistant' && typeof m.content === 'string')
+      ? { ...m, content: stripProtocolLine(m.content) }
+      : m);
+    processCKBConversation(chatId, effectiveUserId, userName, ckbHistory)
       .catch(err => console.warn('[ckb] Background processing failed:', err.message));
 
     return {
@@ -2482,7 +2510,10 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       // so the feed can name it instead of the configured primary.
       model: response._model || null,
       provider: response._provider || null,
-      toolsRan,
+      // The receipt count the protocol used: tools that ran and worked (a failed call backs nothing).
+      toolsRan: toolEvents.filter(t => t.ok).length,
+      // The checked protocol object this reply came from; callers log it, none re-gate the text.
+      protocol: spoken,
     };
   } catch (error) {
     console.error('[claude] API error:', error.message);

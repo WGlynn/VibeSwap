@@ -20,7 +20,6 @@
 
 import { config } from './config.js';
 import { chat } from './claude.js';
-import { gateFakeActions } from './action-claims.js';
 import { stripDashes } from './text-style.js';
 import { speak as jarvisSpeak, cleanup as ttsCleanup } from './tts.js';
 import { getChainStats } from './knowledge-chain.js';
@@ -363,7 +362,8 @@ export async function handleWebRequest(req, res, pathname) {
 
       jsonResponse(res, 200, {
         // Constitution 1.2 and 10.1 on this path too (2026-11-01).
-        reply: stripDashes(gateFakeActions(response.text, { toolsRan: response.toolsRan || 0 }).text),
+        // chat() returned the protocol-checked reply (protocol.js); only the dash filter is left here.
+        reply: stripDashes(response.text),
         timestamp: new Date().toISOString(),
         budget: {
           daily: budgetCheck.budget,
@@ -1039,7 +1039,9 @@ export async function handleWebRequest(req, res, pathname) {
       const chatOptions = budgetCheck.degraded ? { maxTokensOverride: budgetCheck.maxTokens } : {};
 
       const response = await chat(chatId, name, message, 'web', [], chatOptions);
-      const fullText = response.text || '';
+      // The streamed web reply had neither the action gate nor the dash filter until 2026-11-01. The
+      // first now comes from chat() (protocol.js), the second is applied here (Article 10.1).
+      const fullText = stripDashes(response.text || '');
 
       // Stream in chunks (~word-by-word)
       const words = fullText.split(/(\s+)/);

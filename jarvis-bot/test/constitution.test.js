@@ -3,7 +3,7 @@
 // an enforced article cannot be deployed. Case ids match the "Tested by" lines in the document.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
+import { readFileSync, readdirSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
@@ -83,18 +83,40 @@ test('A1 H5 a first-person tracking promise is removed', () => {
   assert.equal(gateFakeActions("I'll keep track of that for you.", { toolsRan: 0 }).changed, true);
 });
 
-// Article 1.2 must hold on every reply path, not only the main one. Every place that logs a
-// model reply must sit after the action gate (the media path was ungated until 2026-11-01).
-test('A1 every logged model reply path passes the action gate first', () => {
-  const lines = src('index.js').split('\n');
-  const sites = lines
-    .map((line, i) => ({ line, i }))
-    .filter(({ line }) => /\brecordExchange\(/.test(line) && !/noModel/.test(line) && !/^\s*import\b/.test(line));
-  assert.ok(sites.length >= 2, `expected at least 2 model reply paths, found ${sites.length}`);
-  for (const { i } of sites) {
-    const before = lines.slice(Math.max(0, i - 40), i).join('\n');
-    assert.match(before, /gateFakeActions\(/, `ungated reply path at src/index.js:${i + 1}`);
-  }
+// Article 1.2 must hold on every reply path. Since 2026-11-01 the check lives at one point: chat()
+// turns the model's output into a protocol object and returns only its checked reply (protocol.js),
+// so no path can skip it by forgetting a gate call. The media, web and collision paths each did
+// while the gate lived at the call sites.
+test('A1 chat() returns only the protocol-checked reply', () => {
+  const c = src('claude.js');
+  const body = c.slice(c.indexOf('export async function chat('), c.indexOf('// ============ Cross-Chat Context Extraction'));
+  assert.equal((body.match(/const spoken = speak\(/g) || []).length, 1);
+  assert.match(body, /let assistantMessage = spoken\.reply \|\| '\.\.\.';/);
+  assert.match(body, /protocol: spoken,/);
+  // The only place chat() reads the model's text is the call into speak().
+  assert.equal((body.match(/\.filter\(block => block\.type === 'text'\)/g) || []).length, 1);
+  // /idea posts model text too, so codeGenChat returns the checked reply as well.
+  assert.match(c, /return \{ text: spoken\.reply, filesWritten, protocol: spoken \};/);
+});
+
+test('A1 every logged model reply records its protocol object, and no path gates on its own', () => {
+  const sites = src('index.js').split('\n')
+    .filter((line) => /\brecordExchange\(/.test(line) && !/noModel/.test(line) && !/^\s*import\b/.test(line));
+  assert.ok(sites.length >= 3, `expected the message, media and regeneration paths, found ${sites.length}`);
+  for (const line of sites) assert.match(line, /protocol: \w+\.protocol/, line.trim());
+  for (const f of ['index.js', 'web-api.js']) assert.doesNotMatch(src(f), /gateFakeActions\(/, f);
+  assert.match(src('feed.js'), /protocol: meta\.noModel \? null : protocolSummary\(meta\.protocol\)/);
+});
+
+test('A1 chat() fails loud on arguments out of order, and the collision path calls it in order', () => {
+  assert.match(src('claude.js'), /throw new TypeError\(`chat\(\): arguments out of order/);
+  assert.match(src('index.js'), /await chat\(chatId, userName, collisionPrompt, ctx\.chat\.type, \[\]/);
+});
+
+test('A1 A5 broadcasts pass the protocol and skip quiet and tag-only chats (Article 5.2)', () => {
+  const b = src('broadcast.js');
+  assert.match(b, /cleanContent\(speak\(raw, turnRecord\(\{ chatType: 'group' \}\)\)\.reply\)/);
+  assert.match(b, /if \(shouldSuppress\(chatId, 'broadcast'\)\)/);
 });
 
 test('A1 the exchange log records the tool receipt', () => {
@@ -221,8 +243,19 @@ test('A8 the bot never posts the tip-jar funding notice', () => {
 
 // ============ Article 1.2 and 10.1 on the web chat path ============
 
-test('A1 the web chat reply passes the action gate and the dash filter', () => {
-  assert.match(src('web-api.js'), /reply: stripDashes\(gateFakeActions\(response\.text/);
+// Article 12.1: the suite that gates every restart is the whole suite. `npm test` names its files,
+// and three test files (the protocol's among them) were silently left out until 2026-11-01.
+test('A12 every test file runs in npm test', () => {
+  const script = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).scripts.test;
+  const dir = (d) => readdirSync(new URL(`../${d}/`, import.meta.url)).filter((f) => f.endsWith('.test.js')).map((f) => `${d}/${f}`);
+  for (const f of [...dir('test'), ...dir('src')]) assert.ok(script.includes(f), `${f} is not in npm test`);
+});
+
+test('A1 V1 both web chat paths send the protocol-checked reply through the dash filter', () => {
+  const w = src('web-api.js');
+  assert.match(w, /reply: stripDashes\(response\.text\)/);
+  // The streamed path had neither check until 2026-11-01.
+  assert.match(w, /const fullText = stripDashes\(response\.text \|\| ''\);/);
 });
 
 // ============ Article 5.1: the documented quiet command works ============

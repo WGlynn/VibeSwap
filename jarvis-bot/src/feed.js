@@ -11,6 +11,7 @@ import { appendFileSync, mkdirSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { getProviderName, getModelName } from './llm-provider.js';
+import { protocolSummary } from './protocol.js';
 
 export const FEED_DIR = process.env.JARVIS_FEED_DIR || join(homedir(), 'jarvis-feed');
 const MAX_CHARS = 2000;
@@ -42,6 +43,11 @@ export function recordExchange(ctx, inbound, reply, meta = {}) {
       // Tools that ran this turn: the receipt the action gate checks (Article 1.2). Lets the
       // constitution replay tell a backed "saved" from a fake one (2026-11-01).
       toolsRan: meta.noModel ? 0 : (Number.isFinite(meta.toolsRan) ? meta.toolsRan : null),
+      // The reply's protocol object, summarized (protocol.js, 2026-11-01): did the model declare its
+      // claims, how many were backed, what was removed and why, which tools ran. Counts and kinds only.
+      protocol: meta.noModel ? null : protocolSummary(meta.protocol),
+      // A collision regeneration replaced the reply logged just before it for the same message.
+      ...(meta.regen ? { regen: true } : {}),
     };
     appendFileSync(join(FEED_DIR, `${ts.slice(0, 10)}.jsonl`), JSON.stringify(entry) + '\n');
   } catch (err) {

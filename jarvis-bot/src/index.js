@@ -271,7 +271,6 @@ import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAu
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
 import { quickReply, isBareAck } from './quick-reply.js';
-import { gateFakeActions } from './action-claims.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
 import { noteBotInfo, noteChatTitle, noteContextReport } from './self-state.js';
 import { getPersonaName, getActivePersonaId, listPersonas, setPersona } from './persona.js';
@@ -6236,20 +6235,15 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
       try { recordComputeUsage(String(chatId), response.usage); } catch {}
     }
 
-    // Article 1.2 holds on every reply path: media replies pass the same action gate (2026-11-01).
-    const gatedMedia = gateFakeActions(response.text, { toolsRan: response.toolsRan || 0, chatMode: getChatMode(ctx.chat.id) });
-    if (gatedMedia.changed) {
-      console.warn(`[action-gate] media path: removed ${gatedMedia.removed.length} action claim(s) with no tool receipt`);
-      recordHealthEvent({ kind: 'fake_action_blocked', where: 'media-handler', chatType: ctx.chat?.type, removed: gatedMedia.removed.map(x => x.slice(0, 160)) });
-      response.text = gatedMedia.text;
-    }
+    // Article 1.2 holds on every reply path because chat() returns only the protocol-checked reply
+    // (protocol.js); this path no longer gates on its own (2026-11-01).
     const reply = response.text?.trim();
     if (!reply) {
       console.warn('[bot] Empty response from LLM — skipping send');
       pacer.cancel();
       return;
     }
-    recordExchange(ctx, text, reply, { model: response.model, provider: response.provider, toolsRan: response.toolsRan || 0 });
+    recordExchange(ctx, text, reply, { model: response.model, provider: response.provider, toolsRan: response.toolsRan || 0, protocol: response.protocol });
     if (reply.length <= 4096) {
       await pacer.replyWith(reply, { parse_mode: undefined });
     } else {
@@ -7305,12 +7299,16 @@ bot.on('text', async (ctx) => {
       messageForLLM = `${messageForLLM}\n\n[CONTEXT: ${userName} is replying to a ${mediaType} from @${replyAuthor}${caption ? ` with caption: "${caption}"` : ''}. Address what they're asking about this ${mediaType}.]`;
     }
 
+    // Receipts for work done before the model runs: a fetched link backs "I read the article".
+    const turnReceipts = [];
+
     // YouTube Intelligence — detect links and fetch transcript/metadata for context
     const ytContext = await processYouTubeLinks(messageForLLM).catch(err => {
       console.warn(`[youtube] Failed: ${err.message}`);
       return null;
     });
     if (ytContext) {
+      turnReceipts.push({ name: 'youtube', ok: true });
       messageForLLM = `${messageForLLM}\n\n${ytContext}`;
       // Passive attribution — record video source in contribution graph
       autoAttributeContent({ url: messageForLLM.match(/https?:\/\/[^\s]+/)?.[0], title: ytContext.split('\n')[0], type: 'youtube' });
@@ -7323,6 +7321,7 @@ bot.on('text', async (ctx) => {
         return null;
       });
       if (webContext) {
+        turnReceipts.push({ name: 'web', ok: true });
         messageForLLM = `${messageForLLM}\n\n${webContext}`;
         // Passive attribution — record each web source with author metadata
         for (const page of (webContext.pages || [])) {
@@ -7401,7 +7400,7 @@ bot.on('text', async (ctx) => {
         // withTurn tags every meter row this call produces (tool rounds, 429/503 rotations,
         // and the background work chat() spawns) with one id, so calls per message is countable.
         response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
-          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id }));
+          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id, receipts: turnReceipts }));
         break; // Success — exit retry loop
       } catch (chatErr) {
         const errMsg = (chatErr?.message || '').toLowerCase();
@@ -7425,14 +7424,9 @@ bot.on('text', async (ctx) => {
       console.log(`[shard-dedup] Suppressed response in ${chatId} — sibling already covered it`);
       return;
     }
-    // Fake-action gate (Will 2026-10-28): no promised or claimed action without a tool receipt this turn.
-    const gated = gateFakeActions(response.text, { toolsRan: response.toolsRan || 0, chatMode: getChatMode(ctx.chat.id) });
-    if (gated.changed) {
-      console.warn(`[action-gate] removed ${gated.removed.length} action claim(s) with no tool receipt`);
-      recordHealthEvent({ kind: 'fake_action_blocked', where: 'message-handler', chatType: ctx.chat?.type, removed: gated.removed.map(x => x.slice(0, 160)) });
-      response.text = gated.text;
-    }
-    recordExchange(ctx, ctx.message.text, response.text, { model: response.model, provider: response.provider, toolsRan: response.toolsRan || 0 });
+    // No promised or claimed action without a receipt (Will 2026-10-28): chat() checked this reply as
+    // a protocol object against the turn's tools and the chat's mode (protocol.js, 2026-11-01).
+    recordExchange(ctx, ctx.message.text, response.text, { model: response.model, provider: response.provider, toolsRan: response.toolsRan || 0, protocol: response.protocol });
 
     // Record compute usage (non-blocking)
     if (response.usage) {
@@ -7524,12 +7518,18 @@ bot.on('text', async (ctx) => {
       const collisionPrompt = `${messageForLLM}${buildCollisionContext(collision.matchedMessage, collision.similarity)}`;
       try {
         ctx.sendChatAction('typing').catch(() => {});
-        const regenResponse = await chat(collisionPrompt, String(chatId), userName, ctx, { regenAttempt: true });
+        // Arguments in chat()'s order (2026-11-01): this call used to pass (prompt, chatId, userName,
+        // ctx), which ran the model on the user's name under a key made of the prompt text.
+        const regenResponse = await chat(chatId, userName, collisionPrompt, ctx.chat.type, [], { userId: ctx.from?.id, receipts: turnReceipts });
         if (regenResponse?.text?.trim()) {
           let regenText = regenResponse.text.trim();
           if (isGroup) regenText = stripGroupMarkdown(regenText);
           regenText = sanitizeOutput(regenText);
-          if (regenText) text = regenText;
+          if (regenText) {
+            text = regenText;
+            // The regenerated reply is what goes out, so it gets its own row (Article 7.4).
+            recordExchange(ctx, ctx.message.text, text, { model: regenResponse.model, provider: regenResponse.provider, toolsRan: regenResponse.toolsRan || 0, protocol: regenResponse.protocol, regen: true });
+          }
         }
       } catch (regenErr) {
         console.warn(`[collision] Regen failed, using original: ${regenErr.message}`);

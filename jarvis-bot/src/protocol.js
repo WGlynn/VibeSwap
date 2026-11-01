@@ -38,6 +38,13 @@ Why: code reads this line, removes it before anyone sees your reply, and checks 
 // Tools that record future work. A promise is backed only by one of these.
 const FUTURE_TOOLS = new Set(['defertask']);
 
+// Violations that mean an action claim was taken out (or could not be), so the reply must say so.
+const ACTION_VIOLATIONS = new Set(['unbacked_action', 'unbacked_promise', 'unbacked_declared', 'unlocated_declared']);
+
+// Said when a claimed mode change is removed. Each phrase is one the directive detector recognizes
+// (test P21), so the person is never sent to a command that does nothing (Constitution 5.1).
+export const MODE_NOTE = 'That did not change this chat\'s mode. To change it, say "jarvis be quiet", "jarvis only respond when tagged" or "jarvis back to normal".';
+
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // ============ Inbound: the turn's record ============
@@ -176,10 +183,15 @@ export function speak(raw, record = turnRecord()) {
     if (s === 'web' && !record.tools.some((t) => /^(?:web|web_search|scrape_page|scrape_prices|fetch_repo|youtube)$/.test(t.name))) violations.push('unbacked_source');
   }
 
-  // 4. Compose. A claim that could not be pinned to a sentence gets the honest line after it.
+  // 4. Compose. Removing a claim must not leave a reply that still implies it: asked to track a date,
+  // the model said "dec 12. noted." and the bare "dec 12." read as an acknowledgment (live probe,
+  // 2026-11-01). So whenever a claim is removed or cannot be pinned to a sentence, the reply says what
+  // actually happened: nothing was done, or the mode did not change and how to change it.
   let reply = remove.size ? removeSentences(body, sentences, remove) : body;
-  if (remove.size && !reply) reply = FALLBACK;
-  else if (actions.some((a) => a.unlocated)) reply = reply ? `${reply}\n\n${FALLBACK}` : FALLBACK;
+  const notes = [];
+  if (violations.some((v) => ACTION_VIOLATIONS.has(v))) notes.push(FALLBACK);
+  if (violations.includes('mode_claim')) notes.push(MODE_NOTE);
+  if (notes.length) reply = [reply, ...notes.filter((n) => !reply.includes(n))].filter(Boolean).join('\n\n');
 
   return {
     v: PROTOCOL_VERSION,

@@ -3,8 +3,9 @@
 // CONSTITUTION.md ("Tested by", Articles 1 and 5).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { speak, parseDeclaration, turnRecord, protocolLine, protocolSummary, REPLY_PROTOCOL } from '../src/protocol.js';
+import { speak, parseDeclaration, turnRecord, protocolLine, protocolSummary, REPLY_PROTOCOL, MODE_NOTE } from '../src/protocol.js';
 import { FALLBACK } from '../src/action-claims.js';
+import { detectDirective } from '../src/directives.js';
 
 const rec = (tools = [], extra = {}) => turnRecord({ chatType: 'supergroup', chatMode: 'normal', tools, ...extra });
 const ok = (name) => ({ name, ok: true });
@@ -48,7 +49,7 @@ test('P3 "none" declares no actions, and a reply with no line is marked undeclar
 
 test('P4 a reworded claim the fixed phrasings miss is caught through the declaration', () => {
   const r = speak('nice, love the direction. consider your project on my radar from here on.\n<protocol>actions: keep your project on my radar (none) | sources: conversation</protocol>', rec());
-  assert.equal(r.reply, 'nice, love the direction.');
+  assert.equal(r.reply, `nice, love the direction.\n\n${FALLBACK}`);
   assert.deepEqual(r.violations, ['unbacked_declared']);
 });
 
@@ -62,7 +63,7 @@ test('P5 a declared action backed by a tool that worked this turn stays', () => 
 
 test('P6 a tool that ran and failed is not a receipt ("Saved." after a failed save is removed)', () => {
   const r = speak('Saved. the binary state flip plus the living seed.', rec([failed('learn_fact')]));
-  assert.equal(r.reply, 'the binary state flip plus the living seed.');
+  assert.equal(r.reply, `the binary state flip plus the living seed.\n\n${FALLBACK}`);
   assert.deepEqual(r.violations, ['unbacked_action']);
 });
 
@@ -74,7 +75,7 @@ test('P7 a declared tool that did not run backs nothing', () => {
 
 test('P8 a promise needs a tool that records future work, not just any tool', () => {
   const r = speak("found it on the docs page. I'll keep track of your launch date.", rec([ok('web_search')]));
-  assert.equal(r.reply, 'found it on the docs page.');
+  assert.equal(r.reply, `found it on the docs page.\n\n${FALLBACK}`);
   assert.deepEqual(r.violations, ['unbacked_promise']);
   const backed = speak("I'll check back tomorrow with the numbers.", rec([ok('defer_task')]));
   assert.equal(backed.reply, "I'll check back tomorrow with the numbers.");
@@ -102,7 +103,16 @@ test('P11 an unbacked claim that cannot be pinned to a sentence gets the honest 
 
 test('P12 removing a sentence keeps the paragraphs around it', () => {
   const r = speak("line one is fine.\n\nI'll keep track of that.\n\nline three is fine.", rec());
-  assert.equal(r.reply, 'line one is fine.\n\nline three is fine.');
+  assert.equal(r.reply, `line one is fine.\n\nline three is fine.\n\n${FALLBACK}`);
+});
+
+test('P22 a removed claim never leaves a reply that still implies it (live probe, 2026-11-01)', () => {
+  // Asked to track a launch date, gemini wrote "dec 12. noted." and declared no actions. The bare
+  // "dec 12." left behind read as an acknowledgment; the honest line says nothing was tracked.
+  const r = speak('dec 12. noted.\n\n<protocol>actions: none | sources: conversation</protocol>', rec());
+  assert.equal(r.reply, `dec 12.\n\n${FALLBACK}`);
+  assert.equal(r.declared, true);
+  assert.deepEqual(r.violations, ['unbacked_action']);
 });
 
 test('P13 true statements still pass: the board, and "act on it" inside a sentence', () => {
@@ -115,8 +125,13 @@ test('P13 true statements still pass: the board, and "act on it" inside a senten
 
 test('P14 a claimed mode change is removed even when a tool ran (no tool changes a mode)', () => {
   const r = speak('got it, back in tag-only mode.', rec([ok('web_search')]));
-  assert.equal(r.reply, FALLBACK);
+  assert.equal(r.reply, MODE_NOTE);
   assert.deepEqual(r.violations, ['mode_claim']);
+});
+
+test('P21 the mode note only names phrases the directive detector actually recognizes', () => {
+  const phrases = [...MODE_NOTE.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(phrases.map((p) => detectDirective(p)?.mode), ['quiet', 'tag-only', 'normal']);
 });
 
 test('P15 a claim about the current mode passes only when it is the real mode', () => {

@@ -50,6 +50,7 @@ import { isMultiShard } from './shard.js';
 import { archiveFact, archiveBatch, searchDeepStorageFull, getDeepStorageStats } from './deep-storage.js';
 import { creditKnowledgeValue } from './compute-economics.js';
 import { addChange } from './knowledge-chain.js';
+import { learnedIn, offerableFacts, mergedProvenance, scopeOf } from './provenance.js';
 
 // LLM calls use llmChat from llm-provider.js (supports fallback chain)
 
@@ -546,6 +547,7 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
       category: correction.category,
       confidence: correction.confidence,
       tags: lesson?.tags || [],
+      learned: learnedIn({ chatType, chatId }),
     });
   }
 
@@ -565,6 +567,7 @@ export async function processCorrection(userMessage, previousJarvisResponse, use
       category: correction.category,
       confidence: correction.confidence,
       tags: lesson?.tags || [],
+      learned: learnedIn({ chatType, chatId }),
     });
     await saveGroupCKB(chatId);
   }
@@ -648,6 +651,8 @@ function addFactWithEconomics(ckb, factData) {
     accessCount: 0,
     tokenCost: 0,
     tags: factData.tags || [],
+    // Where it was learned (provenance.js). Decides which prompts it may be offered in.
+    learned: factData.learned || null,
   };
   newFact.tokenCost = estimateTokenCost(newFact);
 
@@ -836,7 +841,9 @@ async function saveSkills() {
 
 // ============ Learn Fact (Tool-Invoked) ============
 
-export async function learnFact(userId, userName, chatId, chatType, fact, category, tags) {
+// chatPublic: the chat is a group anyone can read (Telegram gives public groups a username).
+export async function learnFact(userId, userName, chatId, chatType, fact, category, tags, { chatPublic = false } = {}) {
+  const learned = learnedIn({ chatType, chatId, chatPublic });
   const userCKB = await loadUserCKB(userId);
   userCKB.username = userName;
   userCKB.interactionCount++;
@@ -853,6 +860,7 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
     content: fact,
     category: category || 'general',
     tags: tags || [],
+    learned,
   });
 
   await saveUserCKB(userId);
@@ -865,6 +873,7 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
       sourceUser: userName,
       category: category || 'general',
       tags: tags || [],
+      learned,
     });
     await saveGroupCKB(chatId);
   }
@@ -884,13 +893,14 @@ export async function learnFact(userId, userName, chatId, chatType, fact, catego
     addChange({
       type: 'fact_learned',
       userId: String(userId),
-      fact: { content: fact, category: category || 'general', tags: tags || [] },
+      fact: { content: fact, category: category || 'general', tags: tags || [], learned },
       valueDensity: factVD,
     }).catch(() => {});
   }
 
-  // Cross-shard learning bus — git-synced JSONL (shouldBroadcast handles threshold)
-  broadcastLearning(fact, category, tags, 'high').catch(() => {});
+  // Cross-shard learning bus — git-synced JSONL (shouldBroadcast handles threshold). Every prompt on
+  // every other shard reads the bus, whatever the chat, so only facts learned in public go on it.
+  if (learned.public) broadcastLearning(fact, category, tags, 'high').catch(() => {});
 
   return true;
 }
@@ -974,16 +984,21 @@ export async function buildKnowledgeContext(userId, chatId, chatType, messageTex
     } catch {
       // Apoptosis slow — skip, defer to next message
     }
+  }
 
+  // Only facts that may be offered in this chat (proposal 0003, provenance.js): a fact learned in a
+  // DM is never put into a group prompt.
+  const offered = offerableFacts(userCKB.facts, { scope: scopeOf(chatType), chatId });
+  if (offered.length > 0) {
     const ckbLabel = userCKB.username
       ? `Jarvisx${userCKB.username}`
       : `JarvisxUser${userId}`;
-    const occupation = computeCKBOccupation(userCKB.facts);
+    const occupation = computeCKBOccupation(offered);
 
-    parts.push(`--- CKB: ${ckbLabel} [${userCKB.knowledgeClass}] (${occupation}/${userCKB.tokenBudget} tokens, ${userCKB.facts.length} facts) ---`);
+    parts.push(`--- CKB: ${ckbLabel} [${userCKB.knowledgeClass}] (${occupation}/${userCKB.tokenBudget} tokens, ${offered.length} facts) ---`);
 
     // Sort by composite score: value density + relevance to current message
-    const scored = userCKB.facts.map(f => {
+    const scored = offered.map(f => {
       const vd = computeValueDensity(f, now);
       const rel = messageText ? scoreRelevance(f, messageText) : 0;
       return {
@@ -1280,6 +1295,7 @@ Rules:
         category: originals[0].category,
         confidence: Math.max(...originals.map(f => f.confidence || 0.8)),
         tags: [...new Set(originals.flatMap(f => f.tags || []))],
+        learned: mergedProvenance(originals.map(f => f.learned)),
       });
 
       mergeCount++;
@@ -1331,6 +1347,7 @@ export async function syncUserCKB(userId, incomingFacts) {
       category: fact.category,
       confidence: fact.confidence,
       tags: fact.tags || [],
+      learned: fact.learned || null,
     });
     added++;
   }

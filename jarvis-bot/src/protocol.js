@@ -60,10 +60,13 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 // ============ Inbound: the turn's record ============
 
+// Which kind of chat a turn is in: Telegram's private, group, supergroup and channel, or the web chat.
+export const scopeOf = (chatType) => (chatType === 'private' ? 'dm' : chatType === 'web' ? 'web' : 'group');
+
 // tools: every tool call the model made, in order, as { name, ok }. receipts: work code did for
 // this turn before the model ran, in the same shape (a fetched link is { name: 'web', ok: true }).
 export function turnRecord({ chatId = null, chatType = 'private', chatMode = null, fromId = null, tools = [], receipts = [] } = {}) {
-  const scope = chatType === 'private' ? 'dm' : chatType === 'web' ? 'web' : 'group';
+  const scope = scopeOf(chatType);
   const all = [...receipts, ...tools].map((t) => ({ name: String(t?.name || '').toLowerCase(), ok: !!t?.ok }));
   return { chatId, chatType, chatMode, fromId, scope, tools: all };
 }

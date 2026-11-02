@@ -5,6 +5,7 @@ import { config } from './config.js';
 import { loadSystemPrompt, getCellContext, getCellStats } from './memory.js';
 import { constitutionChanged } from './constitution.js';
 import { speak, turnRecord, protocolLine, stripProtocolLine } from './protocol.js';
+import { offerableFacts, scopeOf } from './provenance.js';
 import { ASK_SESSION_TOOL, queueSessionRequest, askSessionResult } from './session-requests.js';
 import { getChatMode } from './directives.js';
 import { recordHealthEvent } from './feed.js';
@@ -672,7 +673,7 @@ export function bufferAssistantMessage(chatId, message) {
 
 // receipts: work code did for this turn before the model ran, as { name, ok } (a fetched link is
 // { name: 'web', ok: true }), so the protocol can back a claim like "read the article" (protocol.js).
-export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId, receipts = [], messageId = null, chatTitle = null } = {}) {
+export async function chat(chatId, userName, message, chatType = 'private', media = [], { maxTokensOverride, userId, receipts = [], messageId = null, chatTitle = null, chatPublic = false } = {}) {
   // Six positional arguments invite swaps: the collision regeneration passed (prompt, chatId,
   // userName, ctx) and answered a user's name with no history. Fail loud instead (2026-11-01).
   if ((message != null && typeof message !== 'string') || (chatType != null && typeof chatType !== 'string') || !Array.isArray(media)) {
@@ -735,7 +736,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
       sanitizeHistory(history);
 
       try {
-        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts, { messageId, chatTitle });
+        return await _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts, { messageId, chatTitle, chatPublic });
       } finally {
         // Restore text-only content for persistence (no base64 stored)
         historyEntry.content = savedContent;
@@ -761,7 +762,7 @@ export async function chat(chatId, userName, message, chatType = 'private', medi
     }
     sanitizeHistory(history);
 
-    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts, { messageId, chatTitle });
+    return _sendToLLM(chatId, userName, chatType, history, maxTokensOverride, userId, receipts, { messageId, chatTitle, chatPublic });
   });
 }
 
@@ -1796,7 +1797,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           try {
             await learnFact(
               effectiveUserId, userName, chatId, chatType,
-              tb.input.fact, tb.input.category, tb.input.tags || []
+              tb.input.fact, tb.input.category, tb.input.tags || [], { chatPublic: turn.chatPublic }
             );
             result = `Learned: "${tb.input.fact}" — stored in persistent knowledge base.`;
             console.log(`[claude] Tool: learn_fact("${tb.input.fact.slice(0, 50)}...")`);
@@ -1805,7 +1806,10 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           }
         } else if (tb.name === 'recall_knowledge') {
           try {
-            const results = await searchDeepStorageFull(effectiveUserId, tb.input.query, tb.input.tags || [], 5);
+            // Only facts that may be offered in this chat (proposal 0003, provenance.js): the archive
+            // holds what was learned in DMs too. Search wider, then keep the first 5 allowed here.
+            const results = offerableFacts(await searchDeepStorageFull(effectiveUserId, tb.input.query, tb.input.tags || [], 25),
+              { scope: scopeOf(chatType), chatId }).slice(0, 5);
             if (results.length === 0) {
               result = 'No matching facts found in deep memory (L2 archive).';
             } else {
@@ -2485,7 +2489,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     // Free-tier quota (llm-meter, 2026-10-27): each follow-up is one more model request per message.
     // Context extraction overlaps the CKB extraction below; on only with JARVIS_CONTEXT_EXTRACT=on.
     if (process.env.JARVIS_CONTEXT_EXTRACT === 'on') {
-      _extractConversationContext(effectiveUserId, userName, chatId, chatType, messageText, assistantMessage).catch(() => {});
+      _extractConversationContext(effectiveUserId, userName, chatId, chatType, messageText, assistantMessage, turn.chatPublic).catch(() => {});
     }
 
     // Self-correcting feedback loop: score every response (fire-and-forget). One extra request per
@@ -2542,7 +2546,7 @@ const _contextExtractionThrottle = new Map(); // userId -> lastExtractTime
 const EXTRACTION_COOLDOWN = 60 * 1000; // 1 min between extractions per user
 const MAX_EXTRACTION_THROTTLE = 10000;
 
-async function _extractConversationContext(userId, userName, chatId, chatType, userMessage, assistantResponse) {
+async function _extractConversationContext(userId, userName, chatId, chatType, userMessage, assistantResponse, chatPublic = false) {
   if (!userMessage || userMessage.length < 30) return;
   if (!userId) return;
 
@@ -2577,7 +2581,7 @@ Return { "facts": [] } if nothing worth remembering. Be very selective — only 
     // Learn each extracted fact via the CKB pipeline
     for (const fact of result.facts.slice(0, 3)) {
       if (fact.content && fact.content.length > 5) {
-        await learnFact(userId, userName, chatId, chatType, fact.content, fact.category || 'factual', fact.tags || []);
+        await learnFact(userId, userName, chatId, chatType, fact.content, fact.category || 'factual', fact.tags || [], { chatPublic });
       }
     }
   } catch {

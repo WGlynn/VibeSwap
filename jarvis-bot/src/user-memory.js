@@ -14,6 +14,7 @@ import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { config } from './config.js';
+import { offerable } from './provenance.js';
 
 const DATA_DIR = config.dataDir;
 const MEMORIES_FILE = join(DATA_DIR, 'user-memories.json');
@@ -21,9 +22,13 @@ const MAX_MEMORIES_PER_USER = 20;
 
 // ============ State ============
 
-// userId (string) -> { userName, memories: string[] }
+// userId (string) -> { userName, memories: { text, learned }[] }. learned is where the memory was
+// learned (provenance.js); memories stored before provenance existed are plain strings, read as private.
 const userMemories = new Map();
 let dirty = false;
+
+const textOf = (m) => (typeof m === 'string' ? m : m?.text || '');
+const learnedOf = (m) => (typeof m === 'string' ? null : m?.learned || null);
 
 // ============ Init ============
 
@@ -53,10 +58,10 @@ export async function initUserMemory() {
 export function getUserMemory(userId) {
   const key = String(userId);
   const entry = userMemories.get(key);
-  return entry ? [...entry.memories] : [];
+  return entry ? entry.memories.map(textOf) : [];
 }
 
-export function addUserMemory(userId, memory) {
+export function addUserMemory(userId, memory, learned = null) {
   const key = String(userId);
   const trimmed = memory.trim();
   if (!trimmed) return;
@@ -70,7 +75,7 @@ export function addUserMemory(userId, memory) {
   // Deduplicate — skip if a similar memory already exists
   const normalized = trimmed.toLowerCase();
   const isDuplicate = entry.memories.some(existing => {
-    const existingNorm = existing.toLowerCase();
+    const existingNorm = textOf(existing).toLowerCase();
     // Exact match
     if (existingNorm === normalized) return true;
     // One contains the other (substring match for similar memories)
@@ -89,12 +94,12 @@ export function addUserMemory(userId, memory) {
     return;
   }
 
-  entry.memories.push(trimmed);
+  entry.memories.push({ text: trimmed, learned });
 
   // FIFO eviction if over limit
   while (entry.memories.length > MAX_MEMORIES_PER_USER) {
     const evicted = entry.memories.shift();
-    console.log(`[user-memory] Evicted oldest memory for user ${key}: "${evicted}"`);
+    console.log(`[user-memory] Evicted oldest memory for user ${key}: "${textOf(evicted)}"`);
   }
 
   dirty = true;
@@ -103,13 +108,16 @@ export function addUserMemory(userId, memory) {
 
 // ============ Context Injection ============
 
-export function getUserMemoryContext(userId) {
+// turn: { scope, chatId } of the chat the prompt is for. Only memories that may be offered there are
+// included (proposal 0003): a detail learned in a DM is never put into a group prompt.
+export function getUserMemoryContext(userId, turn) {
   const key = String(userId);
   const entry = userMemories.get(key);
-  if (!entry || entry.memories.length === 0) return '';
+  const offered = (entry?.memories || []).filter((m) => offerable(learnedOf(m), turn));
+  if (offered.length === 0) return '';
 
   const name = entry.userName || `user ${key}`;
-  const memoriesText = entry.memories.join('\n');
+  const memoriesText = offered.map(textOf).join('\n');
   return `[JARVIS MEMORY — What you remember about ${name}]:\n${memoriesText}`;
 }
 
@@ -231,7 +239,8 @@ const EXTRACTION_PATTERNS = [
   ],
 ];
 
-export async function extractAndStoreMemories(userId, userName, userMessage, assistantResponse) {
+// learned: where the message was sent (provenance.js learnedIn), stored with each memory.
+export async function extractAndStoreMemories(userId, userName, userMessage, assistantResponse, learned = null) {
   const key = String(userId);
 
   // Update userName if provided
@@ -257,7 +266,7 @@ export async function extractAndStoreMemories(userId, userName, userMessage, ass
       try {
         const memory = extractor(match);
         if (memory) {
-          addUserMemory(userId, memory);
+          addUserMemory(userId, memory, learned);
           extracted++;
         }
       } catch (err) {

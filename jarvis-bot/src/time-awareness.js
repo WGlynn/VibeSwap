@@ -1,13 +1,16 @@
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
+import { offerable } from './provenance.js';
 
 const DATA_DIR = config.dataDir;
 const TIMEZONE_FILE = join(DATA_DIR, 'user-timezones.json');
 
 // ============ State ============
 
-const userTimezones = new Map(); // userId -> IANA timezone string
+// userId -> { tz: IANA timezone, learned } (provenance.js); an entry stored before provenance existed
+// is a plain string and is read as private.
+const userTimezones = new Map();
 
 // ============ Timezone Detection Patterns ============
 
@@ -93,13 +96,20 @@ const CITY_TIMEZONES = {
 
 // ============ Timezone Management ============
 
-export function setUserTimezone(userId, timezone) {
-  userTimezones.set(String(userId), timezone);
+// learned: where the timezone was guessed from (provenance.js learnedIn).
+export function setUserTimezone(userId, timezone, learned = null) {
+  userTimezones.set(String(userId), { tz: timezone, learned });
   console.log(`[time] Set timezone for user ${userId}: ${timezone}`);
 }
 
-export function getUserTimezone(userId) {
-  return userTimezones.get(String(userId)) || null;
+// turn: { scope, chatId } of the chat asking. A timezone learned in a DM is not used in a group
+// (proposal 0003): the time context names it, and it says roughly where the person lives.
+export function getUserTimezone(userId, turn) {
+  const entry = userTimezones.get(String(userId));
+  if (!entry) return null;
+  const learned = typeof entry === 'string' ? null : entry.learned;
+  if (!offerable(learned, turn)) return null;
+  return typeof entry === 'string' ? entry : entry.tz || null;
 }
 
 // ============ Timezone Detection ============
@@ -155,8 +165,8 @@ export function detectTimezone(text) {
 
 // ============ Time Context ============
 
-export function getTimeContext(userId) {
-  const tz = getUserTimezone(String(userId)) || 'UTC';
+export function getTimeContext(userId, turn) {
+  const tz = getUserTimezone(String(userId), turn) || 'UTC';
 
   try {
     const now = new Date();
@@ -209,8 +219,8 @@ export function getTimeContext(userId) {
 
 // ============ Greeting ============
 
-export function getGreeting(userId) {
-  const tz = getUserTimezone(String(userId)) || 'UTC';
+export function getGreeting(userId, turn) {
+  const tz = getUserTimezone(String(userId), turn) || 'UTC';
 
   try {
     const now = new Date();

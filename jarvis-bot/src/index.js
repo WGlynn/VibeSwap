@@ -397,6 +397,7 @@ import { speak as jarvisSpeak, cleanup as ttsCleanup } from './tts.js';
 import { processYouTubeLinks } from './youtube.js';
 import { processWebLinks } from './web-reader.js';
 import { initUserMemory, getUserMemoryContext, extractAndStoreMemories, flushUserMemory } from './user-memory.js';
+import { learnedIn, scopeOf } from './provenance.js';
 import { initTimeAwareness, getTimeContext, detectTimezone, setUserTimezone, flushTimezones } from './time-awareness.js';
 import { initAttribution, autoAttributeContent, attributeSource, detectTextAttribution, attributeAgent, getGraphStats, getAuthorAttribution, flushAttribution, shutdownAttribution, SourceType } from './passive-attribution.js';
 import { initRelay, addRelayCommand, getPendingCommands, acknowledgeAll, flushRelay } from './relay.js';
@@ -6227,7 +6228,7 @@ async function sendChatResponse(ctx, chatId, userName, text, chatType, media = [
   try {
     noteBotInfo(ctx.botInfo);
     const response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
-      chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id, messageId: ctx.message?.message_id, chatTitle: ctx.chat?.title }));
+      chat(chatId, userName, text, chatType, media, { userId: ctx.from?.id, messageId: ctx.message?.message_id, chatTitle: ctx.chat?.title, chatPublic: !!ctx.chat?.username }));
     clearInterval(typingInterval);
     await saveConversations();
 
@@ -7332,13 +7333,14 @@ bot.on('text', async (ctx) => {
     }
 
     // Time awareness — inject current time context
-    const timeCtx = getTimeContext(String(ctx.from.id));
+    const timeCtx = getTimeContext(String(ctx.from.id), { scope: scopeOf(ctx.chat?.type), chatId: ctx.chat?.id });
     if (timeCtx) {
       messageForLLM = `${messageForLLM}\n\n${timeCtx}`;
     }
 
-    // User memory — inject what JARVIS remembers about this person
-    const memCtx = getUserMemoryContext(String(ctx.from.id));
+    // User memory — inject what JARVIS remembers about this person, only what may be offered in this
+    // chat (proposal 0003): a detail learned in a DM is never put into a group prompt.
+    const memCtx = getUserMemoryContext(String(ctx.from.id), { scope: scopeOf(ctx.chat?.type), chatId: ctx.chat?.id });
     if (memCtx) {
       messageForLLM = `${messageForLLM}\n\n${memCtx}`;
     }
@@ -7418,7 +7420,7 @@ bot.on('text', async (ctx) => {
         // withTurn tags every meter row this call produces (tool rounds, 429/503 rotations,
         // and the background work chat() spawns) with one id, so calls per message is countable.
         response = await withTurn(`${chatId}:${ctx.message?.message_id}`, () =>
-          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id, receipts: turnReceipts, messageId: ctx.message?.message_id, chatTitle: ctx.chat?.title }));
+          chat(chatId, userName, messageForLLM, ctx.chat.type, [], { userId: ctx.from.id, receipts: turnReceipts, messageId: ctx.message?.message_id, chatTitle: ctx.chat?.title, chatPublic: !!ctx.chat?.username }));
         break; // Success — exit retry loop
       } catch (chatErr) {
         const errMsg = (chatErr?.message || '').toLowerCase();
@@ -7455,7 +7457,7 @@ bot.on('text', async (ctx) => {
     await saveConversations();
 
     // Learn about user (non-blocking)
-    extractAndStoreMemories(String(ctx.from.id), userName, ctx.message.text, response.text).catch(() => {});
+    extractAndStoreMemories(String(ctx.from.id), userName, ctx.message.text, response.text, learnedIn({ chatType: ctx.chat?.type, chatId: ctx.chat?.id, chatPublic: !!ctx.chat?.username })).catch(() => {});
 
     // Passive attribution — scan message text for attribution signals (non-blocking)
     try { detectTextAttribution(ctx.message.text); } catch {}
@@ -7507,7 +7509,7 @@ bot.on('text', async (ctx) => {
     // Detect timezone from message (non-blocking)
     const detectedTz = detectTimezone(ctx.message.text);
     if (detectedTz) {
-      setUserTimezone(String(ctx.from.id), detectedTz);
+      setUserTimezone(String(ctx.from.id), detectedTz, learnedIn({ chatType: ctx.chat?.type, chatId: ctx.chat?.id, chatPublic: !!ctx.chat?.username }));
       flushTimezones().catch(() => {});
     }
 

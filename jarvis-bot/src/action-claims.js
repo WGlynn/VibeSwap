@@ -57,13 +57,19 @@ const futurePromise = s => {
 // Bare "logged" / "noted" count only as the opening word ("Logged.", "Noted, thanks"). Inside a
 // sentence they describe state: "conversation history logged locally" is true by design (Article
 // 2.5) and was being removed (found replaying the feed through the protocol, 2026-11-01).
-const STOCK = /\b(consider it (?:done|handled|logged|noted)|done and done|noted and (?:saved|logged|stored)|will do|tracking (?:this|that|it) now)\b|^\s*(?:logged|noted)\b/i;
+// An acknowledgment in front of the claim is still the claim: "got it, logged." went out on 2026-11-03
+// with nothing saved, because the opening-word checks below looked only at the sentence's first word.
+const ACK = String.raw`(?:(?:got it|gotcha|ok(?:ay)?|sure|yep|yes|yeah|alright|all right|cool|done|perfect|great|thanks|noted|roger|understood)[,.!:;]?\s+)*`;
+const STOCK = new RegExp(String.raw`\b(consider it (?:done|handled|logged|noted)|done and done|noted and (?:saved|logged|stored)|will do|tracking (?:this|that|it) now)\b|^\s*${ACK}(?:logged|noted)\b`, 'i');
 // "on it" is a promise only as the reply itself ("On it.", "I'm on it"); inside a sentence it is
 // ordinary English ("adopt a premise, act on it", a private group chat, 2026-11-01).
 const ON_IT = /^\s*(?:(?:i'm|i am|we're|we are)\s+)?on it\b/i;
 // True statements about the shared notes pass: the board, people, topics and repos notes are real
 // files written by Will's session and loaded into this prompt, so "already on the project board" is honest.
-const SUBJECTLESS = /^\s*(?:saved|logged|tracked|added|stored|recorded|updated|scheduled|filed|queued|bookmarked|pinned|remembered)\b(?!\s+by\b)/i;
+const SUBJECTLESS = new RegExp(String.raw`^\s*${ACK}(?:saved|logged|tracked|added|stored|recorded|updated|scheduled|filed|queued|bookmarked|pinned|remembered)\b(?!\s+by\b)`, 'i');
+// Plain past "I logged it": the claim forms above need "I've", "I'll" or "I just". Only verbs that mean
+// storing something, with what was stored right after, so "I logged in" and "I noted earlier" pass.
+const STORED_PAST = /\bi\s+(?:just\s+)?(?:logged|saved|stored|recorded|bookmarked|pinned|filed|queued)\s+(?:it|that|this|them|those|these|your|his|her|their|the|a|an)\b/i;
 const SHARED_STATE = /\b(project board|projects? note|my notes|the board|people note|topics note|repos note|shared notes|already (?:on|in) (?:the|my) (?:board|notes))\b/i;
 export const FALLBACK = "I can't take actions from this chat on my own. Will's Claude Code session reads it and acts.";
 
@@ -95,8 +101,11 @@ export function splitSentences(text) {
 // One sentence, no tool receipt: does it claim a first-person action (done, doing or promised)?
 // A reference to the shared board passes only as a statement of state, never as 'I added/will add'.
 export function claimsAction(s) {
+  // A sentence that opens with the action is a claim even when it names the board: "Added it to the
+  // board." is what a model says when nothing was added, and it passed as a statement of state.
+  if (SUBJECTLESS.test(s) || STORED_PAST.test(s)) return true;
   const stateRef = SHARED_STATE.test(s) && !/\bI(?:'ve| have| had| just| am now|'m now| will|'ll| am going to)\b/i.test(s);
-  return (CLAIM.test(s) || FUTURE_EXPERIMENT.test(s) || futurePromise(s) || STOCK.test(s) || ON_IT.test(s) || SUBJECTLESS.test(s)) && !stateRef;
+  return (CLAIM.test(s) || FUTURE_EXPERIMENT.test(s) || futurePromise(s) || STOCK.test(s) || ON_IT.test(s)) && !stateRef;
 }
 
 // One sentence: is it a promise (an action claimed for now or later, not one already done)? A

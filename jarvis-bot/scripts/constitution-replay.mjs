@@ -14,6 +14,7 @@ import { homedir } from 'os';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { gateFakeActions } from '../src/action-claims.js';
+import { speak, turnRecord } from '../src/protocol.js';
 import { parseConstitution, CONSTITUTION_PATH } from '../src/constitution.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -71,7 +72,15 @@ const blocked = health.filter(e => e.kind === 'fake_action_blocked' && inWindow(
 const blockedByPath = {};
 for (const e of blocked) blockedByPath[e.where || 'unknown'] = (blockedByPath[e.where || 'unknown'] || 0) + 1;
 const withReceipt = model.filter(r => Number.isFinite(r.toolsRan));
-const unbackedReached = withReceipt.filter(r => gateFakeActions(r.out, { toolsRan: r.toolsRan }).changed).length;
+// A reply that went through the protocol object logged its record's tools, including work code did
+// before the model ran (a request it queued). toolsRan counts only the model's own calls, so it read a
+// backed "queued for Will's session, I'll confirm here" as unbacked (2026-11-03). Judge those replies
+// the way the protocol did, against their own record.
+const unbacked = (r) => (Array.isArray(r.protocol?.tools)
+  ? speak(r.out, turnRecord({ chatType: r.chat?.type, tools: r.protocol.tools.map(t => ({ name: String(t).replace(/:failed$/, ''), ok: !String(t).endsWith(':failed') })) }))
+    .violations.some(v => v.startsWith('unbacked'))
+  : gateFakeActions(r.out, { toolsRan: r.toolsRan }).changed);
+const unbackedReached = withReceipt.filter(unbacked).length;
 const withoutReceipt = model.length - withReceipt.length;
 const claimShapedUnknown = model.filter(r => !Number.isFinite(r.toolsRan) && gateFakeActions(r.out, { toolsRan: 0 }).changed).length;
 

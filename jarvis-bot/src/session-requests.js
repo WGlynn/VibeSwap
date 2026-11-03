@@ -159,6 +159,31 @@ export function markDelivered(id) {
   writeFileSync(DELIVERED_PATH, JSON.stringify(delivered.slice(-2000)));
 }
 
+// The session can answer a request itself, in its chat, through POST /api/say. Then the receipt needs no
+// confirmation: a second reply only restates the session's notes to itself, which is how "keeping the
+// personal June parts out" reached a group (2026-11-03). /api/say records each reply here.
+const ANSWERED_PATH = join(FEED_DIR, 'answered-in-chat.json');
+
+export function noteSessionReply(chatId, replyToMessageId) {
+  if (chatId == null || replyToMessageId == null) return;
+  const key = `${chatId}:${replyToMessageId}`;
+  let answered = [];
+  try { answered = existsSync(ANSWERED_PATH) ? JSON.parse(readFileSync(ANSWERED_PATH, 'utf-8')) : []; } catch {}
+  if (answered.includes(key)) return;
+  answered.push(key);
+  mkdirSync(FEED_DIR, { recursive: true });
+  writeFileSync(ANSWERED_PATH, JSON.stringify(answered.slice(-2000)));
+}
+
+export function answeredInChat(request) {
+  if (request?.chat?.id == null || request?.messageId == null) return false;
+  try {
+    return JSON.parse(readFileSync(ANSWERED_PATH, 'utf-8')).includes(`${request.chat.id}:${request.messageId}`);
+  } catch {
+    return false;
+  }
+}
+
 // The second call's prompt: confirm from the receipt alone.
 export function confirmationPrompt({ receipt, request }) {
   const who = request.from?.name || 'the person who asked';
@@ -168,5 +193,6 @@ export function confirmationPrompt({ receipt, request }) {
     `They asked (${request.action}): ${request.summary}`,
     `Status: ${status}. What the session did, in its words: ${clip(receipt.summary, 500)}`,
     `Write a short reply to ${who} in this chat confirming this. State only what the receipt says; if it was declined, say so and why.`,
+    `Everyone in this chat reads it: say in plain words what was done for ${who}. Never repeat the session's notes to itself, such as message numbers, what it left out, or how it went about it.`,
   ].join('\n');
 }

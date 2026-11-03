@@ -270,7 +270,7 @@ try {
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
-import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest, queueFromMessage } from './session-requests.js';
+import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest, queueFromMessage, noteSessionReply, answeredInChat } from './session-requests.js';
 import { turnRecord, QUEUED_NOTE } from './protocol.js';
 import { quickReply, isBareAck } from './quick-reply.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
@@ -8165,6 +8165,12 @@ async function main() {
         recordHealthEvent({ kind: 'session_receipt_not_sent', requestId: receipt.id, reason: !target ? 'no chat' : String(target).startsWith('web-') ? 'web chat' : 'chat mode' });
         continue;
       }
+      // The session already answered in the chat (POST /api/say, replying to the request's message).
+      if (answeredInChat(request)) {
+        markDelivered(receipt.id);
+        recordHealthEvent({ kind: 'session_receipt_not_sent', requestId: receipt.id, reason: 'answered in chat' });
+        continue;
+      }
       try {
         if (receipt.status === 'done') await reloadSystemPrompt(); // the notes it changed reach the prompt
         const res = await chat(target, 'jarvis-session', confirmationPrompt({ receipt, request }), request.chat?.type || 'private', [], {
@@ -9069,6 +9075,8 @@ async function main() {
             const extra = { parse_mode: undefined };
             if (payload.replyToMessageId) extra.reply_parameters = { message_id: Number(payload.replyToMessageId) };
             const sent = await bot.telegram.sendMessage(chatId, text, extra);
+            // A session reply to a request's message is the answer; its receipt then gets no second reply.
+            if (payload.replyToMessageId) noteSessionReply(chatId, payload.replyToMessageId);
             recordOutgoing(chatId, text);
             if (chatId.startsWith('-')) pushGroupMessage(chatId, 'JARVIS', text.slice(0, 500), null, true);
             console.log(`[api] /api/say posted ${text.length} chars to chat ${chatId} (message ${sent.message_id})`);

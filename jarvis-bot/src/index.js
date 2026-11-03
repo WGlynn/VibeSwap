@@ -270,7 +270,8 @@ try {
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
-import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest } from './session-requests.js';
+import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest, queueFromMessage } from './session-requests.js';
+import { turnRecord, QUEUED_NOTE } from './protocol.js';
 import { quickReply, isBareAck } from './quick-reply.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
 import { noteBotInfo, noteChatTitle, noteContextReport } from './self-state.js';
@@ -6957,6 +6958,28 @@ bot.on('text', async (ctx) => {
     const basicQuality = Math.min(1 + (msgText.length > 50 ? 1 : 0) + (msgText.length > 200 ? 1 : 0) + (msgText.includes('?') ? 1 : 0), 5);
     trackForThread(ctx.chat.id, ctx.from.id, userName, msgText, basicQuality, ctx.message.message_id);
 
+    // ============ Act first, then speak, when the bot was not named (Will 2026-11-03) ============
+    // Will replied to his own message with "Save this to memory as a logical primitive" without naming
+    // the bot: nothing was queued, and the proactive path answered "noted." for a save nobody did. An
+    // action ask from Will goes to his own session wherever he says it, with the message it replied to.
+    // Anyone else's unaddressed ask gets no proactive reply; naming the bot queues it on the addressed path.
+    const unaddressedAsk = detectActionRequest(msgText);
+    if (unaddressedAsk && String(ctx.from.id) === String(config.ownerUserId)) {
+      const queued = queueFromMessage({ chat: ctx.chat, from: ctx.from, message: ctx.message, userName, isOwner: true }, unaddressedAsk.action);
+      if (queued.id) {
+        console.log(`[session] queued request ${queued.id} (${unaddressedAsk.action}) from ${userName}, bot not named`);
+        await ctx.reply(QUEUED_NOTE, { parse_mode: undefined });
+        pushGroupMessage(ctx.chat.id, persona === 'degen' ? 'DIABLO' : 'JARVIS', QUEUED_NOTE, null, true);
+        bufferAssistantMessage(ctx.chat.id, QUEUED_NOTE);
+        recordOutgoing(String(ctx.chat.id), QUEUED_NOTE);
+        recordExchange(ctx, msgText, QUEUED_NOTE, { noModel: true });
+        return;
+      }
+      console.warn(`[session] could not queue ${userName}'s request: ${queued.error}`);
+    }
+    // What every proactive reply below is checked against (protocol.js): no tool runs on this path.
+    const proactiveRecord = turnRecord({ chatId: ctx.chat.id, chatType: ctx.chat.type, chatMode: getChatMode(ctx.chat.id), fromId: ctx.from.id });
+
     // Check if thread is worth archiving (skip in directive-restricted chats)
     if (!shouldSuppress(ctx.chat.id, 'archive') && shouldSuggestArchival(ctx.chat.id)) {
       ctx.reply('This conversation is getting good. Use /archive if you want to save it as a knowledge artifact.');
@@ -7006,7 +7029,7 @@ bot.on('text', async (ctx) => {
             confidence: 1.0,
           };
           try {
-            const reply = await generateProactiveResponse(backslashText, userName, analysis.response_hint, getSystemPrompt(), recentCtx);
+            const reply = await generateProactiveResponse(backslashText, userName, analysis.response_hint, getSystemPrompt(), recentCtx, { record: proactiveRecord });
             if (reply) {
               let clean = stripGroupMarkdown(reply);
               clean = sanitizeOutput(clean);
@@ -7038,7 +7061,7 @@ bot.on('text', async (ctx) => {
     const shouldSkipProactive = (persona !== 'degen' && msgAddressesDiablo)
       || (persona === 'degen' && msgAddressesJarvis && !msgAddressesDiablo);
 
-    if (msgText.length >= 3 && !shouldSkipProactive && !shouldSuppress(ctx.chat.id, 'proactive')) {
+    if (msgText.length >= 3 && !unaddressedAsk && !shouldSkipProactive && !shouldSuppress(ctx.chat.id, 'proactive')) {
       try {
         // Feed real recent context instead of '' — the group context primitive provides this
         let recentCtx = getRecentContext(ctx.chat.id, 10);
@@ -7128,7 +7151,7 @@ bot.on('text', async (ctx) => {
           const useCRPC = analysis.confidence >= 0.9;
           const proactiveReply = await generateProactiveResponse(
             msgText, userName, analysis.response_hint, getSystemPrompt(), recentCtx,
-            { useCRPC, normAction: analysis.norm_action || null }
+            { useCRPC, normAction: analysis.norm_action || null, record: proactiveRecord }
           );
           if (proactiveReply) {
             let cleanReply = stripGroupMarkdown(proactiveReply);
@@ -7173,7 +7196,7 @@ bot.on('text', async (ctx) => {
             await new Promise(r => setTimeout(r, 2000));
             const retryAnalysis = await analyzeMessage(msgText, userName, getRecentContext(ctx.chat.id, 10));
             if (retryAnalysis.action === 'engage' && retryAnalysis.response_hint) {
-              const retryReply = await generateProactiveResponse(msgText, userName, retryAnalysis.response_hint, getSystemPrompt(), getRecentContext(ctx.chat.id, 10));
+              const retryReply = await generateProactiveResponse(msgText, userName, retryAnalysis.response_hint, getSystemPrompt(), getRecentContext(ctx.chat.id, 10), { record: proactiveRecord });
               if (retryReply) {
                 let cleanRetry = stripGroupMarkdown(retryReply);
                 cleanRetry = sanitizeOutput(cleanRetry);
@@ -7389,10 +7412,7 @@ bot.on('text', async (ctx) => {
     const addressedToBot = ctx.chat.type === 'private' || isMentioned || isReplyToBot || isCalledByName;
     const actionAsk = addressedToBot ? detectActionRequest(ctx.message.text) : null;
     if (actionAsk) {
-      const queued = queueSessionRequest({
-        chatId: ctx.chat.id, chatType: ctx.chat.type, chatTitle: ctx.chat.title, messageId: ctx.message.message_id,
-        userId: ctx.from.id, userName, isOwner: String(ctx.from.id) === String(config.ownerUserId),
-      }, { action: actionAsk.action, summary: `${userName}: ${ctx.message.text}` });
+      const queued = queueFromMessage({ chat: ctx.chat, from: ctx.from, message: ctx.message, userName, isOwner: String(ctx.from.id) === String(config.ownerUserId) }, actionAsk.action);
       if (queued.id) {
         turnReceipts.push({ name: 'ask_session', ok: true });
         messageForLLM += `\n\n[SESSION REQUEST ${queued.id}] Code already queued this message for Will's Claude Code session${queued.needsApproval ? ', where it waits for his approval' : ''}. Do not call ask_session for it again. In one short line, say it is queued, not done, and that you will confirm here when it is; then answer anything else they asked.`;

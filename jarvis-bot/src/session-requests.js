@@ -113,6 +113,18 @@ export function queueSessionRequest(ctx, input = {}) {
   return { id: request.id, needsApproval };
 }
 
+// The request a Telegram message makes, with the message it replied to in details, so the session can
+// act on "save this": Will's "Save this to memory as a logical primitive" (2026-11-03) meant his
+// previous message, and the text alone does not say what "this" is.
+export function queueFromMessage({ chat, from, message, userName, isOwner }, action) {
+  const quoted = message?.reply_to_message?.text || message?.reply_to_message?.caption || '';
+  const author = message?.reply_to_message?.from?.username || message?.reply_to_message?.from?.first_name || 'someone';
+  return queueSessionRequest(
+    { chatId: chat?.id, chatType: chat?.type, chatTitle: chat?.title, messageId: message?.message_id, userId: from?.id, userName, isOwner },
+    { action, summary: `${userName}: ${message?.text || message?.caption || ''}`, details: quoted ? `In reply to ${author}: "${quoted}"` : undefined },
+  );
+}
+
 // The tool result the model sees. It tells the model what is true now: queued, not done.
 export function askSessionResult(q) {
   if (q.error) return `Failed to queue: ${q.error}`;

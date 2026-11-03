@@ -5,6 +5,8 @@ import { llmChat } from './llm-provider.js';
 import { recordUsage } from './compute-economics.js';
 import { getTriageModifier, getResponseModifier } from './persona.js';
 import { runLocalCRPC } from './crpc.js';
+import { speak, turnRecord } from './protocol.js';
+import { recordHealthEvent } from './feed.js';
 
 // ============ Adaptive Triage — Reward Signal Feedback Loop ============
 // Paper: "On Information Self-Locking in RL for Active Reasoning of LLM agents"
@@ -316,8 +318,22 @@ For MODERATE: include "violation" and "severity": "low"|"medium"|"high". Only fo
 // ============ Generate Proactive Response ============
 // Two-phase orchestrator: cheap model drafts, Haiku quality-gates.
 // "I M J A R V I S" — Claude reasoning on every response, cheap models do grunt work.
+//
+// Every proactive reply passes the protocol object, as chat() replies do (protocol.js). It is written
+// from the same system prompt, which asks for a closing <protocol> line, and no tool runs on this path,
+// so a reply that claims an action has nothing behind it. Live 2026-11-03: a CRPC reply went out with
+// its <protocol> line showing and "noted." for a save nobody did. opts.record is the turn's record.
+export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, opts = {}) {
+  const raw = await draftProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, opts);
+  if (!raw) return raw;
+  const spoken = speak(raw, opts.record || turnRecord({ chatType: 'group' }));
+  if (spoken.violations.length) {
+    recordHealthEvent({ kind: 'fake_action_blocked', where: 'proactive', chatType: opts.record?.chatType || 'group', violations: spoken.violations, removed: spoken.removed.map((x) => x.slice(0, 160)) });
+  }
+  return spoken.reply || null;
+}
 
-export async function generateProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, { useCRPC = false, normAction = null } = {}) {
+async function draftProactiveResponse(text, userName, responseHint, systemPrompt, recentContext, { useCRPC = false, normAction = null } = {}) {
   try {
     const contextBlock = recentContext
       ? `<recent_conversation>\n${recentContext}\n</recent_conversation>\n\n`

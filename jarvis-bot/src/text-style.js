@@ -2,7 +2,10 @@
 //
 // Prompt rules drift, so this is enforced at transport level. Telegraf builds a new Telegram
 // instance per update, so the filter wraps Telegram.prototype.callApi: every outgoing message,
-// edit and caption (handlers, reply pacer, boot DMs, broadcasts) passes through it.
+// edit and caption (handlers, reply pacer, boot DMs, broadcasts) passes through it. The same
+// filter removes anything protocol-shaped (protocol.js stripProtocolBlocks).
+
+import { stripProtocolBlocks } from './protocol.js';
 
 const DASHES = /[—–]/;
 
@@ -21,8 +24,8 @@ export function installDashFilter(Telegram) {
   if (original.__dashFiltered) return;
   const filtered = function (method, payload, opts) {
     if (payload && typeof payload === 'object') {
-      if (typeof payload.text === 'string') payload = { ...payload, text: stripDashes(payload.text) };
-      if (typeof payload.caption === 'string') payload = { ...payload, caption: stripDashes(payload.caption) };
+      if (typeof payload.text === 'string') payload = { ...payload, text: stripDashes(stripProtocolBlocks(payload.text)) };
+      if (typeof payload.caption === 'string') payload = { ...payload, caption: stripDashes(stripProtocolBlocks(payload.caption)) };
     }
     return original.call(this, method, payload, opts);
   };

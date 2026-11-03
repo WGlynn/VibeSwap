@@ -240,6 +240,15 @@ export function protocolLine(p) {
   return `<protocol>actions: ${acts.length ? acts.join('; ') : 'none'} | sources: ${sources}</protocol>`;
 }
 
+// For the transport filter (text-style.js): every message Telegram is asked to send loses anything
+// protocol-shaped, whichever path wrote it. The proactive path skipped the protocol object and showed
+// its closing <protocol> line in a group (2026-11-03). Text with nothing protocol-shaped is unchanged.
+const SHAPED = /<\s*protocol\s*>|(?:^|\n)[ \t]*[`*_]*\[?protocol\]?[`*_]*[ \t]*:?[ \t]*actions[ \t]*:/i;
+export function stripProtocolBlocks(text) {
+  if (typeof text !== 'string' || !SHAPED.test(text)) return text;
+  return parseDeclaration(text).reply;
+}
+
 // History turns end with the protocol line; anything that reads them as replies (the room's
 // question count, knowledge extraction) reads them without it.
 export function stripProtocolLine(text) {

@@ -2,6 +2,7 @@ import simpleGit from 'simple-git';
 import { existsSync } from 'fs';
 import { config } from './config.js';
 import { getCKBDataFiles } from './ckb-generator.js';
+import { changedAmong } from './tool-guard.js';
 
 const REPO_PATH = config.repo.path;
 const repoExists = existsSync(REPO_PATH);
@@ -72,17 +73,14 @@ export async function gitPull() {
 // (repo-relative paths, forward slashes), only those of them that git reports as changed or new are
 // staged, and the commit names them (git commit -- <files>), so nothing else in the index rides along.
 // Without a list the whole tree is staged, as before: that path is the owner's explicit /commit.
-function changedAmong(status, files) {
-  const changed = new Set([...status.modified, ...status.not_added, ...status.created, ...status.staged, ...status.renamed.map(r => r.to)]);
-  return files.filter(f => changed.has(f));
-}
-
+// changedAmong (tool-guard.js) picks the listed files git reports as changed or new.
 async function stageAndCommit(status, fullMessage, files) {
   if (Array.isArray(files)) {
     const toCommit = changedAmong(status, files);
     if (toCommit.length === 0) return false;
-    await git.add(toCommit);
-    await git.commit(fullMessage, toCommit);
+    // "--" first, so a file whose name starts with a dash is a path to git, never an option
+    await git.add(['--', ...toCommit]);
+    await git.commit(fullMessage, ['--', ...toCommit]);
     return true;
   }
   if (!status.modified.length && !status.not_added.length && !status.staged.length) return false;

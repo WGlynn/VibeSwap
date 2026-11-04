@@ -41,7 +41,7 @@ import { PANTHEON_TOOLS, PANTHEON_TOOL_NAMES, handlePantheonTool } from './panth
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 import { ARCHIVE_TOOLS, ARCHIVE_TOOL_NAMES, handleArchiveTool } from './tools-archive.js';
 import { runLocalCRPC } from './crpc.js';
-import { offeredTools, readFileTool, runCommandTool, isDeniedPath, SECRET_REFUSAL } from './tool-guard.js';
+import { offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL } from './tool-guard.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -470,30 +470,14 @@ const CODE_GEN_TOOLS = [
   },
 ];
 
-async function handleCodeGenTool(toolName, input) {
+// guard = { userId, ownerUserId, repoPath, written }: who asked, and the list the branch commit stages.
+async function handleCodeGenTool(toolName, input, guard) {
   try {
-    if (toolName === 'write_file') {
-      const fullPath = safeRepoPath(input.path);
-      const dir = resolve(fullPath, '..');
-      await mkdir(dir, { recursive: true });
-      await writeFile(fullPath, input.content, 'utf-8');
-      return `Wrote ${input.content.length} chars to ${input.path}`;
-    }
-    if (toolName === 'edit_file') {
-      const fullPath = safeRepoPath(input.path);
-      if (!existsSync(fullPath)) return `File not found: ${input.path}`;
-      const content = await readFile(fullPath, 'utf-8');
-      if (!content.includes(input.old_string)) {
-        return `old_string not found in ${input.path}. Read the file first to get the exact text.`;
-      }
-      const occurrences = content.split(input.old_string).length - 1;
-      if (occurrences > 1) {
-        return `old_string found ${occurrences} times in ${input.path}. Provide more context to make it unique.`;
-      }
-      const newContent = content.replace(input.old_string, input.new_string);
-      await writeFile(fullPath, newContent, 'utf-8');
-      return `Edited ${input.path}: replaced ${input.old_string.length} chars with ${input.new_string.length} chars`;
-    }
+    // write_file and edit_file: owner only, inside the repo on the real path, no secret file, nothing
+    // under .git (tool-guard.js, 2026-11-04). Before, a prefix check that followed no link was the
+    // only gate. A successful write lands on guard.written, which the branch commit stages by name.
+    if (toolName === 'write_file') return await writeFileTool(input, guard);
+    if (toolName === 'edit_file') return await editFileTool(input, guard);
     if (toolName === 'search_code') {
       // BOT-103: Use execFileSync with array args to prevent shell injection via pattern
       const { execFileSync } = await import('child_process');
@@ -537,7 +521,7 @@ async function handleCodeGenTool(toolName, input) {
  * Generate code from an idea description. Claude gets file read/write tools.
  * Returns: { text: string, filesWritten: string[] }
  */
-export async function codeGenChat(ideaDescription, author) {
+export async function codeGenChat(ideaDescription, author, { userId } = {}) {
   const codeGenPrompt = `${systemPrompt}
 
 # CODE GENERATION MODE
@@ -562,7 +546,12 @@ Use the tools to read existing files for reference and write new files.`;
     content: `Generate code for this idea:\n\n${ideaDescription}`,
   }];
 
+  // The repo-relative paths the guard wrote (write_file and edit_file both push), which the branch
+  // commit stages by name. Anyone but the owner is not offered the owner-only tools here either,
+  // and a call that arrives anyway is refused at execution (tool-guard.js, 2026-11-04).
   const filesWritten = [];
+  const guard = { userId, ownerUserId: config.ownerUserId, repoPath: REPO_PATH, written: filesWritten };
+  const tools = offeredTools(CODE_GEN_TOOLS, userId, config.ownerUserId);
   const codeGenTools = []; // receipts for the protocol object, as in chat()
   let rounds = 0;
 
@@ -572,7 +561,7 @@ Use the tools to read existing files for reference and write new files.`;
       max_tokens: 8192,
       system: codeGenPrompt,
       messages,
-      tools: CODE_GEN_TOOLS,
+      tools,
     });
 
     while (response.stop_reason === 'tool_use' && rounds < 10) {
@@ -582,11 +571,8 @@ Use the tools to read existing files for reference and write new files.`;
 
       const toolResults = [];
       for (const tb of toolBlocks) {
-        const result = await handleCodeGenTool(tb.name, tb.input);
-        codeGenTools.push({ name: tb.name, ok: !/^(?:error|failed)/i.test(String(result)) });
-        if (tb.name === 'write_file') {
-          filesWritten.push(tb.input.path);
-        }
+        const result = await handleCodeGenTool(tb.name, tb.input, guard);
+        codeGenTools.push({ name: tb.name, ok: !/^(?:error|failed|refused)/i.test(String(result)) });
         toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: result });
         console.log(`[codegen] Tool: ${tb.name}(${tb.input.path || ''}) → ${result.slice(0, 80)}`);
       }
@@ -597,7 +583,7 @@ Use the tools to read existing files for reference and write new files.`;
         max_tokens: 8192,
         system: codeGenPrompt,
         messages,
-        tools: CODE_GEN_TOOLS,
+        tools,
       });
     }
 
@@ -1835,25 +1821,12 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           result = await readFileTool(tb.input, { userId, ownerUserId: config.ownerUserId, repoPath: REPO_PATH });
           console.log(`[claude] Tool: read_file("${tb.input?.path}") → ${result.startsWith('Refused') ? result.slice(0, 60) : `${result.length} chars`}`);
         } else if (tb.name === 'write_file') {
-          try {
-            const filePath = join(REPO_PATH, tb.input.path);
-            // Safety: ensure path is within repo
-            const resolved = resolve(filePath);
-            const repoResolved = resolve(REPO_PATH);
-            if (!resolved.startsWith(repoResolved)) {
-              result = 'Blocked: write_file path must be within the repository.';
-            } else {
-              // Ensure parent directory exists
-              const parentDir = resolve(filePath, '..');
-              await mkdir(parentDir, { recursive: true });
-              await writeFile(filePath, tb.input.content, 'utf-8');
-              filesWrittenInLoop.push(tb.input.path);
-              result = `Written ${tb.input.content.length} chars to ${tb.input.path}`;
-              console.log(`[claude] Tool: write_file("${tb.input.path}") → ${tb.input.content.length} chars`);
-            }
-          } catch (err) {
-            result = `Failed to write file: ${err.message}`;
-          }
+          // Owner only, inside the repo on the real path, no secret file, nothing under .git
+          // (tool-guard.js, 2026-11-04). Before, a prefix check that followed no link was the only
+          // gate, for anyone in any chat. A successful write lands on filesWrittenInLoop, which the
+          // auto-commit below stages by name, never -A.
+          result = await writeFileTool(tb.input, { userId, ownerUserId: config.ownerUserId, repoPath: REPO_PATH, written: filesWrittenInLoop });
+          console.log(`[claude] Tool: write_file("${tb.input?.path}") → ${result.slice(0, 80)}`);
         } else if (tb.name === 'run_command') {
           // Owner only, the BOT-101 allowlist, no secret path, and a child environment without the
           // bot's secrets (tool-guard.js, 2026-11-04).
@@ -2367,7 +2340,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
       try {
         const fileList = filesWrittenInLoop.join(', ');
         const commitMsg = `jarvis: auto-commit ${filesWrittenInLoop.length} file(s)\n\nFiles: ${fileList}\nTriggered by: ${userName || 'unknown'} in ${chatType}`;
-        const pushResult = await gitCommitAndPush(commitMsg);
+        // The written files only (git.js stageAndCommit): the owner's other uncommitted work stays out.
+        const pushResult = await gitCommitAndPush(commitMsg, filesWrittenInLoop);
         console.log(`[claude] Auto-commit after write_file: ${pushResult}`);
       } catch (err) {
         console.error(`[claude] Auto-commit failed: ${err.message}`);

@@ -227,3 +227,11 @@ export async function editFileTool(input, { userId, ownerUserId, repoPath, writt
   if (Array.isArray(written)) written.push(rel);
   return `Edited ${rel}: replaced ${oldString.length} chars with ${newString.length} chars`;
 }
+
+// The auto-commit after a write (git.js stageAndCommit) stages only the listed files that git
+// reports as changed or new, never -A, so the owner's other uncommitted work does not ride along.
+// status is simple-git's StatusResult; files are repo-relative, forward slashes, as `written` holds them.
+export function changedAmong(status, files) {
+  const changed = new Set([...status.modified, ...status.not_added, ...status.created, ...status.staged, ...status.renamed.map(r => r.to)]);
+  return files.filter(f => changed.has(f));
+}

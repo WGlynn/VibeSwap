@@ -10,11 +10,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, readFileSyn
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import {
-  OWNER_ONLY_TOOLS, offeredTools, readFileTool, runCommandTool, isDeniedPath, mentionsDeniedPath,
-  childEnv, redactSecrets, SECRET_REFUSAL,
+  OWNER_ONLY_TOOLS, offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, mentionsDeniedPath,
+  childEnv, redactSecrets, SECRET_REFUSAL, OUTSIDE_WRITE_REFUSAL, GIT_DIR_REFUSAL, changedAmong,
 } from '../src/tool-guard.js';
 
-const src = (f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf-8');
+// Source files carry CRLF or LF depending on the editor that last touched them; the assertions see LF.
+const src = (f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf-8').replace(/\r\n/g, '\n');
 const OWNER = 1002;
 const STRANGER = 1001;
 const OUTSIDE = 'Refused: read_file reads files inside the repository only.';
@@ -161,4 +162,108 @@ test('G10 claude.js offers the two tools through offeredTools and runs them only
   assert.doesNotMatch(c, /execSync\(cmd/); // the old run_command, which handed the child process.env
   assert.match(c, /if \(isDeniedPath\(fullPath\)\) return SECRET_REFUSAL;/); // the /idea code-gen read_file
   assert.match(c, /Failed to\|Refused\)\/i\.test\(String\(result\)\)/); // a refusal backs no claim
+});
+
+// ============ write_file and edit_file (second pass, 2026-11-04) ============
+// Before: write_file had no owner check and a prefix check that followed no link, so anyone in any
+// chat who got the model to call it could write any path the prefix matched, and the auto-commit
+// then ran git add -A and pushed the whole working tree.
+
+test('G11 anyone but the owner is refused by write_file and edit_file, and nothing is written', async () => {
+  for (const who of [STRANGER, undefined, '']) {
+    const written = [];
+    assert.equal(await writeFileTool({ path: 'docs/stranger.md', content: 'x' }, as(who, { written })), 'Refused: write_file is available to the owner only.');
+    assert.equal(await editFileTool({ path: 'README.md', old_string: 'readme', new_string: 'x' }, as(who, { written })), 'Refused: edit_file is available to the owner only.');
+    assert.deepEqual(written, []);
+  }
+  assert.equal(existsSync(join(repo, 'docs', 'stranger.md')), false);
+  assert.equal(readFileSync(join(repo, 'README.md'), 'utf-8'), 'VibeSwap readme\n');
+});
+
+test('G12 the owner writes inside the repo; the written list gets the repo-relative path, new directories included', async () => {
+  const written = [];
+  assert.equal(await writeFileTool({ path: 'docs/ideas/new-idea.md', content: 'draft' }, as(OWNER, { written })), 'Wrote 5 chars to docs/ideas/new-idea.md');
+  assert.equal(readFileSync(join(repo, 'docs', 'ideas', 'new-idea.md'), 'utf-8'), 'draft');
+  assert.equal(await writeFileTool({ path: join(repo, 'docs', 'abs.md'), content: 'absolute, inside' }, as(OWNER, { written })), 'Wrote 16 chars to docs/abs.md');
+  assert.equal(await writeFileTool({ path: 'docs\\back.md', content: 'x' }, as(OWNER, { written })), 'Wrote 1 chars to docs/back.md');
+  assert.equal(await editFileTool({ path: 'README.md', old_string: 'readme', new_string: 'guide' }, as(OWNER, { written })), 'Edited README.md: replaced 6 chars with 5 chars');
+  assert.equal(readFileSync(join(repo, 'README.md'), 'utf-8'), 'VibeSwap guide\n');
+  assert.equal(await editFileTool({ path: 'README.md', old_string: 'guide', new_string: 'a$&b' }, as(OWNER, { written })), 'Edited README.md: replaced 5 chars with 4 chars');
+  assert.equal(readFileSync(join(repo, 'README.md'), 'utf-8'), 'VibeSwap a$&b\n'); // "$&" stays literal
+  assert.deepEqual(written, ['docs/ideas/new-idea.md', 'docs/abs.md', 'docs/back.md', 'README.md', 'README.md']);
+  // edit_file's own refusals, none of which touch the list.
+  const untouched = [];
+  assert.equal(await editFileTool({ path: 'README.md', old_string: 'nope', new_string: 'x' }, as(OWNER, { written: untouched })), 'old_string not found in README.md. Read the file first to get the exact text.');
+  assert.equal(await editFileTool({ path: 'README.md', old_string: 'b', new_string: 'x' }, as(OWNER, { written: untouched })), 'old_string found 2 times in README.md. Provide more context to make it unique.');
+  assert.equal(await editFileTool({ path: 'README.md', old_string: '', new_string: 'x' }, as(OWNER, { written: untouched })), 'old_string is required.');
+  assert.equal(await editFileTool({ path: 'docs/missing.md', old_string: 'a', new_string: 'x' }, as(OWNER, { written: untouched })), 'File not found: docs/missing.md');
+  assert.deepEqual(untouched, []);
+});
+
+test('G13 outside the repo, a secret file, a junction out, the base itself and .git are refused for the owner too', async () => {
+  const written = [];
+  const tryWrite = (path) => writeFileTool({ path, content: 'x' }, as(OWNER, { written }));
+  const tryEdit = (path) => editFileTool({ path, old_string: 'a', new_string: 'b' }, as(OWNER, { written }));
+  for (const path of ['../outside.txt', join(root, 'outside.txt'), 'docs/../../outside.txt', 'elsewhere-link/plain.txt', '', '.', 'docs/..', join(root, 'elsewhere', 'x.txt')]) {
+    assert.equal(await tryWrite(path), OUTSIDE_WRITE_REFUSAL, path);
+    assert.equal(await tryEdit(path), OUTSIDE_WRITE_REFUSAL, path);
+  }
+  for (const path of ['jarvis-bot/.env', 'jarvis-bot/.env.production', 'jarvis-bot/new.pem', 'jarvis-bot/data/.master-key', 'notes/config',
+    'jarvis-bot/token.json', 'frontend/.credentials.json', 'docs/../jarvis-bot/.env', 'vault/.ssh/id_ed25519']) {
+    assert.equal(await tryWrite(path), SECRET_REFUSAL, path);
+    assert.equal(await tryEdit(path), SECRET_REFUSAL, path);
+  }
+  for (const path of ['.git/hooks/pre-commit', '.git/config', 'sub/.git/hooks/post-checkout', '.GIT/config']) {
+    assert.equal(await tryWrite(path), GIT_DIR_REFUSAL, path);
+    assert.equal(await tryEdit(path), GIT_DIR_REFUSAL, path);
+  }
+  assert.deepEqual(written, []);
+  assert.equal(readFileSync(join(repo, 'jarvis-bot', '.env'), 'utf-8'), 'CLAUDE_CODE_API_SECRET=fake-api-secret-0001\n');
+  assert.equal(existsSync(join(root, 'outside.txt')) && readFileSync(join(root, 'outside.txt'), 'utf-8'), 'outside\n');
+  assert.equal(existsSync(join(repo, '.git')), false);
+  assert.equal(existsSync(join(root, 'elsewhere', 'x.txt')), false);
+});
+
+test('G14 the auto-commit stages the written files alone: changedAmong keeps only listed files git reports as changed', () => {
+  const status = {
+    modified: ['docs/a.md', 'jarvis-bot/.env'], not_added: ['docs/ideas/new.md', 'secret-notes.txt'], created: ['docs/c.md'],
+    staged: ['docs/s.md'], renamed: [{ from: 'docs/old.md', to: 'docs/b.md' }],
+  };
+  assert.deepEqual(changedAmong(status, ['docs/a.md', 'docs/ideas/new.md', 'docs/untouched.md', 'docs/b.md', 'docs/c.md', 'docs/s.md', 'docs/nope.md']),
+    ['docs/a.md', 'docs/ideas/new.md', 'docs/b.md', 'docs/c.md', 'docs/s.md']);
+  assert.deepEqual(changedAmong(status, []), []); // nothing written: nothing staged, whatever else is dirty
+  assert.deepEqual(changedAmong(status, ['docs/ideas']), []); // a directory is not a file
+});
+
+test('G15 claude.js, index.js and git.js are wired: the guard runs the writes, and every pipeline commit names its files', () => {
+  const c = src('claude.js');
+  assert.match(c, /import \{ offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL \} from '\.\/tool-guard\.js';/);
+  // The chat tool loop: the guard, with the list the auto-commit stages; no inline write is left.
+  assert.match(c, /result = await writeFileTool\(tb\.input, \{ userId, ownerUserId: config\.ownerUserId, repoPath: REPO_PATH, written: filesWrittenInLoop \}\);/);
+  assert.doesNotMatch(c, /filesWrittenInLoop\.push\(/);
+  assert.doesNotMatch(c, /resolved\.startsWith\(repoResolved\)/);
+  assert.match(c, /const pushResult = await gitCommitAndPush\(commitMsg, filesWrittenInLoop\);/);
+  // The /idea and /code pipeline: the same guard, the tools offered through offeredTools, the model's path never written directly.
+  assert.match(c, /if \(toolName === 'write_file'\) return await writeFileTool\(input, guard\);\n\s+if \(toolName === 'edit_file'\) return await editFileTool\(input, guard\);/);
+  assert.match(c, /const guard = \{ userId, ownerUserId: config\.ownerUserId, repoPath: REPO_PATH, written: filesWritten \};\n\s+const tools = offeredTools\(CODE_GEN_TOOLS, userId, config\.ownerUserId\);/);
+  assert.match(c, /const result = await handleCodeGenTool\(tb\.name, tb\.input, guard\);/);
+  assert.doesNotMatch(c, /filesWritten\.push\(/);
+  const codegen = c.slice(c.indexOf('async function handleCodeGenTool('), c.indexOf('export async function codeGenChat('));
+  assert.doesNotMatch(codegen, /writeFile\(/);
+  // index.js: both pipelines pass the caller and commit the written files by name; the owner's /commit keeps the whole tree.
+  const idx = src('index.js');
+  assert.match(idx, /await codeGenChat\(ideaText, author, \{ userId: ctx\.from\.id \}\);/);
+  assert.match(idx, /author,\n\s+\{ userId: ctx\.from\.id \}\n\s+\);/);
+  assert.equal((idx.match(/gitCommitAndPushBranch\(commitMsg, branch, filesWritten\)/g) || []).length, 2);
+  assert.equal((idx.match(/gitCommitAndPushBranch\(/g) || []).length, 2);
+  assert.equal((idx.match(/await gitCommitAndPush\(message\);/g) || []).length, 2); // /commit and /gitcommit, authorized users, explicit
+  // git.js: a list stages and commits those files, after "--"; -A survives only on the no-list path.
+  const g = src('git.js');
+  assert.match(g, /import \{ changedAmong \} from '\.\/tool-guard\.js';/);
+  assert.match(g, /const toCommit = changedAmong\(status, files\);\n\s+if \(toCommit\.length === 0\) return false;\n.*\n\s+await git\.add\(\['--', \.\.\.toCommit\]\);\n\s+await git\.commit\(fullMessage, \['--', \.\.\.toCommit\]\);/);
+  const staging = g.slice(g.indexOf('async function stageAndCommit('), g.indexOf('export async function gitCommitAndPush('));
+  assert.match(staging, /if \(Array\.isArray\(files\)\) \{/);
+  assert.equal((staging.match(/git\.add\('-A'\)/g) || []).length, 1); // the no-list branch only
+  assert.match(g, /export async function gitCommitAndPush\(message, files\) \{/);
+  assert.match(g, /export async function gitCommitAndPushBranch\(message, branch, files\) \{/);
 });

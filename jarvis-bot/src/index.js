@@ -5849,17 +5849,18 @@ bot.command('idea', async (ctx) => {
       return ctx.reply(`Failed to create branch: ${branchResult.error}`);
     }
 
-    // 2. Generate code with Claude
-    const { text, filesWritten } = await codeGenChat(ideaText, author);
+    // 2. Generate code with Claude. The caller's id goes along: write_file and edit_file are
+    // owner-only in the pipeline too (tool-guard.js), so anyone else gets analysis text and no files.
+    const { text, filesWritten } = await codeGenChat(ideaText, author, { userId: ctx.from.id });
 
     if (filesWritten.length === 0) {
       await gitReturnToMaster();
       return ctx.reply(`Jarvis analyzed the idea but didn't generate files:\n\n${text.slice(0, 1500)}`);
     }
 
-    // 3. Commit and push
+    // 3. Commit and push: the written files only, never the whole tree
     const commitMsg = `idea: ${ideaText.slice(0, 72)}\n\nAuthor: @${author} (via Telegram)\nFiles: ${filesWritten.join(', ')}`;
-    const pushResult = await gitCommitAndPushBranch(commitMsg, branch);
+    const pushResult = await gitCommitAndPushBranch(commitMsg, branch, filesWritten);
 
     // 4. Return to master
     await gitReturnToMaster();
@@ -5942,7 +5943,8 @@ bot.command('code', async (ctx) => {
     // 3. Generate code with enhanced tools (edit_file, search_code)
     const { text, filesWritten } = await codeGenChat(
       `TASK: ${taskText}\n\nIMPORTANT: This is a targeted code modification task, not a new idea. Read existing files first, then use edit_file to make precise changes. Do NOT rewrite entire files. Search for relevant code with search_code. Keep changes minimal and focused.`,
-      author
+      author,
+      { userId: ctx.from.id }
     );
 
     // 4. Get diff for review
@@ -5962,9 +5964,9 @@ bot.command('code', async (ctx) => {
       return ctx.reply(`Shard analyzed the task but made no changes:\n\n${text.slice(0, 1500)}`);
     }
 
-    // 5. Commit and push
+    // 5. Commit and push: the files the pipeline wrote or edited only, never the whole tree
     const commitMsg = `shard: ${taskText.slice(0, 72)}\n\nAuthor: @${author} (via /code)\nShard: ${config.shard?.id || 'primary'}`;
-    const pushResult = await gitCommitAndPushBranch(commitMsg, branch);
+    const pushResult = await gitCommitAndPushBranch(commitMsg, branch, filesWritten);
 
     // 6. Return to master
     await gitReturnToMaster();

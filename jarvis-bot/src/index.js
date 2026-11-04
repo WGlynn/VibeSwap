@@ -1,5 +1,5 @@
 import { Telegraf, Telegram } from 'telegraf';
-import { installDashFilter } from './text-style.js';
+import { installDashFilter, reactInstead } from './text-style.js';
 
 // No em or en dashes in anything the bot sends (Will 2026-10-27); see text-style.js.
 installDashFilter(Telegram);
@@ -7157,15 +7157,14 @@ bot.on('text', async (ctx) => {
             let cleanReply = stripGroupMarkdown(proactiveReply);
             cleanReply = sanitizeOutput(cleanReply);
             if (!cleanReply) return; // Sanitizer gutted it — skip
-            // Natural "typing" delay — humans don't respond instantly
-            // 1-3 seconds based on response length, with slight randomness
-            const typeDelay = Math.min(1000 + cleanReply.length * 10, 3000) + Math.random() * 1000;
-            await new Promise(r => setTimeout(r, typeDelay));
-            await ctx.reply(cleanReply, { parse_mode: undefined });
+            // ============ Third wheel: react, do not reply (Will 2026-11-03) ============
+            // This message did not address the bot (no tag, no reply to it, not called by name), so it
+            // is someone else's exchange. Where a reply would have gone out, the bot sets a thumbs-up on
+            // the message and posts no text, so nothing is added to the chat's history either. The
+            // draft above still decides whether to react at all: reactions come no more often than
+            // these replies did. Addressed messages never reach this path and are answered as before.
+            await reactInstead(ctx);
             global._lastGroupReply.set(ctx.chat.id, Date.now());
-            const myDisplayName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
-            pushGroupMessage(ctx.chat.id, myDisplayName, proactiveReply, null, true);
-            bufferAssistantMessage(ctx.chat.id, proactiveReply);
 
             // Track bot-to-bot exchange count
             if (isFromSibling) {
@@ -7200,12 +7199,8 @@ bot.on('text', async (ctx) => {
               if (retryReply) {
                 let cleanRetry = stripGroupMarkdown(retryReply);
                 cleanRetry = sanitizeOutput(cleanRetry);
-                if (cleanRetry) {
-                  await ctx.reply(cleanRetry, { parse_mode: undefined });
-                  const myName = persona === 'degen' ? 'DIABLO' : 'JARVIS';
-                  pushGroupMessage(ctx.chat.id, myName, retryReply, null, true);
-                  bufferAssistantMessage(ctx.chat.id, retryReply);
-                }
+                // Third wheel, as above: a reaction where the reply would have been, never text.
+                if (cleanRetry) await reactInstead(ctx);
               }
             }
           } catch (retryErr) {

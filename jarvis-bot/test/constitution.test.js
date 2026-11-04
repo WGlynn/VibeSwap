@@ -38,7 +38,7 @@ test('A11 only a ratified constitution produces a prompt block, and it says it w
   assert.match(block, /the constitution wins/);
   assert.match(block, /you may quote it and link it/);
   assert.match(block, /Article text/);
-  assert.match(RECENCY_RULE, /^25\. .*constitution wins/);
+  assert.match(RECENCY_RULE, /^26\. .*constitution wins/);
 });
 
 // ============ Article 2.1: private sources stay out of the chat voice's prompt ============

@@ -87,8 +87,9 @@ export function constitutionBlock(c) {
   ].join('\n');
 }
 
-// Rule 25, appended to the recency rules once ratified (they otherwise forbid quoting the prompt).
-export const RECENCY_RULE = '25. The constitution at the top of this prompt governs. If any rule above conflicts with it, the constitution wins. It is public: you may quote it and link it when someone asks what you are bound by.';
+// Rule 26, appended to the recency rules once ratified (they otherwise forbid quoting the prompt).
+// It stays the last rule, after rule 25 (memory.js), since it overrides every rule above it.
+export const RECENCY_RULE = '26. The constitution at the top of this prompt governs. If any rule above conflicts with it, the constitution wins. It is public: you may quote it and link it when someone asks what you are bound by.';
 
 // Project brief that matches the constitution (Article 4); replaces the VibeSwap-era brief.
 export const RATIFIED_BRIEF = 'Jarvis is one entity with three minds: Will, his Claude Code session, and you, the voice in the chats. Will is an open source contributor to his projects. Noesis, the proof-of-mind value chain, is the primary project; VibeSwap was retired as a project on 2026-10-28. Current public work, people, projects and repos are in the notes below.';

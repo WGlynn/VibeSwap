@@ -31,6 +31,8 @@ const BOT_TRIGGER_LIMIT = 8;              // Max bot responses per user per hour
 const TOPIC_REPEAT_LIMIT = 15;             // Same topic 15+ times = throttle
 const QUIET_USER_BOOST_DAYS = 3;           // Users silent for 3+ days get priority
 const NOISE_COOLDOWN_MS = 30 * 60 * 1000;  // 30 min after owner "noise" signal
+const SMALL_GROUP_MAX_MEMBERS = 3;         // Telegram's count, the bot included: no dominance check
+const MEMBER_COUNT_TTL_MS = 60 * 60 * 1000; // Ask Telegram for a chat's member count at most hourly
 
 // Response probabilities based on dominance
 const RESPONSE_PROBABILITY = {
@@ -49,6 +51,12 @@ const chatState = new Map();
 
 // userId -> { lastMessageTimestamp, messageCount (lifetime), daysSilent }
 const userActivity = new Map();
+
+// chatId -> { count, fetchedAt }; count is null when the lookup failed
+const memberCounts = new Map();
+
+// chatIds whose failed member-count lookup has been logged (once per chat)
+const memberCountFailLogged = new Set();
 
 // ============ Core API ============
 
@@ -110,13 +118,39 @@ export function flagNoise(chatId) {
 }
 
 /**
+ * Member count of a chat as Telegram reports it (the bot included), cached per chat for an hour.
+ * Returns null when the lookup fails. A failure is cached too, so a broken lookup is not retried on
+ * every message, and it is logged once per chat.
+ */
+export async function getMemberCount(chatId, telegram) {
+  const key = String(chatId);
+  const now = Date.now();
+  const cached = memberCounts.get(key);
+  if (cached && now - cached.fetchedAt < MEMBER_COUNT_TTL_MS) return cached.count;
+
+  let count = null;
+  try {
+    count = await telegram.getChatMembersCount(chatId);
+  } catch (err) {
+    if (!memberCountFailLogged.has(key)) {
+      memberCountFailLogged.add(key);
+      console.warn(`[airspace] member count lookup failed in ${key}, dominance throttle stays on: ${err.message}`);
+    }
+  }
+  memberCounts.set(key, { count, fetchedAt: now });
+  return count;
+}
+
+/**
  * Should the bot respond to this user in this chat?
  * Returns { shouldRespond: boolean, reason: string, probability: number }
  *
  * This is NOT a hard block — it's probabilistic throttling.
  * The bot rolls a dice and responds with the given probability.
+ *
+ * memberCount: the chat's member count from getMemberCount, or null when unknown.
  */
-export function checkAirspace(chatId, userId) {
+export function checkAirspace(chatId, userId, memberCount = null) {
   const key = String(chatId);
   const uid = String(userId);
   const now = Date.now();
@@ -163,6 +197,15 @@ export function checkAirspace(chatId, userId) {
       reason: `bot_saturated (${botResponses} responses this hour)`,
       probability: prob,
     };
+  }
+
+  // Small group (2026-11-04): dominance needs a crowd to protect. With two people and the bot, one
+  // person always sends most of the messages; in "Will, Blake and Jarvis" Blake was throttled at 86%
+  // while talking to Jarvis by name. Will: "exempt small groups from the throttle". Both dominance
+  // tiers are skipped, since a share skipped at 50% would land in the 30% tier. An unknown count (a
+  // failed lookup) is no exemption. The noise, quiet-user and saturation checks above still apply.
+  if (typeof memberCount === 'number' && memberCount <= SMALL_GROUP_MAX_MEMBERS) {
+    return { shouldRespond: true, reason: `small_group (${memberCount} members)`, probability: 1.0 };
   }
 
   // Heavy dominance
@@ -226,11 +269,13 @@ export function getAirspaceStats(chatId) {
 
 // ============ Cleanup ============
 
-// Prune stale chat state every 30 minutes
-setInterval(() => {
+// Prune stale chat state every 30 minutes. Unref'd so the timer alone does not keep a process (a test
+// that loads this module) alive; the bot stays up on its own handles.
+const pruneTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, state] of chatState) {
     state.messages = state.messages.filter(m => now - m.timestamp < WINDOW_MS * 2);
     if (state.messages.length === 0) chatState.delete(key);
   }
 }, 30 * 60 * 1000);
+if (pruneTimer.unref) pruneTimer.unref();

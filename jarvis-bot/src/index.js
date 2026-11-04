@@ -180,7 +180,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
-import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, flagNoise, getAirspaceStats } from './airspace-monitor.js';
+import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats } from './airspace-monitor.js';
 import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval, fastCheck } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -6889,7 +6889,9 @@ bot.on('text', async (ctx) => {
     // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
     // BOT-004: Fixed typo — was config.ownerId (undefined), throttling owner's own messages
     if (String(ctx.from?.id) !== String(config.ownerUserId)) {
-      const airspace = checkAirspace(ctx.chat.id, ctx.from.id);
+      // Groups of three or fewer (the bot included) skip the dominance throttle; count cached hourly.
+      const memberCount = await getMemberCount(ctx.chat.id, ctx.telegram);
+      const airspace = checkAirspace(ctx.chat.id, ctx.from.id, memberCount);
       if (!airspace.shouldRespond) {
         // Silently skip — don't even acknowledge. The troll gets nothing.
         const userName = ctx.from.username || ctx.from.first_name || 'Unknown';

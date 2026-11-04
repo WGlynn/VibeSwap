@@ -19,6 +19,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
+import { safeFetch, parseHttpUrl } from './url-guard.js';
 
 const DATA_DIR = config.dataDir;
 const TASKS_FILE = join(DATA_DIR, 'task-queue.json');
@@ -68,20 +69,17 @@ const executors = {
     }
   },
 
-  // Web fetch — check a URL and summarize
+  // Web fetch — check a URL and summarize. Through the URL guard (url-guard.js, 2026-11-04): the
+  // model chose this URL, so localhost, private and link-local addresses are refused on the resolved
+  // address, every redirect hop is re-checked, and the body is capped.
   web_check: async (task) => {
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10_000);
-      const res = await fetch(task.url, { signal: controller.signal });
-      clearTimeout(timer);
-
-      if (!res.ok) {
+      const res = await safeFetch(task.url, { timeoutMs: 10_000, maxBytes: 256 * 1024 });
+      if (res.status < 200 || res.status >= 300) {
         return { result: `HTTP ${res.status}: ${res.statusText}`, success: false };
       }
-      const text = await res.text();
-      const preview = text.slice(0, 500);
-      return { result: `Fetched ${task.url} — ${res.status} OK (${text.length} bytes):\n${preview}...`, success: true };
+      const preview = res.body.slice(0, 500);
+      return { result: `Fetched ${res.url} — ${res.status} OK (${res.body.length}${res.truncated ? '+' : ''} bytes):\n${preview}...`, success: true };
     } catch (err) {
       return { result: `Fetch failed: ${err.message}`, success: false };
     }
@@ -199,6 +197,11 @@ export function createTask({
   // Validate type
   if (!executors[type]) {
     return { error: `Unknown task type "${type}". Available: ${Object.keys(executors).join(', ')}` };
+  }
+  // A web_check URL is refused at creation when the guard can tell without DNS (scheme, a denied
+  // name, a non-public literal); the resolved address is checked again when the task runs.
+  if (type === 'web_check') {
+    try { parseHttpUrl(url); } catch (err) { return { error: err.message }; }
   }
 
   const task = {

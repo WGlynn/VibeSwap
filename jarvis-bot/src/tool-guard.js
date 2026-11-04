@@ -9,15 +9,18 @@
 //    and junctions followed), so "../" or a link with an innocent name does not get around it.
 // 3. run_command's child gets a small allowlisted environment, never the bot's keys and tokens, and
 //    a command whose text names a secret path is refused.
+// 4. (2026-11-04, second pass) write_file and edit_file are owner-only the same way, write inside
+//    the repository only (real path), never a secret file or anything under .git, and the auto-commit
+//    after them stages the written files alone (git.js), never -A.
 // Pure (no config import): the owner id, repo path and environment are passed in.
 
 import * as fs from 'fs';
-import { readFile } from 'fs/promises';
+import { readFile, writeFile, mkdir } from 'fs/promises';
 import { execSync } from 'child_process';
 import { resolve, dirname, basename, join, relative, isAbsolute } from 'path';
 
 // ============ 1. Owner only ============
-export const OWNER_ONLY_TOOLS = ['read_file', 'run_command'];
+export const OWNER_ONLY_TOOLS = ['read_file', 'run_command', 'write_file', 'edit_file'];
 
 export function isOwner(userId, ownerUserId) {
   const id = String(userId ?? '');
@@ -70,6 +73,18 @@ export function isDeniedPath(p) {
 function isInside(p, dir) {
   const r = relative(dir, p);
   return !isAbsolute(r) && r.split(/[\\/]/)[0] !== '..';
+}
+
+// The real path of `asked` (relative to base, or absolute) when it lies strictly inside base, else
+// null. Both the path as asked and its real path (links and junctions followed) must be inside, so
+// "../", an absolute path elsewhere, the base itself, and a link that leaves the base all give null.
+export function containedRealPath(asked, base) {
+  const root = resolve(base);
+  const full = resolve(root, String(asked ?? ''));
+  if (!isInside(full, root) || relative(root, full) === '') return null;
+  const real = realPath(full);
+  const realRoot = realPath(root);
+  return isInside(real, realRoot) && relative(realRoot, real) !== '' ? real : null;
 }
 
 // What a command or file prints can still hold a secret no path check saw (grep -r over jarvis-bot
@@ -154,4 +169,61 @@ export function runCommandTool(input, { userId, ownerUserId, repoPath, env = pro
   } catch (err) {
     return redactSecrets(`Command failed: ${err.stderr || err.message || String(err)}`, env).slice(0, 2000);
   }
+}
+
+// ============ 4. write_file and edit_file ============
+// Before this (2026-11-04) write_file had no owner check and a prefix check that followed no link, so
+// a person in any chat who got the model to call it could write any path the prefix matched, and the
+// auto-commit then pushed the whole working tree. Now: owner only; the target's real path must be
+// strictly inside the repository; a secret file is refused for everyone; and nothing under .git is
+// written, since a hook or config placed there runs on the bot's own next git call. The path
+// written is the checked real path. A successful write pushes its repo-relative path (forward
+// slashes) onto `written`, the list the auto-commit stages, and nothing else.
+const NO_WRITE_DIRS = ['.git'];
+export const OUTSIDE_WRITE_REFUSAL = 'Refused: write_file and edit_file write inside the repository only.';
+export const GIT_DIR_REFUSAL = 'Refused: nothing under .git is written by a chat tool.';
+
+function writeTarget(path, repoPath) {
+  const real = containedRealPath(path, repoPath);
+  if (!real) return { refused: OUTSIDE_WRITE_REFUSAL };
+  if (isDeniedPath(real)) return { refused: SECRET_REFUSAL };
+  const rel = relative(realPath(repoPath), real).split(/[\\/]+/).join('/');
+  if (rel.split('/').some(s => NO_WRITE_DIRS.includes(s.toLowerCase()))) return { refused: GIT_DIR_REFUSAL };
+  return { real, rel };
+}
+
+export async function writeFileTool(input, { userId, ownerUserId, repoPath, written }) {
+  if (!isOwner(userId, ownerUserId)) return ownerOnly('write_file');
+  const { real, rel, refused } = writeTarget(input?.path, repoPath);
+  if (refused) return refused;
+  const content = String(input?.content ?? '');
+  try {
+    await mkdir(dirname(real), { recursive: true });
+    await writeFile(real, content, 'utf-8');
+  } catch (err) {
+    return `Failed to write file: ${err.message}`;
+  }
+  if (Array.isArray(written)) written.push(rel);
+  return `Wrote ${content.length} chars to ${rel}`;
+}
+
+export async function editFileTool(input, { userId, ownerUserId, repoPath, written }) {
+  if (!isOwner(userId, ownerUserId)) return ownerOnly('edit_file');
+  const { real, rel, refused } = writeTarget(input?.path, repoPath);
+  if (refused) return refused;
+  const oldString = String(input?.old_string ?? '');
+  const newString = String(input?.new_string ?? '');
+  if (!oldString) return 'old_string is required.';
+  let content;
+  try { content = await readFile(real, 'utf-8'); } catch { return `File not found: ${rel}`; }
+  const occurrences = content.split(oldString).length - 1;
+  if (occurrences === 0) return `old_string not found in ${rel}. Read the file first to get the exact text.`;
+  if (occurrences > 1) return `old_string found ${occurrences} times in ${rel}. Provide more context to make it unique.`;
+  try {
+    await writeFile(real, content.replace(oldString, () => newString), 'utf-8'); // a function: "$&" in new_string stays literal
+  } catch (err) {
+    return `Failed to write file: ${err.message}`;
+  }
+  if (Array.isArray(written)) written.push(rel);
+  return `Edited ${rel}: replaced ${oldString.length} chars with ${newString.length} chars`;
 }

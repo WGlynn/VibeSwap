@@ -42,10 +42,12 @@
 import { createHash } from 'crypto';
 import { writeFile, readFile, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, relative, isAbsolute } from 'path';
 import { mkdir } from 'fs/promises';
 import { config } from './config.js';
 import { getShardInfo, getShardPeers } from './shard.js';
+import { realPath, isDeniedPath, containedRealPath } from './tool-guard.js';
+import { peerHeaders, peerGate, peerMessageOf } from './peer-auth.js';
 
 // ============ Constants ============
 
@@ -53,9 +55,23 @@ const EPOCH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — aligned with flush cyc
 const MAX_CHAIN_LENGTH = 1000; // Keep last 1000 epochs
 const HTTP_TIMEOUT_MS = 3000;
 const MAX_MISSED_EPOCHS_PER_PEER = 10;
-const WAL_FILE = join(config.dataDir, 'knowledge', 'wal.jsonl');
-const MISSED_EPOCHS_FILE = join(config.dataDir, 'knowledge', 'missed-epochs.json');
-const CHAIN_FILE = join(config.dataDir, 'knowledge', 'chain.json');
+export const KNOWLEDGE_ROOT = join(config.dataDir, 'knowledge');
+const WAL_FILE = join(KNOWLEDGE_ROOT, 'wal.jsonl');
+const MISSED_EPOCHS_FILE = join(KNOWLEDGE_ROOT, 'missed-epochs.json');
+const CHAIN_FILE = join(KNOWLEDGE_ROOT, 'chain.json');
+
+// ============ Peer requests (peer-auth.js, 2026-11-04) ============
+// Every request to a peer's knowledge-chain route is signed with the shard secret: a POST over its
+// JSON body, a GET over its request target. A peer without the secret refuses them, by design.
+function peerFetch(peer, path, { method = 'GET', body, timeoutMs = HTTP_TIMEOUT_MS } = {}) {
+  const message = peerMessageOf(method, path, body);
+  return fetch(`${peer.url}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...peerHeaders(message, config.shard?.secret) },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
 
 // NC-Max constants — propose/commit pipelining
 const PROPOSAL_WINDOW_EPOCHS = 2; // Changes must be proposed N epochs before commitment
@@ -226,12 +242,7 @@ async function flushPrePropagation() {
   // Best-effort broadcast — failures are non-fatal (epoch still works, just slower)
   for (const peer of peers) {
     try {
-      await fetch(`${peer.url}/knowledge-chain/announce`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(announcement),
-        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-      });
+      await peerFetch(peer, '/knowledge-chain/announce', { method: 'POST', body: announcement });
     } catch { /* non-fatal — epoch will carry full content as fallback */ }
   }
 }
@@ -360,10 +371,43 @@ export function computeFreshnessPenalty(compactEpoch) {
 // ============ File Sync — Shard-to-Shard File Relay ============
 // When a memory file or SESSION_STATE changes, propagate via knowledge chain.
 // This makes shards independent of GitHub — peer-to-peer file relay.
+//
+// Containment (2026-11-04). Before, a synced file was named by its absolute path on the sending
+// machine: GET /knowledge/file?path= read that path, any path, and an epoch's file sync wrote
+// wherever its path said. Now a file is named by a sync KEY, '<root>/<relative path>', where root is
+// one of the sync roots below (the Claude Code memory dir, the repo's .claude dir). A node publishes
+// only files inside those roots that are not secret files; a key received from a peer is stored
+// under KNOWLEDGE_ROOT/synced only, after the same checks a chat tool gets (relative, no '..', real
+// path inside, not a secret file); and GET /knowledge/file serves inventory keys only, never a path
+// from the query, reading the real path recorded when the key was published or received.
 
 const FILE_SYNC_MAX_INLINE = 4096; // Only inline content under 4KB
-const syncedFileHashes = new Map(); // path -> contentHash (dedup)
-const syncedFileInventory = new Map(); // path -> { hash, size, lastUpdated }
+const syncedFileHashes = new Map(); // key -> contentHash (dedup)
+const syncedFileInventory = new Map(); // key -> { hash, size, lastUpdated, file: real path on this machine }
+export const SYNCED_DIR = join(KNOWLEDGE_ROOT, 'synced');
+const SYNC_ROOTS = { memory: config.memory?.dir, claude: join(config.repo.path, '.claude') };
+
+// The sync key of a local file, or null when it is outside every sync root or is a secret file.
+export function syncKeyOf(filePath, roots = SYNC_ROOTS) {
+  const real = realPath(String(filePath ?? ''));
+  if (isDeniedPath(real)) return null;
+  for (const [prefix, root] of Object.entries(roots)) {
+    if (!root) continue;
+    const rel = relative(realPath(root), real);
+    if (rel && !isAbsolute(rel) && rel.split(/[\\/]/)[0] !== '..') return `${prefix}/${rel.split(/[\\/]+/).join('/')}`;
+  }
+  return null;
+}
+
+// Where a key received from a peer is stored: a real path strictly inside syncedDir, or null for a
+// key that is absolute, has a drive letter, a backslash, an empty, '.' or '..' segment, resolves
+// (links followed) outside the dir, or names a secret file.
+export function syncedFilePath(key, syncedDir = SYNCED_DIR) {
+  const k = String(key ?? '');
+  if (!k || k.length > 512 || /^[\\/]|^[a-z]:|\\|\0/i.test(k) || k.split('/').some(s => s === '' || s === '.' || s === '..')) return null;
+  const real = containedRealPath(k, syncedDir);
+  return real && !isDeniedPath(real) ? real : null;
+}
 
 function hashContent(content) {
   return createHash('sha256').update(content).digest('hex').slice(0, 32);

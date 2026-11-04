@@ -28,11 +28,12 @@
 // In single-shard mode: proposals auto-commit (no voting needed).
 // ============
 
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
 import { getShardInfo, getShardPeers } from './shard.js';
+import { canonicalJSON, signPeerMessage, verifyPeerSignature } from './peer-auth.js';
 
 // ============ Constants ============
 
@@ -67,46 +68,20 @@ const VOTES = {
   REJECT: 'reject',
 };
 
-// ============ Canonical JSON ============
-// JSON.stringify key ordering is NOT stable across engines/versions.
-// Canonical form: recursively sort object keys before stringifying.
-
-function canonicalJSON(obj) {
-  if (obj === null || obj === undefined) return JSON.stringify(obj);
-  if (Array.isArray(obj)) return '[' + obj.map(canonicalJSON).join(',') + ']';
-  if (typeof obj === 'object') {
-    const sorted = Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJSON(obj[k]));
-    return '{' + sorted.join(',') + '}';
-  }
-  return JSON.stringify(obj);
-}
-
-// ============ HMAC Authentication for Inter-Shard Communication ============
+// ============ Canonical JSON + HMAC Authentication for Inter-Shard Communication ============
+// The scheme lives in peer-auth.js since 2026-11-04 (shared with /shard/update, /shard/learn and
+// the knowledge-chain routes): HMAC-SHA256 over the canonical JSON of the body, keyed by SHARD_SECRET.
 
 function getShardSecret() {
   return config.shard?.secret || null;
 }
 
 function signPayload(data) {
-  const secret = getShardSecret();
-  if (!secret) return null;
-  return createHmac('sha256', secret)
-    .update(canonicalJSON(data))
-    .digest('hex');
+  return signPeerMessage(data, getShardSecret());
 }
 
 function verifyShardSignature(body, signature) {
-  const secret = getShardSecret();
-  if (!secret) return false; // Fail-closed: no secret = reject all
-  if (!signature || typeof signature !== 'string') return false;
-  const expected = createHmac('sha256', secret)
-    .update(canonicalJSON(body))
-    .digest('hex');
-  try {
-    return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
-  } catch {
-    return false;
-  }
+  return verifyPeerSignature(body, signature, getShardSecret()); // no secret: false, fail closed
 }
 
 // ============ Replay Protection ============

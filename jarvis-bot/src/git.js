@@ -66,7 +66,32 @@ export async function gitPull() {
   });
 }
 
-export async function gitCommitAndPush(message) {
+// ============ Scoped staging (2026-11-04) ============
+// The chat tools' auto-commit used `git add -A`, so one write_file call pushed everything in the
+// working tree, the owner's uncommitted work and any untracked file included. With a `files` list
+// (repo-relative paths, forward slashes), only those of them that git reports as changed or new are
+// staged, and the commit names them (git commit -- <files>), so nothing else in the index rides along.
+// Without a list the whole tree is staged, as before: that path is the owner's explicit /commit.
+function changedAmong(status, files) {
+  const changed = new Set([...status.modified, ...status.not_added, ...status.created, ...status.staged, ...status.renamed.map(r => r.to)]);
+  return files.filter(f => changed.has(f));
+}
+
+async function stageAndCommit(status, fullMessage, files) {
+  if (Array.isArray(files)) {
+    const toCommit = changedAmong(status, files);
+    if (toCommit.length === 0) return false;
+    await git.add(toCommit);
+    await git.commit(fullMessage, toCommit);
+    return true;
+  }
+  if (!status.modified.length && !status.not_added.length && !status.staged.length) return false;
+  await git.add('-A');
+  await git.commit(fullMessage);
+  return true;
+}
+
+export async function gitCommitAndPush(message, files) {
   if (!git) return NO_REPO;
   return withGitLock(async () => {
     try {
@@ -80,16 +105,9 @@ export async function gitCommitAndPush(message) {
         return `Cannot commit — ${status.conflicted.length} conflicts found and reset. Try again.`;
       }
 
-      if (!status.modified.length && !status.not_added.length && !status.staged.length) {
-        return 'Nothing to commit.';
-      }
-
-      // Stage all changes
-      await git.add('-A');
-
-      // Commit
+      // Stage and commit: the listed files only, or (no list) the whole tree
       const fullMessage = `${message}\n\nCo-Authored-By: JARVIS <noreply@anthropic.com>`;
-      await git.commit(fullMessage);
+      if (!await stageAndCommit(status, fullMessage, files)) return 'Nothing to commit.';
 
       // Push to all configured remotes (origin + stealth + mirrors)
       await git.push(config.repo.remoteOrigin, 'master');
@@ -216,7 +234,7 @@ export async function gitCreateBranch(branchName) {
   });
 }
 
-export async function gitCommitAndPushBranch(message, branch) {
+export async function gitCommitAndPushBranch(message, branch, files) {
   if (!git) return NO_REPO;
   return withGitLock(async () => {
     try {
@@ -225,12 +243,9 @@ export async function gitCommitAndPushBranch(message, branch) {
         await git.reset(['--hard', 'HEAD']);
         return `Cannot commit — conflicts found and reset.`;
       }
-      if (!status.modified.length && !status.not_added.length && !status.staged.length) {
-        return 'Nothing to commit.';
-      }
-      await git.add('-A');
+      // The listed files only (the /idea and /code pipelines pass what the model wrote), or the whole tree
       const fullMessage = `${message}\n\nCo-Authored-By: JARVIS <noreply@anthropic.com>`;
-      await git.commit(fullMessage);
+      if (!await stageAndCommit(status, fullMessage, files)) return 'Nothing to commit.';
       await git.push(config.repo.remoteOrigin, branch, ['--set-upstream']);
       try {
         await git.push(config.repo.remoteStealth, branch, ['--set-upstream']);

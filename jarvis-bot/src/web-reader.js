@@ -6,35 +6,17 @@
 
 // ============ Constants ============
 
+import { safeFetch } from './url-guard.js';
+
 const MAX_URLS = 2;
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_BODY_CHARS = 2000;
 const MAX_RESPONSE_BYTES = 512 * 1024; // BOT-301: 512KB cap on response body
 const USER_AGENT = 'JarvisBot/1.0 (VibeSwap; +https://vibeswap.io)';
+const HTML_TYPES = /text\/html|application\/xhtml/;
 
-// BOT-300: SSRF protection — block internal/private network addresses
-const BLOCKED_HOSTS = /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|0\.0\.0\.0|\[?::1?\]?|metadata\.google\.internal)$/i;
-
-function isBlockedUrl(urlStr) {
-  try {
-    const u = new URL(urlStr);
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return true;
-    if (BLOCKED_HOSTS.test(u.hostname)) return true;
-    // Block numeric IPs in private ranges (catches decimal, octal, hex variations)
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) {
-      const parts = u.hostname.split('.').map(Number);
-      if (parts[0] === 10) return true;
-      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-      if (parts[0] === 192 && parts[1] === 168) return true;
-      if (parts[0] === 169 && parts[1] === 254) return true;
-      if (parts[0] === 127) return true;
-      if (parts[0] === 0) return true;
-    }
-    return false;
-  } catch {
-    return true;
-  }
-}
+// BOT-300 (SSRF) lives in url-guard.js since 2026-11-04, shared with every other fetch of an
+// outside URL: the old host-name check here let a public name that resolves to 127.0.0.1 through.
 
 // ============ URL Detection ============
 
@@ -175,71 +157,32 @@ function extractBodyText(html) {
  */
 async function fetchPage(url) {
   try {
-    // BOT-300: Block requests to internal/private network addresses
-    if (isBlockedUrl(url)) {
-      console.warn(`[web-reader] Blocked SSRF attempt: ${url}`);
-      return null;
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    const response = await fetch(url, {
-      signal: controller.signal,
+    // url-guard.js: the resolved address must be public (BOT-300), every redirect hop is checked
+    // again, the body stops at MAX_RESPONSE_BYTES (BOT-301), and a non-HTML body is not read.
+    const response = await safeFetch(url, {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      maxBytes: MAX_RESPONSE_BYTES,
+      maxRedirects: 3,
+      contentType: HTML_TYPES,
       headers: {
         'User-Agent': USER_AGENT,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
-      redirect: 'manual', // BOT-300: Don't auto-follow redirects — validate each hop
     });
 
-    clearTimeout(timeout);
-
-    // BOT-300: Handle redirects manually to check each destination
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (!location || isBlockedUrl(new URL(location, url).href)) {
-        console.warn(`[web-reader] Blocked redirect to internal address from ${url}`);
-        return null;
-      }
-      return fetchPage(new URL(location, url).href); // Recurse with validation
-    }
-
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       console.warn(`[web-reader] HTTP ${response.status} for ${url}`);
       return null;
     }
-
-    // BOT-301: Check Content-Length before reading body
-    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-    if (contentLength > MAX_RESPONSE_BYTES) {
-      console.warn(`[web-reader] Response too large (${contentLength} bytes) for ${url}`);
+    if (response.skipped) {
+      console.warn(`[web-reader] Non-HTML content-type for ${url}: ${response.headers['content-type'] || ''}`);
       return null;
     }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
-      console.warn(`[web-reader] Non-HTML content-type for ${url}: ${contentType}`);
-      return null;
+    if (response.truncated) {
+      console.warn(`[web-reader] Response exceeded ${MAX_RESPONSE_BYTES} bytes for ${url}, truncated`);
     }
-
-    // BOT-301: Stream response with size cap (Content-Length can be missing or lie)
-    const reader = response.body.getReader();
-    const chunks = [];
-    let totalSize = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalSize += value.length;
-      if (totalSize > MAX_RESPONSE_BYTES) {
-        reader.cancel();
-        console.warn(`[web-reader] Response exceeded ${MAX_RESPONSE_BYTES} bytes for ${url}, truncating`);
-        break;
-      }
-      chunks.push(value);
-    }
-    const html = Buffer.concat(chunks).toString('utf-8');
+    const html = response.body;
     const title = extractTitle(html) || 'Untitled';
     const description = extractMetaDescription(html);
     const body = extractBodyText(html);

@@ -22,6 +22,12 @@
 import { Telegraf } from 'telegraf';
 import express from 'express';
 import { config } from './config.js';
+import { peerHeaders } from './peer-auth.js';
+
+// Every dispatch to a worker is signed with the shard secret (peer-auth.js, 2026-11-04): the
+// workers' /shard/update and /shard/learn refuse anything else, and refuse everything when no
+// secret is configured.
+const PEER_SECRET = config.shard?.secret || null;
 
 const PORT = parseInt(process.env.PORT, 10) || 8080;
 const WEBHOOK_DOMAIN = process.env.WEBHOOK_DOMAIN || null;
@@ -94,7 +100,7 @@ async function dispatchUpdate(update) {
   try {
     const resp = await fetch(`${shard.url}/shard/update`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...peerHeaders(update, PEER_SECRET) },
       body: JSON.stringify(update),
       signal: AbortSignal.timeout(10_000),
     });
@@ -245,10 +251,11 @@ app.post('/router/broadcast', async (req, res) => {
     if (shard.status !== 'running') continue;
 
     try {
+      const message = { type, data, fromShard: excludeShard || 'router' };
       await fetch(`${shard.url}/shard/learn`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, data, fromShard: excludeShard || 'router' }),
+        headers: { 'Content-Type': 'application/json', ...peerHeaders(message, PEER_SECRET) },
+        body: JSON.stringify(message),
         signal: AbortSignal.timeout(5_000),
       });
       results.push({ shard: id, ok: true });

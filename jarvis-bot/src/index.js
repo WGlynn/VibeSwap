@@ -29,6 +29,7 @@ import { initCRPC, flushCRPC, stopCRPC, getCRPCStats, handleCRPCRequest, process
 import { registerConsensusHandlers } from './learning.js';
 import { produceEpoch, addChange, broadcastEpoch, syncWithPeers, getChainStats, handleKnowledgeChainRequest, processKnowledgeChainBody, recoverWAL, recoverChain, persistChain, retryMissedEpochs, scheduleHarmonicTick, bootstrapFilesFromPeer } from './knowledge-chain.js';
 import { initAnchor, maybeAnchor, getAnchorStats } from './anchor.js';
+import { peerGate } from './peer-auth.js';
 import { handleNyxRequest } from './nyx.js';
 import { handleTheAIRequest } from './theai-dashboard.js';
 import { initCKB, processConversation as processCKBConversation, getUserCKB, getCKBStats, getCKBDataFiles } from './ckb-generator.js';
@@ -9341,15 +9342,24 @@ async function main() {
           res.end(JSON.stringify(data));
         }
       // ============ Shard Update Receiver ============
-      // Receives dispatched TG updates from the shard router
+      // Receives dispatched TG updates from the shard router. Peer-gated (peer-auth.js, 2026-11-04):
+      // before, anyone who could reach the port could feed Telegraf a forged update, the owner's id
+      // included. The router signs each dispatch with the shard secret; without a secret here the
+      // route answers 503, and an unsigned or wrongly signed update is dropped with 401.
       } else if (req.url === '/shard/update' && req.method === 'POST') {
         try {
           const body = await readBody(req);
           const update = JSON.parse(body);
-          // Feed the update directly into Telegraf's processing pipeline
-          await bot.handleUpdate(update);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true }));
+          const denied = peerGate(req, update, config.shard?.secret);
+          if (denied) {
+            res.writeHead(denied.status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: denied.error }));
+          } else {
+            // Feed the update directly into Telegraf's processing pipeline
+            await bot.handleUpdate(update);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true }));
+          }
         } catch (err) {
           console.error(`[shard] Update processing failed: ${err.message}`);
           res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -9357,11 +9367,20 @@ async function main() {
         }
 
       // ============ Cross-Shard Learning Bus Receiver ============
-      // Receives learned insights from other shards (via router broadcast)
+      // Receives learned insights from other shards (via router broadcast). Same peer gate as
+      // /shard/update: a token_alert sends a message to any chat id in the body, so it is for
+      // signed peers only.
       } else if (req.url === '/shard/learn' && req.method === 'POST') {
         try {
           const body = await readBody(req);
-          const { type, data, fromShard } = JSON.parse(body);
+          const learned = JSON.parse(body);
+          const denied = peerGate(req, learned, config.shard?.secret);
+          if (denied) {
+            res.writeHead(denied.status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: denied.error }));
+            return;
+          }
+          const { type, data, fromShard } = learned;
           console.log(`[shard] Learning from ${fromShard}: ${type}`);
 
           // Process different learning types

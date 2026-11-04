@@ -50,17 +50,17 @@ const FAKE_SECRETS = {
   JARVIS_MASTER_KEY: 'fake-master-key-0001',
 };
 
-test('G1 anyone but the owner is not offered read_file or run_command', () => {
-  const tools = ['web_search', 'read_file', 'write_file', 'run_command', 'learn_fact'].map(name => ({ name }));
+test('G1 anyone but the owner is not offered read_file, run_command, write_file or edit_file', () => {
+  const tools = ['web_search', 'read_file', 'write_file', 'edit_file', 'run_command', 'learn_fact'].map(name => ({ name }));
   const names = (userId, ownerUserId = OWNER) => offeredTools(tools, userId, ownerUserId).map(t => t.name);
-  assert.deepEqual(OWNER_ONLY_TOOLS, ['read_file', 'run_command']);
-  assert.deepEqual(names(OWNER), ['web_search', 'read_file', 'write_file', 'run_command', 'learn_fact']);
+  assert.deepEqual(OWNER_ONLY_TOOLS, ['read_file', 'run_command', 'write_file', 'edit_file']);
+  assert.deepEqual(names(OWNER), ['web_search', 'read_file', 'write_file', 'edit_file', 'run_command', 'learn_fact']);
   assert.deepEqual(names(String(OWNER)), names(OWNER)); // a Telegram id may arrive as a number or a string
-  // A stranger, an internal caller with no id, and a group id all get neither tool.
+  // A stranger, an internal caller with no id, and a group id all get none of the four.
   for (const who of [STRANGER, undefined, null, '', -1001234]) {
-    assert.deepEqual(names(who), ['web_search', 'write_file', 'learn_fact'], `userId ${who}`);
+    assert.deepEqual(names(who), ['web_search', 'learn_fact'], `userId ${who}`);
   }
-  assert.deepEqual(names(undefined, undefined), ['web_search', 'write_file', 'learn_fact']); // no owner set: nobody
+  assert.deepEqual(names(undefined, undefined), ['web_search', 'learn_fact']); // no owner set: nobody
 });
 
 test('G2 a call that arrives anyway is refused for anyone but the owner, and nothing runs', async () => {

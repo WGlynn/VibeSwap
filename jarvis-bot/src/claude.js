@@ -41,6 +41,7 @@ import { PANTHEON_TOOLS, PANTHEON_TOOL_NAMES, handlePantheonTool } from './panth
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 import { ARCHIVE_TOOLS, ARCHIVE_TOOL_NAMES, handleArchiveTool } from './tools-archive.js';
 import { runLocalCRPC } from './crpc.js';
+import { offeredTools, readFileTool, runCommandTool, isDeniedPath, SECRET_REFUSAL } from './tool-guard.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -514,6 +515,7 @@ async function handleCodeGenTool(toolName, input) {
     }
     if (toolName === 'read_file') {
       const fullPath = safeRepoPath(input.path);
+      if (isDeniedPath(fullPath)) return SECRET_REFUSAL; // secret files stay closed here too (tool-guard.js)
       if (!existsSync(fullPath)) return `File not found: ${input.path}`;
       const content = await readFile(fullPath, 'utf-8');
       return content.length > 8000 ? content.slice(0, 8000) + '\n... (truncated)' : content;
@@ -1176,11 +1178,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     },
     {
       name: 'read_file',
-      description: 'Read the contents of a file from the VibeSwap repository or any accessible path. Use this when you need to look up code, configs, docs, or any file content. Returns the file contents as text. Path can be relative to the repo root (e.g., "jarvis-bot/src/config.js") or absolute.',
+      description: 'Read the contents of a file inside the VibeSwap repository. Use this when you need to look up code, configs, docs, or any file content. Returns the file contents as text. Path is relative to the repo root (e.g., "jarvis-bot/src/config.js"). Secret files (.env, keys, tokens, credentials) are refused.',
       input_schema: {
         type: 'object',
         properties: {
-          path: { type: 'string', description: 'File path (relative to repo root or absolute)' },
+          path: { type: 'string', description: 'File path relative to the repo root' },
         },
         required: ['path'],
       },
@@ -1744,7 +1746,8 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
 
   // Select only relevant tools based on message content
   // Light tier: NO tools at all — simple messages don't need tool calls
-  const tools = isLightContext ? [] : selectTools(messageText, allTools);
+  // read_file and run_command are offered on the owner's turns only (tool-guard.js, 2026-11-04).
+  const tools = isLightContext ? [] : offeredTools(selectTools(messageText, allTools), userId, config.ownerUserId);
 
   // ============ History Trimming for Light Tier ============
   // "Every extra call slows him down exponentially" — Will
@@ -1828,24 +1831,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = `Web search failed: ${err.message}`;
           }
         } else if (tb.name === 'read_file') {
-          try {
-            // BOT-100: Path traversal guard — resolve relative to REPO_PATH, block absolute paths
-            const filePath = join(REPO_PATH, tb.input.path);
-            const resolved = resolve(filePath);
-            const repoResolved = resolve(REPO_PATH);
-            if (!resolved.startsWith(repoResolved)) {
-              result = 'Blocked: read_file path must be within the repository.';
-            } else {
-              const content = await readFile(resolved, 'utf-8');
-              // Cap at 8000 chars to avoid context explosion
-              result = content.length > 8000
-                ? content.slice(0, 8000) + `\n\n[... truncated, ${content.length} chars total]`
-                : content;
-              console.log(`[claude] Tool: read_file("${tb.input.path}") → ${content.length} chars`);
-            }
-          } catch (err) {
-            result = `Failed to read file: ${err.message}`;
-          }
+          // Owner only, inside the repo, no secret file for anyone, checked on the real path (tool-guard.js).
+          result = await readFileTool(tb.input, { userId, ownerUserId: config.ownerUserId, repoPath: REPO_PATH });
+          console.log(`[claude] Tool: read_file("${tb.input?.path}") → ${result.startsWith('Refused') ? result.slice(0, 60) : `${result.length} chars`}`);
         } else if (tb.name === 'write_file') {
           try {
             const filePath = join(REPO_PATH, tb.input.path);
@@ -1867,43 +1855,10 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = `Failed to write file: ${err.message}`;
           }
         } else if (tb.name === 'run_command') {
-          // BOT-101: Allowlist of permitted command prefixes. Blocklist approach was trivially bypassed.
-          try {
-            const cmd = tb.input.command.trim();
-            const ALLOWED_PREFIXES = [
-              'git ', 'git\t', 'forge ', 'npm ', 'npx ', 'node ', 'python ', 'pip ',
-              'ls ', 'ls\t', 'dir ', 'cat ', 'head ', 'tail ', 'wc ', 'find ',
-              'grep ', 'rg ', 'echo ', 'pwd', 'which ', 'date', 'uptime',
-            ];
-            const isAllowed = ALLOWED_PREFIXES.some(p => cmd.startsWith(p)) || cmd === 'ls' || cmd === 'pwd' || cmd === 'date' || cmd === 'uptime';
-            if (!isAllowed) {
-              result = 'Blocked: only repository-related commands are allowed (git, forge, npm, node, python, ls, grep, etc).';
-            } else {
-              // BOT-101: Also block shell chaining operators that bypass the prefix check
-              if (/[;&|`$]|\bsudo\b/.test(cmd)) {
-                result = 'Blocked: shell operators (;, &, |, `, $) and sudo are not allowed.';
-              } else {
-                const cwd = tb.input.cwd
-                  ? (tb.input.cwd.startsWith('/') || tb.input.cwd.match(/^[A-Z]:/) ? tb.input.cwd : join(REPO_PATH, tb.input.cwd))
-                  : REPO_PATH;
-                const { execSync } = await import('child_process');
-                const output = execSync(cmd, {
-                  cwd,
-                  timeout: 60000,
-                  encoding: 'utf-8',
-                  maxBuffer: 1024 * 1024,
-                  env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-                });
-                // Cap output
-                result = output.length > 4000
-                  ? output.slice(0, 4000) + `\n\n[... truncated, ${output.length} chars total]`
-                  : output || '(no output)';
-                console.log(`[claude] Tool: run_command("${cmd.slice(0, 60)}") → ${output.length} chars output`);
-              }
-            }
-          } catch (err) {
-            result = `Command failed: ${err.stderr || err.message || String(err)}`.slice(0, 2000);
-          }
+          // Owner only, the BOT-101 allowlist, no secret path, and a child environment without the
+          // bot's secrets (tool-guard.js, 2026-11-04).
+          result = runCommandTool(tb.input, { userId, ownerUserId: config.ownerUserId, repoPath: REPO_PATH });
+          console.log(`[claude] Tool: run_command("${String(tb.input?.command || '').slice(0, 60)}") → ${result.startsWith('Refused') ? result.slice(0, 60) : `${result.length} chars output`}`);
         } else if (tb.name === 'fetch_repo') {
           try {
             const url = tb.input.url.replace(/\.git$/, '');
@@ -2382,7 +2337,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
         } else {
           recordToolSuccess(tb.name);
         }
-        toolEvents.push({ name: tb.name, ok: !isFailure && !/^(?:Unknown tool|Unknown flag|Failed to)/i.test(String(result)) });
+        toolEvents.push({ name: tb.name, ok: !isFailure && !/^(?:Unknown tool|Unknown flag|Failed to|Refused)/i.test(String(result)) });
         toolResults.push({ type: 'tool_result', tool_use_id: tb.id, content: result });
       }
       history.push({ role: 'user', content: toolResults });

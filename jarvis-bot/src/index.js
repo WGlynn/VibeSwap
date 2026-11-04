@@ -270,6 +270,7 @@ try {
 import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAutonomousStats, loadChatActivity, flushAutonomous } from './autonomous.js';
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
+import { startEmail, stopEmail, handleEmailApi } from './email.js';
 import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest, queueFromMessage, noteSessionReply, answeredInChat } from './session-requests.js';
 import { turnRecord, QUEUED_NOTE } from './protocol.js';
 import { quickReply, isBareAck } from './quick-reply.js';
@@ -8191,6 +8192,10 @@ async function main() {
   };
   setInterval(() => { deliverSessionReceipts().catch((e) => console.warn(`[session] ${e.message}`)); }, 30_000);
 
+  // ============ Email (email.js): allowed senders' Gmail into the feed folder; sends only via POST /api/email ============
+  // Off unless GMAIL_USER and GMAIL_APP_PASSWORD are set. A failed login is logged, never thrown.
+  startEmail();
+
   await initBroadcast({
     telegramSend: (chatId, text) => bot.telegram.sendMessage(chatId, text),
     chatIds: config.authorizedGroups || [],
@@ -9082,6 +9087,12 @@ async function main() {
             res.end(JSON.stringify({ error: err.message }));
           }
 
+        // POST /api/email: Claude Code sends mail from the bot's Gmail (email.js, Will 2026-11-04).
+        // Body: { to, subject, text, inReplyToUid? }. Only to EMAIL_ALLOWED_RECIPIENTS; each send goes
+        // to health.jsonl without its body. The chat model has no email tool.
+        } else if (path === '/api/email' && req.method === 'POST') {
+          await handleEmailApi(req, res, { secret: config.claudeCodeApiSecret, readBody });
+
         // GET /api/outbox — Messages JARVIS has queued for Claude Code
         } else if (path === '/api/outbox' && req.method === 'GET') {
           const messages = getOutbox();
@@ -9136,6 +9147,7 @@ async function main() {
             'GET /api/intel?group=&count=',
             'POST /api/message',
             'POST /api/say',
+            'POST /api/email',
             'GET /api/outbox',
             'POST /api/outbox/ack',
             'GET /api/comms/log?count=',
@@ -9734,6 +9746,7 @@ async function main() {
     stopAutonomous();
     stopGroupContext();
     stopCRPC();
+    stopEmail();
     // Close HTTP server — stop accepting new connections during shutdown
     if (global._httpServer) {
       global._httpServer.close();

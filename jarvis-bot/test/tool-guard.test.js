@@ -12,6 +12,7 @@ import { join, dirname } from 'path';
 import {
   OWNER_ONLY_TOOLS, offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, mentionsDeniedPath,
   childEnv, redactSecrets, SECRET_REFUSAL, OUTSIDE_WRITE_REFUSAL, GIT_DIR_REFUSAL, changedAmong,
+  repoTarget, clonedFilePath, REPO_URL_REFUSAL, GIT_HOSTS,
 } from '../src/tool-guard.js';
 
 // Source files carry CRLF or LF depending on the editor that last touched them; the assertions see LF.
@@ -237,7 +238,7 @@ test('G14 the auto-commit stages the written files alone: changedAmong keeps onl
 
 test('G15 claude.js, index.js and git.js are wired: the guard runs the writes, and every pipeline commit names its files', () => {
   const c = src('claude.js');
-  assert.match(c, /import \{ offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL \} from '\.\/tool-guard\.js';/);
+  assert.match(c, /import \{ offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL, repoTarget, clonedFilePath, childEnv \} from '\.\/tool-guard\.js';/);
   // The chat tool loop: the guard, with the list the auto-commit stages; no inline write is left.
   assert.match(c, /result = await writeFileTool\(tb\.input, \{ userId, ownerUserId: config\.ownerUserId, repoPath: REPO_PATH, written: filesWrittenInLoop \}\);/);
   assert.doesNotMatch(c, /filesWrittenInLoop\.push\(/);

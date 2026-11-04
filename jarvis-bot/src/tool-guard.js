@@ -235,3 +235,41 @@ export function changedAmong(status, files) {
   const changed = new Set([...status.modified, ...status.not_added, ...status.created, ...status.staged, ...status.renamed.map(r => r.to)]);
   return files.filter(f => changed.has(f));
 }
+
+// ============ 5. fetch_repo ============
+// The model clones a repository URL from a chat message into .claude/repo-cache and reads files
+// from the clone. Before (2026-11-04): the files list accepted "../", so it read any file on the
+// machine; the URL could name any host, a private address included; and git ran with the bot's
+// whole environment and the owner's credential helper, so a private repository of the owner's
+// could be read from any chat. Now: https only, a known public git host (an allowlist, which also
+// covers git following redirects on its own), a plain /owner/name path, the clone dir derived from
+// the validated host, owner and name, and each file read on its real path strictly inside the
+// clone, never a secret file or anything under .git. claude.js runs git with childEnv and
+// credential.helper reset, so only a public repository clones.
+export const GIT_HOSTS = ['github.com', 'gitlab.com', 'bitbucket.org', 'codeberg.org'];
+export const REPO_URL_REFUSAL = `Refused: fetch_repo reads public repositories on ${GIT_HOSTS.join(', ')} only, by an https URL of the form https://host/owner/name.`;
+const REPO_PATH_RE = /^\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*?)(?:\.git)?\/?$/;
+
+// { url, host, owner, name } for an acceptable repository URL, else { refused }.
+export function repoTarget(input) {
+  let url;
+  try { url = new URL(String(input ?? '').trim()); } catch { return { refused: REPO_URL_REFUSAL }; }
+  const host = url.hostname.toLowerCase();
+  const m = REPO_PATH_RE.exec(url.pathname);
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !GIT_HOSTS.includes(host) || !m) {
+    return { refused: REPO_URL_REFUSAL };
+  }
+  const [, owner, name] = m;
+  return { url: `https://${host}/${owner}/${name}.git`, host, owner, name };
+}
+
+// The real path of a file inside a clone, { real, rel }, or { refused } with the reason: outside
+// the clone (".." or a link out), a secret file, or anything under .git.
+export function clonedFilePath(asked, cloneDir) {
+  const real = containedRealPath(asked, cloneDir);
+  if (!real) return { refused: 'outside the repository' };
+  if (isDeniedPath(real)) return { refused: 'a secret file' };
+  const rel = relative(realPath(cloneDir), real).split(/[\\/]+/).join('/');
+  if (rel.split('/').some(s => NO_WRITE_DIRS.includes(s.toLowerCase()))) return { refused: 'under .git' };
+  return { real, rel };
+}

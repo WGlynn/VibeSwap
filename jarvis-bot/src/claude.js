@@ -41,7 +41,7 @@ import { PANTHEON_TOOLS, PANTHEON_TOOL_NAMES, handlePantheonTool } from './panth
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 import { ARCHIVE_TOOLS, ARCHIVE_TOOL_NAMES, handleArchiveTool } from './tools-archive.js';
 import { runLocalCRPC } from './crpc.js';
-import { offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL } from './tool-guard.js';
+import { offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL, repoTarget, clonedFilePath, childEnv } from './tool-guard.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -1833,39 +1833,48 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
           result = runCommandTool(tb.input, { userId, ownerUserId: config.ownerUserId, repoPath: REPO_PATH });
           console.log(`[claude] Tool: run_command("${String(tb.input?.command || '').slice(0, 60)}") → ${result.startsWith('Refused') ? result.slice(0, 60) : `${result.length} chars output`}`);
         } else if (tb.name === 'fetch_repo') {
-          try {
-            const url = tb.input.url.replace(/\.git$/, '');
-            // BOT-102: Validate URL format to prevent command injection
-            if (!/^https?:\/\/[a-zA-Z0-9._\-\/]+$/.test(url)) {
-              result = 'Blocked: URL must be a valid HTTPS git repository URL with no special characters.';
-            } else {
-            const repoName = url.split('/').pop();
-            const tempDir = join(REPO_PATH, '.claude', 'repo-cache', repoName);
-            const { execFileSync } = await import('child_process');
-            const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
-            if (existsSync(tempDir)) {
-              execFileSync('git', ['pull', '--ff-only'], { cwd: tempDir, timeout: 30000, encoding: 'utf-8', env: gitEnv });
-            } else {
-              await mkdir(join(REPO_PATH, '.claude', 'repo-cache'), { recursive: true });
-              // BOT-102: Use execFileSync with array args — no shell interpretation
-              execFileSync('git', ['clone', '--depth', '1', url + '.git', tempDir], { timeout: 60000, encoding: 'utf-8', env: gitEnv });
-            }
-            const files = tb.input.files?.length ? tb.input.files : ['README.md'];
-            const results = [];
-            for (const f of files.slice(0, 5)) { // Max 5 files
-              try {
-                const content = await readFile(join(tempDir, f), 'utf-8');
-                const truncated = content.length > 4000 ? content.slice(0, 4000) + '\n[truncated]' : content;
-                results.push(`--- ${f} ---\n${truncated}`);
-              } catch {
-                results.push(`--- ${f} --- (not found)`);
+          // A public repository on a known git host, by https (tool-guard.js repoTarget), cloned with
+          // a scrubbed environment and the credential helper reset, so the owner's stored tokens never
+          // clone a private repository for a chat, into a dir derived from the validated host, owner
+          // and name. Each requested file is read on its real path inside the clone, never a secret
+          // file or .git (clonedFilePath). Before (2026-11-04) the files list accepted "../".
+          const target = repoTarget(tb.input?.url);
+          if (target.refused) {
+            result = target.refused;
+          } else {
+            try {
+              const cacheDir = join(REPO_PATH, '.claude', 'repo-cache', target.host, target.owner);
+              const tempDir = join(cacheDir, target.name);
+              const { execFileSync } = await import('child_process');
+              // BOT-102: execFileSync with array args, no shell interpretation
+              const gitOpts = { encoding: 'utf-8', env: childEnv(process.env), stdio: ['ignore', 'pipe', 'pipe'] };
+              if (existsSync(join(tempDir, '.git'))) {
+                execFileSync('git', ['-c', 'credential.helper=', 'pull', '--ff-only'], { ...gitOpts, cwd: tempDir, timeout: 30000 });
+              } else {
+                await mkdir(cacheDir, { recursive: true });
+                execFileSync('git', ['-c', 'credential.helper=', 'clone', '--depth', '1', target.url, tempDir], { ...gitOpts, timeout: 60000 });
               }
+              const files = Array.isArray(tb.input.files) && tb.input.files.length ? tb.input.files : ['README.md'];
+              const results = [];
+              for (const f of files.slice(0, 5).map(String)) { // Max 5 files
+                const file = clonedFilePath(f, tempDir);
+                if (file.refused) {
+                  results.push(`--- ${f} --- (refused: ${file.refused})`);
+                  continue;
+                }
+                try {
+                  const content = await readFile(file.real, 'utf-8');
+                  const truncated = content.length > 4000 ? content.slice(0, 4000) + '\n[truncated]' : content;
+                  results.push(`--- ${file.rel} ---\n${truncated}`);
+                } catch {
+                  results.push(`--- ${file.rel} --- (not found)`);
+                }
+              }
+              result = results.join('\n\n');
+              console.log(`[claude] Tool: fetch_repo("${target.host}/${target.owner}/${target.name}") → ${files.length} files read`);
+            } catch (err) {
+              result = `Failed to fetch repo: ${String(err.message || err).slice(0, 500)}`;
             }
-            result = results.join('\n\n');
-            console.log(`[claude] Tool: fetch_repo("${repoName}") → ${files.length} files read`);
-            } // close BOT-102 else block
-          } catch (err) {
-            result = `Failed to fetch repo: ${err.message}`;
           }
         } else if (tb.name === 'flag_deceiver') {
           try {

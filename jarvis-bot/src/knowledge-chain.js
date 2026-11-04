@@ -64,8 +64,10 @@ const CHAIN_FILE = join(KNOWLEDGE_ROOT, 'chain.json');
 // Every request to a peer's knowledge-chain route is signed with the shard secret: a POST over its
 // JSON body, a GET over its request target. A peer without the secret refuses them, by design.
 function peerFetch(peer, path, { method = 'GET', body, timeoutMs = HTTP_TIMEOUT_MS } = {}) {
-  const message = peerMessageOf(method, path, body);
-  return fetch(`${peer.url}${path}`, {
+  const url = new URL(`${peer.url}${path}`);
+  // A GET signs exactly the request target that goes on the wire: the peer verifies its req.url.
+  const message = peerMessageOf(method, url.pathname + url.search, body);
+  return fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json', ...peerHeaders(message, config.shard?.secret) },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -413,76 +415,91 @@ function hashContent(content) {
   return createHash('sha256').update(content).digest('hex').slice(0, 32);
 }
 
+// A file served on demand to a bootstrapping peer may be larger than the inline cap; this is the
+// most that is accepted from a peer either way.
+const FILE_SYNC_MAX_BYTES = 1024 * 1024;
+
+/**
+ * The file_sync change for a local file, recorded in the inventory under its sync key, or null
+ * when the file is outside every sync root, is a secret file, or has not changed since it was
+ * last published. The inventory remembers the real path so GET /knowledge/file can serve the key.
+ */
+export function publishFileSync(filePath, content, roots = SYNC_ROOTS) {
+  const key = syncKeyOf(filePath, roots);
+  if (!key) {
+    console.log(`[knowledge-chain] Not synced: ${filePath} is outside the sync roots or is a secret file`);
+    return null;
+  }
+  const contentHash = hashContent(content);
+  const existingHash = syncedFileHashes.get(key);
+  if (existingHash === contentHash) return null; // Dedup: nothing changed
+  if (existingHash && existingHash !== contentHash) {
+    console.warn(`[knowledge-chain] File sync conflict: ${key} — local hash ${existingHash.slice(0, 12)} vs incoming ${contentHash.slice(0, 12)} (accepting newer)`);
+  }
+  syncedFileHashes.set(key, contentHash);
+  syncedFileInventory.set(key, { hash: contentHash, size: content.length, lastUpdated: Date.now(), file: realPath(filePath) });
+  return {
+    type: 'file_sync',
+    path: key,
+    contentHash,
+    // Only inline content under threshold; larger files served on demand
+    content: content.length <= FILE_SYNC_MAX_INLINE ? content : null,
+    size: content.length,
+  };
+}
+
 /**
  * Sync a file change across the shard network via knowledge chain epochs.
  * Call this when a memory file, CKB, or SESSION_STATE changes.
  */
 export async function syncFileChange(filePath, content) {
-  const contentHash = hashContent(content);
-
-  // Dedup: don't re-sync if hash hasn't changed
-  const existingHash = syncedFileHashes.get(filePath);
-  if (existingHash === contentHash) return false;
-
-  // Conflict detection: same path but different content hash
-  if (existingHash && existingHash !== contentHash) {
-    console.warn(`[knowledge-chain] File sync conflict: ${filePath} — local hash ${existingHash.slice(0, 12)} vs incoming ${contentHash.slice(0, 12)} (accepting newer)`);
-  }
-  syncedFileHashes.set(filePath, contentHash);
-
-  // Update inventory
-  syncedFileInventory.set(filePath, {
-    hash: contentHash,
-    size: content.length,
-    lastUpdated: Date.now(),
-  });
-
-  await addChange({
-    type: 'file_sync',
-    path: filePath,
-    contentHash,
-    // Only inline content under threshold; larger files served on demand
-    content: content.length <= FILE_SYNC_MAX_INLINE ? content : null,
-    size: content.length,
-  });
-
-  console.log(`[knowledge-chain] File sync queued: ${filePath} (${content.length} chars, hash: ${contentHash.slice(0, 12)})`);
+  const change = publishFileSync(filePath, content);
+  if (!change) return false;
+  await addChange(change);
+  console.log(`[knowledge-chain] File sync queued: ${change.path} (${content.length} chars, hash: ${change.contentHash.slice(0, 12)})`);
   return true;
 }
 
 /**
- * Apply file_sync changes from a received epoch.
- * Writes synced files to local disk.
+ * Apply file_sync changes from a received epoch. Each key is stored under the synced dir only
+ * (syncedFilePath), the content must match its hash and stay under the inline cap. Returns how
+ * many files were written. The dir can be passed in (tests).
  */
-async function applyFileSyncChanges(epochChanges) {
-  if (!Array.isArray(epochChanges)) return;
+export async function applyFileSyncChanges(epochChanges, syncedDir = SYNCED_DIR) {
+  if (!Array.isArray(epochChanges)) return 0;
+  let applied = 0;
   for (const change of epochChanges) {
-    if (change.type !== 'file_sync' || !change.content || !change.path) continue;
+    if (change?.type !== 'file_sync' || typeof change.content !== 'string' || !change.content || !change.path) continue;
+    const key = String(change.path);
+    const file = syncedFilePath(key, syncedDir);
+    if (!file) {
+      console.warn(`[knowledge-chain] File sync refused: key ${JSON.stringify(key.slice(0, 120))} is not a plain relative path inside the synced dir, or names a secret file`);
+      continue;
+    }
+    if (change.content.length > FILE_SYNC_MAX_INLINE || hashContent(change.content) !== change.contentHash) {
+      console.warn(`[knowledge-chain] File sync refused: ${key} is over the inline cap or its content does not match its hash`);
+      continue;
+    }
 
     // Don't overwrite if we already have the same hash
-    if (syncedFileHashes.get(change.path) === change.contentHash) continue;
+    if (syncedFileHashes.get(key) === change.contentHash) continue;
 
     try {
-      // Ensure directory exists
-      const dir = dirname(change.path);
-      await mkdir(dir, { recursive: true });
-
-      await writeFile(change.path, change.content, 'utf-8');
-      syncedFileHashes.set(change.path, change.contentHash);
-      syncedFileInventory.set(change.path, {
-        hash: change.contentHash,
-        size: change.size || change.content.length,
-        lastUpdated: Date.now(),
-      });
-      console.log(`[knowledge-chain] File synced from peer: ${change.path} (${change.content.length} chars)`);
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, change.content, 'utf-8');
+      syncedFileHashes.set(key, change.contentHash);
+      syncedFileInventory.set(key, { hash: change.contentHash, size: change.content.length, lastUpdated: Date.now(), file });
+      applied++;
+      console.log(`[knowledge-chain] File synced from peer: ${key} (${change.content.length} chars)`);
     } catch (err) {
-      console.warn(`[knowledge-chain] File sync write failed for ${change.path}: ${err.message}`);
+      console.warn(`[knowledge-chain] File sync write failed for ${key}: ${err.message}`);
     }
   }
+  return applied;
 }
 
 /**
- * Get inventory of all synced files (for peer bootstrap).
+ * Get inventory of all synced files (for peer bootstrap): keys, never paths on this machine.
  */
 export function getFileInventory() {
   const inventory = [];
@@ -493,45 +510,49 @@ export function getFileInventory() {
 }
 
 /**
- * Get content of a synced file by path (for peer bootstrap).
+ * Get content of a synced file by its key (for peer bootstrap). Only a key in the inventory is
+ * served, from the real path recorded when it was published or received; that path is checked
+ * again now, in case something replaced it with a link since.
  */
-export async function getFileContent(filePath) {
+export async function getFileContent(key) {
+  const info = syncedFileInventory.get(String(key ?? ''));
+  if (!info?.file || realPath(info.file) !== info.file || isDeniedPath(info.file)) return null;
   try {
-    return await readFile(filePath, 'utf-8');
+    return await readFile(info.file, 'utf-8');
   } catch {
     return null;
   }
 }
 
 /**
- * Bootstrap files from a peer (when booting without git).
+ * Bootstrap files from a peer (when booting without git). Signed requests; each key is stored
+ * under the synced dir only.
  */
-export async function bootstrapFilesFromPeer(peerUrl) {
+export async function bootstrapFilesFromPeer(peerUrl, syncedDir = SYNCED_DIR) {
+  const peer = { url: peerUrl };
   try {
-    const response = await fetch(`${peerUrl}/knowledge/files`, {
-      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS * 3),
-    });
+    const response = await peerFetch(peer, '/knowledge/files', { timeoutMs: HTTP_TIMEOUT_MS * 3 });
     const inventory = await response.json();
+    if (!Array.isArray(inventory)) return 0;
 
     let synced = 0;
-    for (const file of inventory) {
+    for (const file of inventory.slice(0, 1000)) {
+      const key = String(file?.path ?? '');
+      const target = syncedFilePath(key, syncedDir);
+      if (!target) continue;
       // Skip if we already have this version
-      if (syncedFileHashes.get(file.path) === file.hash) continue;
+      if (syncedFileHashes.get(key) === file.hash) continue;
 
       try {
-        const contentResponse = await fetch(
-          `${peerUrl}/knowledge/file?path=${encodeURIComponent(file.path)}`,
-          { signal: AbortSignal.timeout(HTTP_TIMEOUT_MS * 2) }
-        );
-        if (contentResponse.ok) {
-          const content = await contentResponse.text();
-          const dir = dirname(file.path);
-          await mkdir(dir, { recursive: true });
-          await writeFile(file.path, content, 'utf-8');
-          syncedFileHashes.set(file.path, file.hash);
-          syncedFileInventory.set(file.path, { hash: file.hash, size: file.size, lastUpdated: Date.now() });
-          synced++;
-        }
+        const contentResponse = await peerFetch(peer, `/knowledge/file?path=${encodeURIComponent(key)}`, { timeoutMs: HTTP_TIMEOUT_MS * 2 });
+        if (!contentResponse.ok) continue;
+        const { content } = await contentResponse.json();
+        if (typeof content !== 'string' || content.length > FILE_SYNC_MAX_BYTES || hashContent(content) !== file.hash) continue;
+        await mkdir(dirname(target), { recursive: true });
+        await writeFile(target, content, 'utf-8');
+        syncedFileHashes.set(key, file.hash);
+        syncedFileInventory.set(key, { hash: file.hash, size: content.length, lastUpdated: Date.now(), file: target });
+        synced++;
       } catch { /* individual file failure is non-fatal */ }
     }
 
@@ -669,16 +690,12 @@ export async function syncWithPeers() {
 
   for (const peer of peers) {
     try {
-      const response = await fetch(`${peer.url}/knowledge-chain/head`, {
-        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-      });
+      const response = await peerFetch(peer, '/knowledge-chain/head');
       const remoteHead = await response.json();
 
       // If remote has higher cumulative VD, request their chain
       if (remoteHead.cumulativeValueDensity > (chainHead?.cumulativeValueDensity || 0)) {
-        const chainResponse = await fetch(`${peer.url}/knowledge-chain/chain?since=${chainHead?.height || 0}`, {
-          signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-        });
+        const chainResponse = await peerFetch(peer, `/knowledge-chain/chain?since=${chainHead?.height || 0}`);
         const remoteChain = await chainResponse.json();
         acceptRemoteChain(remoteChain.epochs || []);
       }
@@ -692,12 +709,7 @@ export async function broadcastEpoch(epoch) {
   const peers = getShardPeers();
   for (const peer of peers) {
     try {
-      const response = await fetch(`${peer.url}/knowledge-chain/epoch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(epoch),
-        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-      });
+      const response = await peerFetch(peer, '/knowledge-chain/epoch', { method: 'POST', body: epoch });
       const result = await response.json();
       if (!result.accepted) {
         queueMissedEpoch(peer.shardId, epoch);
@@ -736,12 +748,7 @@ export async function retryMissedEpochs() {
     while (epochs.length > 0) {
       const epoch = epochs[0];
       try {
-        const response = await fetch(`${peer.url}/knowledge-chain/epoch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(epoch),
-          signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
-        });
+        const response = await peerFetch(peer, '/knowledge-chain/epoch', { method: 'POST', body: epoch });
         const result = await response.json();
         epochs.shift(); // Delivered
         if (!result.accepted) break; // Peer rejected — don't hammer
@@ -799,9 +806,8 @@ export async function receiveEpoch(epoch) {
   const sourcePeer = peers.find(p => p.shardId === epoch.shardId);
   if (sourcePeer) {
     try {
-      const chainResponse = await fetch(`${sourcePeer.url}/knowledge-chain/chain?since=0`, {
-        signal: AbortSignal.timeout(HTTP_TIMEOUT_MS * 2), // Give extra time for full chain
-      });
+      // Give extra time for the full chain
+      const chainResponse = await peerFetch(sourcePeer, '/knowledge-chain/chain?since=0', { timeoutMs: HTTP_TIMEOUT_MS * 2 });
       const remoteData = await chainResponse.json();
       const remoteChain = remoteData.epochs || [];
       if (remoteChain.length > 0) {

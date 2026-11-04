@@ -521,6 +521,31 @@ function readBody(req) {
   });
 }
 
+// ============ Knowledge chain routes (peer-gated, 2026-11-04) ============
+// Both HTTP servers, primary and worker, serve /knowledge-chain/* and /knowledge/* through here.
+// The chain carries memory-file contents in its file syncs and GET /knowledge/file serves them, so
+// every one of these routes, the read-only ones included, is for signed peers (peer-auth.js): no
+// shard secret means 503, a missing or wrong signature 401. A POST body is read (64 KB cap) before
+// the check because the signature covers it. Returns false for a path that is not a knowledge route.
+async function serveKnowledgeChainRoute(req, res, healthPort) {
+  const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
+  const kcHandler = handleKnowledgeChainRequest(kcUrl.pathname, req.method);
+  if (!kcHandler) return false;
+  const json = (status, data) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
+  let payload = null;
+  if (req.method === 'POST') {
+    try { payload = JSON.parse(await readBody(req)); } catch (err) { json(400, { error: err.message }); return true; }
+  }
+  const denied = peerGate(req, payload, config.shard?.secret);
+  if (denied) { json(denied.status, { error: denied.error }); return true; }
+  try {
+    json(200, await processKnowledgeChainBody(kcHandler, payload, Object.fromEntries(kcUrl.searchParams)));
+  } catch (err) {
+    json(400, { error: err.message });
+  }
+  return true;
+}
+
 const HEARTBEAT_FILE = join(config.dataDir, 'heartbeat.json');
 const LOCK_FILE = join(config.dataDir, 'jarvis.lock');
 
@@ -7808,28 +7833,7 @@ async function main() {
       }
 
       if (req.url?.startsWith('/knowledge-chain/') || req.url?.startsWith('/knowledge/')) {
-        const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
-        const kcPath = kcUrl.pathname;
-        const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
-        if (kcHandler === 'epoch') {
-          try {
-            const body = await readBody(req);
-            const payload = JSON.parse(body);
-            const data = await processKnowledgeChainBody(kcHandler, payload);
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(data));
-          } catch (err) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: err.message }));
-          }
-          return;
-        } else if (kcHandler) {
-          const query = Object.fromEntries(kcUrl.searchParams);
-          const data = await processKnowledgeChainBody(kcHandler, null, query);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(data));
-          return;
-        }
+        if (await serveKnowledgeChainRoute(req, res, healthPort)) return; // peer-gated, see the helper
       }
 
       // Constellation — Interactive Star Map (must check BEFORE generic /theai)
@@ -9317,29 +9321,10 @@ async function main() {
 
       // ============ Knowledge Chain API ============
       } else if (req.url?.startsWith('/knowledge-chain/') || req.url?.startsWith('/knowledge/')) {
-        const kcUrl = new URL(req.url, `http://localhost:${healthPort}`);
-        const kcPath = kcUrl.pathname;
-        const kcHandler = handleKnowledgeChainRequest(kcPath, req.method);
-
-        if (!kcHandler) {
+        // Peer-gated, see serveKnowledgeChainRoute
+        if (!await serveKnowledgeChainRoute(req, res, healthPort)) {
           res.writeHead(404, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unknown knowledge-chain route' }));
-        } else if (kcHandler === 'epoch') {
-          try {
-              const body = await readBody(req);
-              const payload = JSON.parse(body);
-              const data = await processKnowledgeChainBody(kcHandler, payload);
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify(data));
-          } catch (err) {
-              res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: err.message }));
-          }
-        } else {
-          const query = Object.fromEntries(kcUrl.searchParams);
-          const data = await processKnowledgeChainBody(kcHandler, null, query);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(data));
         }
       // ============ Shard Update Receiver ============
       // Receives dispatched TG updates from the shard router. Peer-gated (peer-auth.js, 2026-11-04):

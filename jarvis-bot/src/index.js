@@ -271,6 +271,7 @@ import { initAutonomous, stopAutonomous, registerChat, recordChatActivity, getAu
 import { loadDirectives, flushDirectives, detectDirective, getDirective, setDirective, getChatMode, shouldSuppress, getAcknowledgment, listDirectives } from './directives.js';
 import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed.js';
 import { startEmail, stopEmail, handleEmailApi } from './email.js';
+import { handleSendFileApi, handleRecordApi } from './session-api.js';
 import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest, queueFromMessage, noteSessionReply, answeredInChat } from './session-requests.js';
 import { turnRecord, QUEUED_NOTE } from './protocol.js';
 import { quickReply, isBareAck } from './quick-reply.js';
@@ -8462,6 +8463,14 @@ async function main() {
   // HTTP health endpoint for cloud platforms (Fly.io, Railway, etc.)
   if (config.isDocker || process.env.HEALTH_PORT) {
     const healthPort = parseInt(process.env.HEALTH_PORT, 10) || 8080;
+    // The bot's record of a message the session posted as it: /api/say after a send, and the same for
+    // /api/send-file and /api/record (session-api.js), so the bot knows the message exists.
+    const recordSessionPost = (chatId, text, payload) => {
+      // A session reply to a request's message is the answer; its receipt then gets no second reply.
+      if (payload.replyToMessageId) noteSessionReply(chatId, payload.replyToMessageId);
+      recordOutgoing(chatId, text);
+      if (chatId.startsWith('-')) pushGroupMessage(chatId, 'JARVIS', text.slice(0, 500), payload.messageId ?? null, true);
+    };
     const httpServer = createServer(async (req, res) => {
       if (req.url === '/health') {
         const apiSecret = process.env.CLAUDE_CODE_API_SECRET;
@@ -9077,10 +9086,7 @@ async function main() {
             const extra = { parse_mode: undefined };
             if (payload.replyToMessageId) extra.reply_parameters = { message_id: Number(payload.replyToMessageId) };
             const sent = await bot.telegram.sendMessage(chatId, text, extra);
-            // A session reply to a request's message is the answer; its receipt then gets no second reply.
-            if (payload.replyToMessageId) noteSessionReply(chatId, payload.replyToMessageId);
-            recordOutgoing(chatId, text);
-            if (chatId.startsWith('-')) pushGroupMessage(chatId, 'JARVIS', text.slice(0, 500), null, true);
+            recordSessionPost(chatId, text, { replyToMessageId: payload.replyToMessageId });
             console.log(`[api] /api/say posted ${text.length} chars to chat ${chatId} (message ${sent.message_id})`);
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, messageId: sent.message_id }));
@@ -9088,6 +9094,14 @@ async function main() {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: err.message }));
           }
+
+        // POST /api/send-file and POST /api/record (session-api.js, Will 2026-11-04): a file from
+        // <JARVIS_FEED_DIR>/outbox-files sent and recorded the way /api/say records text, and a record
+        // of a message the session already sent directly (nothing is sent). Same secret, checked again inside.
+        } else if (path === '/api/send-file' && req.method === 'POST') {
+          await handleSendFileApi(req, res, { secret: config.claudeCodeApiSecret, readBody, telegram: bot.telegram, record: recordSessionPost });
+        } else if (path === '/api/record' && req.method === 'POST') {
+          await handleRecordApi(req, res, { secret: config.claudeCodeApiSecret, readBody, record: recordSessionPost });
 
         // POST /api/email: Claude Code sends mail from the bot's Gmail (email.js, Will 2026-11-04).
         // Body: { to, subject, text, inReplyToUid? }. Only to EMAIL_ALLOWED_RECIPIENTS; each send goes
@@ -9149,6 +9163,8 @@ async function main() {
             'GET /api/intel?group=&count=',
             'POST /api/message',
             'POST /api/say',
+            'POST /api/send-file',
+            'POST /api/record',
             'POST /api/email',
             'GET /api/outbox',
             'POST /api/outbox/ack',

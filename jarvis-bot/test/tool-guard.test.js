@@ -268,3 +268,59 @@ test('G15 claude.js, index.js and git.js are wired: the guard runs the writes, a
   assert.match(g, /export async function gitCommitAndPush\(message, files\) \{/);
   assert.match(g, /export async function gitCommitAndPushBranch\(message, branch, files\) \{/);
 });
+
+// ============ fetch_repo (2026-11-04) ============
+// Before: the files list accepted "../", the URL could name any host, and git ran with the bot's
+// environment and the owner's credential helper.
+
+test('G16 fetch_repo accepts an https URL of a public repository on a known host and nothing else', () => {
+  assert.deepEqual(GIT_HOSTS, ['github.com', 'gitlab.com', 'bitbucket.org', 'codeberg.org']);
+  const noesis = { url: 'https://github.com/WGlynn/noesis.git', host: 'github.com', owner: 'WGlynn', name: 'noesis' };
+  for (const ok of ['https://github.com/WGlynn/noesis', 'https://github.com/WGlynn/noesis.git', 'https://github.com/WGlynn/noesis/', ' https://GitHub.com/WGlynn/noesis ']) {
+    assert.deepEqual(repoTarget(ok), noesis, ok);
+  }
+  assert.deepEqual(repoTarget('https://gitlab.com/some-group/my.project'), { url: 'https://gitlab.com/some-group/my.project.git', host: 'gitlab.com', owner: 'some-group', name: 'my.project' });
+  for (const bad of ['http://github.com/a/b', 'https://user:pw@github.com/a/b', 'https://user@github.com/a/b', 'https://github.com/a/b?x=1',
+    'https://github.com/a/b#x', 'https://github.com/a', 'https://github.com/a/b/c', 'https://github.com/../b', 'https://github.com/a/..',
+    'https://github.com/.a/b', 'https://github.com/a/-b', 'https://github.com/a/--upload-pack=x', 'https://github.com/a/b%2F..%2Fc',
+    'https://github.com/a/b;rm', 'https://github.com/a/b c', 'https://evil.example/a/b', 'https://github.com.evil.example/a/b',
+    'https://127.0.0.1/a/b', 'https://localhost/a/b', 'https://[::1]/a/b', 'https://github.com:8443/a/b'.replace(':8443', ':443') === 'https://github.com/a/b' ? 'ssh://git@github.com/a/b' : 'ssh://git@github.com/a/b',
+    'git@github.com:a/b.git', 'file:///C:/Users/x', '', undefined, null, 42]) {
+    assert.deepEqual(repoTarget(bad), { refused: REPO_URL_REFUSAL }, String(bad));
+  }
+  assert.match(REPO_URL_REFUSAL, /^Refused: /);
+});
+
+test('G17 a file from the clone is read on its real path inside it; outside, a secret file or .git is refused', () => {
+  const clone = join(root, 'repo-cache', 'github.com', 'someone', 'thing');
+  put(join(clone, 'README.md'), 'readme\n');
+  put(join(clone, 'src', 'index.ts'), 'code\n');
+  put(join(clone, '.git', 'config'), '[core]\n');
+  put(join(clone, '.env'), 'X=fake\n');
+  put(join(clone, 'deploy', 'key.pem'), 'fake key\n');
+  symlinkSync(join(root, 'elsewhere'), join(clone, 'out'), 'junction');
+  const real = (p) => fs.realpathSync.native(join(clone, p));
+  assert.deepEqual(clonedFilePath('README.md', clone), { real: real('README.md'), rel: 'README.md' });
+  assert.deepEqual(clonedFilePath('./src/../src/index.ts', clone), { real: real('src/index.ts'), rel: 'src/index.ts' });
+  assert.deepEqual(clonedFilePath('src\\index.ts', clone), { real: real('src/index.ts'), rel: 'src/index.ts' });
+  assert.deepEqual(clonedFilePath('missing.md', clone).rel, 'missing.md'); // read fails later as "not found"
+  for (const [asked, why] of [['../../../outside.txt', 'outside the repository'], [join(root, 'outside.txt'), 'outside the repository'],
+    ['', 'outside the repository'], ['.', 'outside the repository'], ['out/plain.txt', 'outside the repository'],
+    ['.env', 'a secret file'], ['deploy/key.pem', 'a secret file'], ['src/../.env', 'a secret file'],
+    ['.git/config', 'under .git'], ['.git/hooks/pre-commit', 'under .git'], ['.GIT/config', 'under .git']]) {
+    assert.deepEqual(clonedFilePath(asked, clone), { refused: why }, asked);
+  }
+});
+
+test('G18 claude.js clones through the allowlist with a scrubbed environment and no credential helper, and reads through clonedFilePath', () => {
+  const c = src('claude.js');
+  const block = c.slice(c.indexOf("} else if (tb.name === 'fetch_repo') {"), c.indexOf("} else if (tb.name === 'flag_deceiver') {"));
+  assert.match(block, /const target = repoTarget\(tb\.input\?\.url\);\n\s+if \(target\.refused\) \{\n\s+result = target\.refused;/);
+  assert.match(block, /const cacheDir = join\(REPO_PATH, '\.claude', 'repo-cache', target\.host, target\.owner\);\n\s+const tempDir = join\(cacheDir, target\.name\);/);
+  assert.match(block, /env: childEnv\(process\.env\)/);
+  assert.match(block, /execFileSync\('git', \['-c', 'credential\.helper=', 'pull', '--ff-only'\], \{ \.\.\.gitOpts, cwd: tempDir, timeout: 30000 \}\);/);
+  assert.match(block, /execFileSync\('git', \['-c', 'credential\.helper=', 'clone', '--depth', '1', target\.url, tempDir\], \{ \.\.\.gitOpts, timeout: 60000 \}\);/);
+  assert.match(block, /const file = clonedFilePath\(f, tempDir\);\n\s+if \(file\.refused\) \{/);
+  assert.match(block, /await readFile\(file\.real, 'utf-8'\)/);
+  assert.doesNotMatch(block, /join\(tempDir, f\)|\.\.\.process\.env|url\.split\('\/'\)\.pop\(\)/);
+});

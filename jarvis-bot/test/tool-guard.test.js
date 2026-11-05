@@ -161,7 +161,10 @@ test('G10 claude.js offers the two tools through offeredTools and runs them only
   assert.match(c, /result = await readFileTool\(tb\.input, \{ userId, ownerUserId: config\.ownerUserId, repoPath: REPO_PATH \}\);/);
   assert.match(c, /result = runCommandTool\(tb\.input, \{ userId, ownerUserId: config\.ownerUserId, repoPath: REPO_PATH \}\);/);
   assert.doesNotMatch(c, /execSync\(cmd/); // the old run_command, which handed the child process.env
-  assert.match(c, /if \(isDeniedPath\(fullPath\)\) return SECRET_REFUSAL;/); // the /idea code-gen read_file
+  // The /idea and /code read_file: the same guard, owner check at execution included (2026-11-05;
+  // before, only the offer-site filter kept it from anyone but the owner).
+  assert.match(c, /if \(toolName === 'read_file'\) return await readFileTool\(input, guard\);/);
+  assert.doesNotMatch(c, /isDeniedPath\(fullPath\)|readFile\(fullPath/);
   assert.match(c, /Failed to\|Refused\)\/i\.test\(String\(result\)\)/); // a refusal backs no claim
 });
 
@@ -238,7 +241,7 @@ test('G14 the auto-commit stages the written files alone: changedAmong keeps onl
 
 test('G15 claude.js, index.js and git.js are wired: the guard runs the writes, and every pipeline commit names its files', () => {
   const c = src('claude.js');
-  assert.match(c, /import \{ offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL, repoTarget, clonedFilePath, childEnv \} from '\.\/tool-guard\.js';/);
+  assert.match(c, /import \{ offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, repoTarget, clonedFilePath, childEnv \} from '\.\/tool-guard\.js';/);
   // The chat tool loop: the guard, with the list the auto-commit stages; no inline write is left.
   assert.match(c, /result = await writeFileTool\(tb\.input, \{ userId, ownerUserId: config\.ownerUserId, repoPath: REPO_PATH, written: filesWrittenInLoop \}\);/);
   assert.doesNotMatch(c, /filesWrittenInLoop\.push\(/);

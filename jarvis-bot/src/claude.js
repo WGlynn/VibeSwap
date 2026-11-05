@@ -41,7 +41,7 @@ import { PANTHEON_TOOLS, PANTHEON_TOOL_NAMES, handlePantheonTool } from './panth
 import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './proactive.js';
 import { ARCHIVE_TOOLS, ARCHIVE_TOOL_NAMES, handleArchiveTool } from './tools-archive.js';
 import { runLocalCRPC } from './crpc.js';
-import { offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL, repoTarget, clonedFilePath, childEnv } from './tool-guard.js';
+import { offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, repoTarget, clonedFilePath, childEnv } from './tool-guard.js';
 import { checkUrl } from './url-guard.js';
 
 const REPO_PATH = config.repo.path;
@@ -498,13 +498,11 @@ async function handleCodeGenTool(toolName, input, guard) {
         return `Search error: ${err.message}`;
       }
     }
-    if (toolName === 'read_file') {
-      const fullPath = safeRepoPath(input.path);
-      if (isDeniedPath(fullPath)) return SECRET_REFUSAL; // secret files stay closed here too (tool-guard.js)
-      if (!existsSync(fullPath)) return `File not found: ${input.path}`;
-      const content = await readFile(fullPath, 'utf-8');
-      return content.length > 8000 ? content.slice(0, 8000) + '\n... (truncated)' : content;
-    }
+    // read_file: the same guard as the chat tool (owner only, the real path inside the repo, never a
+    // secret file, secret values masked). Before (2026-11-05) this path had the secret check and a
+    // prefix check that followed no link, but no owner check at execution: the offer-site filter
+    // was the only thing keeping it from anyone else.
+    if (toolName === 'read_file') return await readFileTool(input, guard);
     if (toolName === 'list_files') {
       const fullPath = safeRepoPath(input.path);
       if (!existsSync(fullPath)) return `Directory not found: ${input.path}`;

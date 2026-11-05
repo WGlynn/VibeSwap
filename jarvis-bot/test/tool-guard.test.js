@@ -284,10 +284,11 @@ test('G16 fetch_repo accepts an https URL of a public repository on a known host
     'https://github.com/a/b#x', 'https://github.com/a', 'https://github.com/a/b/c', 'https://github.com/../b', 'https://github.com/a/..',
     'https://github.com/.a/b', 'https://github.com/a/-b', 'https://github.com/a/--upload-pack=x', 'https://github.com/a/b%2F..%2Fc',
     'https://github.com/a/b;rm', 'https://github.com/a/b c', 'https://evil.example/a/b', 'https://github.com.evil.example/a/b',
-    'https://127.0.0.1/a/b', 'https://localhost/a/b', 'https://[::1]/a/b', 'https://github.com:8443/a/b'.replace(':8443', ':443') === 'https://github.com/a/b' ? 'ssh://git@github.com/a/b' : 'ssh://git@github.com/a/b',
+    'https://127.0.0.1/a/b', 'https://localhost/a/b', 'https://[::1]/a/b', 'https://github.com:8443/a/b', 'ssh://git@github.com/a/b',
     'git@github.com:a/b.git', 'file:///C:/Users/x', '', undefined, null, 42]) {
     assert.deepEqual(repoTarget(bad), { refused: REPO_URL_REFUSAL }, String(bad));
   }
+  assert.deepEqual(repoTarget('https://github.com:443/WGlynn/noesis'), noesis); // the default port is no port
   assert.match(REPO_URL_REFUSAL, /^Refused: /);
 });
 
@@ -314,9 +315,16 @@ test('G17 a file from the clone is read on its real path inside it; outside, a s
 
 test('G18 claude.js clones through the allowlist with a scrubbed environment and no credential helper, and reads through clonedFilePath', () => {
   const c = src('claude.js');
+  assert.match(c, /import \{ checkUrl \} from '\.\/url-guard\.js';/);
   const block = c.slice(c.indexOf("} else if (tb.name === 'fetch_repo') {"), c.indexOf("} else if (tb.name === 'flag_deceiver') {"));
   assert.match(block, /const target = repoTarget\(tb\.input\?\.url\);\n\s+if \(target\.refused\) \{\n\s+result = target\.refused;/);
-  assert.match(block, /const cacheDir = join\(REPO_PATH, '\.claude', 'repo-cache', target\.host, target\.owner\);\n\s+const tempDir = join\(cacheDir, target\.name\);/);
+  // The resolved address is checked before git runs (url-guard.js), and a refusal is the tool's result.
+  assert.match(block, /await checkUrl\(target\.url\);\n\s+const cacheDir = join\(REPO_PATH, '\.claude', 'repo-cache', target\.host, target\.owner\);\n\s+const tempDir = join\(cacheDir, target\.name\);/);
+  assert.match(block, /result = err\.refused \? err\.message : `Failed to fetch repo: /);
+  // The tool is described to the model as it is enforced: public, known hosts, paths inside the repo.
+  const def = c.slice(c.indexOf("name: 'fetch_repo',"), c.indexOf("name: 'flag_deceiver',"));
+  assert.match(def, /public repository on github\.com, gitlab\.com, bitbucket\.org or codeberg\.org/);
+  assert.match(def, /Paths outside the repository, secret files and \.git are refused/);
   assert.match(block, /env: childEnv\(process\.env\)/);
   assert.match(block, /execFileSync\('git', \['-c', 'credential\.helper=', 'pull', '--ff-only'\], \{ \.\.\.gitOpts, cwd: tempDir, timeout: 30000 \}\);/);
   assert.match(block, /execFileSync\('git', \['-c', 'credential\.helper=', 'clone', '--depth', '1', target\.url, tempDir\], \{ \.\.\.gitOpts, timeout: 60000 \}\);/);

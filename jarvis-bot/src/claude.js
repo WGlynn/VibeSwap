@@ -42,6 +42,7 @@ import { PROACTIVE_TOOLS, PROACTIVE_TOOL_NAMES, handleProactiveTool } from './pr
 import { ARCHIVE_TOOLS, ARCHIVE_TOOL_NAMES, handleArchiveTool } from './tools-archive.js';
 import { runLocalCRPC } from './crpc.js';
 import { offeredTools, readFileTool, runCommandTool, writeFileTool, editFileTool, isDeniedPath, SECRET_REFUSAL, repoTarget, clonedFilePath, childEnv } from './tool-guard.js';
+import { checkUrl } from './url-guard.js';
 
 const REPO_PATH = config.repo.path;
 
@@ -1199,15 +1200,15 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
     },
     {
       name: 'fetch_repo',
-      description: 'Fetch and read files from a GitHub repository URL. Clones/pulls the repo to a temp directory and reads specified files. Use when someone shares a GitHub URL and you need to read its contents.',
+      description: 'Fetch and read files from a public repository on github.com, gitlab.com, bitbucket.org or codeberg.org. Clones/pulls the repo to a cache directory and reads the specified files. Use when someone shares a repository URL and you need to read its contents. Private repositories and other hosts are refused.',
       input_schema: {
         type: 'object',
         properties: {
-          url: { type: 'string', description: 'GitHub repository URL (e.g., https://github.com/user/repo)' },
+          url: { type: 'string', description: 'Repository URL of the form https://host/owner/name (e.g., https://github.com/user/repo)' },
           files: {
             type: 'array',
             items: { type: 'string' },
-            description: 'List of file paths to read from the repo (e.g., ["README.md", "src/index.ts"]). If empty, reads README.md.',
+            description: 'List of file paths inside the repository to read (e.g., ["README.md", "src/index.ts"]). Paths outside the repository, secret files and .git are refused. If empty, reads README.md.',
           },
         },
         required: ['url'],
@@ -1843,6 +1844,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             result = target.refused;
           } else {
             try {
+              // url-guard.js: the host is on the allowlist, and the address it resolves to must be
+              // public as well (a hosts-file entry or a poisoned answer sending github.com to a
+              // private address). git resolves on its own, so this is a check before the clone,
+              // not a pinned connection.
+              await checkUrl(target.url);
               const cacheDir = join(REPO_PATH, '.claude', 'repo-cache', target.host, target.owner);
               const tempDir = join(cacheDir, target.name);
               const { execFileSync } = await import('child_process');
@@ -1873,7 +1879,7 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
               result = results.join('\n\n');
               console.log(`[claude] Tool: fetch_repo("${target.host}/${target.owner}/${target.name}") → ${files.length} files read`);
             } catch (err) {
-              result = `Failed to fetch repo: ${String(err.message || err).slice(0, 500)}`;
+              result = err.refused ? err.message : `Failed to fetch repo: ${String(err.message || err).slice(0, 500)}`;
             }
           }
         } else if (tb.name === 'flag_deceiver') {

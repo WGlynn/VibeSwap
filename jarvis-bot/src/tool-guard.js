@@ -256,7 +256,8 @@ export function repoTarget(input) {
   try { url = new URL(String(input ?? '').trim()); } catch { return { refused: REPO_URL_REFUSAL }; }
   const host = url.hostname.toLowerCase();
   const m = REPO_PATH_RE.exec(url.pathname);
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || !GIT_HOSTS.includes(host) || !m) {
+  // A port other than the default is refused too, so the clone goes to the host's git service.
+  if (url.protocol !== 'https:' || url.port || url.username || url.password || url.search || url.hash || !GIT_HOSTS.includes(host) || !m) {
     return { refused: REPO_URL_REFUSAL };
   }
   const [, owner, name] = m;

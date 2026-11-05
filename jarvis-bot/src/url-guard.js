@@ -21,6 +21,9 @@ import https from 'https';
 
 const USER_AGENT = 'JarvisBot/1.0 (VibeSwap; +https://vibeswap.io)';
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
+// A credential header is for the origin it was given for (a Limni terminal's bearer key): it does
+// not follow a redirect to another origin.
+const CREDENTIAL_HEADER = /^(authorization|proxy-authorization|cookie)$/i;
 
 const NOT_PUBLIC = new BlockList();
 for (const [net, bits] of [
@@ -96,8 +99,11 @@ export function httpRequest(url, { address, family, method = 'GET', headers = {}
     const lookup = (host, options, cb) => (options?.all ? cb(null, [{ address, family }]) : cb(null, address, family));
     let done = false;
     const finish = (err, value) => { if (done) return; done = true; clearTimeout(deadline); err ? reject(err) : resolve(value); };
+    const sent = { 'User-Agent': USER_AGENT, ...headers };
+    // A body is sent with its length, as fetch would, not chunked: a plain API server expects that.
+    if (body !== undefined && !Object.keys(sent).some(k => k.toLowerCase() === 'content-length')) sent['Content-Length'] = Buffer.byteLength(body);
     const req = (url.protocol === 'https:' ? https : http).request(url, {
-      method, lookup, headers: { 'User-Agent': USER_AGENT, ...headers },
+      method, lookup, headers: sent,
     }, (res) => {
       const status = res.statusCode;
       const base = { status, statusText: res.statusMessage || '', headers: res.headers, truncated: false, skipped: false };
@@ -134,16 +140,17 @@ export function httpRequest(url, { address, family, method = 'GET', headers = {}
 // body. Throws a 'Refused: ...' error for anything the guard rejects.
 export async function safeFetch(input, options = {}) {
   const { lookup, transport = httpRequest, maxRedirects = 3 } = options;
-  let { method = 'GET', body } = options;
+  let { method = 'GET', body, headers = {} } = options;
   let current = input;
   for (let hop = 0; ; hop++) {
     const { url, address, family } = await checkUrl(current, lookup ? { lookup } : {});
-    const res = await transport(url, { ...options, method, body, address, family });
+    const res = await transport(url, { ...options, method, body, headers, address, family });
     if (!REDIRECTS.has(res.status) || !res.headers?.location) return { ...res, url: url.href };
     if (hop >= maxRedirects) throw refusal(`more than ${maxRedirects} redirects from ${url.href}`);
     let next;
-    try { next = new URL(res.headers.location, url).href; } catch { throw refusal(`a bad redirect location from ${url.href}`); }
+    try { next = new URL(res.headers.location, url); } catch { throw refusal(`a bad redirect location from ${url.href}`); }
     if (res.status === 303 || (method !== 'GET' && (res.status === 301 || res.status === 302))) { method = 'GET'; body = undefined; }
-    current = next;
+    if (next.origin !== url.origin) headers = Object.fromEntries(Object.entries(headers).filter(([k]) => !CREDENTIAL_HEADER.test(k)));
+    current = next.href;
   }
 }

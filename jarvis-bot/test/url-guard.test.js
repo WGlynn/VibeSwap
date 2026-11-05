@@ -9,6 +9,7 @@ import { readFileSync } from 'fs';
 import { createServer } from 'http';
 import { isPublicAddress, parseHttpUrl, checkUrl, safeFetch, httpRequest } from '../src/url-guard.js';
 import { createTask } from '../src/task-queue.js';
+import { registerTerminal, registerVPS } from '../src/limni.js';
 
 // Source files carry CRLF or LF depending on the editor that last touched them; the assertions see LF.
 const src = (f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf-8').replace(/\r\n/g, '\n');
@@ -97,12 +98,14 @@ test('U4 safeFetch: every redirect hop is checked again, the hop count is capped
   })[host] || [{ address: '127.0.0.1', family: 4 }];
   const seen = [];
   const transport = async (url, opts) => {
-    seen.push({ href: url.href, address: opts.address, method: opts.method, body: opts.body });
+    seen.push({ href: url.href, address: opts.address, method: opts.method, body: opts.body, headers: opts.headers });
     const routes = {
       'https://a.example/to-local': { status: 302, headers: { location: 'http://127.0.0.1:8080/health' } },
       'https://a.example/to-name': { status: 302, headers: { location: 'http://internal.example/' } },
       'https://a.example/loop': { status: 301, headers: { location: 'https://a.example/loop' } },
       'https://a.example/post': { status: 303, headers: { location: 'https://b.example/landed' } },
+      'https://a.example/auth': { status: 302, headers: { location: 'https://b.example/landed' } },
+      'https://a.example/same': { status: 302, headers: { location: 'https://a.example/page' } },
       'https://a.example/bad': { status: 302, headers: { location: 'http://[bad' } },
       'https://a.example/nowhere': { status: 302, headers: {} },
       'https://b.example/landed': { status: 200, headers: {}, body: 'landed' },
@@ -128,6 +131,14 @@ test('U4 safeFetch: every redirect hop is checked again, the hop count is capped
     ['https://b.example/landed', '93.184.216.35', 'GET', undefined],
   ]);
   await rejects(safeFetch('http://localhost/', opts), 'localhost is not a public host'); // refused before any transport
+  // A credential header is for the origin it was given for: dropped on a redirect to another origin, kept on the same one.
+  const auth = { Authorization: 'Bearer fake-terminal-key', Accept: 'application/json' };
+  seen.length = 0;
+  await safeFetch('https://a.example/auth', { ...opts, headers: auth });
+  assert.deepEqual(seen.map(s => [s.href, s.headers]), [['https://a.example/auth', auth], ['https://b.example/landed', { Accept: 'application/json' }]]);
+  seen.length = 0;
+  await safeFetch('https://a.example/same', { ...opts, headers: auth });
+  assert.deepEqual(seen.map(s => [s.href, s.headers]), [['https://a.example/same', auth], ['https://a.example/page', auth]]);
 });
 
 test('U5 httpRequest connects to the pinned address, caps the body, skips a wrong content type and does not follow a redirect', async () => {
@@ -135,7 +146,7 @@ test('U5 httpRequest connects to the pinned address, caps the body, skips a wron
     if (req.url === '/big') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('x'.repeat(10000)); }
     else if (req.url === '/json') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"a":1}'); }
     else if (req.url === '/redirect') { res.writeHead(302, { location: 'http://127.0.0.1/' }); res.end('moved'); }
-    else { res.writeHead(200, { 'content-type': 'text/plain' }); res.end(`host=${req.headers.host} ua=${req.headers['user-agent']} m=${req.method}`); }
+    else { res.writeHead(200, { 'content-type': 'text/plain' }); res.end(`host=${req.headers.host} ua=${req.headers['user-agent']} m=${req.method}${req.method === 'POST' ? ` cl=${req.headers['content-length']}` : ''}`); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   after(() => server.close());
@@ -152,7 +163,7 @@ test('U5 httpRequest connects to the pinned address, caps the body, skips a wron
   const redirect = await at('/redirect');
   assert.deepEqual([redirect.status, redirect.headers.location, redirect.body], [302, 'http://127.0.0.1/', '']);
   const posted = await at('/plain', { method: 'POST', body: '{}' , headers: { 'Content-Type': 'application/json' } });
-  assert.match(posted.body, /m=POST$/);
+  assert.match(posted.body, /m=POST cl=2$/); // the body goes with its length, as fetch sends it, not chunked
 });
 
 test('U6 a web_check task to a local or non-http URL is refused at creation, before it is queued', () => {
@@ -180,4 +191,38 @@ test('U7 the fetchers of outside URLs go through the guard: web_check and the we
   assert.match(reader, /const response = await safeFetch\(url, \{\n\s+timeoutMs: FETCH_TIMEOUT_MS,\n\s+maxBytes: MAX_RESPONSE_BYTES,\n\s+maxRedirects: 3,\n\s+contentType: HTML_TYPES,/);
   assert.doesNotMatch(reader, /\bfetch\(/);
   assert.doesNotMatch(reader, /BLOCKED_HOSTS|isBlockedUrl/); // the old host-name denylist is gone, not duplicated
+  // scrape_page: the scraper fetches whatever URL it is handed, so claude.js checks the resolved address first,
+  // and a refusal is the tool's result. (fetch_repo's check is asserted in tool-guard.test.js G18.)
+  const c = src('claude.js');
+  assert.match(c, /import \{ checkUrl \} from '\.\/url-guard\.js';/);
+  const scrape = c.slice(c.indexOf("if (tb.name === 'scrape_page') {"), c.indexOf("} else if (tb.name === 'scrape_sentiment') {"));
+  assert.match(scrape, /await checkUrl\(tb\.input\.url\);\n\s+endpoint = '\/scrape';/);
+  const scrapeCatch = c.slice(c.indexOf('Scraper request timed out'), c.indexOf('// ============ Limni Tools ============'));
+  assert.match(c.slice(c.lastIndexOf('} catch (err) {', c.indexOf('Scraper request timed out')), c.indexOf('Scraper request timed out')), /if \(err\.refused\) \{\n\s+result = err\.message;\n\s+\} else if \(err\.name === 'TimeoutError'\) \{/);
+  assert.ok(scrapeCatch.length > 0);
+  // Limni: a terminal or VPS URL is refused at registration, and every probe goes through safeFetch.
+  const limni = src('limni.js');
+  assert.match(limni, /import \{ safeFetch, parseHttpUrl \} from '\.\/url-guard\.js';/);
+  assert.doesNotMatch(limni, /\bfetch\(|AbortController/);
+  assert.equal((limni.match(/await safeFetch\(/g) || []).length, 4, 'terminal health, trades, VPS health, deploy');
+  assert.match(limni, /parseHttpUrl\(url\);\n\s+state\.connectedTerminals\[terminalId\] = \{/);
+  assert.match(limni, /parseHttpUrl\(vpsConfig\?\.healthUrl\);[^\n]*\n\s+state\.vpsHealth\[vpsId\] = \{/);
+});
+
+test('U8 a Limni terminal or VPS URL is refused at registration when the guard can tell without DNS; a public one is stored as given, less a trailing slash', () => {
+  for (const [url, why] of [
+    ['http://localhost:8080', 'localhost is not a public host'],
+    ['http://127.0.0.1:8900/', '127.0.0.1 is not a public address'],
+    ['http://169.254.169.254/latest/meta-data/', '169.254.169.254 is not a public address'],
+    ['http://[::1]:8080/', '::1 is not a public address'],
+    ['http://user:pw@terminal.example/', 'a URL carrying credentials is not fetched'],
+    ['ftp://terminal.example/', 'only http and https URLs are fetched'],
+    ['', 'not a valid URL'],
+    [undefined, 'not a valid URL'],
+  ]) {
+    assert.throws(() => registerTerminal('u8-bad', { url, operator: 'test' }), refusal(why), String(url));
+    assert.throws(() => registerVPS('u8-bad', { host: 'h', healthUrl: url, operator: 'test' }), refusal(why), String(url));
+  }
+  assert.equal(registerTerminal('u8-terminal', { url: 'https://terminal.example:8443/', operator: 'test' }).url, 'https://terminal.example:8443');
+  assert.equal(registerVPS('u8-vps', { host: 'h', healthUrl: ' https://vps.example/health ', operator: 'test' }).healthUrl, 'https://vps.example/health');
 });

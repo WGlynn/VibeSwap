@@ -30,6 +30,7 @@ import { writeFile, readFile, mkdir, appendFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { config } from './config.js';
+import { safeFetch, parseHttpUrl } from './url-guard.js';
 
 const DATA_DIR = config.dataDir;
 const LIMNI_DIR = join(DATA_DIR, 'poseidon');
@@ -125,9 +126,15 @@ export async function flushLimni() {
  * @param {Object} terminalConfig - { url, apiKey?, operator, strategies[] }
  */
 export function registerTerminal(terminalId, terminalConfig) {
+  // url-guard.js (2026-11-04): the URL comes from a chat through the model. A non-http scheme, a
+  // local name or a non-public literal is refused here, before anything is stored; the resolved
+  // address is checked again on every probe (safeFetch). A trailing slash is dropped, since the
+  // probes append their paths.
+  const url = String(terminalConfig?.url ?? '').trim().replace(/\/+$/, '');
+  parseHttpUrl(url);
   state.connectedTerminals[terminalId] = {
     id: terminalId,
-    url: terminalConfig.url,
+    url,
     apiKey: terminalConfig.apiKey || null,
     operator: terminalConfig.operator,
     strategies: terminalConfig.strategies || [],
@@ -148,16 +155,14 @@ export async function checkTerminalHealth(terminalId) {
   if (!terminal) return { error: `Terminal '${terminalId}' not found` };
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch(`${terminal.url}/health`, {
-      signal: controller.signal,
+    // url-guard.js (2026-11-04): the resolved address must be public, every redirect hop is checked
+    // again (the bearer key does not follow a redirect to another origin), and the body is capped.
+    const response = await safeFetch(`${terminal.url}/health`, {
+      timeoutMs: 10000, maxBytes: 64 * 1024,
       headers: terminal.apiKey ? { 'Authorization': `Bearer ${terminal.apiKey}` } : {},
     });
-    clearTimeout(timeout);
 
-    if (response.ok) {
+    if (response.status >= 200 && response.status < 300) {
       terminal.status = 'healthy';
       terminal.lastSeen = Date.now();
       terminal.lastError = null;
@@ -186,23 +191,19 @@ export async function fetchTrades(terminalId) {
   if (!terminal) return { error: `Terminal '${terminalId}' not found` };
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(`${terminal.url}/api/trades/recent`, {
-      signal: controller.signal,
+    const response = await safeFetch(`${terminal.url}/api/trades/recent`, {
+      timeoutMs: 15000, maxBytes: 1024 * 1024,
       headers: {
         'Content-Type': 'application/json',
         ...(terminal.apiKey ? { 'Authorization': `Bearer ${terminal.apiKey}` } : {}),
       },
     });
-    clearTimeout(timeout);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`HTTP ${response.status}: ${response.body.slice(0, 200)}`);
     }
 
-    const trades = await response.json();
+    const trades = JSON.parse(response.body);
     return { trades, terminalId, count: trades.length };
   } catch (err) {
     return { error: err.message, terminalId };
@@ -365,11 +366,12 @@ export function stopMonitorLoop() {
  * Register a VPS for health monitoring.
  */
 export function registerVPS(vpsId, vpsConfig) {
+  parseHttpUrl(vpsConfig?.healthUrl); // url-guard.js: refused before it is stored, as for a terminal
   state.vpsHealth[vpsId] = {
     id: vpsId,
     host: vpsConfig.host,
     port: vpsConfig.port || 22,
-    healthUrl: vpsConfig.healthUrl,
+    healthUrl: String(vpsConfig.healthUrl).trim(),
     operator: vpsConfig.operator,
     status: 'registered',
     lastCheck: null,
@@ -388,13 +390,9 @@ export async function checkVPSHealth(vpsId) {
   if (!vps) return { error: `VPS '${vpsId}' not found` };
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const response = await safeFetch(vps.healthUrl, { timeoutMs: 10000, maxBytes: 64 * 1024 });
 
-    const response = await fetch(vps.healthUrl, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (response.ok) {
+    if (response.status >= 200 && response.status < 300) {
       vps.status = 'healthy';
       vps.lastCheck = Date.now();
       vps.consecutiveFailures = 0;
@@ -884,23 +882,18 @@ export async function deployStrategy(strategyId, terminalId) {
   if (!terminal) return { error: `Terminal '${terminalId}' not found` };
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(`${terminal.url}/api/strategies/deploy`, {
+    const response = await safeFetch(`${terminal.url}/api/strategies/deploy`, {
       method: 'POST',
-      signal: controller.signal,
+      timeoutMs: 15000, maxBytes: 256 * 1024,
       headers: {
         'Content-Type': 'application/json',
         ...(terminal.apiKey ? { 'Authorization': `Bearer ${terminal.apiKey}` } : {}),
       },
       body: JSON.stringify(strategy),
     });
-    clearTimeout(timeout);
 
-    if (!response.ok) {
-      const err = await response.text();
-      return { error: `Deploy failed: HTTP ${response.status} — ${err}` };
+    if (response.status < 200 || response.status >= 300) {
+      return { error: `Deploy failed: HTTP ${response.status} — ${response.body.slice(0, 500)}` };
     }
 
     // Update strategy with terminal assignment

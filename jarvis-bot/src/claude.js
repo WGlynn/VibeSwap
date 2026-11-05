@@ -1904,6 +1904,11 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             let endpoint, body, method = 'POST';
 
             if (tb.name === 'scrape_page') {
+              // url-guard.js (2026-11-04): the scraper fetches whatever URL it is handed, so the URL
+              // is checked here first, on its resolved address (a public name resolving to a private
+              // address included). Known limit: the scraper (scraper/server.py) resolves and follows
+              // redirects on its own, outside the guard.
+              await checkUrl(tb.input.url);
               endpoint = '/scrape';
               body = JSON.stringify({
                 url: tb.input.url,
@@ -1949,7 +1954,9 @@ async function _sendToLLM(chatId, userName, chatType, history, maxTokensOverride
             }
             console.log(`[claude] Tool: ${tb.name}(${tb.input.url || tb.input.query || tb.input.token})`);
           } catch (err) {
-            if (err.name === 'TimeoutError') {
+            if (err.refused) {
+              result = err.message;
+            } else if (err.name === 'TimeoutError') {
               result = 'Scraper request timed out (30s). The page may be slow or protected.';
             } else if (err.code === 'ECONNREFUSED') {
               result = 'Scraper service not running. Start it with: cd jarvis-bot/scraper && python server.py';

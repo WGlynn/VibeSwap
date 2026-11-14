@@ -71,7 +71,10 @@ const SUBJECTLESS = new RegExp(String.raw`^\s*${ACK}(?:saved|logged|tracked|adde
 // storing something, with what was stored right after, so "I logged in" and "I noted earlier" pass.
 const STORED_PAST = /\bi\s+(?:just\s+)?(?:logged|saved|stored|recorded|bookmarked|pinned|filed|queued)\s+(?:it|that|this|them|those|these|your|his|her|their|the|a|an)\b/i;
 const SHARED_STATE = /\b(project board|projects? note|my notes|the board|people note|topics note|repos note|shared notes|already (?:on|in) (?:the|my) (?:board|notes))\b/i;
-export const FALLBACK = "I can't take actions from this chat on my own. Will's Claude Code session reads it and acts.";
+// 2026-11-14 (FM-001): the old text, "Will's Claude Code session reads it and acts", was itself an unbacked promise:
+// nothing handed the request to the session, which only reads the feed on its 10-minute triage cron, and only
+// while a session is running. The text now says what actually happens and when.
+export const FALLBACK = "I can't do that from this chat. Will's Claude Code session checks this chat about every 10 minutes while it is running, and picks it up then.";
 
 // Mode claims are checked against the chat's real mode (Constitution 1.2 and 5.1; 2026-11-01).
 // 2026-10-30: asked "You can't respond unless tagged", the bot answered "got it, back in tag-only

@@ -124,5 +124,5 @@ test('A6 the noise flag still silences a small group', () => {
 
 test('A7 the group handler passes the cached member count to checkAirspace', () => {
   assert.match(src('index.js'),
-    /const memberCount = await getMemberCount\(ctx\.chat\.id, ctx\.telegram\);\s+const airspace = checkAirspace\(ctx\.chat\.id, ctx\.from\.id, memberCount\);/);
+    /const memberCount = await getMemberCount\(ctx\.chat\.id, ctx\.telegram\);\s+const airspace = checkAirspace\(ctx\.chat\.id, ctx\.from\.id, memberCount, throttleMemberClass\(ctx\.from\)\);/);
 });

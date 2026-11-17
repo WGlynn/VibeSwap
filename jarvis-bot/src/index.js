@@ -181,7 +181,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
-import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats, isThrottleMember, isMember } from './airspace-monitor.js';
+import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats, throttleMemberClass, isMember } from './airspace-monitor.js';
 import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval, fastCheck } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -6933,16 +6933,18 @@ bot.on('text', async (ctx) => {
   // ============ Airspace Monitor — Anti-Dominance Throttling ============
   // Rebalances bot attention: dominant users get less, quiet users get more.
   // The troll doesn't get banned — they get boring.
-  // Members (data/throttle-members.json) are never throttled. Will (2026-11-17): "the throttle is working
-  // as intended but we need a members list that it doesn't apply to". It had muted two regulars
-  // mid-conversation (2026-11-16 and 11-17, FM-006). Everyone else is throttled exactly as before.
-  if (isGroup && isAddressed && !isThrottleMember(ctx.from)) {
+  // Members (data/throttle-members.json) skip the dominance throttle. Will (2026-11-17): "the throttle is
+  // working as intended but we need a members list that it doesn't apply to". It had muted two regulars
+  // mid-conversation (2026-11-16 and 11-17, FM-006). Since the same day every member still goes through
+  // checkAirspace, so Will's noise flag ("slop", "stop") reaches them too; members who claimed a Vibeswap
+  // identity also keep the saturation limit (throttleMemberClass, airspace-monitor.js).
+  if (isGroup && isAddressed) {
     // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
     // BOT-004: Fixed typo — was config.ownerId (undefined), throttling owner's own messages
     if (String(ctx.from?.id) !== String(config.ownerUserId)) {
       // Groups of three or fewer (the bot included) skip the dominance throttle; count cached hourly.
       const memberCount = await getMemberCount(ctx.chat.id, ctx.telegram);
-      const airspace = checkAirspace(ctx.chat.id, ctx.from.id, memberCount);
+      const airspace = checkAirspace(ctx.chat.id, ctx.from.id, memberCount, throttleMemberClass(ctx.from));
       if (!airspace.shouldRespond) {
         // Silently skip — don't even acknowledge. The troll gets nothing.
         const userName = ctx.from.username || ctx.from.first_name || 'Unknown';

@@ -100,12 +100,14 @@ export function recordBotResponse(chatId, userId) {
   const uid = String(userId);
   state.botResponses[uid] = (state.botResponses[uid] || 0) + 1;
 
-  // Decay bot response counts every hour
-  setTimeout(() => {
+  // Decay bot response counts every hour. Unref'd, like the prune timer below, so it alone does not
+  // keep a process (a test) alive for the hour.
+  const decay = setTimeout(() => {
     if (state.botResponses[uid]) {
       state.botResponses[uid] = Math.max(0, state.botResponses[uid] - 1);
     }
   }, WINDOW_MS);
+  if (decay.unref) decay.unref();
 }
 
 /**
@@ -151,8 +153,9 @@ export async function getMemberCount(chatId, telegram) {
  * The bot rolls a dice and responds with the given probability.
  *
  * memberCount: the chat's member count from getMemberCount, or null when unknown.
+ * memberClass: throttleMemberClass(from): 'listed', 'claimed' or null.
  */
-export function checkAirspace(chatId, userId, memberCount = null) {
+export function checkAirspace(chatId, userId, memberCount = null, memberClass = null) {
   const key = String(chatId);
   const uid = String(userId);
   const now = Date.now();
@@ -162,14 +165,20 @@ export function checkAirspace(chatId, userId, memberCount = null) {
     return { shouldRespond: true, reason: 'owner', probability: 1.0 };
   }
 
+  // Noise flag first (owner said "slop"), for everyone, members included, and before the data check:
+  // it used to sit after it, so a flag in a chat with under 5 messages that hour silenced no one.
   const state = chatState.get(key);
-  if (!state || state.messages.length < 5) {
-    return { shouldRespond: true, reason: 'insufficient_data', probability: 1.0 };
+  if (state && state.noiseFlaggedUntil > now) {
+    return { shouldRespond: false, reason: 'noise_flagged', probability: 0.0 };
   }
 
-  // Check noise flag first (owner said "slop")
-  if (state.noiseFlaggedUntil > now) {
-    return { shouldRespond: false, reason: 'noise_flagged', probability: 0.0 };
+  // Members Will listed by hand: nothing but the noise flag applies.
+  if (memberClass === 'listed') {
+    return { shouldRespond: true, reason: 'member', probability: 1.0 };
+  }
+
+  if (!state || state.messages.length < 5) {
+    return { shouldRespond: true, reason: 'insufficient_data', probability: 1.0 };
   }
 
   // Calculate user's dominance in the window
@@ -199,6 +208,11 @@ export function checkAirspace(chatId, userId, memberCount = null) {
       reason: `bot_saturated (${botResponses} responses this hour)`,
       probability: prob,
     };
+  }
+
+  // Members by Vibeswap identity claim: past the noise flag and the saturation limit, no dominance check.
+  if (memberClass === 'claimed') {
+    return { shouldRespond: true, reason: 'claimed_member', probability: 1.0 };
   }
 
   // Small group (2026-11-04): dominance needs a crowd to protect. With two people and the bot, one
@@ -291,15 +305,24 @@ if (pruneTimer.unref) pruneTimer.unref();
 // Every listed member also gets the member DM budget (compute-economics.js). An entry with
 // "throttleExempt": false gets only that budget and stays under the group throttle: the limited
 // access Will gave a chat regular on 2026-11-17 ("yes but limited").
+//
+// Two kinds of exempt entry (slice A4 of Desktop/Research/vibeswap-sbt/DESIGN.md, same day):
+//   - 'listed': added by hand (no "claimed" field), matched by id or username; skips everything in
+//     checkAirspace except Will's noise flag.
+//   - 'claimed': written by a Vibeswap identity claim (identity-claim.js), matched by id ONLY (a username
+//     can be dropped and taken by another account); skips the dominance throttle but keeps the noise
+//     flag and the saturation limit (8 bot replies an hour).
+// Before this, a member skipped the whole airspace check, so Will's "slop" or "stop" did not reach them.
 
 const MEMBERS_FILE = joinPath(config.dataDir, 'throttle-members.json');
 const noMembers = () => ({ ids: new Set(), usernames: new Set() });
-let membersCache = { checkedAt: 0, mtime: 0, all: noMembers(), exempt: noMembers() };
+const emptyCache = (checkedAt, mtime) => ({ checkedAt, mtime, all: noMembers(), listed: noMembers(), claimed: noMembers() });
+let membersCache = emptyCache(0, 0);
 
 function memberSets(list) {
   return {
     ids: new Set(list.filter(m => m.id != null).map(m => String(m.id))),
-    usernames: new Set(list.filter(m => m.username).map(m => String(m.username).toLowerCase())),
+    usernames: new Set(list.filter(m => m.username && !m.claimed).map(m => String(m.username).toLowerCase())),
   };
 }
 
@@ -311,13 +334,15 @@ function loadMembers() {
     const mtime = statSync(MEMBERS_FILE).mtimeMs;
     if (mtime === membersCache.mtime) return membersCache;
     const list = JSON.parse(readFileSync(MEMBERS_FILE, 'utf8')).members || [];
+    const exempt = list.filter(m => m.throttleExempt !== false);
     membersCache = {
       checkedAt: now, mtime,
       all: memberSets(list),
-      exempt: memberSets(list.filter(m => m.throttleExempt !== false)),
+      listed: memberSets(exempt.filter(m => !m.claimed)),
+      claimed: memberSets(exempt.filter(m => m.claimed)),
     };
   } catch {
-    membersCache = { checkedAt: now, mtime: 0, all: noMembers(), exempt: noMembers() };
+    membersCache = emptyCache(now, 0);
   }
   return membersCache;
 }
@@ -330,9 +355,17 @@ export function isMember(from) {
   return inSets(loadMembers().all, from);
 }
 
+// 'listed', 'claimed' or null (not exempt from the group throttle). A hand-added entry wins.
+export function throttleMemberClass(from) {
+  const m = loadMembers();
+  if (inSets(m.listed, from)) return 'listed';
+  if (inSets(m.claimed, from)) return 'claimed';
+  return null;
+}
+
 // Listed and not marked "throttleExempt": false: skips the group dominance throttle.
 export function isThrottleMember(from) {
-  return inSets(loadMembers().exempt, from);
+  return throttleMemberClass(from) !== null;
 }
 
 // ============ Claimed entries (identity-claim.js, 2026-11-17) ============

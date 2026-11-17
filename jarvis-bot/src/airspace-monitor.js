@@ -284,7 +284,7 @@ if (pruneTimer.unref) pruneTimer.unref();
 
 // ============ Members exempt from the dominance throttle (Will 2026-11-17) ============
 // "the throttle is working as intended but we need a members list that it doesn't apply to".
-// The throttle muted Rodney (2026-11-16) and Tadija (2026-11-17) in mid-conversation. Members are
+// The throttle had muted two regulars mid-conversation (2026-11-16 and 11-17). Members are
 // listed by Telegram id (or username) in <dataDir>/throttle-members.json, edited by Will or the session.
 // Re-read at most once a minute, so edits apply without a restart. A missing or broken file means
 // no members (the throttle then behaves exactly as before).

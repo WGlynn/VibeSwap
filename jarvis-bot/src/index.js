@@ -6915,8 +6915,8 @@ bot.on('text', async (ctx) => {
   // Rebalances bot attention: dominant users get less, quiet users get more.
   // The troll doesn't get banned — they get boring.
   // Members (data/throttle-members.json) are never throttled. Will (2026-11-17): "the throttle is working
-  // as intended but we need a members list that it doesn't apply to". It had muted Rodney (2026-11-16,
-  // FM-006) and Tadija (2026-11-17) mid-conversation. Everyone else is throttled exactly as before.
+  // as intended but we need a members list that it doesn't apply to". It had muted two regulars
+  // mid-conversation (2026-11-16 and 11-17, FM-006). Everyone else is throttled exactly as before.
   if (isGroup && isAddressed && !isThrottleMember(ctx.from)) {
     // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
     // BOT-004: Fixed typo — was config.ownerId (undefined), throttling owner's own messages

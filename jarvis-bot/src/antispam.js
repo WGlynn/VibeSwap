@@ -153,6 +153,7 @@ async function executeAction(bot, chatId, userId, action, reason, messageId) {
     userId,
     chatId,
     reason,
+    messageId, // lets post-counter.js leave this exact message out of a person's post count
     moderatorId: 'jarvis-antispam',
     evidenceHash,
     timestamp: Date.now(),

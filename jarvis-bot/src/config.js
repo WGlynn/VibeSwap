@@ -46,6 +46,8 @@ export const config = {
   botUsername: process.env.BOT_USERNAME || 'JarvisMind1828383bot',
   // Community group chat ID — set after adding bot to group, use /whoami in group to get it
   communityGroupId: process.env.COMMUNITY_GROUP_ID ? parseInt(process.env.COMMUNITY_GROUP_ID, 10) || null : null,
+  // The Vibeswap supergroup: the only chat whose posts count toward a Vibeswap identity (post-counter.js).
+  identityChatId: process.env.IDENTITY_CHAT_ID || '-1003877696956',
   // The Ark — backup group. If main group dies, Jarvis DMs everyone an invite link here.
   arkGroupId: process.env.ARK_GROUP_ID ? parseInt(process.env.ARK_GROUP_ID, 10) || null : null,
   // Tag-only chats — Jarvis ONLY responds when @mentioned or replied to (no proactive, no name triggers)

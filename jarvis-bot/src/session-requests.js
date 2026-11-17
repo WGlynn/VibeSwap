@@ -26,6 +26,9 @@ const DELIVERED_PATH = join(FEED_DIR, 'receipts-delivered.json');
 
 export const SAFE_ACTIONS = ['note', 'board'];
 const ACTIONS = [...SAFE_ACTIONS, 'other'];
+// Queued by code only, never offered to the model (the ask_session enum is ACTIONS): identity_mint tells
+// the session a Vibeswap identity serial is pending for the next mint batch (identity-claim.js).
+const INTERNAL_ACTIONS = ['identity_mint'];
 const MAX_PER_HOUR = 5; // per person, Will exempt: a flood of requests is the cheapest attack here
 const recent = new Map(); // userId -> request timestamps (ms)
 
@@ -72,9 +75,11 @@ export function detectActionRequest(text) {
 const queuedByMessage = new Map(); // `${chatId}:${messageId}` -> request id
 
 // Write one request. ctx: { chatId, chatType, chatTitle, messageId, userId, userName, isOwner }.
+// opts.internal: code (not the model) is queueing, so the internal actions are allowed too.
 // Returns { id, needsApproval } or { error }.
-export function queueSessionRequest(ctx, input = {}) {
-  const action = ACTIONS.includes(input.action) ? input.action : null;
+export function queueSessionRequest(ctx, input = {}, { internal = false } = {}) {
+  const allowed = internal ? [...ACTIONS, ...INTERNAL_ACTIONS] : ACTIONS;
+  const action = allowed.includes(input.action) ? input.action : null;
   const summary = clip(input.summary, 300);
   if (!action) return { error: `action must be one of ${ACTIONS.join(', ')}` };
   if (!summary) return { error: 'summary is required' };

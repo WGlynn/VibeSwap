@@ -21,8 +21,8 @@
 // ============
 
 import { config } from './config.js';
-import { readFileSync, statSync } from 'fs';
-import { join as joinPath } from 'path';
+import { readFileSync, statSync, writeFileSync, renameSync, mkdirSync } from 'fs';
+import { join as joinPath, dirname } from 'path';
 
 // ============ Constants ============
 
@@ -333,4 +333,63 @@ export function isMember(from) {
 // Listed and not marked "throttleExempt": false: skips the group dominance throttle.
 export function isThrottleMember(from) {
   return inSets(loadMembers().exempt, from);
+}
+
+// ============ Claimed entries (identity-claim.js, 2026-11-17) ============
+// A member-tier Vibeswap identity claim adds { id, claimed, serial } to the members file; a revoke or an
+// unclaim removes it. Claimed entries carry no username and no name. Entries Will added by hand (no
+// "claimed" field) are never added, changed or removed here. Each write applies at once (the cache is
+// dropped), and a members file that exists but does not parse is left alone (it holds Will's entries).
+// Each returns true when the file says what was asked, false when it could not be written.
+
+function updateMembersFile(change) {
+  try {
+    let file = { members: [] };
+    try {
+      file = JSON.parse(readFileSync(MEMBERS_FILE, 'utf8'));
+    } catch (err) {
+      if (err.code !== 'ENOENT') return false;
+    }
+    if (!file || !Array.isArray(file.members)) return false;
+    const next = change(file.members);
+    if (!next) return true; // nothing to change
+    file.members = next;
+    mkdirSync(dirname(MEMBERS_FILE), { recursive: true });
+    const tmp = `${MEMBERS_FILE}.tmp-${process.pid}`;
+    writeFileSync(tmp, JSON.stringify(file, null, 2) + '\n');
+    renameSync(tmp, MEMBERS_FILE);
+    membersCache = { ...membersCache, checkedAt: 0, mtime: -1 };
+    return true;
+  } catch (err) {
+    console.warn(`[airspace] members file not updated: ${err.message}`);
+    return false;
+  }
+}
+
+const isClaimedEntry = (m, id) => !!m.claimed && String(m.id) === id;
+
+export function isListedByHand(telegramId) {
+  const id = String(telegramId);
+  try {
+    const list = JSON.parse(readFileSync(MEMBERS_FILE, 'utf8')).members || [];
+    return list.some((m) => !m.claimed && String(m.id) === id);
+  } catch {
+    return false;
+  }
+}
+
+export function addClaimedMember(telegramId, serial, now = Date.now()) {
+  const id = String(telegramId);
+  return updateMembersFile((members) => {
+    if (members.some((m) => !m.claimed && String(m.id) === id)) return null; // already listed by hand
+    return [...members.filter((m) => !isClaimedEntry(m, id)), { id, claimed: new Date(now).toISOString(), serial }];
+  });
+}
+
+export function removeClaimedMember(telegramId) {
+  const id = String(telegramId);
+  return updateMembersFile((members) => {
+    const rest = members.filter((m) => !isClaimedEntry(m, id));
+    return rest.length === members.length ? null : rest;
+  });
 }

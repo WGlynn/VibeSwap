@@ -274,6 +274,7 @@ import { recordExchange, recordUncleanShutdown, recordHealthEvent } from './feed
 import { startEmail, stopEmail, handleEmailApi } from './email.js';
 import { handleSendFileApi, handleRecordApi } from './session-api.js';
 import { pendingReceipts, markDelivered, confirmationPrompt, detectActionRequest, queueSessionRequest, queueFromMessage, noteSessionReply, answeredInChat } from './session-requests.js';
+import { handleClaim, handleUnclaim, handleIdentityAdmin } from './identity-claim.js';
 import { turnRecord, QUEUED_NOTE } from './protocol.js';
 import { quickReply, isBareAck } from './quick-reply.js';
 import { recordNoModelTurn, withTurn } from './llm-meter.js';
@@ -3695,6 +3696,13 @@ bot.command('linkwallet', async (ctx) => {
     ctx.reply('Send a message first so I can track you, then link your wallet.');
   }
 });
+
+// ============ Vibeswap identity: /claim, /unclaim, /identity (identity-claim.js, 2026-11-17) ============
+// DMs only, silent in groups. Claims are closed by default ("claimsOpen" in data/identity-registry.json):
+// only Will can claim until he sends /identity open. Kept out of /help and the command menu while closed.
+bot.command('claim', (ctx) => handleClaim(ctx));
+bot.command('unclaim', (ctx) => handleUnclaim(ctx));
+bot.command('identity', (ctx) => handleIdentityAdmin(ctx));
 
 // ============ Contribution & Reward Commands ============
 

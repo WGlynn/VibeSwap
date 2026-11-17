@@ -36,6 +36,7 @@ const STATE_FILE = join(DATA_DIR, 'compute-economics.json');
 
 const FREE_BUDGET_ANONYMOUS = 25_000;   // tokens/day for unidentified/demo users
 const FREE_BUDGET_IDENTIFIED = 50_000;  // tokens/day for identified users
+const FREE_BUDGET_MEMBER = 50_000;     // tokens/day for listed members (data/throttle-members.json)
 const FREE_BUDGET_AUTHORIZED = 100_000; // tokens/day for authorized/blessed users
 const BASE_POOL = 500_000;             // Will's baseline funding (floor)
 
@@ -493,25 +494,30 @@ export function markIdentified(userId) {
 
 // ============ Tiered Budget — Open Access with Caps ============
 // Everyone can talk. Budget tiers control volume.
-// anonymous: 5k tokens/day | authorized/blessed: 25k | owner/trusted: uncapped
+// anonymous: 25k tokens/day | member: 50k | authorized/blessed: 100k | owner/trusted: uncapped
+// A member (data/throttle-members.json, Will 2026-11-17 "yes but limited" for a chat regular) gets a
+// bigger DM budget than anonymous but none of the authorized commands (git, persona, model, shards).
 
 /**
  * Get a user's authorization tier for budget purposes.
  * @param {string} userId - Telegram user ID as string
- * @param {object} opts - { isOwner, isAuthorized, isTrustedAuthorizer }
- * @returns {'owner' | 'authorized' | 'anonymous'}
+ * @param {object} opts - { isOwner, isAuthorized, isTrustedAuthorizer, isMember }
+ * @returns {'owner' | 'authorized' | 'member' | 'anonymous'}
  */
 export function getUserTier(userId, opts = {}) {
   if (opts.isOwner || opts.isTrustedAuthorizer) return 'owner';
   if (opts.isAuthorized) return 'authorized';
+  if (opts.isMember) return 'member';
   return 'anonymous';
 }
 
+const TIER_BUDGET_FLOOR = { authorized: FREE_BUDGET_AUTHORIZED, member: FREE_BUDGET_MEMBER };
+
 /**
  * Check budget with tier awareness.
- * Owner tier gets Infinity budget. Authorized gets 25k base. Anonymous gets 5k.
+ * Owner tier is uncapped. Authorized gets at least 100k, member at least 50k, anonymous 25k.
  * @param {string} userId
- * @param {'owner'|'authorized'|'anonymous'} tier
+ * @param {'owner'|'authorized'|'member'|'anonymous'} tier
  */
 export function checkTieredBudget(userId, tier) {
   if (tier === 'owner') {
@@ -521,16 +527,17 @@ export function checkTieredBudget(userId, tier) {
     const used = user.today.input + user.today.output;
     return { allowed: true, budget: Infinity, used, remaining: Infinity, degraded: false, maxTokens: null };
   }
-  // For authorized tier, temporarily boost the user's free budget
-  if (tier === 'authorized') {
+  // For authorized and member tiers, temporarily boost the user's free budget to the tier floor
+  const floor = TIER_BUDGET_FLOOR[tier];
+  if (floor) {
     checkDayRollover();
     const user = ensureUser(userId);
-    // Ensure authorized users get at least 25k base (poolShare adds on top)
-    if (user.budget < FREE_BUDGET_AUTHORIZED) {
+    // The floor is the base; poolShare adds on top
+    if (user.budget < floor) {
       const poolShare = state.shapleySum > 0
         ? getEffectivePool() * user.shapleyWeight / state.shapleySum
         : 0;
-      user.budget = Math.round(FREE_BUDGET_AUTHORIZED + poolShare);
+      user.budget = Math.round(floor + poolShare);
     }
   }
   // Fall through to standard checkBudget

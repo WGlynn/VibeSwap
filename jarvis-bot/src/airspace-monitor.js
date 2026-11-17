@@ -288,9 +288,20 @@ if (pruneTimer.unref) pruneTimer.unref();
 // listed by Telegram id (or username) in <dataDir>/throttle-members.json, edited by Will or the session.
 // Re-read at most once a minute, so edits apply without a restart. A missing or broken file means
 // no members (the throttle then behaves exactly as before).
+// Every listed member also gets the member DM budget (compute-economics.js). An entry with
+// "throttleExempt": false gets only that budget and stays under the group throttle: the limited
+// access Will gave a chat regular on 2026-11-17 ("yes but limited").
 
 const MEMBERS_FILE = joinPath(config.dataDir, 'throttle-members.json');
-let membersCache = { checkedAt: 0, mtime: 0, ids: new Set(), usernames: new Set() };
+const noMembers = () => ({ ids: new Set(), usernames: new Set() });
+let membersCache = { checkedAt: 0, mtime: 0, all: noMembers(), exempt: noMembers() };
+
+function memberSets(list) {
+  return {
+    ids: new Set(list.filter(m => m.id != null).map(m => String(m.id))),
+    usernames: new Set(list.filter(m => m.username).map(m => String(m.username).toLowerCase())),
+  };
+}
 
 function loadMembers() {
   const now = Date.now();
@@ -302,17 +313,24 @@ function loadMembers() {
     const list = JSON.parse(readFileSync(MEMBERS_FILE, 'utf8')).members || [];
     membersCache = {
       checkedAt: now, mtime,
-      ids: new Set(list.filter(m => m.id != null).map(m => String(m.id))),
-      usernames: new Set(list.filter(m => m.username).map(m => String(m.username).toLowerCase())),
+      all: memberSets(list),
+      exempt: memberSets(list.filter(m => m.throttleExempt !== false)),
     };
   } catch {
-    membersCache = { checkedAt: now, mtime: 0, ids: new Set(), usernames: new Set() };
+    membersCache = { checkedAt: now, mtime: 0, all: noMembers(), exempt: noMembers() };
   }
   return membersCache;
 }
 
+const inSets = (s, from) =>
+  !!from && (s.ids.has(String(from.id)) || (!!from.username && s.usernames.has(String(from.username).toLowerCase())));
+
+// Listed at all: gets the member DM budget.
+export function isMember(from) {
+  return inSets(loadMembers().all, from);
+}
+
+// Listed and not marked "throttleExempt": false: skips the group dominance throttle.
 export function isThrottleMember(from) {
-  if (!from) return false;
-  const m = loadMembers();
-  return m.ids.has(String(from.id)) || (!!from.username && m.usernames.has(String(from.username).toLowerCase()));
+  return inSets(loadMembers().exempt, from);
 }

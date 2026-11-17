@@ -181,7 +181,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
-import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats, isThrottleMember } from './airspace-monitor.js';
+import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats, isThrottleMember, isMember } from './airspace-monitor.js';
 import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval, fastCheck } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -1172,7 +1172,18 @@ bot.command('start', async (ctx) => {
     );
   }
 
-  if (!isAuthorized(ctx) && !isShadow(ctx.from.id)) return unauthorized(ctx);
+  // Chat is open to everyone (budget-gated in the text handler); only the admin commands need
+  // authorization. /start used to answer "Not authorized" here, so people asked Will for an id
+  // they did not need (2026-11-16).
+  if (!isAuthorized(ctx) && !isShadow(ctx.from.id)) {
+    if (ctx.chat?.type !== 'private') return unauthorized(ctx);
+    const member = isMember(ctx.from);
+    return ctx.reply(
+      'JARVIS online. Just talk to me.\n\n' +
+      `Chat here is open, with a daily allowance${member ? ' (the bigger member one)' : ''} that resets at midnight UTC. ` +
+      'The admin commands are for people Will has authorized.'
+    );
+  }
   const persona = getActivePersonaId();
   if (persona === 'degen') {
     ctx.reply('DIABLO JARVIS online. Same brain, zero filter. NFA. WAGMI. LFG.');
@@ -7261,6 +7272,7 @@ bot.on('text', async (ctx) => {
     isOwner: isOwner(ctx) || isUnlimitedUser(ctx),
     isAuthorized: isAuthorized(ctx),
     isTrustedAuthorizer: isTrustedAuthorizer(ctx),
+    isMember: isMember(ctx.from),
   });
   const budgetCheck = checkTieredBudget(userId, tier);
   if (!budgetCheck.allowed && !shadowCodename) {

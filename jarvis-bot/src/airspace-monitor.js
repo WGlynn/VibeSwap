@@ -21,6 +21,8 @@
 // ============
 
 import { config } from './config.js';
+import { readFileSync, statSync } from 'fs';
+import { join as joinPath } from 'path';
 
 // ============ Constants ============
 
@@ -279,3 +281,38 @@ const pruneTimer = setInterval(() => {
   }
 }, 30 * 60 * 1000);
 if (pruneTimer.unref) pruneTimer.unref();
+
+// ============ Members exempt from the dominance throttle (Will 2026-11-17) ============
+// "the throttle is working as intended but we need a members list that it doesn't apply to".
+// The throttle muted Rodney (2026-11-16) and Tadija (2026-11-17) in mid-conversation. Members are
+// listed by Telegram id (or username) in <dataDir>/throttle-members.json, edited by Will or the session.
+// Re-read at most once a minute, so edits apply without a restart. A missing or broken file means
+// no members (the throttle then behaves exactly as before).
+
+const MEMBERS_FILE = joinPath(config.dataDir, 'throttle-members.json');
+let membersCache = { checkedAt: 0, mtime: 0, ids: new Set(), usernames: new Set() };
+
+function loadMembers() {
+  const now = Date.now();
+  if (now - membersCache.checkedAt < 60_000) return membersCache;
+  membersCache.checkedAt = now;
+  try {
+    const mtime = statSync(MEMBERS_FILE).mtimeMs;
+    if (mtime === membersCache.mtime) return membersCache;
+    const list = JSON.parse(readFileSync(MEMBERS_FILE, 'utf8')).members || [];
+    membersCache = {
+      checkedAt: now, mtime,
+      ids: new Set(list.filter(m => m.id != null).map(m => String(m.id))),
+      usernames: new Set(list.filter(m => m.username).map(m => String(m.username).toLowerCase())),
+    };
+  } catch {
+    membersCache = { checkedAt: now, mtime: 0, ids: new Set(), usernames: new Set() };
+  }
+  return membersCache;
+}
+
+export function isThrottleMember(from) {
+  if (!from) return false;
+  const m = loadMembers();
+  return m.ids.has(String(from.id)) || (!!from.username && m.usernames.has(String(from.username).toLowerCase()));
+}

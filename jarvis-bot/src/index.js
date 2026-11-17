@@ -181,7 +181,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
-import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats } from './airspace-monitor.js';
+import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats, isThrottleMember } from './airspace-monitor.js';
 import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval, fastCheck } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -6914,7 +6914,10 @@ bot.on('text', async (ctx) => {
   // ============ Airspace Monitor — Anti-Dominance Throttling ============
   // Rebalances bot attention: dominant users get less, quiet users get more.
   // The troll doesn't get banned — they get boring.
-  if (isGroup && isAddressed) {
+  // Members (data/throttle-members.json) are never throttled. Will (2026-11-17): "the throttle is working
+  // as intended but we need a members list that it doesn't apply to". It had muted Rodney (2026-11-16,
+  // FM-006) and Tadija (2026-11-17) mid-conversation. Everyone else is throttled exactly as before.
+  if (isGroup && isAddressed && !isThrottleMember(ctx.from)) {
     // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
     // BOT-004: Fixed typo — was config.ownerId (undefined), throttling owner's own messages
     if (String(ctx.from?.id) !== String(config.ownerUserId)) {
@@ -6927,6 +6930,8 @@ bot.on('text', async (ctx) => {
         bufferMessage(ctx.chat.id, userName, ctx.message.text);
         pushGroupMessage(ctx.chat.id, userName, ctx.message.text, ctx.message.message_id, false);
         console.log(`[airspace] Throttled response to ${userName} in ${ctx.chat.id}: ${airspace.reason}`);
+        // Leave a trace the session's error triage can see (FM-004/FM-006: a mute left none). No text.
+        recordHealthEvent({ kind: 'throttled', chatType: ctx.chat?.type, user: userName, reason: airspace.reason });
         return;
       }
     }

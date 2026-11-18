@@ -13,6 +13,7 @@ import { startReplyPacer } from './reply-pacer.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
+import { noteSeen, noteCountedPost } from './first-seen.js';
 import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats, checkGroupNorms, getScoreTrends, getScoreCalibration } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
@@ -980,7 +981,13 @@ if (!IS_WORKER) {
   // about chat activity comes from LLM inference over stale state.
   bot.use(async (ctx, next) => {
     try {
-      await archiveMessage(ctx);
+      const record = await archiveMessage(ctx);
+      // First-seen times for antispam's new-account check and the engage gate (first-seen.js). Ids and
+      // times only. The record is kept on ctx.state so the text handler can note a counted post.
+      if (record) {
+        ctx.state.archiveRecord = record;
+        noteSeen(record);
+      }
     } catch (err) {
       console.warn(`[archive] middleware error: ${err.message}`);
     }
@@ -6736,6 +6743,8 @@ bot.on('text', async (ctx) => {
   // Anti-spam check FIRST — before anything else
   const spamResult = await checkMessage(bot, ctx);
   if (spamResult.action !== 'allow') return; // Message handled by antispam
+  // Past antispam: this may be the person's first counted post here (first-seen.js, post-counter.js rules)
+  try { noteCountedPost(ctx.state?.archiveRecord); } catch {}
 
   // Track ALL messages silently (before auth check for chat responses)
   await trackMessage(ctx);

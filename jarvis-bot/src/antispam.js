@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { writeFile, readFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { config } from './config.js';
+import { joinDateFor } from './first-seen.js';
 
 const DATA_DIR = config.dataDir;
 const SPAM_LOG_FILE = join(DATA_DIR, 'spam-log.json');
@@ -137,7 +138,16 @@ export async function checkMessage(bot, ctx) {
   }
 
   // Check 3: New account link spam → delete + mute 1hr
-  const linkSpam = isNewAccountLinkSpam(user, text);
+  // The join date is the person's first-seen time in this chat (first-seen.js; the Bot API gives none).
+  // It used to be called with no date, so every account looked old and this check never fired. Unknown
+  // (the chat's logs are under 24 h old, or unreadable) stays undefined: not new, as before.
+  let joinDate;
+  try {
+    joinDate = joinDateFor(chatId, userId, ctx.message.date ? ctx.message.date * 1000 : now);
+  } catch {
+    joinDate = undefined;
+  }
+  const linkSpam = isNewAccountLinkSpam(user, text, joinDate);
   if (linkSpam.detected) {
     return await executeAction(bot, chatId, userId, 'mute', linkSpam.reason, ctx.message.message_id);
   }

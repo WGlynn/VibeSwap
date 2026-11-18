@@ -170,14 +170,21 @@ export function loadChatLogs(dataDir = config.dataDir, chatId = config.identityC
 }
 
 // Everyone's counts in the chat, plus who has a moderation action there (antispam, or an unreversed
-// moderation.js action).
+// moderation.js action). Also each person's first logged message of any kind (`firstSeen`, joins and
+// media included) and the time of the chat's oldest logged message (`since`, null with no logs), for
+// first-seen.js.
 export function chatPostStats(dataDir = config.dataDir, chatId = config.identityChatId) {
   const { records, spamLog, modLog } = loadChatLogs(dataDir, chatId);
   const chat = String(chatId);
   const inChat = (e) => e && String(e.chatId) === chat;
   const spamMessageIds = new Set(spamLog.filter((e) => inChat(e) && e.messageId != null).map((e) => e.messageId));
   const moderated = new Set([...spamLog.filter(inChat), ...modLog.filter((e) => inChat(e) && !e.reversed)].map((e) => String(e.userId)));
-  return { records: records.length, stats: countPosts(records, { spamMessageIds }), moderated };
+  const firstSeen = new Map();
+  for (const r of records) if (!firstSeen.has(r.userId)) firstSeen.set(r.userId, r.ts); // oldest first
+  return {
+    records: records.length, stats: countPosts(records, { spamMessageIds }), moderated,
+    firstSeen, since: records.length ? records[0].ts : null,
+  };
 }
 
 // One person's counts and the tier they qualify for now.

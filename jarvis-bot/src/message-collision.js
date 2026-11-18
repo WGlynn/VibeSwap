@@ -38,8 +38,9 @@ let dataDir = null;
 /**
  * Extract word bigrams from text (lowercased, punctuation stripped).
  * "hello world foo" → Set(["hello world", "world foo"])
+ * Exported for the engage gate's repeat rule (engage-gate.js), which compares incoming messages.
  */
-function bigrams(text) {
+export function bigrams(text) {
   const words = text
     .toLowerCase()
     .replace(/[^\w\s]/g, '')
@@ -57,7 +58,7 @@ function bigrams(text) {
  * Jaccard similarity between two bigram sets.
  * |A ∩ B| / |A ∪ B| → [0, 1]
  */
-function jaccardSimilarity(setA, setB) {
+export function jaccardSimilarity(setA, setB) {
   if (setA.size === 0 && setB.size === 0) return 1;
   if (setA.size === 0 || setB.size === 0) return 0;
 

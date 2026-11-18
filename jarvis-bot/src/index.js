@@ -13,7 +13,8 @@ import { startReplyPacer } from './reply-pacer.js';
 import { diagnoseContext } from './memory.js';
 import { initModeration, warnUser, muteUser, unmuteUser, banUser, unbanUser, getModerationLog, flushModeration } from './moderation.js';
 import { checkMessage, initAntispam, flushAntispam, getSpamLog } from './antispam.js';
-import { noteSeen, noteCountedPost } from './first-seen.js';
+import { noteSeen, noteCountedPost, presenceOf } from './first-seen.js';
+import { runEngageGate } from './engage-gate.js';
 import { generateDigest, generateWeeklyDigest } from './digest.js';
 import { analyzeMessage, generateProactiveResponse, evaluateModeration, getIntelligenceStats, checkGroupNorms, getScoreTrends, getScoreCalibration } from './intelligence.js';
 import { initThreads, trackForThread, shouldSuggestArchival, archiveThread, getRecentThreads, getThreadStats, flushThreads } from './threads.js';
@@ -182,7 +183,7 @@ import { initRosetta, translate, translateToAll, bridgeMessage, getRosettaView, 
 import { initSocial as initSocialOutbound, flushSocial as flushSocialOutbound, getSocialStats, processQueue as processSocialQueue, createGitHubIssue } from './social.js';
 import { initProactive, flushProactive, stopProactive, enableProactive, disableProactive, getProactiveStatus } from './proactive.js';
 import { initDialogueToCode, quickDetect, runPipeline as runDialoguePipeline, getDialogueStats as getCodeStats, getUserContributions, flushDialogueInsights } from './dialogue-to-code.js';
-import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, getAirspaceStats, throttleMemberClass, isMember } from './airspace-monitor.js';
+import { recordMessage as recordAirspace, recordBotResponse, checkAirspace, getMemberCount, flagNoise, isNoiseFlagged, getAirspaceStats, throttleMemberClass, isMember } from './airspace-monitor.js';
 import { initSelfEval, evaluateResponse, getSelfEvalStats, getSelfCorrectionPrompt, flushSelfEval, fastCheck } from './self-eval.js';
 import { initRewardBatcher, computeBatch, formatBatchAnnouncement, formatUserRewardStatus, getBatcherStats } from './reward-batcher.js';
 // ============ Tool Module Imports — Graceful Fallback ============
@@ -6729,6 +6730,8 @@ bot.on('video_note', async (ctx) => {
 
 // ============ Message Handler ============
 
+let engageGateCallFailed = false; // the engage gate's call site logs a failure once
+
 bot.on('text', async (ctx) => {
   // Track ALL group messages for shard dedup (sees sibling bot responses)
   if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
@@ -6947,23 +6950,58 @@ bot.on('text', async (ctx) => {
   // mid-conversation (2026-11-16 and 11-17, FM-006). Since the same day every member still goes through
   // checkAirspace, so Will's noise flag ("slop", "stop") reaches them too; members who claimed a Vibeswap
   // identity also keep the saturation limit (throttleMemberClass, airspace-monitor.js).
+  //
+  // Engage gate (engage-gate.js, DESIGN section 2, 2026-11-17): Layer 1 rules run on every addressed group
+  // message after today's throttle decision is made. In the default shadow mode today's decision still
+  // acts and the gate only logs; ENGAGE_GATE=live lets its ignore verdict stop a reply; =off skips it.
+  // It never sends, mutes or deletes. On any error, today's decision stands.
   if (isGroup && isAddressed) {
-    // Check if owner flagged noise (detect "slop", "noise", "bruv stop" from owner)
     // BOT-004: Fixed typo — was config.ownerId (undefined), throttling owner's own messages
-    if (String(ctx.from?.id) !== String(config.ownerUserId)) {
+    const ownerMsg = String(ctx.from?.id) === String(config.ownerUserId);
+    const memberClass = ownerMsg ? null : throttleMemberClass(ctx.from);
+    let airspace = { shouldRespond: true, reason: 'owner', probability: 1.0 };
+    if (!ownerMsg) {
       // Groups of three or fewer (the bot included) skip the dominance throttle; count cached hourly.
       const memberCount = await getMemberCount(ctx.chat.id, ctx.telegram);
-      const airspace = checkAirspace(ctx.chat.id, ctx.from.id, memberCount, throttleMemberClass(ctx.from));
-      if (!airspace.shouldRespond) {
-        // Silently skip — don't even acknowledge. The troll gets nothing.
-        const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
-        bufferMessage(ctx.chat.id, userName, ctx.message.text);
-        pushGroupMessage(ctx.chat.id, userName, ctx.message.text, ctx.message.message_id, false);
+      airspace = checkAirspace(ctx.chat.id, ctx.from.id, memberCount, memberClass);
+    }
+    let engage = { respond: airspace.shouldRespond, by: 'throttle', reason: airspace.reason };
+    try {
+      engage = await runEngageGate({
+        chatId: ctx.chat.id,
+        userId: ctx.from.id,
+        text: ctx.message.text,
+        entities: ctx.message.entities,
+        isReplyToBot: !!isReplyToBot,
+        isOwner: ownerMsg,
+        isMember: memberClass !== null,
+        botUsername,
+        chatMode: getChatMode(ctx.chat.id),
+        noiseFlagged: isNoiseFlagged(ctx.chat.id),
+        presence: ownerMsg ? null : presenceOf(ctx.chat.id, ctx.from.id),
+      }, airspace, {
+        onEvent: (event) => recordHealthEvent({ ...event, chatType: ctx.chat?.type }),
+      });
+    } catch (err) {
+      if (!engageGateCallFailed) {
+        engageGateCallFailed = true;
+        console.warn(`[engage-gate] call failed, today's throttle decision stands: ${err.message}`);
+      }
+    }
+    if (!engage.respond) {
+      // Silently skip — don't even acknowledge. The troll gets nothing.
+      const userName = ctx.from.username || ctx.from.first_name || 'Unknown';
+      bufferMessage(ctx.chat.id, userName, ctx.message.text);
+      pushGroupMessage(ctx.chat.id, userName, ctx.message.text, ctx.message.message_id, false);
+      if (engage.by === 'throttle') {
         console.log(`[airspace] Throttled response to ${userName} in ${ctx.chat.id}: ${airspace.reason}`);
         // Leave a trace the session's error triage can see (FM-004/FM-006: a mute left none). No text.
         recordHealthEvent({ kind: 'throttled', chatType: ctx.chat?.type, user: userName, reason: airspace.reason });
-        return;
+      } else {
+        // The gate wrote its own engage_deny event (rule ids only).
+        console.log(`[engage-gate] No reply in ${ctx.chat.id}: ${engage.reason}`);
       }
+      return;
     }
   }
 

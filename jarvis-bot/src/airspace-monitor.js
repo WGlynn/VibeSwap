@@ -122,6 +122,14 @@ export function flagNoise(chatId) {
 }
 
 /**
+ * Is the owner's noise flag on in this chat? Read by the engage gate's L2 rule (engage-gate.js).
+ */
+export function isNoiseFlagged(chatId, now = Date.now()) {
+  const state = chatState.get(String(chatId));
+  return !!state && state.noiseFlaggedUntil > now;
+}
+
+/**
  * Member count of a chat as Telegram reports it (the bot included), cached per chat for an hour.
  * Returns null when the lookup fails. A failure is cached too, so a broken lookup is not retried on
  * every message, and it is logged once per chat.

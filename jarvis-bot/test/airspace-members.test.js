@@ -99,7 +99,9 @@ test('M5 a claim or a revoke applies at once, without waiting for the minute re-
 
 test('M6 index.js sends every member through checkAirspace with their class', () => {
   const index = src('index.js');
-  assert.match(index, /if \(isGroup && isAddressed\) \{\s+\/\/ Check if owner flagged noise/);
+  // (the block now also feeds today's decision to the engage gate, test/engage-decide.test.js)
+  assert.match(index, /if \(isGroup && isAddressed\) \{\s+\/\/ BOT-004/);
   assert.doesNotMatch(index, /isAddressed && !isThrottleMember/);
-  assert.match(index, /checkAirspace\(ctx\.chat\.id, ctx\.from\.id, memberCount, throttleMemberClass\(ctx\.from\)\)/);
+  assert.match(index, /const memberClass = ownerMsg \? null : throttleMemberClass\(ctx\.from\);/);
+  assert.match(index, /checkAirspace\(ctx\.chat\.id, ctx\.from\.id, memberCount, memberClass\)/);
 });

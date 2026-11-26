@@ -134,7 +134,7 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(trader1);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(commitHash); // TRP-R46-F02: 5% collateral on a 1 ether order
 
         // Move to reveal phase
         vm.warp(block.timestamp + 9);
@@ -160,7 +160,7 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash = _generateCommitHash(trader1, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(trader1);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(commitHash);
+        bytes32 commitId = auction.commitOrder{value: 0.05 ether}(commitHash); // TRP-R46-F02: 5% collateral on a 1 ether order
 
         vm.warp(block.timestamp + 9);
 
@@ -262,6 +262,7 @@ contract CommitRevealAuctionTest is Test {
 
         // Settle
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block after the reveal phase ends
         auction.settleBatch();
 
         ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
@@ -284,13 +285,13 @@ contract CommitRevealAuctionTest is Test {
         bytes32 commitHash3 = _generateCommitHash(trader3, tokenB, tokenA, 1.5 ether, 1.3 ether, secret3);
 
         vm.prank(trader1);
-        bytes32 commitId1 = auction.commitOrder{value: 0.01 ether}(commitHash1);
+        bytes32 commitId1 = auction.commitOrder{value: 0.05 ether}(commitHash1); // TRP-R46-F02: 5% collateral
 
         vm.prank(trader2);
-        bytes32 commitId2 = auction.commitOrder{value: 0.01 ether}(commitHash2);
+        bytes32 commitId2 = auction.commitOrder{value: 0.1 ether}(commitHash2); // TRP-R46-F02: 5% collateral
 
         vm.prank(trader3);
-        bytes32 commitId3 = auction.commitOrder{value: 0.01 ether}(commitHash3);
+        bytes32 commitId3 = auction.commitOrder{value: 0.075 ether}(commitHash3); // TRP-R46-F02: 5% collateral
 
         vm.warp(block.timestamp + 9);
 
@@ -306,6 +307,7 @@ contract CommitRevealAuctionTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block after the reveal phase ends
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -394,6 +396,7 @@ contract CommitRevealAuctionTest is Test {
         vm.warp(block.timestamp + 12); // Past both commit and reveal phases
 
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block after the reveal phase ends
         auction.settleBatch();
 
         uint256 treasuryBalanceBefore = treasury.balance;
@@ -423,6 +426,7 @@ contract CommitRevealAuctionTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block after the reveal phase ends
         auction.settleBatch();
 
         // Should fail because it was revealed

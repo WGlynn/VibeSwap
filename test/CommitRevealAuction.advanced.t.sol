@@ -11,6 +11,9 @@ import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
  * @notice Advanced tests for MEV resistance, edge cases, and attack scenarios
  */
 contract CommitRevealAuctionAdvancedTest is Test {
+    // TRP-R46-F02 wants 5% collateral at reveal; 0.5 ether covers the largest order here (10 ether).
+    uint256 constant DEPOSIT = 0.5 ether;
+
     CommitRevealAuction public auction;
     address public owner;
     address public treasury;
@@ -95,7 +98,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 aliceHash = _generateCommitHash(alice, tokenA, tokenB, 10 ether, 9 ether, aliceSecret);
 
         vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+        bytes32 aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
 
         // Eve (attacker) sees Alice's commit but cannot determine:
         // 1. What tokens are being traded
@@ -108,7 +111,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 eveHash = _generateCommitHash(eve, tokenA, tokenB, 5 ether, 4.5 ether, eveSecret);
 
         vm.prank(eve);
-        bytes32 eveCommitId = auction.commitOrder{value: 0.01 ether}(eveHash);
+        bytes32 eveCommitId = auction.commitOrder{value: DEPOSIT}(eveHash);
 
         // Move to reveal phase
         vm.warp(block.timestamp + 9);
@@ -123,6 +126,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         // Settle
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         // Get execution order
@@ -150,11 +154,11 @@ contract CommitRevealAuctionAdvancedTest is Test {
             bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
             bytes32 charlieHash = _generateCommitHash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret);
             vm.prank(alice);
-            aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+            aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
             vm.prank(bob);
-            bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+            bobCommitId = auction.commitOrder{value: DEPOSIT}(bobHash);
             vm.prank(charlie);
-            charlieCommitId = auction.commitOrder{value: 0.01 ether}(charlieHash);
+            charlieCommitId = auction.commitOrder{value: DEPOSIT}(charlieHash);
         }
 
         vm.warp(block.timestamp + 9);
@@ -173,6 +177,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -195,10 +200,10 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 bobHash = _generateCommitHash(bob, tokenB, tokenA, 1 ether, 0.9 ether, bobSecret);
 
         vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+        bytes32 aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
 
         vm.prank(bob);
-        bytes32 bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+        bytes32 bobCommitId = auction.commitOrder{value: DEPOSIT}(bobHash);
 
         vm.warp(block.timestamp + 9);
 
@@ -238,15 +243,15 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         // All commit in same batch (attacker doesn't know Alice's order yet)
         vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+        bytes32 aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
 
         vm.roll(10);
         vm.prank(eve);
-        bytes32 eveFrontCommitId = auction.commitOrder{value: 0.01 ether}(eveFrontHash);
+        bytes32 eveFrontCommitId = auction.commitOrder{value: DEPOSIT}(eveFrontHash);
 
         vm.roll(20);
         vm.prank(eve);
-        bytes32 eveBackCommitId = auction.commitOrder{value: 0.01 ether}(eveBackHash);
+        bytes32 eveBackCommitId = auction.commitOrder{value: DEPOSIT}(eveBackHash);
 
         vm.warp(block.timestamp + 9);
 
@@ -262,6 +267,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         // Key insight: In batch auctions with uniform clearing price,
@@ -309,6 +315,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
@@ -336,10 +343,10 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
 
         vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+        bytes32 aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
 
         vm.prank(bob);
-        bytes32 bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+        bytes32 bobCommitId = auction.commitOrder{value: DEPOSIT}(bobHash);
 
         vm.warp(block.timestamp + 9);
 
@@ -352,6 +359,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -369,7 +377,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 hash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(alice);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(hash);
+        bytes32 commitId = auction.commitOrder{value: DEPOSIT}(hash);
 
         vm.warp(block.timestamp + 9);
 
@@ -378,6 +386,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -394,12 +403,13 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 hash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(alice);
-        auction.commitOrder{value: 0.01 ether}(hash);
+        auction.commitOrder{value: DEPOSIT}(hash);
 
         // Skip reveal phase
         vm.warp(block.timestamp + 12);
 
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         ICommitRevealAuction.Batch memory batch = auction.getBatch(1);
@@ -426,11 +436,11 @@ contract CommitRevealAuctionAdvancedTest is Test {
             bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
             bytes32 charlieHash = _generateCommitHash(charlie, tokenA, tokenB, 1 ether, 0.9 ether, charlieSecret);
             vm.prank(alice);
-            aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+            aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
             vm.prank(bob);
-            bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+            bobCommitId = auction.commitOrder{value: DEPOSIT}(bobHash);
             vm.prank(charlie);
-            charlieCommitId = auction.commitOrder{value: 0.01 ether}(charlieHash);
+            charlieCommitId = auction.commitOrder{value: DEPOSIT}(charlieHash);
         }
 
         vm.warp(block.timestamp + 9);
@@ -447,6 +457,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
@@ -468,7 +479,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 hash1 = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret1);
 
         vm.prank(alice);
-        bytes32 commitId1 = auction.commitOrder{value: 0.01 ether}(hash1);
+        bytes32 commitId1 = auction.commitOrder{value: DEPOSIT}(hash1);
 
         vm.warp(block.timestamp + 9);
         vm.prank(alice);
@@ -476,6 +487,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         assertEq(auction.getCurrentBatchId(), 2);
@@ -485,7 +497,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 hash2 = _generateCommitHash(bob, tokenA, tokenB, 2 ether, 1.8 ether, secret2);
 
         vm.prank(bob);
-        bytes32 commitId2 = auction.commitOrder{value: 0.01 ether}(hash2);
+        bytes32 commitId2 = auction.commitOrder{value: DEPOSIT}(hash2);
 
         vm.warp(block.timestamp + 9);
         vm.prank(bob);
@@ -493,6 +505,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         assertEq(auction.getCurrentBatchId(), 3);
@@ -515,11 +528,12 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 hash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(alice);
-        bytes32 commitId = auction.commitOrder{value: 0.01 ether}(hash);
+        bytes32 commitId = auction.commitOrder{value: DEPOSIT}(hash);
 
         // Move to batch 2
         vm.warp(block.timestamp + 12);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         // Now in batch 2 - try to reveal batch 1 commit
@@ -543,10 +557,10 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
 
         vm.prank(alice);
-        bytes32 aliceCommitId = auction.commitOrder{value: 0.02 ether}(aliceHash);
+        bytes32 aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
 
         vm.prank(bob);
-        bytes32 bobCommitId = auction.commitOrder{value: 0.02 ether}(bobHash);
+        bytes32 bobCommitId = auction.commitOrder{value: DEPOSIT}(bobHash);
 
         vm.warp(block.timestamp + 9);
 
@@ -558,20 +572,21 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         // Alice can withdraw her deposit
         uint256 aliceBalanceBefore = alice.balance;
         vm.prank(alice);
         auction.withdrawDeposit(aliceCommitId);
-        assertEq(alice.balance, aliceBalanceBefore + 0.02 ether);
+        assertEq(alice.balance, aliceBalanceBefore + DEPOSIT);
 
         // Bob's deposit can be slashed
         uint256 treasuryBalanceBefore = treasury.balance;
         auction.slashUnrevealedCommitment(bobCommitId);
 
         // Treasury receives 50% of Bob's deposit
-        assertEq(treasury.balance, treasuryBalanceBefore + 0.01 ether);
+        assertEq(treasury.balance, treasuryBalanceBefore + DEPOSIT / 2);
     }
 
     /**
@@ -582,7 +597,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
         bytes32 hash = _generateCommitHash(alice, tokenA, tokenB, 1 ether, 0.9 ether, secret);
 
         vm.prank(alice);
-        bytes32 commitId = auction.commitOrder{value: 0.02 ether}(hash);
+        bytes32 commitId = auction.commitOrder{value: DEPOSIT}(hash);
 
         vm.warp(block.timestamp + 9);
 
@@ -591,6 +606,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         vm.expectRevert(CommitRevealAuction.NotSlashable.selector);
@@ -639,10 +655,10 @@ contract CommitRevealAuctionAdvancedTest is Test {
             bytes32 bobHash = _generateCommitHash(bob, tokenA, tokenB, 1 ether, 0.9 ether, bobSecret);
 
             vm.prank(alice);
-            aliceCommitId = auction.commitOrder{value: 0.01 ether}(aliceHash);
+            aliceCommitId = auction.commitOrder{value: DEPOSIT}(aliceHash);
 
             vm.prank(bob);
-            bobCommitId = auction.commitOrder{value: 0.01 ether}(bobHash);
+            bobCommitId = auction.commitOrder{value: DEPOSIT}(bobHash);
         }
 
         vm.warp(block.timestamp + 9);
@@ -655,6 +671,7 @@ contract CommitRevealAuctionAdvancedTest is Test {
 
         vm.warp(block.timestamp + 3);
         auction.advancePhase();
+        vm.roll(block.number + 1); // TRP-R17-F04: settlement waits one block
         auction.settleBatch();
 
         uint256[] memory order = auction.getExecutionOrder(1);
